@@ -29,8 +29,21 @@ import sqlLesson23 from '../courses/sql-server/03-joins/08-cross-apply.json';
 import sqlLesson24 from '../courses/sql-server/04-set-operations/01-union-ultimate-guide.json';
 import sqlLesson25 from '../courses/sql-server/04-set-operations/02-except.json';
 import sqlLesson26 from '../courses/sql-server/04-set-operations/03-intersect.json';
+import sqlLesson27 from '../courses/sql-server/05-grouping-aggregation-subqueries/01-group-by.json';
+import sqlLesson28 from '../courses/sql-server/05-grouping-aggregation-subqueries/02-having-clause.json';
+import sqlLesson29 from '../courses/sql-server/05-grouping-aggregation-subqueries/03-cube.json';
+import sqlLesson30 from '../courses/sql-server/05-grouping-aggregation-subqueries/04-rollup.json';
+import sqlLesson31 from '../courses/sql-server/05-grouping-aggregation-subqueries/05-grouping-sets.json';
+import sqlLesson32 from '../courses/sql-server/05-grouping-aggregation-subqueries/06-pivot-operator.json';
+import sqlLesson33 from '../courses/sql-server/05-grouping-aggregation-subqueries/07-common-table-expressions.json';
+import sqlLesson34 from '../courses/sql-server/05-grouping-aggregation-subqueries/08-recursive-cte.json';
+import sqlLesson35 from '../courses/sql-server/05-grouping-aggregation-subqueries/09-correlated-subquery.json';
+import sqlLesson36 from '../courses/sql-server/05-grouping-aggregation-subqueries/10-subquery.json';
+import sqlLesson37 from '../courses/sql-server/05-grouping-aggregation-subqueries/11-any-operator.json';
+import sqlLesson38 from '../courses/sql-server/05-grouping-aggregation-subqueries/12-exists-operator.json';
+import sqlLesson39 from '../courses/sql-server/05-grouping-aggregation-subqueries/13-all-operator.json';
 
-const rawLessons = [lesson1, lesson2, lesson3, sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26];
+const rawLessons = [lesson1, lesson2, lesson3, sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 

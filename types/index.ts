@@ -133,6 +133,11 @@ export type ContentBlock =
       type: 'divider';
       id?: string;
       data: Record<string, never>;
+    }
+  | {
+      type: 'image';
+      id?: string;
+      data: { src: string; alt: string; caption?: string };
     };
 
 // ── Table of Contents ────────────────────────────────────────────────────────

@@ -1,9 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useState, useCallback, useEffect } from 'react';
 import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
+import { ImageModal } from './ImageModal';
 
 // Mermaid is loaded dynamically (client-side only)
 const MermaidRenderer = dynamic(
@@ -14,6 +16,82 @@ const MermaidRenderer = dynamic(
 interface ContentBlockRendererProps {
   blocks: ContentBlock[];
   className?: string;
+}
+
+function highlightCode(code: string, language?: string): string {
+  try {
+    const Prism = require('prismjs');
+    const lang = language && Prism.languages[language] ? language : 'sql';
+    return Prism.highlight(code, Prism.languages[lang], lang);
+  } catch {
+    return code;
+  }
+}
+
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+  const lines = code.split('\n');
+
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        className="absolute top-2 right-2 z-10 rounded-md border border-border bg-canvas px-2 py-1 text-xs text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent-fg"
+        aria-label="Copy code to clipboard"
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+<pre className="flex rounded-lg bg-[#2d2d2d] p-3 overflow-x-auto text-sm leading-relaxed">
+         <div className="mr-3 select-none text-right text-fg-muted/60 shrink-0" aria-hidden="true">
+          {lines.map((_, i) => (
+            <div key={i} className="min-h-[1.5em]">
+              {i + 1}
+            </div>
+          ))}
+        </div>
+        <code className="flex-1" dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
+      </pre>
+    </div>
+  );
+}
+
+function ImageBlock({ block }: { block: ContentBlock & { type: 'image' } }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <figure className="my-6 flex justify-center">
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className="cursor-zoom-in rounded-lg border border-border bg-canvas-subtle p-1 transition hover:border-accent-fg focus:outline-none focus:ring-2 focus:ring-accent-fg focus:ring-offset-2"
+        aria-label={`Click to enlarge ${block.data.alt}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={block.data.src}
+          alt={block.data.alt}
+          className="max-h-[50vh] w-auto max-w-[150%] object-contain"
+        />
+      </button>
+      {block.data.caption && (
+        <figcaption className="mt-2 text-center text-xs text-fg-muted">
+          {block.data.caption}
+        </figcaption>
+      )}
+      {isOpen && (
+        <ImageModal
+          src={block.data.src}
+          alt={block.data.alt}
+          caption={block.data.caption}
+          onClose={() => setIsOpen(false)}
+        />
+      )}
+    </figure>
+  );
 }
 
 function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
@@ -154,32 +232,34 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
         </div>
       );
 
-    case 'example':
+    case 'example': {
+      const { title, content, code, language } = block.data;
       return (
         <div
           key={idx}
-          className="my-4 rounded-xl border border-border bg-canvas-subtle overflow-hidden"
+          className="my-3 rounded-xl border border-border bg-canvas-subtle overflow-hidden"
         >
           <div className="border-b border-border bg-canvas-inset px-4 py-2">
             <span className="text-xs font-semibold text-fg-muted">
-              📌 {block.data.title ?? 'Example'}
+              📌 {title ?? 'Example'}
             </span>
           </div>
-          <div className="p-4">
-            {block.data.code ? (
-              <pre className="text-xs leading-relaxed text-fg-default overflow-x-auto whitespace-pre-wrap font-mono">
-                {block.data.content}
-                {'\n\n'}
-                <code>{block.data.code}</code>
-              </pre>
-            ) : (
+          <div className="p-3">
+            {content && !code && (
               <p className="whitespace-pre-line text-sm text-fg-default leading-relaxed">
-                {block.data.content}
+                {content}
               </p>
             )}
+            {content && code && (
+              <p className="mb-3 text-sm text-fg-default leading-relaxed">{content}</p>
+            )}
+{code && (
+               <CodeBlock code={code} language={language} />
+             )}
           </div>
         </div>
       );
+    }
 
     case 'exercise':
       return (
@@ -355,12 +435,31 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
     case 'divider':
       return <hr key={idx} className="my-8 border-border" />;
 
+    case 'image':
+      return <ImageBlock key={idx} block={block} />;
+
     default:
       return null;
   }
 }
 
 export function ContentBlockRenderer({ blocks, className }: ContentBlockRendererProps) {
+  const [prismLoaded, setPrismLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadPrism() {
+      try {
+        await import('prismjs');
+        await import('prismjs/components/prism-sql');
+        await import('prismjs/themes/prism-dark.css');
+        setPrismLoaded(true);
+      } catch {
+        // prismjs unavailable — code will render as plain text
+      }
+    }
+    loadPrism();
+  }, []);
+
   return (
     <div className={cn('lesson-prose', className)}>
       {blocks.map((block, idx) => renderBlock(block, idx))}

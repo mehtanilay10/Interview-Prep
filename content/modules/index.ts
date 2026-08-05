@@ -6,8 +6,9 @@ import sqlModule1 from '../courses/sql-server/01-getting-started/content.json';
 import sqlModule2 from '../courses/sql-server/02-querying-data/content.json';
 import sqlModule3 from '../courses/sql-server/03-joins/content.json';
 import sqlModule4 from '../courses/sql-server/04-set-operations/content.json';
+import sqlModule5 from '../courses/sql-server/05-grouping-aggregation-subqueries/content.json';
 
-const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4];
+const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 

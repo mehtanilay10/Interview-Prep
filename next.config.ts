@@ -3,7 +3,13 @@ import withPWA from '@ducanh2912/next-pwa';
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.sqlservertutorial.net',
+        pathname: '/wp-content/uploads/**',
+      },
+    ],
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
