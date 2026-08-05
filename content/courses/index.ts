@@ -1,8 +1,9 @@
 import type { Course } from '@/types';
 
 import dummyCourse from './dummy-course/content.json';
+import sqlServerCourse from './sql-server/content.json';
 
-const rawCourses = [dummyCourse];
+const rawCourses = [dummyCourse, sqlServerCourse];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 

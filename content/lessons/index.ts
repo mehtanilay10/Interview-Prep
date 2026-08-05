@@ -3,8 +3,34 @@ import type { Lesson } from '@/types';
 import lesson1 from '../courses/dummy-course/module-1/lesson-1.json';
 import lesson2 from '../courses/dummy-course/module-1/lesson-2.json';
 import lesson3 from '../courses/dummy-course/module-2/lesson-1.json';
+import sqlLesson1 from '../courses/sql-server/01-getting-started/01-what-is-sql-server.json';
+import sqlLesson2 from '../courses/sql-server/01-getting-started/02-sql-server-basics.json';
+import sqlLesson3 from '../courses/sql-server/01-getting-started/03-sql-server-aliases.json';
+import sqlLesson4 from '../courses/sql-server/02-querying-data/01-select-statement.json';
+import sqlLesson5 from '../courses/sql-server/02-querying-data/02-select-distinct.json';
+import sqlLesson6 from '../courses/sql-server/02-querying-data/03-select-top.json';
+import sqlLesson7 from '../courses/sql-server/02-querying-data/04-where-clause.json';
+import sqlLesson8 from '../courses/sql-server/02-querying-data/05-and-operator.json';
+import sqlLesson9 from '../courses/sql-server/02-querying-data/06-or-operator.json';
+import sqlLesson10 from '../courses/sql-server/02-querying-data/07-between-operator.json';
+import sqlLesson11 from '../courses/sql-server/02-querying-data/08-in-operator.json';
+import sqlLesson12 from '../courses/sql-server/02-querying-data/09-like-operator.json';
+import sqlLesson13 from '../courses/sql-server/02-querying-data/10-null-three-valued-logic.json';
+import sqlLesson14 from '../courses/sql-server/02-querying-data/11-order-by-clause.json';
+import sqlLesson15 from '../courses/sql-server/02-querying-data/12-offset-and-fetch.json';
+import sqlLesson16 from '../courses/sql-server/03-joins/01-visualization-explanation-of-joins.json';
+import sqlLesson17 from '../courses/sql-server/03-joins/02-inner-join.json';
+import sqlLesson18 from '../courses/sql-server/03-joins/03-left-join.json';
+import sqlLesson19 from '../courses/sql-server/03-joins/04-right-join.json';
+import sqlLesson20 from '../courses/sql-server/03-joins/05-full-outer-join.json';
+import sqlLesson21 from '../courses/sql-server/03-joins/06-cross-join.json';
+import sqlLesson22 from '../courses/sql-server/03-joins/07-self-join.json';
+import sqlLesson23 from '../courses/sql-server/03-joins/08-cross-apply.json';
+import sqlLesson24 from '../courses/sql-server/04-set-operations/01-union-ultimate-guide.json';
+import sqlLesson25 from '../courses/sql-server/04-set-operations/02-except.json';
+import sqlLesson26 from '../courses/sql-server/04-set-operations/03-intersect.json';
 
-const rawLessons = [lesson1, lesson2, lesson3];
+const rawLessons = [lesson1, lesson2, lesson3, sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 
