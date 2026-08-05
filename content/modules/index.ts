@@ -11,8 +11,15 @@ import sqlModule6 from '../courses/sql-server/06-data-modification-dml/content.j
 import sqlModule7 from '../courses/sql-server/07-database-schema-table-objects/content.json';
 import sqlModule8 from '../courses/sql-server/08-data-types/content.json';
 import sqlModule9 from '../courses/sql-server/09-constraints/content.json';
+import sqlModule10 from '../courses/sql-server/10-indexes/content.json';
+import sqlModule11 from '../courses/sql-server/11-views/content.json';
+import sqlModule12 from '../courses/sql-server/12-stored-procedures-functions/content.json';
 
-const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9];
+import sqlModule13 from '../courses/sql-server/13-triggers/content.json';
+import sqlModule14 from '../courses/sql-server/14-transactions-error-handling-backup/content.json';
+import sqlModule15 from '../courses/sql-server/15-advanced-topics/content.json';
+
+const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
