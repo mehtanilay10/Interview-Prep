@@ -7,8 +7,12 @@ import sqlModule2 from '../courses/sql-server/02-querying-data/content.json';
 import sqlModule3 from '../courses/sql-server/03-joins/content.json';
 import sqlModule4 from '../courses/sql-server/04-set-operations/content.json';
 import sqlModule5 from '../courses/sql-server/05-grouping-aggregation-subqueries/content.json';
+import sqlModule6 from '../courses/sql-server/06-data-modification-dml/content.json';
+import sqlModule7 from '../courses/sql-server/07-database-schema-table-objects/content.json';
+import sqlModule8 from '../courses/sql-server/08-data-types/content.json';
+import sqlModule9 from '../courses/sql-server/09-constraints/content.json';
 
-const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5];
+const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
