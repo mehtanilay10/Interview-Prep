@@ -122,7 +122,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/courses/dummy-course"
+              href="/courses/sql-server"
               className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
             >
               Start Preparing

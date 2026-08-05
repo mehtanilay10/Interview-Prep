@@ -1,7 +1,5 @@
 import type { Module } from '@/types';
 
-import module1 from '../courses/dummy-course/module-1/content.json';
-import module2 from '../courses/dummy-course/module-2/content.json';
 import sqlModule1 from '../courses/sql-server/01-getting-started/content.json';
 import sqlModule2 from '../courses/sql-server/02-querying-data/content.json';
 import sqlModule3 from '../courses/sql-server/03-joins/content.json';
@@ -19,7 +17,7 @@ import sqlModule13 from '../courses/sql-server/13-triggers/content.json';
 import sqlModule14 from '../courses/sql-server/14-transactions-error-handling-backup/content.json';
 import sqlModule15 from '../courses/sql-server/15-advanced-topics/content.json';
 
-const rawModules = [module1, module2, sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15];
+const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
