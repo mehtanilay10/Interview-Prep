@@ -1,0 +1,752 @@
+# Learn ASP.NET Core Convention-Based Routing
+
+**What is ASP.NET Core routing?** Routing is used to create URL patterns for a web app. These route patterns match the incoming HTTP requests and dispatches these requests to the endpoints in the app. Endpoints are those units that are responsible for handling these requests. Most commonly endpoints are the Controllers in an ASP.NET Core MVC app.
+
+In the Program.cs class we can define one or more **ASP.NET Core Routes** to perform the following tasks:
+
+-   1\. Maps the incoming URLs to Controllers and Actions.
+
+-   2\. Generates URLs for the links based on the defined routes.
+
+There are 2 types of Routing Supported by ASP.NET Core:
+
+-   Convention-Based Routing (this tutorial) – Routes are applied on the Program.cs class.
+
+-   [Attribute-Based Routing](https://www.yogihosting.com/aspnet-core-attribute-routing/) – Routes are applied on Controllers and their action methods as C# attributes.
+
+Let’s create an **ASP.NET Core MVC Routing Example** to understand how it works.
+
+Page Contents
+
+## ASP.NET Core MVC Routing Example
+
+In Visual Studio create a new ASP.NET Core project by selecting the ASP.NET Core Web App (Model-View-Controller) template and name it URLRouting.
+
+![ASP.NET Core Web App (Model-View-Controller)](https://www.yogihosting.com/wp-content/uploads/2022/02/ASP.NET-Core-Web-App-MVC.png "ASP.NET Core Web App (Model-View-Controller)")
+
+After the project is created, open the Program.cs file in Solution Explorer which will shows the default routing applied to the app:
+
+```
+app.UseRouting();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+```
+
+The app.UseRouting() method configures the **ASP.NET Core Routing Middleware** for the app. While the app.MapControllerRoute() method adds a route named “default” that maps endpoints for a url with a given pattern. This means whenever the app recieves a url that matches the given pattern – {controller=Home}/{action=Index}/{id?} then the Home Controller’s Index action method will be handling it.
+
+Note: {controller=Home} means if controller is not specified then take HomeController as the default controller. Similarly {action=Index} means if action is not specified then take Index action as the default action. {id?} – id parameter is an optional one as we have applied “?” after it.
+
+This route pattern matches URLs like /, /Home, /Home/Index, /Products/Details, /Products/Details/3.
+
+The ASP.NET Core app has a Controller called HomeController.cs with an action method named Index in it. It’s code is shown below:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14 | `using` `Microsoft.AspNetCore.Mvc;`
+
+`using` `System.Diagnostics;`
+
+`using` `URLRouting.Models;`
+
+`namespace` `URLRouting.Controllers`
+
+`{`
+
+    `public` `class` `HomeController : Controller`
+
+    `{`
+
+        `public` `IActionResult Index()`
+
+        `{`
+
+            `return` `View();`
+
+        `}`
+
+    `}`
+
+`}` |
+
+Now change the Index.cshtml view code (which lies inside the Views ➤ Home folder) as shown below:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7 | `@{ Layout = null; }`
+
+`@{`
+
+    `ViewData["Title"] = "Routing";`
+
+`}`
+
+`<``h1``>'Home' Controller, 'Index' View</``h1``>` |
+
+Now run your application. You will see the Index View’s Contents displayed by the browser. See the image below:
+
+![home controller index view](https://www.yogihosting.com/wp-content/uploads/2019/01/home-controller-index-view.png "Home Controller Index View")
+
+This happens becuase in the url – https://localhost:7037/ we did not specified controller nor action. But in the route we have defined a default controller which is “HomeController” and default action which is “Index”. So the request get mapped to the Index action of HomeController. The same this also happens when we visit – https://localhost:7037/Home/Index.
+
+Before explaining how the URL Routing in ASP.NET Core works, I will explain what segments are in a URL.
+
+## What are Segments in URL
+
+**Segments** are the parts of the URL, excluding the hostname and query string, and are separated by the ‘/’ character.
+
+The given image explains what segments are:
+
+![segments in url](https://www.yogihosting.com/wp-content/uploads/2019/01/segments-in-url.png "Segments in URL")
+
+So a URL can have 0 or infinite segments but most applications just need no more than 3 segments.
+
+When there is an incoming HTTP request the **ASP.NET Core Routing** has a job to match the URL and extract the values of the segments from it. In the Program.cs we can see a default convention route which can match upto 3 segments.
+
+```
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+```
+
+For Dot Net 5.0 and ASP.NET Core 3.0
+
+If you are using these versions then check the Configure() method of Startup.cs class where default route (‘default’ is just a name and can be anything) is added. Inside the UseEndpoints method, Endpoints for Controller’s action is provided. For this the MapControllerRoute() method is used to create a single route as shown below:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7 | `app.UseEndpoints(endpoints =>`
+
+`{`
+
+    `endpoints.MapControllerRoute(`
+
+        `name:` `"default"``,`
+
+        `pattern:` `"{controller=Home}/{action=Index}/{id?}"``);`
+
+`});` |
+
+For earlier versions of ASP.NET Core like 2.0, 2.1 & 2.2. We used the app.UseMvc() method which is very much similar to app.UseEndpoints(). See it’s code below:
+
+| 1
+
+2
+
+3
+
+4 | `app.UseMvc(routes =>`
+
+`{`
+
+   `routes.MapRoute("default", "{controller=Home}/{action=Index}/{id?}");`
+
+`});` |
+
+ASP.NET Core 3.0 introduces the concept of [Endpoint Routing](https://www.yogihosting.com/aspnet-core-endpoint-routing/).
+
+The segment are represented inside the braces ({ … }). The default route has 3 segments:
+
+-   1\. Controller with default value of Home
+
+-   2\. Action with default value of Index
+-   3\. The ‘id’ having ? character like {id?} that defines id as optional.
+
+Note: The defualt route tells Dot Net routing to take a given default value for the corresponding segment if the segment is missing from the URL.
+
+When you run the current application you will notice that the Index View of the Home Controller is invoked even thought there are no segments in the URL (i.e. URL is just https://localhost:7037/). The reason being the default values of the segments coming to play, which are – ‘Home’ for the controller and ‘Index’ for action.
+
+Below is the table that shows all possible URL matches done by the default route:
+
+| Segments | URL | Maps to: |
+| --- | --- | --- |
+| 0 | / | controller = Home action = Index |
+| 1 | /Home | controller = Home action = Index |
+| 1 | /About | controller = About action = Index |
+| 2 | /Home/Index | controller = Home action = Index |
+| 2 | /Home/List | controller = Home action = List |
+| 2 | /About/Show | controller = About action = Show |
+| 3 | /Home/Index/3 | controller = About action = Index |
+| 3 | /Home/List/3 | No match |
+
+Clearly you can see the current route will match up to 3 segments in the URL. For more than 3 segments it will fail and will give 404 error message.
+
+Now remove the default values of the Controller and action segments, and also remove completely the id segment from the route:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"default"``,`
+
+    `pattern:` `"{controller}/{action}"``);` |
+
+And run your application. You will get HTTP 404 error message because the routing system cannot maps the URL to any controller. I have illustrated this in the below image:
+
+![HTTP Error 404](https://www.yogihosting.com/wp-content/uploads/2020/06/HTTP-Error-404.png "HTTP Error 404")
+
+Now open the URL – https://localhost:7037/Home/Index (Note – we added controller and action names on the route) and this time you will see the Home Controller’s Index method is evoked.
+
+So this route will now match exactly 2 segments in the URL. For other number of segments like 0, 1, 3, 4, … it will fail and give 404 error message.
+
+The given table shows all possible URL matching given by this route:
+
+| Segments | URL | Maps to: |
+| --- | --- | --- |
+| 0 | / | No match |
+| 1 | /Home | No match |
+| 2 | /Home/Index | controller = Home action = Index |
+| 2 | /Home/List | controller = Home action = List |
+| 2 | /About/List | controller = About action = List |
+| 3 | /Home/Show/4 | No match |
+
+## ASP.NET Core Static Route
+
+ASP.NET Core supports **Static Routes** also. To understand it remove the default route and add a route which contains a static text as given below:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"news1"``,`
+
+    `pattern:` `"News/{controller=Home}/{action=Index}"``);` |
+
+The route contains a static text – News in it. Run the application and go to the URL – https://localhost:7037/News. You will find the Home Controller’s Index action is invoked.
+
+Let’s understand what happened here. The route will match 3 segments. The first one should be News (a static text), the second and third are optional segments for Controller and Action. If omitted, the default values which are Home for Controller and Index for Action will be used.
+
+You can also combine static text with variable segments (like controllers or actions). Remove the route with that shown below:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"news2"``,`
+
+    `pattern:` `"News{controller}/{action}"``);` |
+
+Here I have added a static text News that will join with the Controller’s segment value. Now run your application and go to the URL – https://localhost:7037/NewsHome/Index. You will find the Home Controller’s Index Action method is invoked.
+
+![static text routing](https://www.yogihosting.com/wp-content/uploads/2019/01/static-text-routing.png "Static Text Routing")
+
+Preserving Old Routes
+
+By using static routes we can preserve Old URLs. Suppose you had a controller named Shopping and now you replaced it with a Home Controller. You must make sure that the previous URLs (eg /Shopping/Clothes, /Shopping/Electronics, /Shopping/Grocery, etc) should now map to Home Controller.
+
+This is the route which you should add in the Program class for performing this thing:
+
+| 1
+
+2
+
+3
+
+4 | `app.MapControllerRoute(`
+
+    `name:` `"shop"``,`
+
+    `pattern:` `"Shopping/{action}"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"` `});` |
+
+The route matches 2 Segments where the first segment is Shopping.
+
+The action value is taken from the second segment. The URL pattern doesn’t contain a segment for controller, so the default value is used. The defaults argument provides the controller value which is the Home controller.
+
+So now the ULRs like /Shopping/Clothes, /Shopping/Electronics, /Shopping/Grocery will be mapped to the Home Controller “instead” of the Shopping Controller.
+
+To check, open the URL – https://localhost:7037/Shopping/Index in your browser. You will find the Home Controller’s Index method is invoked. See the below image:
+
+![preserving old routes](https://www.yogihosting.com/wp-content/uploads/2019/01/changing-controller-mappings.png)
+
+Default values for Controller and Action in Route
+
+If you want only a specific Controller and Action should be mapped to a URL then you have to provide the default values for both Controller and Action like shown in the below route:
+
+| 1
+
+2
+
+3
+
+4 | `app.MapControllerRoute(`
+
+    `name:` `"old"``,`
+
+    `pattern:` `"Shopping/Old"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"``, action =` `"Index"` `});` |
+
+The above route maps the Home Controller’s Index method for the URL – https://localhost:7037/Shopping/Old.
+
+See the below image:
+
+![default value for controller action](https://www.yogihosting.com/wp-content/uploads/2019/01/default-value-for-controller-action.png "Default Value for Controller & Action")
+
+## ASP.NET Core Multiple Routes
+
+The Routes are applied in the order in which they are defined in the Program class. The ASP.NET Core Routing tries to match the incoming URL against the first defined route and proceeds only to the next route only if there is no match. Therefore you must define the most **specific routes first**.
+
+Let’s add the below shown 2 routes to the app’s Program.cs class:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9 | `app.MapControllerRoute(`
+
+    `name:` `"old"``,`
+
+    `pattern:` `"Shopping/Old"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"``, action =` `"Index"` `});`
+
+`app.MapControllerRoute(`
+
+    `name:` `"shop"``,`
+
+    `pattern:` `"Shopping/{action}"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"` `});` |
+
+Add a new Action method called Old to the Home Controller. It’s code is shown below:
+
+```
+public IActionResult Old ()
+{
+    return View();
+}
+```
+
+Next add Old View inside the Views ➤ Home folder with contents given below:
+
+| 1
+
+2
+
+3 | `@{ Layout = null; }`
+
+`<``h1``>'Home' Controller, 'Old' View</``h1``>` |
+
+Run your application and go to the URL – https://localhost:7037/Shopping/Old. You will find the Index action of the Home Controller getting invoked.
+
+See the below image:
+
+![default value for controller action](https://www.yogihosting.com/wp-content/uploads/2019/01/default-value-for-controller-action.png "Default Value for Controller & Action")
+
+This happens because when you request the URL – https://localhost:7037/Shopping/Old the routing system starts matching the URL with the routes starting from the first one. Since the match happens on the first route itself therefore the Index View of the Home Controller is shown on the browser.
+
+Now change the order of the routes by bringing the second route before the first one as shown in the code below:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9 | `app.MapControllerRoute(`
+
+    `name:` `"shop"``,`
+
+    `pattern:` `"Shopping/{action}"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"` `});`
+
+`app.MapControllerRoute(`
+
+    `name:` `"old"``,`
+
+    `pattern:` `"Shopping/Old"``,`
+
+    `defaults:` `new` `{ controller =` `"Home"``, action =` `"Index"` `});` |
+
+Re-run your application and refresh the same URL – https://localhost:7037/Shopping/Old on your browser. This time you will find the Old action of the Home Controller getting invoked. See the below image:
+
+![route ordering 2](https://www.yogihosting.com/wp-content/uploads/2019/01/route-ordering-2.png "Route Ordering Priority")
+
+The reason for this is that this time the routing system finds the different matching route for the URL since I changed the route ordering in the Program class. Therefore always remember to place your most specific routes first else the routing system will do the mappings wrongly.
+
+## Custom Segment Variables
+
+So far you have seen the controller and action segment variables in routes. You can also add your own Custom Segment variables in routes. Let me show how to do it.
+
+Remove all the routes and add the following route in the Program.cs file of your ASP.NET Core app.
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"MyRoute"``,`
+
+    `pattern:` `"{controller=Home}/{action=Index}/{id}"``);` |
+
+In this route I have added a Custom Segment variables by the name id.
+
+Next add a new Action method called Check to the Home Controller:
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `public` `IActionResult Check()`
+
+`{`
+
+    `ViewBag.ValueofId = RouteData.Values[``"id"``];`
+
+    `return` `View();`
+
+`}` |
+
+This action method obtains the value of the custom variable called id in the route URL pattern using the RouteData.Values property, and stores this value in a ViewBag variable.
+
+Now create the Check View inside the Home ➤ Check folder. The Check View code is shown below. This view shows the value of the ViewBag variable which holds the value of the Custom Segment called Id.
+
+| 1
+
+2
+
+3
+
+4 | `@{ Layout = null; }`
+
+`<``h1``>'Home' Controller, 'Check' View</``h1``>`
+
+`<``h2``>Id value is: @ViewBag.ValueofId</``h2``>` |
+
+Now run your application and go to URL – https://localhost:7037/Home/Check/cSharp.
+
+The URL Routing system of ASP.NET Core will match the third segment which is cSharp in this URL as the value for the ‘id’ variable. You will see the Id value is: cSharp get displayed on the browser as shown in the below image:
+
+![custom segment variable](https://www.yogihosting.com/wp-content/uploads/2019/01/custom-segment-variable.png "custom segment variable")
+
+ASP.NET Core Identity is a membership system with which you can add login functionality to your ASP.NET Core application. Users can create an account and login with a user name and password. Learn it from this article – [How to Setup and Configure ASP.NET Core Identity](https://www.yogihosting.com/aspnet-core-identity-setup/).
+
+If you don’t pass a value to the 3rd segment of the URL e.g. as in the URL – https://localhost:7037/Home/Check. Then the routing does not find any matching routes and so HTTP ERROR 404 is displayed on the browser.
+
+Get Route Variable in the Action’s Parameters
+
+If we add Parameters in Action Methods with the same names like the URL variables, then DOT NET will automatically pass the values obtained from these URL variables to the parameters of the action methods.
+
+Consider the same route from the above section. It has a custom segment variable – id.
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"MyRoute"``,`
+
+    `pattern:` `"{controller=Home}/{action=Index}/{id}"``);` |
+
+In order to get the value of id in the URL, I can add an Id parameter to the Action Method. So change the Check action method by adding id parameter to it as shown below:
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `public` `IActionResult Check(``int` `id)`
+
+`{`
+
+    `ViewBag.ValueofId = id;`
+
+    `return` `View();`
+
+`}` |
+
+Also notice inside the method I am simply assigning the value of id variable to the ViewBag variable.
+
+You can check it by running your application and going to the URL – https://localhost:7037/Home/Check/100. There you will see the value 100 displayed on the View.
+
+See the below image:
+
+![route constraint passed](https://www.yogihosting.com/wp-content/uploads/2019/01/route-constraint-passed.png "Route Constraint Passed")
+
+Note: I kept the type of the id parameter as Int, but DOT NET will try to convert it to whatever parameter type is used in the action method. This feature is known as [Model Binding feature of ASP.NET Core](https://www.yogihosting.com/aspnet-core-model-binding/) which I have covered in details in another tutorial. But for this tutorial it is enough to know just the basics of **Model Binding**.
+
+Similarly, if I put the type of the id parameter as a string or a DateTime in the action method, then DOT NET will automatically convert the id’s value to the specified type.
+
+For example Change the type of the id parameter of Check action method to sting as shown below.
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `public` `IActionResult Check(``string` `id)`
+
+`{`
+
+    `ViewBag.ValueofId = id;`
+
+    `return` `View();`
+
+`}` |
+
+Now when you request the URL – https://localhost:7037/Home/Check/hello or https://localhost:7037/Home/Check/100. Then MVC will automatically convert the value for the custom segment id (hello and 100) to string.
+
+## ASP.NET Core Routing Optional Parameter
+
+The segments which you don’t need to specify for the route are called **Optional Route Parameters**. You denote them by placing a question mark (?) after them.
+
+Remove all the routes from your app and add just one which is shown below. In this route I made the **id segment as optional Route Parameter** by adding ‘?’ against it:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"MyRoute1"``,`
+
+    `pattern:` `"{controller=Home}/{action=Index}/{id?}"``);` |
+
+So now when no value is supplied for the **optional Parameter** then also this route will match and the value of the optional parameter will be null.
+
+To test this change the Check action method of the Home Controller as shown in the below Code:
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `public` `IActionResult Check()`
+
+`{`
+
+    `ViewBag.ValueofId = RouteData.Values[``"id"``];`
+
+    `return` `View();`
+
+`}` |
+
+Run your application and go to the URL – https://localhost:7037/Home/Check. You will see the Empty Value displayed on the browser as shown in the below image:
+
+![empty custom segment value](https://www.yogihosting.com/wp-content/uploads/2019/01/empty-custom-segment-value.png "Empty Custom Segment Value")
+
+The empty value is displayed because the routing does not find the value of this Optional Parameter called id, and so empty value of id is displayed on the browser
+
+Next, change the Check action method of the Home Controller as shown in the below Code:
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `public` `IActionResult Check(``string` `id)`
+
+`{`
+
+    `ViewBag.ValueofId = id ??` `"Null Value"``;`
+
+    `return` `View();`
+
+`}` |
+
+I changed the type of id parameter to string. Now the code – `ViewBag.ValueofId = id ?? "Null Value"` tells that if ‘id’ value is null (done by the ?? operator) then put the string “Null Value” to the ViewBag variable else put the id value to the ViewBag variable.
+
+Run your application and go to the URL – https://localhost:7037/Home/Check. You will see the Null Value displayed on the browser as shown in the below image:
+
+![optional segment variable](https://www.yogihosting.com/wp-content/uploads/2019/01/optional-segment-variable.png "Optional Segment Variable")
+
+## “\*catchall” for Route Wildcard
+
+So far you have seen routes that can match URL with at most 3 segments. What if you have URL is having 4, 5 or more segments?
+
+One way is to add a new routes each for matching 4, 5, etc segments. For example for matching the 4 segment URL – http://localhost:7037/Home/Check/Hello/World you can add a new route which is given below:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name:` `"MyRoute2"``,`
+
+    `pattern:` `"{controller=Home}/{action=Index}/{id?}/{idtwo?}"``);` |
+
+This will work but if the 5th segment comes then you have to add another new route for matching 5 segments.
+
+This is tiring and causes code duplication. Instead you can use the term \*catchall in your routes which will act as a **Wildcard** character to **catch variable number of segments**.
+
+Change the route to add {\*catchall} as the 4th segment. It should be like:
+
+| 1
+
+2
+
+3 | `app.MapControllerRoute(`
+
+    `name: "MyRoute2",`
+
+    `pattern: "{controller=Home}/{action=Index}/{id?}/{*catchall}");` |
+
+I have added the {\*catchall} as the 4th segment in the route. The first 3 segments are used for mapping controller, action & id variable. If the URL contains more than 3 segments then **catchall variable will catch all these segments** i.e. from 4th till the last.
+
+The table below tells about all the routes which this catchall route will match:
+
+| Segments | URL | Maps to: |
+| --- | --- | --- |
+| 0 | / | controller = Home action = Index id = Null |
+| 1 | /Home | controller = Home action = Index id = Null |
+| 2 | /Home/CatchallTest | controller = Home action = CatchallTest Id = Null |
+| 3 | /Home/CatchallTest/Hello | controller = Home action = catchallTest id = Hello |
+| 4 | /Home/CatchallTest/Hello/How | controller = Home action = catchallTest id = Hello catchall = How |
+| 5 | /Home/CatchallTest/Hello/How/Are | controller = Home action = catchallTest id = Hello catchall = How/Are |
+| 6 | /Home/CatchallTest/Hello/How/Are/U | controller = Home action = catchallTest id = Hello catchall = How/Are/You |
+
+To test this, in your Home Controller Code add a new Action method with name as CatchallTest. Put the following code to it:
+
+| 1
+
+2
+
+3
+
+4
+
+5
+
+6 | `public` `IActionResult CatchallTest(``string` `id,` `string` `catchall)`
+
+`{`
+
+    `ViewBag.ValueofId = id;`
+
+    `ViewBag.ValueofCatchall = catchall;`
+
+    `return` `View();`
+
+`}` |
+
+I have just added a new parameter with name called catchall to the Action method. This parameter will contain the values of 4th, 5th, 6th,…. segments. The ViewBag variable called ValueofCatchall will store this value of catchall.
+
+Next add the CatchallTest View inside the Views ➤ Home folder with the code given below:
+
+| 1
+
+2
+
+3
+
+4
+
+5 | `@{ Layout = null; }`
+
+`<``h1``>'Home' Controller, 'CatchallTest' View</``h1``>`
+
+`<``h2``>Id value is: @ViewBag.ValueofId</``h2``>`
+
+`<``h2``>Catchall value is: @ViewBag.ValueofCatchall</``h2``>` |
+
+The View will show the value of ViewBag’s variable called ValueofCatchall which stores the value of **catchall** segment.
+
+Run the application and go to the URL – http://localhost:7037/Home/CatchallTest/Hello/How/Are/U. You will find the catchall value – How/Are/U (value of 4th, 5th,6th url segments) displayed on the view.
+
+![catchall](https://www.yogihosting.com/wp-content/uploads/2019/01/catchall.png "catchall")
+
+You can download the full codes of this tutorial from the below link:
+
+[Download](https://www.yogihosting.com/wp-content/themes/yogi-yogihosting/download/aspnetcore/URLRouting.zip)
+
+Conclusion
+
+In this tutorial you learned how to create **routes** in your ASP.NET Core application using **Convention-Based Routing**. I hoped you liked this tutorial. Look out for other tutorials on ASP.NET Core.
+
+---
+Source: [Learn ASP.NET Core Convention-Based Routing](https://www.yogihosting.com/aspnet-core-url-routing/)
