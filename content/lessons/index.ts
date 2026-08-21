@@ -143,7 +143,45 @@ import sqlLesson140 from '../courses/sql-server/15-advanced-topics/09-while-loop
 import sqlLesson141 from '../courses/sql-server/15-advanced-topics/10-break-statement.json';
 import sqlLesson142 from '../courses/sql-server/15-advanced-topics/11-continue-statement.json';
 
-const rawLessons = [sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40, sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48, sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56, sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64, sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72, sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80, sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88, sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96, sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104, sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112, sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120, sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128, sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136, sqlLesson137, sqlLesson138, sqlLesson139, sqlLesson140, sqlLesson141, sqlLesson142];
+import aspLesson1 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/first-aspnet-core-10-0-mvc-application.json';
+import aspLesson2 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/first-crud-application-aspnet-core-mvc.json';
+import aspLesson3 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/introduction-to-aspnet-core-mvc.json';
+import aspLesson4 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/learn-aspnet-core-examples-codes.json';
+import aspLesson5 from '../courses/aspnet-core/02-controllers-routing/actions-in-aspnet-core.json';
+import aspLesson6 from '../courses/aspnet-core/02-controllers-routing/aspnet-core-convention-based-routing.json';
+import aspLesson7 from '../courses/aspnet-core/02-controllers-routing/controllers-in-aspnet-core.json';
+import aspLesson8 from '../courses/aspnet-core/03-model-binding-validation/advanced-model-binding-concepts.json';
+import aspLesson9 from '../courses/aspnet-core/03-model-binding-validation/model-binding-aspnet-core-beginner-advanced.json';
+import aspLesson10 from '../courses/aspnet-core/03-model-binding-validation/model-validation-aspnet-core-beginner-expert.json';
+import aspLesson11 from '../courses/aspnet-core/04-views-tag-helpers/built-in-tag-helpers.json';
+import aspLesson12 from '../courses/aspnet-core/04-views-tag-helpers/custom-tag-helper.json';
+import aspLesson13 from '../courses/aspnet-core/04-views-tag-helpers/introduction-to-tag-helpers.json';
+import aspLesson14 from '../courses/aspnet-core/04-views-tag-helpers/views-in-aspnet-core.json';
+import aspLesson15 from '../courses/aspnet-core/05-dependency-injection-configuration/aspnet-core-configurations-program-middleware-appsettings.json';
+import aspLesson16 from '../courses/aspnet-core/05-dependency-injection-configuration/dependency-injection-aspnet-core.json';
+import aspLesson17 from '../courses/aspnet-core/06-filters/aspnet-core-filters-dependency-injection-global-filters.json';
+import aspLesson18 from '../courses/aspnet-core/06-filters/filters-aspnet-core-beginner-expert.json';
+import aspLesson19 from '../courses/aspnet-core/07-web-api/call-web-api-aspnet-core-net10.json';
+import aspLesson20 from '../courses/aspnet-core/07-web-api/call-web-api-javascript-xmlhttprequest.json';
+import aspLesson21 from '../courses/aspnet-core/07-web-api/call-web-api-jquery-aspnet-core.json';
+import aspLesson22 from '../courses/aspnet-core/07-web-api/create-web-apis-aspnet-core-restful-pattern.json';
+import aspLesson23 from '../courses/aspnet-core/08-authentication-identity/add-custom-user-properties-aspnet-core-identity.json';
+import aspLesson24 from '../courses/aspnet-core/08-authentication-identity/authentication-of-users-aspnet-core-identity.json';
+import aspLesson25 from '../courses/aspnet-core/08-authentication-identity/create-read-update-delete-users-aspnet-core-identity.json';
+import aspLesson26 from '../courses/aspnet-core/08-authentication-identity/implement-cookie-authentication-aspnet-core.json';
+import aspLesson27 from '../courses/aspnet-core/08-authentication-identity/integrate-google-login-aspnet-core-identity.json';
+import aspLesson28 from '../courses/aspnet-core/08-authentication-identity/setup-configure-aspnet-core-identity.json';
+import aspLesson29 from '../courses/aspnet-core/08-authentication-identity/username-email-password-policy-aspnet-core-identity.json';
+import aspLesson30 from '../courses/aspnet-core/08-authentication-identity/work-with-claims-aspnet-core-identity.json';
+import aspLesson31 from '../courses/aspnet-core/08-authentication-identity/work-with-policies-aspnet-core-identity.json';
+import aspLesson32 from '../courses/aspnet-core/08-authentication-identity/work-with-roles-aspnet-core-identity.json';
+import aspLesson33 from '../courses/aspnet-core/09-localization-globalization/globalization-localization-resource-files.json';
+import aspLesson34 from '../courses/aspnet-core/09-localization-globalization/localization-portable-object-po-files.json';
+import aspLesson35 from '../courses/aspnet-core/09-localization-globalization/use-globalization-localization-aspnet-core.json';
+import aspLesson36 from '../courses/aspnet-core/10-ado-net-data-access/learn-ado-net-crud-operations-aspnet-core.json';
+import aspLesson37 from '../courses/aspnet-core/11-cors-cross-origin/enable-cors-aspnet-core.json';
+
+const rawLessons = [sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40, sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48, sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56, sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64, sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72, sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80, sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88, sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96, sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104, sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112, sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120, sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128, sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136, sqlLesson137, sqlLesson138, sqlLesson139, sqlLesson140, sqlLesson141, sqlLesson142, aspLesson1, aspLesson2, aspLesson3, aspLesson4, aspLesson5, aspLesson6, aspLesson7, aspLesson8, aspLesson9, aspLesson10, aspLesson11, aspLesson12, aspLesson13, aspLesson14, aspLesson15, aspLesson16, aspLesson17, aspLesson18, aspLesson19, aspLesson20, aspLesson21, aspLesson22, aspLesson23, aspLesson24, aspLesson25, aspLesson26, aspLesson27, aspLesson28, aspLesson29, aspLesson30, aspLesson31, aspLesson32, aspLesson33, aspLesson34, aspLesson35, aspLesson36, aspLesson37];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 
