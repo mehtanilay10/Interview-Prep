@@ -42,11 +42,12 @@ declare module 'prismjs/components/prism-csharp' {
   import 'prismjs';
 }
 
-<<<<<<< ours
 declare module 'prismjs/themes/prism-solarizedlight.css' {
-=======
+  const content: string;
+  export default content;
+}
+
 declare module 'prismjs/themes/prism-coy.css' {
->>>>>>> theirs
   const content: string;
   export default content;
 }
