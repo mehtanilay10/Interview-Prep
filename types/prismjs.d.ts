@@ -42,7 +42,7 @@ declare module 'prismjs/components/prism-csharp' {
   import 'prismjs';
 }
 
-declare module 'prismjs/themes/prism-coy.css' {
+declare module 'prismjs/themes/prism-solarizedlight.css' {
   const content: string;
   export default content;
 }

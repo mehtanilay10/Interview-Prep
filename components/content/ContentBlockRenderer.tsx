@@ -34,10 +34,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
   const lines = code.split('\n');
   const displayLanguage = language || 'code';
+  const langClass = language ? `language-${language}` : '';
 
   return (
-    <div className="group my-4 overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-2">
+    <div className="group my-4 overflow-hidden rounded-xl border border-border shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           {displayLanguage}
         </span>
@@ -68,15 +69,15 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
         </button>
       </div>
       <div className="flex overflow-x-auto">
-        <div className="select-none border-r border-gray-100 bg-gray-50/50 px-4 py-3 text-right text-xs text-gray-400 min-w-[3rem]" aria-hidden="true">
+        <div className="select-none border-r border-gray-200 bg-gray-50 px-4 py-3 text-right text-xs text-gray-400 min-w-[3rem]" aria-hidden="true">
           {lines.map((_, i) => (
             <div key={i} className="leading-6 font-mono">
               {i + 1}
             </div>
           ))}
         </div>
-        <pre className="flex-1 p-4 text-sm leading-6 overflow-x-auto">
-          <code className="font-mono text-gray-800" dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
+        <pre className={`flex-1 p-4 text-sm leading-6 overflow-x-auto ${langClass}`}>
+          <code className={`font-mono ${langClass}`} dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
         </pre>
       </div>
     </div>
@@ -475,7 +476,7 @@ export function ContentBlockRenderer({ blocks, className }: ContentBlockRenderer
         await import('prismjs');
         await import('prismjs/components/prism-csharp');
         await import('prismjs/components/prism-sql');
-        await import('prismjs/themes/prism-coy.css');
+        await import('prismjs/themes/prism-solarizedlight.css');
         setPrismLoaded(true);
       } catch {
         // prismjs unavailable — code will render as plain text
