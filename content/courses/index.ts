@@ -2,8 +2,9 @@ import type { Course } from '@/types';
 
 import sqlServerCourse from './sql-server/content.json';
 import aspNetCoreCourse from './aspnet-core/content.json';
+import linqCourse from './linq/content.json';
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse];
+const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 

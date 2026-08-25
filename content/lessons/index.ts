@@ -181,7 +181,48 @@ import aspLesson35 from '../courses/aspnet-core/09-localization-globalization/us
 import aspLesson36 from '../courses/aspnet-core/10-ado-net-data-access/learn-ado-net-crud-operations-aspnet-core.json';
 import aspLesson37 from '../courses/aspnet-core/11-cors-cross-origin/enable-cors-aspnet-core.json';
 
-const rawLessons = [sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40, sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48, sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56, sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64, sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72, sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80, sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88, sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96, sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104, sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112, sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120, sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128, sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136, sqlLesson137, sqlLesson138, sqlLesson139, sqlLesson140, sqlLesson141, sqlLesson142, aspLesson1, aspLesson2, aspLesson3, aspLesson4, aspLesson5, aspLesson6, aspLesson7, aspLesson8, aspLesson9, aspLesson10, aspLesson11, aspLesson12, aspLesson13, aspLesson14, aspLesson15, aspLesson16, aspLesson17, aspLesson18, aspLesson19, aspLesson20, aspLesson21, aspLesson22, aspLesson23, aspLesson24, aspLesson25, aspLesson26, aspLesson27, aspLesson28, aspLesson29, aspLesson30, aspLesson31, aspLesson32, aspLesson33, aspLesson34, aspLesson35, aspLesson36, aspLesson37];
+import linqLesson1 from '../courses/linq/01-getting-started-linq/learn-linq-step-by-step.json';
+import linqLesson2 from '../courses/linq/01-getting-started-linq/linq-api-in-net.json';
+import linqLesson3 from '../courses/linq/01-getting-started-linq/what-is-linq.json';
+import linqLesson4 from '../courses/linq/01-getting-started-linq/why-linq.json';
+import linqLesson5 from '../courses/linq/02-linq-fundamentals-syntax/anatomy-of-lambda-expression.json';
+import linqLesson6 from '../courses/linq/02-linq-fundamentals-syntax/linq-method-syntax.json';
+import linqLesson7 from '../courses/linq/02-linq-fundamentals-syntax/linq-query-syntax.json';
+import linqLesson8 from '../courses/linq/03-filtering-projection/filtering-operator-where.json';
+import linqLesson9 from '../courses/linq/03-filtering-projection/oftype-filtering-operator.json';
+import linqLesson10 from '../courses/linq/03-filtering-projection/projection-operators.json';
+import linqLesson11 from '../courses/linq/04-sorting-grouping/grouping-operator-groupby-tolookup.json';
+import linqLesson12 from '../courses/linq/04-sorting-grouping/orderby-orderbydescending.json';
+import linqLesson13 from '../courses/linq/04-sorting-grouping/thenby-thenbydescending.json';
+import linqLesson14 from '../courses/linq/05-joining-data/groupjoin-operator.json';
+import linqLesson15 from '../courses/linq/05-joining-data/join-operator.json';
+import linqLesson16 from '../courses/linq/06-set-operations/concat-concatenation-operator.json';
+import linqLesson17 from '../courses/linq/06-set-operations/distinct-set-operator.json';
+import linqLesson18 from '../courses/linq/06-set-operations/except-set-operator.json';
+import linqLesson19 from '../courses/linq/06-set-operations/intersect-set-operator.json';
+import linqLesson20 from '../courses/linq/06-set-operations/union-set-operator.json';
+import linqLesson21 from '../courses/linq/07-aggregation-operators/aggregation-aggregate.json';
+import linqLesson22 from '../courses/linq/07-aggregation-operators/aggregation-average.json';
+import linqLesson23 from '../courses/linq/07-aggregation-operators/aggregation-count.json';
+import linqLesson24 from '../courses/linq/07-aggregation-operators/aggregation-max.json';
+import linqLesson25 from '../courses/linq/07-aggregation-operators/aggregation-sum.json';
+import linqLesson26 from '../courses/linq/08-quantifiers-element-operators/contains-quantifier-operator.json';
+import linqLesson27 from '../courses/linq/08-quantifiers-element-operators/elementat-elementatordefault.json';
+import linqLesson28 from '../courses/linq/08-quantifiers-element-operators/first-firstordefault.json';
+import linqLesson29 from '../courses/linq/08-quantifiers-element-operators/last-lastordefault.json';
+import linqLesson30 from '../courses/linq/08-quantifiers-element-operators/quantifier-operators.json';
+import linqLesson31 from '../courses/linq/08-quantifiers-element-operators/single-singleordefault.json';
+import linqLesson32 from '../courses/linq/09-partitioning-operators/skip-skipwhile.json';
+import linqLesson33 from '../courses/linq/09-partitioning-operators/take-takewhile.json';
+import linqLesson34 from '../courses/linq/10-conversion-generation-operators/conversion-operators.json';
+import linqLesson35 from '../courses/linq/10-conversion-generation-operators/defaultifempty-operator.json';
+import linqLesson36 from '../courses/linq/10-conversion-generation-operators/generation-operators.json';
+import linqLesson37 from '../courses/linq/11-advanced-linq-concepts/expression-trees.json';
+import linqLesson38 from '../courses/linq/11-advanced-linq-concepts/sample-linq-queries.json';
+import linqLesson39 from '../courses/linq/11-advanced-linq-concepts/sequenceequal-operator.json';
+import linqLesson40 from '../courses/linq/11-advanced-linq-concepts/standard-query-operators.json';
+
+const rawLessons = [sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40, sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48, sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56, sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64, sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72, sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80, sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88, sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96, sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104, sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112, sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120, sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128, sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136, sqlLesson137, sqlLesson138, sqlLesson139, sqlLesson140, sqlLesson141, sqlLesson142, aspLesson1, aspLesson2, aspLesson3, aspLesson4, aspLesson5, aspLesson6, aspLesson7, aspLesson8, aspLesson9, aspLesson10, aspLesson11, aspLesson12, aspLesson13, aspLesson14, aspLesson15, aspLesson16, aspLesson17, aspLesson18, aspLesson19, aspLesson20, aspLesson21, aspLesson22, aspLesson23, aspLesson24, aspLesson25, aspLesson26, aspLesson27, aspLesson28, aspLesson29, aspLesson30, aspLesson31, aspLesson32, aspLesson33, aspLesson34, aspLesson35, aspLesson36, aspLesson37, linqLesson1, linqLesson2, linqLesson3, linqLesson4, linqLesson5, linqLesson6, linqLesson7, linqLesson8, linqLesson9, linqLesson10, linqLesson11, linqLesson12, linqLesson13, linqLesson14, linqLesson15, linqLesson16, linqLesson17, linqLesson18, linqLesson19, linqLesson20, linqLesson21, linqLesson22, linqLesson23, linqLesson24, linqLesson25, linqLesson26, linqLesson27, linqLesson28, linqLesson29, linqLesson30, linqLesson31, linqLesson32, linqLesson33, linqLesson34, linqLesson35, linqLesson36, linqLesson37, linqLesson38, linqLesson39, linqLesson40];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 

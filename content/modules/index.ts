@@ -28,7 +28,19 @@ import aspModule9 from '../courses/aspnet-core/09-localization-globalization/con
 import aspModule10 from '../courses/aspnet-core/10-ado-net-data-access/content.json';
 import aspModule11 from '../courses/aspnet-core/11-cors-cross-origin/content.json';
 
-const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11];
+import linqModule1 from '../courses/linq/01-getting-started-linq/content.json';
+import linqModule2 from '../courses/linq/02-linq-fundamentals-syntax/content.json';
+import linqModule3 from '../courses/linq/03-filtering-projection/content.json';
+import linqModule4 from '../courses/linq/04-sorting-grouping/content.json';
+import linqModule5 from '../courses/linq/05-joining-data/content.json';
+import linqModule6 from '../courses/linq/06-set-operations/content.json';
+import linqModule7 from '../courses/linq/07-aggregation-operators/content.json';
+import linqModule8 from '../courses/linq/08-quantifiers-element-operators/content.json';
+import linqModule9 from '../courses/linq/09-partitioning-operators/content.json';
+import linqModule10 from '../courses/linq/10-conversion-generation-operators/content.json';
+import linqModule11 from '../courses/linq/11-advanced-linq-concepts/content.json';
+
+const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
