@@ -21,8 +21,10 @@ interface ContentBlockRendererProps {
 function highlightCode(code: string, language?: string): string {
   try {
     const Prism = require('prismjs');
-    const lang = language && Prism.languages[language] ? language : 'sql';
-    return Prism.highlight(code, Prism.languages[lang], lang);
+    if (language && Prism.languages[language]) {
+      return Prism.highlight(code, Prism.languages[language], language);
+    }
+    return code;
   } catch {
     return code;
   }
@@ -31,31 +33,52 @@ function highlightCode(code: string, language?: string): string {
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
   const lines = code.split('\n');
+  const displayLanguage = language || 'code';
 
   return (
-    <div className="relative group">
-      <button
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(code);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-        className="absolute top-2 right-2 z-10 rounded-md border border-border bg-canvas px-2 py-1 text-xs text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent-fg"
-        aria-label="Copy code to clipboard"
-      >
-        {copied ? 'Copied!' : 'Copy'}
-      </button>
-<pre className="flex rounded-lg bg-[#2d2d2d] p-3 overflow-x-auto text-sm leading-relaxed">
-         <div className="mr-3 select-none text-right text-fg-muted/60 shrink-0" aria-hidden="true">
+    <div className="group my-4 overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-2">
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+          {displayLanguage}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm border border-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-1"
+        >
+          {copied ? (
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Copied!
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy
+            </span>
+          )}
+        </button>
+      </div>
+      <div className="flex overflow-x-auto">
+        <div className="select-none border-r border-gray-100 bg-gray-50/50 px-4 py-3 text-right text-xs text-gray-400 min-w-[3rem]" aria-hidden="true">
           {lines.map((_, i) => (
-            <div key={i} className="min-h-[1.5em]">
+            <div key={i} className="leading-6 font-mono">
               {i + 1}
             </div>
           ))}
         </div>
-        <code className="flex-1" dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
-      </pre>
+        <pre className="flex-1 p-4 text-sm leading-6 overflow-x-auto">
+          <code className="font-mono text-gray-800" dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
+        </pre>
+      </div>
     </div>
   );
 }
@@ -450,8 +473,9 @@ export function ContentBlockRenderer({ blocks, className }: ContentBlockRenderer
     async function loadPrism() {
       try {
         await import('prismjs');
+        await import('prismjs/components/prism-csharp');
         await import('prismjs/components/prism-sql');
-        await import('prismjs/themes/prism-dark.css');
+        await import('prismjs/themes/prism-coy.css');
         setPrismLoaded(true);
       } catch {
         // prismjs unavailable — code will render as plain text

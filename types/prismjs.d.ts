@@ -38,7 +38,11 @@ declare module 'prismjs/components/prism-sql' {
   import 'prismjs';
 }
 
-declare module 'prismjs/themes/prism-dark.css' {
+declare module 'prismjs/components/prism-csharp' {
+  import 'prismjs';
+}
+
+declare module 'prismjs/themes/prism-coy.css' {
   const content: string;
   export default content;
 }
