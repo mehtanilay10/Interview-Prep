@@ -40,7 +40,88 @@ import linqModule9 from '../courses/linq/09-partitioning-operators/content.json'
 import linqModule10 from '../courses/linq/10-conversion-generation-operators/content.json';
 import linqModule11 from '../courses/linq/11-advanced-linq-concepts/content.json';
 
-const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11];
+import efModule1 from '../courses/ef-core/01-getting-started-ef-core/content.json';
+import efModule2 from '../courses/ef-core/02-dbcontext-configuration/content.json';
+import efModule3 from '../courses/ef-core/03-conventions-relationships/content.json';
+import efModule4 from '../courses/ef-core/04-data-operations-connected/content.json';
+import efModule5 from '../courses/ef-core/05-data-operations-disconnected/content.json';
+import efModule6 from '../courses/ef-core/06-change-tracking/content.json';
+import efModule7 from '../courses/ef-core/07-querying/content.json';
+import efModule8 from '../courses/ef-core/08-inheritance-strategies/content.json';
+import efModule9 from '../courses/ef-core/09-migrations/content.json';
+import efModule10 from '../courses/ef-core/10-advanced-features/content.json';
+import efModule11 from '../courses/ef-core/11-database-first-diagnostics/content.json';
+import efModule12 from '../courses/ef-core/12-performance-bulk-operations/content.json';
+
+import reactFundModule1 from '../courses/react-fundamentals/01-getting-started/content.json';
+import reactFundModule2 from '../courses/react-fundamentals/02-components-props/content.json';
+import reactFundModule3 from '../courses/react-fundamentals/03-state-events/content.json';
+import reactFundModule4 from '../courses/react-fundamentals/04-forms-input/content.json';
+import reactFundModule5 from '../courses/react-fundamentals/05-lifecycle-effects/content.json';
+import reactFundModule6 from '../courses/react-fundamentals/06-context-refs/content.json';
+import reactFundModule7 from '../courses/react-fundamentals/07-react-router/content.json';
+import reactFundModule8 from '../courses/react-fundamentals/08-styling/content.json';
+
+import reactAdvModule1 from '../courses/react-advanced-patterns/01-render-props/content.json';
+import reactAdvModule2 from '../courses/react-advanced-patterns/02-higher-order-components/content.json';
+import reactAdvModule3 from '../courses/react-advanced-patterns/03-compound-components/content.json';
+import reactAdvModule4 from '../courses/react-advanced-patterns/04-state-reducers/content.json';
+import reactAdvModule5 from '../courses/react-advanced-patterns/05-control-props/content.json';
+
+import tsrModule1 from '../courses/typescript-for-react/01-typescript-basics/content.json';
+import tsrModule2 from '../courses/typescript-for-react/02-types-in-react/content.json';
+import tsrModule3 from '../courses/typescript-for-react/03-typing-hooks/content.json';
+import tsrModule4 from '../courses/typescript-for-react/04-advanced-types/content.json';
+import tsrModule5 from '../courses/typescript-for-react/05-generic-components/content.json';
+
+import reduxModule1 from '../courses/redux/01-redux-fundamentals/content.json';
+import reduxModule2 from '../courses/redux/02-redux-toolkit/content.json';
+import reduxModule3 from '../courses/redux/03-react-redux/content.json';
+import reduxModule4 from '../courses/redux/04-redux-middleware/content.json';
+import reduxModule5 from '../courses/redux/05-redux-patterns/content.json';
+
+import rqModule1 from '../courses/react-query/01-query-basics/content.json';
+import rqModule2 from '../courses/react-query/02-query-hooks/content.json';
+import rqModule3 from '../courses/react-query/03-mutations/content.json';
+import rqModule4 from '../courses/react-query/04-advanced-features/content.json';
+
+import apolloModule1 from '../courses/apollo/01-apollo-basics/content.json';
+import apolloModule2 from '../courses/apollo/02-queries-mutations/content.json';
+import apolloModule3 from '../courses/apollo/03-caching/content.json';
+import apolloModule4 from '../courses/apollo/04-advanced-patterns/content.json';
+
+import csharpModule1 from '../courses/csharp-fundamentals/01-getting-started/content.json';
+import csharpModule2 from '../courses/csharp-fundamentals/02-variables-types/content.json';
+import csharpModule3 from '../courses/csharp-fundamentals/03-control-flow/content.json';
+import csharpModule4 from '../courses/csharp-fundamentals/04-oop/content.json';
+import csharpModule5 from '../courses/csharp-fundamentals/05-advanced-features/content.json';
+
+import webApiModule1 from '../courses/aspnet-core-web-api/01-getting-started/content.json';
+import webApiModule2 from '../courses/aspnet-core-web-api/02-controllers-routing/content.json';
+import webApiModule3 from '../courses/aspnet-core-web-api/03-model-binding/content.json';
+import webApiModule4 from '../courses/aspnet-core-web-api/04-middleware/content.json';
+import webApiModule5 from '../courses/aspnet-core-web-api/05-dependency-injection/content.json';
+
+import authModule1 from '../courses/authentication-authorization/01-auth-basics/content.json';
+import authModule2 from '../courses/authentication-authorization/02-jwt/content.json';
+import authModule3 from '../courses/authentication-authorization/03-identity/content.json';
+import authModule4 from '../courses/authentication-authorization/04-oauth/content.json';
+
+const rawModules = [
+  sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15,
+  aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11,
+  linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11,
+  efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12,
+  reactFundModule1, reactFundModule2, reactFundModule3, reactFundModule4, reactFundModule5, reactFundModule6, reactFundModule7, reactFundModule8,
+  reactAdvModule1, reactAdvModule2, reactAdvModule3, reactAdvModule4, reactAdvModule5,
+  tsrModule1, tsrModule2, tsrModule3, tsrModule4, tsrModule5,
+  reduxModule1, reduxModule2, reduxModule3, reduxModule4, reduxModule5,
+  rqModule1, rqModule2, rqModule3, rqModule4,
+  apolloModule1, apolloModule2, apolloModule3, apolloModule4,
+  csharpModule1, csharpModule2, csharpModule3, csharpModule4, csharpModule5,
+  webApiModule1, webApiModule2, webApiModule3, webApiModule4, webApiModule5,
+  authModule1, authModule2, authModule3, authModule4
+];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
