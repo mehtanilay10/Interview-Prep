@@ -4,8 +4,39 @@ import sqlServerCourse from './sql-server/content.json';
 import aspNetCoreCourse from './aspnet-core/content.json';
 import linqCourse from './linq/content.json';
 import efCoreCourse from './ef-core/content.json';
+import reactFundamentalsCourse from './react-fundamentals/content.json';
+import reactAdvancedPatternsCourse from './react-advanced-patterns/content.json';
+import typescriptForReactCourse from './typescript-for-react/content.json';
+import reduxCourse from './redux/content.json';
+import reactQueryCourse from './react-query/content.json';
+import apolloCourse from './apollo/content.json';
+import csharpFundamentalsCourse from './csharp-fundamentals/content.json';
+import aspNetCoreWebApiCourse from './aspnet-core-web-api/content.json';
+import authCourse from './authentication-authorization/content.json';
+import cleanCodeCSharpCourse from './clean-code-csharp/content.json';
+import unitTestingDotNetCourse from './unit-testing-dotnet/content.json';
+import reactTestingCourse from './react-testing/content.json';
+import oopsCourse from './oops-concepts/content.json';
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse];
+const rawCourses = [
+  sqlServerCourse,
+  aspNetCoreCourse,
+  linqCourse,
+  efCoreCourse,
+  reactFundamentalsCourse,
+  reactAdvancedPatternsCourse,
+  typescriptForReactCourse,
+  reduxCourse,
+  reactQueryCourse,
+  apolloCourse,
+  csharpFundamentalsCourse,
+  aspNetCoreWebApiCourse,
+  authCourse,
+  cleanCodeCSharpCourse,
+  unitTestingDotNetCourse,
+  reactTestingCourse,
+  oopsCourse
+];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 

@@ -53,7 +53,33 @@ import efModule10 from '../courses/ef-core/10-advanced-features/content.json';
 import efModule11 from '../courses/ef-core/11-database-first-diagnostics/content.json';
 import efModule12 from '../courses/ef-core/12-performance-bulk-operations/content.json';
 
-const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11, efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12];
+import cleanCodeModule1 from '../courses/clean-code-csharp/01-solid-principles/content.json';
+import cleanCodeModule2 from '../courses/clean-code-csharp/02-creational-patterns/content.json';
+import cleanCodeModule3 from '../courses/clean-code-csharp/03-structural-patterns/content.json';
+import cleanCodeModule4 from '../courses/clean-code-csharp/04-behavioral-patterns/content.json';
+import cleanCodeModule5 from '../courses/clean-code-csharp/05-clean-code-practices/content.json';
+import cleanCodeModule6 from '../courses/clean-code-csharp/06-architecture-patterns/content.json';
+
+import unitTestModule1 from '../courses/unit-testing-dotnet/01-testing-fundamentals/content.json';
+import unitTestModule2 from '../courses/unit-testing-dotnet/02-xunit-basics/content.json';
+import unitTestModule3 from '../courses/unit-testing-dotnet/03-mocking-fakes/content.json';
+import unitTestModule4 from '../courses/unit-testing-dotnet/04-integration-testing/content.json';
+import unitTestModule5 from '../courses/unit-testing-dotnet/05-tdd/content.json';
+
+import reactTestModule1 from '../courses/react-testing/01-testing-fundamentals/content.json';
+import reactTestModule2 from '../courses/react-testing/02-jest-basics/content.json';
+import reactTestModule3 from '../courses/react-testing/03-react-testing-library/content.json';
+import reactTestModule4 from '../courses/react-testing/04-component-testing/content.json';
+import reactTestModule5 from '../courses/react-testing/05-e2e-testing/content.json';
+
+import oopModule1 from '../courses/oops-concepts/01-oop-fundamentals/content.json';
+import oopModule2 from '../courses/oops-concepts/02-encapsulation-data-hiding/content.json';
+import oopModule3 from '../courses/oops-concepts/03-inheritance/content.json';
+import oopModule4 from '../courses/oops-concepts/04-polymorphism/content.json';
+import oopModule5 from '../courses/oops-concepts/05-abstraction/content.json';
+import oopModule6 from '../courses/oops-concepts/06-interfaces-abstract-classes/content.json';
+
+const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11, efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12, cleanCodeModule1, cleanCodeModule2, cleanCodeModule3, cleanCodeModule4, cleanCodeModule5, cleanCodeModule6, unitTestModule1, unitTestModule2, unitTestModule3, unitTestModule4, unitTestModule5, reactTestModule1, reactTestModule2, reactTestModule3, reactTestModule4, reactTestModule5, oopModule1, oopModule2, oopModule3, oopModule4, oopModule5, oopModule6];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
