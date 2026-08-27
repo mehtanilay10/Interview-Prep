@@ -43,3 +43,4 @@ export const courses: Course[] = rawCourses as unknown as Course[];
 export function getCourseBySlug(slug: string): Course | undefined {
   return courses.find((c) => c.slug === slug);
 }
+import interviewQaCourse from './interview-qa/content.json';

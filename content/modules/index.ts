@@ -133,7 +133,9 @@ import oopModule4 from '../courses/oops-concepts/04-polymorphism/content.json';
 import oopModule5 from '../courses/oops-concepts/05-abstraction/content.json';
 import oopModule6 from '../courses/oops-concepts/06-interfaces-abstract-classes/content.json';
 
-const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11, efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12, reactFundModule1, reactFundModule2, reactFundModule3, reactFundModule4, reactFundModule5, reactFundModule6, reactFundModule7, reactFundModule8, reactAdvModule1, reactAdvModule2, reactAdvModule3, reactAdvModule4, reactAdvModule5, tsrModule1, tsrModule2, tsrModule3, tsrModule4, tsrModule5, reduxModule1, reduxModule2, reduxModule3, reduxModule4, reduxModule5, rqModule1, rqModule2, rqModule3, rqModule4, apolloModule1, apolloModule2, apolloModule3, apolloModule4, csharpModule1, csharpModule2, csharpModule3, csharpModule4, csharpModule5, webApiModule1, webApiModule2, webApiModule3, webApiModule4, webApiModule5, authModule1, authModule2, authModule3, authModule4, cleanCodeModule1, cleanCodeModule2, cleanCodeModule3, cleanCodeModule4, cleanCodeModule5, cleanCodeModule6, unitTestModule1, unitTestModule2, unitTestModule3, unitTestModule4, unitTestModule5, reactTestModule1, reactTestModule2, reactTestModule3, reactTestModule4, reactTestModule5, oopModule1, oopModule2, oopModule3, oopModule4, oopModule5, oopModule6];
+const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11, efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12, reactFundModule1, reactFundModule2, reactFundModule3, reactFundModule4, reactFundModule5, reactFundModule6, reactFundModule7, reactFundModule8, reactAdvModule1, reactAdvModule2, reactAdvModule3, reactAdvModule4, reactAdvModule5, tsrModule1, tsrModule2, tsrModule3, tsrModule4, tsrModule5, reduxModule1, reduxModule2, reduxModule3, reduxModule4, reduxModule5, rqModule1, rqModule2, rqModule3, rqModule4, apolloModule1, apolloModule2, apolloModule3, apolloModule4, csharpModule1, csharpModule2, csharpModule3, csharpModule4, csharpModule5, webApiModule1, webApiModule2, webApiModule3, webApiModule4, webApiModule5, authModule1, authModule2, authModule3, authModule4, cleanCodeModule1, cleanCodeModule2, cleanCodeModule3, cleanCodeModule4, cleanCodeModule5, cleanCodeModule6, unitTestModule1, unitTestModule2, unitTestModule3, unitTestModule4, unitTestModule5, reactTestModule1, reactTestModule2, reactTestModule3, reactTestModule4, reactTestModule5, oopModule1, oopModule2, oopModule3, oopModule4, oopModule5, oopModule6,
+  iqModule1, iqModule2, iqModule3, iqModule4, iqModule5, iqModule6, iqModule7
+];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
@@ -146,3 +148,11 @@ export function getModulesByCourse(courseSlug: string): Module[] {
     .filter((m) => m.courseSlug === courseSlug)
     .sort((a, b) => a.order - b.order);
 }
+
+import iqModule1 from '../courses/interview-qa/01-beginner-questions/content.json';
+import iqModule2 from '../courses/interview-qa/02-intermediate-questions/content.json';
+import iqModule3 from '../courses/interview-qa/03-advanced-questions/content.json';
+import iqModule4 from '../courses/interview-qa/04-scenario-based/content.json';
+import iqModule5 from '../courses/interview-qa/05-system-design/content.json';
+import iqModule6 from '../courses/interview-qa/06-rapid-fire/content.json';
+import iqModule7 from '../courses/interview-qa/07-interview-traps/content.json';
