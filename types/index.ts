@@ -201,6 +201,7 @@ export interface Lesson {
   id: string;
   slug: string;
   moduleSlug: string;
+  courseSlug: string;
   title: string;
   description: string;
   order: number;

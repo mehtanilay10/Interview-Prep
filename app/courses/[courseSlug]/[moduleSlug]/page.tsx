@@ -42,7 +42,7 @@ export default async function CourseModuleDetailPage({ params }: Params) {
   const mod = getModuleBySlug(moduleSlug);
   if (!course || !mod) notFound();
 
-  const lessons = getLessonsForModule(moduleSlug);
+  const lessons = getLessonsForModule(moduleSlug, courseSlug);
   const courseModules = getModulesForCourse(courseSlug);
   const currentIdx = courseModules.findIndex((m) => m.slug === moduleSlug);
   const prevModule = currentIdx > 0 ? courseModules[currentIdx - 1] : null;

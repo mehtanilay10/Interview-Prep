@@ -529,9 +529,9 @@ export function getLessonBySlug(slug: string): Lesson | undefined {
   return lessons.find((l) => l.slug === slug);
 }
 
-export function getLessonsByModule(moduleSlug: string): Lesson[] {
+export function getLessonsByModule(moduleSlug: string, courseSlug?: string): Lesson[] {
   return lessons
-    .filter((l) => l.moduleSlug === moduleSlug)
+    .filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug))
     .sort((a, b) => a.order - b.order);
 }
 

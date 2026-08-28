@@ -70,8 +70,8 @@ export function getLessonBySlug(slug: string): Lesson | undefined {
   return lessons.find((l) => l.slug === slug);
 }
 
-export function getLessonsForModule(moduleSlug: string): Lesson[] {
-  return getLessonsByModule(moduleSlug);
+export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Lesson[] {
+  return getLessonsByModule(moduleSlug, courseSlug);
 }
 
 export function getAdjacentLessons(

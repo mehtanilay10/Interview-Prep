@@ -60,7 +60,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
   if (!course || !lesson || !mod) notFound();
 
   const courseModules = getModulesForCourse(courseSlug);
-  const moduleLessons = getLessonsForModule(moduleSlug);
+  const moduleLessons = getLessonsForModule(moduleSlug, courseSlug);
   const toc = extractTOC(lesson.blocks);
 
   // Adjacent lessons within the course
@@ -72,7 +72,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
   // Build lessonsByModule map (course-scoped only)
   const lessonsByModule: Record<string, typeof moduleLessons> = {};
   for (const m of courseModules) {
-    lessonsByModule[m.slug] = getLessonsForModule(m.slug);
+    lessonsByModule[m.slug] = getLessonsForModule(m.slug, courseSlug);
   }
 
   // Related lessons
