@@ -10,7 +10,8 @@ import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-	{ href: "/courses", label: "Courses" },
+  { href: "/courses", label: "Courses" },
+  { href: "/interview-questions", label: "Interview Questions" },
 ];
 
 export function Navbar() {

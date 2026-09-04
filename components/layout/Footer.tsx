@@ -11,6 +11,7 @@ const FOOTER_LINKS = [
     heading: 'Learn',
     links: [
       { href: '/courses', label: 'All Courses' },
+      { href: '/interview-questions', label: 'Interview Questions' },
     ],
   },
 ];

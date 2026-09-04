@@ -41,7 +41,7 @@ const variantConfig: Record<
 interface CalloutBoxProps {
   variant?: CalloutVariant;
   title?: string;
-  text: string;
+  text: React.ReactNode;
   className?: string;
 }
 

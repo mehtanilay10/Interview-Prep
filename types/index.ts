@@ -159,6 +159,8 @@ export interface Course {
   icon: string;
   color: string;
   order: number;
+  category?: string;
+  isInterview?: boolean;
   moduleSlugs: string[]; // ordered list of module slugs belonging to this course
 }
 

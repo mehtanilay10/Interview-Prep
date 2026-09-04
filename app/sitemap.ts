@@ -4,11 +4,12 @@ import { getAllCourses } from '@/lib/content';
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const courses = getAllCourses();
+  const courses = getAllCourses().filter((c) => !c.isInterview);
 
   const staticRoutes = [
     '/',
     '/courses',
+    '/interview-questions',
     '/safety',
     '/advanced',
   ].map((route) => ({

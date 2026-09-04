@@ -17,6 +17,7 @@ import cleanCodeCSharpCourse from './clean-code-csharp/content.json';
 import unitTestingDotNetCourse from './unit-testing-dotnet/content.json';
 import reactTestingCourse from './react-testing/content.json';
 import oopsCourse from './oops-concepts/content.json';
+import interviewQaCourse from './interview-qa/content.json';
 
 const rawCourses = [
   sqlServerCourse,
@@ -35,7 +36,8 @@ const rawCourses = [
   cleanCodeCSharpCourse,
   unitTestingDotNetCourse,
   reactTestingCourse,
-  oopsCourse
+  oopsCourse,
+  interviewQaCourse
 ];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
@@ -43,4 +45,3 @@ export const courses: Course[] = rawCourses as unknown as Course[];
 export function getCourseBySlug(slug: string): Course | undefined {
   return courses.find((c) => c.slug === slug);
 }
-import interviewQaCourse from './interview-qa/content.json';

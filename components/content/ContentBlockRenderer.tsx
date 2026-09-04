@@ -7,6 +7,33 @@ import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
 
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const tokens = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
+  return tokens.map((token, i) => {
+    if (token.startsWith('**') && token.endsWith('**')) {
+      return <strong key={i} className="font-semibold text-fg-default">{token.slice(2, -2)}</strong>;
+    }
+    if (token.startsWith('[') && token.includes('](')) {
+      const match = token.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        const href = match[2];
+        const isExternal = href.startsWith('http');
+        return (
+          <a
+            key={i}
+            href={href}
+            {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            className="text-accent-fg underline underline-offset-2 hover:text-accent-fg/80"
+          >
+            {match[1]}
+          </a>
+        );
+      }
+    }
+    return token;
+  });
+}
+
 // Mermaid is loaded dynamically (client-side only)
 const MermaidRenderer = dynamic(
   () => import('./MermaidRenderer').then((m) => m.MermaidRenderer),
@@ -123,7 +150,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
     case 'paragraph':
       return (
         <p key={idx} className="mb-4 leading-relaxed text-fg-default">
-          {block.data.text}
+          {renderInlineMarkdown(block.data.text)}
         </p>
       );
 
@@ -155,7 +182,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
           <ul className="list-disc space-y-1 pl-5 text-fg-default">
             {block.data.items.map((item, i) => (
               <li key={i} className="leading-relaxed text-sm">
-                {item}
+                {renderInlineMarkdown(item)}
               </li>
             ))}
           </ul>
@@ -171,7 +198,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
           <ol className="list-decimal space-y-1 pl-5 text-fg-default">
             {block.data.items.map((item, i) => (
               <li key={i} className="leading-relaxed text-sm">
-                {item}
+                {renderInlineMarkdown(item)}
               </li>
             ))}
           </ol>
@@ -184,7 +211,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
           key={idx}
           variant={block.data.variant}
           title={block.data.title}
-          text={block.data.text}
+          text={renderInlineMarkdown(block.data.text)}
           className="my-4"
         />
       );
@@ -195,9 +222,9 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
           key={idx}
           className="my-4 border-l-4 border-accent-fg pl-4 py-1"
         >
-          <p className="text-fg-default italic leading-relaxed">&ldquo;{block.data.text}&rdquo;</p>
+          <p className="text-fg-default italic leading-relaxed">&ldquo;{renderInlineMarkdown(block.data.text)}&rdquo;</p>
           {block.data.attribution && (
-            <footer className="mt-1 text-xs text-fg-muted">— {block.data.attribution}</footer>
+            <footer className="mt-1 text-xs text-fg-muted">— {renderInlineMarkdown(block.data.attribution)}</footer>
           )}
         </blockquote>
       );
@@ -212,7 +239,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
             {block.data.terms.map((term, i) => (
               <div key={i}>
                 <dt className="font-semibold text-fg-default text-sm">{term.term}</dt>
-                <dd className="mt-0.5 text-sm text-fg-muted leading-relaxed">{term.definition}</dd>
+                <dd className="mt-0.5 text-sm text-fg-muted leading-relaxed">{renderInlineMarkdown(term.definition)}</dd>
               </div>
             ))}
           </dl>
@@ -295,19 +322,19 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
             <span className="text-accent-fg text-lg" aria-hidden="true">✏️</span>
             <h4 className="font-semibold text-accent-fg">{block.data.title}</h4>
           </div>
-          <p className="mb-3 text-sm text-fg-default">{block.data.description}</p>
+          <p className="mb-3 text-sm text-fg-default">{renderInlineMarkdown(block.data.description)}</p>
           {block.data.steps && (
             <ol className="list-decimal space-y-1 pl-5">
               {block.data.steps.map((step, i) => (
                 <li key={i} className="text-sm text-fg-default">
-                  {step}
+                  {renderInlineMarkdown(step)}
                 </li>
               ))}
             </ol>
           )}
           {block.data.expectedOutcome && (
             <p className="mt-3 rounded-lg border border-accent-muted bg-canvas/60 px-3 py-2 text-xs text-fg-muted">
-              <strong>Expected outcome:</strong> {block.data.expectedOutcome}
+              <strong>Expected outcome:</strong> {renderInlineMarkdown(block.data.expectedOutcome)}
             </p>
           )}
         </div>
@@ -329,9 +356,9 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
                   ✓
                 </span>
                 <div>
-                  <span className="text-fg-default">{item.text}</span>
+                  <span className="text-fg-default">{renderInlineMarkdown(item.text)}</span>
                   {item.hint && (
-                    <span className="ml-1 text-xs text-fg-muted">— {item.hint}</span>
+                    <span className="ml-1 text-xs text-fg-muted">— {renderInlineMarkdown(item.hint)}</span>
                   )}
                 </div>
               </li>
@@ -372,14 +399,14 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
                 )}
               >
                 <h5 className="mb-1 font-semibold text-fg-default">{card.title}</h5>
-                <p className="mb-3 text-xs text-fg-muted">{card.description}</p>
+                <p className="mb-3 text-xs text-fg-muted">{renderInlineMarkdown(card.description)}</p>
                 {card.pros && (
                   <div className="mb-2">
                     <p className="text-xs font-semibold text-success-fg mb-1">Pros</p>
                     <ul className="space-y-0.5">
                       {card.pros.map((p, pi) => (
                         <li key={pi} className="text-xs text-fg-default flex items-start gap-1">
-                          <span className="text-success-fg">+</span> {p}
+                          <span className="text-success-fg">+</span> {renderInlineMarkdown(p)}
                         </li>
                       ))}
                     </ul>
@@ -391,7 +418,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
                     <ul className="space-y-0.5">
                       {card.cons.map((c, ci) => (
                         <li key={ci} className="text-xs text-fg-default flex items-start gap-1">
-                          <span className="text-danger-fg">−</span> {c}
+                          <span className="text-danger-fg">−</span> {renderInlineMarkdown(c)}
                         </li>
                       ))}
                     </ul>
@@ -427,13 +454,13 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
             {block.data.points.map((point, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-fg-default">
                 <span className="mt-0.5 text-accent-fg font-bold shrink-0">→</span>
-                {point}
+                {renderInlineMarkdown(point)}
               </li>
             ))}
           </ul>
           {block.data.takeaway && (
             <p className="mt-4 border-t border-border pt-3 text-sm font-medium text-fg-default">
-              💡 {block.data.takeaway}
+              💡 {renderInlineMarkdown(block.data.takeaway)}
             </p>
           )}
         </div>
@@ -448,8 +475,8 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
           <div className="space-y-3">
             {block.data.items.map((item, i) => (
               <div key={i} className="rounded-lg border border-border bg-canvas-subtle p-4">
-                <p className="mb-2 font-medium text-fg-default text-sm">{item.question}</p>
-                <p className="text-sm text-fg-muted leading-relaxed">{item.answer}</p>
+                <p className="mb-2 font-medium text-fg-default text-sm">{renderInlineMarkdown(item.question)}</p>
+                <p className="text-sm text-fg-muted leading-relaxed">{renderInlineMarkdown(item.answer)}</p>
               </div>
             ))}
           </div>
