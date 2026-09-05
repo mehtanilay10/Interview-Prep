@@ -6,7 +6,6 @@ import {
   getLessonBySlug,
   getInterviewQuestions,
   getInterviewTechnologies,
-  getInterviewLevelsForTechnology,
 } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
@@ -22,6 +21,7 @@ const TECH_NAME_MAP: Record<string, string> = {
   'general': 'General',
   'system-design': 'System Design',
   'behavioral': 'Behavioral',
+  'sql-server': 'SQL Server',
 };
 
 const TECH_SLUG_MAP: Record<string, string> = {
@@ -32,26 +32,27 @@ const TECH_SLUG_MAP: Record<string, string> = {
   'general': 'general',
   'system design': 'system-design',
   'behavioral': 'behavioral',
+  'sql server': 'sql-server',
 };
 
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
-  const params: { technology: string; level: string; slug: string }[] = [];
+  const params: { technology: string; slug: string }[] = [];
   for (const tech of technologies) {
-    const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
     const questions = getInterviewQuestions(tech, '');
     const seen = new Set<string>();
     for (const q of questions) {
       const key = `${q.slug}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      params.push({ technology: techSlug, level: q.moduleSlug, slug: q.slug });
+      const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
+      params.push({ technology: techSlug, slug: q.slug });
     }
   }
   return params;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ technology: string; level: string; slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ technology: string; slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const lesson = getLessonBySlug(slug);
   if (!lesson) return {};
@@ -63,19 +64,17 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
   });
 }
 
-export default async function InterviewLessonDetailPage({ params }: { params: Promise<{ technology: string; level: string; slug: string }> }) {
-  const { technology, level, slug } = await params;
+export default async function InterviewLessonDetailPage({ params }: { params: Promise<{ technology: string; slug: string }> }) {
+  const { technology, slug } = await params;
   const tech = TECH_NAME_MAP[technology] ?? technology;
-  const levelInfo = getInterviewLevelsForTechnology(tech).find(l => l.slug === level);
-  const levelTitle = levelInfo?.title ?? level;
 
   const lesson = getLessonBySlug(slug);
   if (!lesson) notFound();
 
-  const moduleQuestions = getInterviewQuestions(tech, level);
-  const currentIdx = moduleQuestions.findIndex((q) => q.slug === slug);
-  const prev = currentIdx > 0 ? moduleQuestions[currentIdx - 1] : null;
-  const next = currentIdx < moduleQuestions.length - 1 ? moduleQuestions[currentIdx + 1] : null;
+  const allQuestions = getInterviewQuestions(tech, '');
+  const currentIdx = allQuestions.findIndex((q) => q.slug === slug);
+  const prev = currentIdx > 0 ? allQuestions[currentIdx - 1] : null;
+  const next = currentIdx < allQuestions.length - 1 ? allQuestions[currentIdx + 1] : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -83,7 +82,6 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         items={[
           { label: 'Interview Questions', href: '/interview-questions' },
           { label: tech, href: `/interview-questions/${technology}` },
-          { label: levelTitle, href: `/interview-questions/${technology}/${level}` },
           { label: lesson.title },
         ]}
         className="mb-4"
@@ -105,7 +103,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
       <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
         {prev ? (
           <Link
-            href={`/interview-questions/${technology}/${level}/${prev.slug}`}
+            href={`/interview-questions/${technology}/${prev.slug}`}
             className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:border-accent-fg hover:text-accent-fg max-w-[45%]"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -116,7 +114,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         )}
         {next && (
           <Link
-            href={`/interview-questions/${technology}/${level}/${next.slug}`}
+            href={`/interview-questions/${technology}/${next.slug}`}
             className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:border-accent-fg hover:text-accent-fg max-w-[45%]"
           >
             <span className="line-clamp-1">{next.title}</span>

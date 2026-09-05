@@ -1,20 +1,11 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, BookOpen, Clock } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getInterviewTechnologies, getInterviewLevelsForTechnology, getInterviewQuestions, getInterviewQuestionCount } from '@/lib/content';
+import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
+import { getInterviewTechnologies, getInterviewQuestions, getInterviewLevelsForTechnology, getInterviewQuestionCount } from '@/lib/content';
 import { formatHours } from '@/lib/utils';
-
-const TECH_SLUG_MAP: Record<string, string> = {
-  'c#': 'csharp',
-  'asp.net core': 'aspnet-core',
-  'oop': 'oop',
-  'javascript': 'javascript',
-  'general': 'general',
-  'system design': 'system-design',
-  'behavioral': 'behavioral',
-};
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -24,6 +15,18 @@ const TECH_NAME_MAP: Record<string, string> = {
   'general': 'General',
   'system-design': 'System Design',
   'behavioral': 'Behavioral',
+  'sql-server': 'SQL Server',
+};
+
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
+  'sql server': 'sql-server',
 };
 
 export async function generateStaticParams() {
@@ -36,9 +39,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ technology: string }> }): Promise<Metadata> {
   const { technology } = await params;
   const tech = TECH_NAME_MAP[technology] ?? technology;
+  const count = getInterviewQuestionCount(tech);
   return {
     title: `${tech} Interview Questions`,
-    description: `Browse ${tech} interview questions organized by difficulty level.`,
+    description: `${count} ${tech} interview questions and answers organized by difficulty level.`,
   };
 }
 
@@ -51,56 +55,91 @@ export default async function InterviewTechnologyPage({ params }: { params: Prom
     notFound();
   }
 
-  const totalCount = getInterviewQuestionCount(tech);
+  const allQuestions = getInterviewQuestions(tech);
+  const totalCount = allQuestions.length;
+  const totalMinutes = allQuestions.reduce((sum, l) => sum + (l.estimatedMinutes || 0), 0);
+
+  // Group questions by level (module slug)
+  const questionsByLevel = new Map<string, { level: typeof levels[0]; questions: typeof allQuestions }>();
+  for (const q of allQuestions) {
+    const level = levels.find(l => l.slug === q.moduleSlug);
+    if (!level) continue;
+    if (!questionsByLevel.has(q.moduleSlug)) {
+      questionsByLevel.set(q.moduleSlug, { level, questions: [] });
+    }
+    questionsByLevel.get(q.moduleSlug)!.questions.push(q);
+  }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="mb-6">
         <Link
           href="/interview-questions"
           className="inline-flex items-center gap-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
         >
-          ← Back to all technologies
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to all technologies
         </Link>
       </div>
 
       <SectionHeader
         eyebrow="🎯 Interview Prep"
         title={`${tech} Interview Questions`}
-        description={`${totalCount} questions organized by difficulty level. Choose a level to start practicing.`}
+        description={`${totalCount} questions · ${formatHours(totalMinutes)} total`}
         titleAs="h1"
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {levels.map((level) => {
-          const questions = getInterviewQuestions(tech, level.slug);
-          const totalMinutes = questions.reduce((sum, l) => sum + l.estimatedMinutes, 0);
-
-          return (
-            <Link
-              key={level.slug}
-              href={`/interview-questions/${technology}/${level.slug}`}
-              className="group flex flex-col rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
-            >
-              <div className="mb-3 flex items-center gap-3">
-                <span className="text-2xl leading-none" aria-hidden="true">
-                  {level.icon}
-                </span>
-                <h3 className="font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
-                  {level.title}
-                </h3>
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-fg-muted">
-                {questions.length} questions · {formatHours(totalMinutes)}
-              </p>
-              <div className="mt-auto flex items-center gap-1 text-sm font-medium text-accent-fg">
-                View questions
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </div>
-            </Link>
-          );
-        })}
+      <div className="mb-8 flex items-center gap-4 text-xs text-fg-subtle">
+        <span className="flex items-center gap-1">
+          <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+          {totalCount} questions
+        </span>
+        <span className="flex items-center gap-1">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {formatHours(totalMinutes)}
+        </span>
       </div>
+
+      {levels.map((level) => {
+        const group = questionsByLevel.get(level.slug);
+        if (!group || group.questions.length === 0) return null;
+
+        return (
+          <section key={level.slug} className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-2xl leading-none" aria-hidden="true">
+                {level.icon}
+              </span>
+              <h2 className="text-lg font-semibold text-fg-default">{level.title}</h2>
+              <span className="text-xs text-fg-subtle">
+                {group.questions.length} question{group.questions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {group.questions.map((q, idx) => (
+                <Link
+                  key={q.id}
+                  href={`/interview-questions/${technology}/${q.slug}`}
+                  className="group flex items-center gap-4 rounded-lg border border-border bg-canvas p-4 transition-all hover:border-accent-fg hover:shadow-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-fg-default group-hover:text-accent-fg transition-colors">
+                      {q.title}
+                    </p>
+                    <p className="mt-1 text-sm text-fg-muted line-clamp-1">
+                      {q.description}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <ReadingTimeBadge minutes={q.estimatedMinutes} />
+                    <BookOpen className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
