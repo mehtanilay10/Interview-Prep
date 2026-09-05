@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
-import { getInterviewTechnologies, getInterviewQuestions, getLessonBySlug } from '@/lib/content';
+import { getInterviewTechnologies, getInterviewQuestions, getInterviewLevelsForTechnology } from '@/lib/content';
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -16,31 +16,24 @@ const TECH_NAME_MAP: Record<string, string> = {
   'behavioral': 'Behavioral',
 };
 
-const LEVEL_NAME_MAP: Record<string, string> = {
-  'beginner': 'Beginner',
-  'intermediate': 'Intermediate',
-  'advanced': 'Advanced',
-  'scenario': 'Scenario',
-  'system-design': 'System Design',
-  'rapid-fire': 'Rapid Fire',
-  'interview-traps': 'Interview Traps',
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
 };
 
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   const params: { technology: string; level: string }[] = [];
   for (const tech of technologies) {
-    const techSlug = Object.entries(TECH_NAME_MAP).find(([, v]) => v === tech)?.[0] ?? tech.toLowerCase();
-    const questions = getInterviewQuestions(tech, '');
-    // We need to get unique levels for this technology
-    const levels = new Set<string>();
-    for (const q of questions) {
-      const mod = q.moduleSlug;
-      const levelName = LEVEL_NAME_MAP[mod] ?? mod;
-      levels.add(levelName.toLowerCase().replace(/\s+/g, '-'));
-    }
+    const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
+    const levels = getInterviewLevelsForTechnology(tech);
     for (const level of levels) {
-      params.push({ technology: techSlug, level });
+      params.push({ technology: techSlug, level: level.slug });
     }
   }
   return params;
@@ -48,26 +41,25 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ technology: string; level: string }> }): Promise<Metadata> {
   const { technology, level } = await params;
-  const tech = TECH_NAME_MAP[technology] ?? technology;
-  const levelName = LEVEL_NAME_MAP[level] ?? level;
+  const levelInfo = getInterviewLevelsForTechnology(technology).find(l => l.slug === level);
+  const title = levelInfo?.title ?? level;
   return {
-    title: `${tech} ${levelName} Interview Questions`,
-    description: `Browse ${tech} ${levelName.toLowerCase()} interview questions and answers.`,
+    title: `${technology} ${title} Interview Questions`,
+    description: `Browse ${technology} ${title.toLowerCase()} interview questions and answers.`,
   };
 }
 
 export default async function InterviewLevelPage({ params }: { params: Promise<{ technology: string; level: string }> }) {
   const { technology, level } = await params;
   const tech = TECH_NAME_MAP[technology] ?? technology;
-  const levelName = LEVEL_NAME_MAP[level] ?? level;
+  const levelInfo = getInterviewLevelsForTechnology(tech).find(l => l.slug === level);
+  const levelTitle = levelInfo?.title ?? level;
 
-  const questions = getInterviewQuestions(tech, levelName);
+  const questions = getInterviewQuestions(tech, level);
 
   if (questions.length === 0) {
     notFound();
   }
-
-  const techSlug = Object.entries(TECH_NAME_MAP).find(([, v]) => v === tech)?.[0] ?? technology;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -83,8 +75,8 @@ export default async function InterviewLevelPage({ params }: { params: Promise<{
 
       <SectionHeader
         eyebrow="🎯 Interview Prep"
-        title={`${tech} ${levelName} Questions`}
-        description={`${questions.length} ${levelName.toLowerCase()} interview questions for ${tech}.`}
+        title={`${tech} ${levelTitle} Questions`}
+        description={`${questions.length} ${levelTitle.toLowerCase()} interview questions for ${tech}.`}
         titleAs="h1"
       />
 

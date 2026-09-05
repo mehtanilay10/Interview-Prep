@@ -26,16 +26,6 @@ const TECH_NAME_MAP: Record<string, string> = {
   'behavioral': 'Behavioral',
 };
 
-const LEVEL_ICONS: Record<string, string> = {
-  'Beginner': '🌱',
-  'Intermediate': '🌿',
-  'Advanced': '🌳',
-  'Scenario': '🎭',
-  'System Design': '🏗️',
-  'Rapid Fire': '⚡',
-  'Interview Traps': '⚠️',
-};
-
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   return technologies.map((tech) => ({
@@ -83,21 +73,21 @@ export default async function InterviewTechnologyPage({ params }: { params: Prom
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {levels.map((level) => {
-          const questions = getInterviewQuestions(tech, level);
+          const questions = getInterviewQuestions(tech, level.slug);
           const totalMinutes = questions.reduce((sum, l) => sum + l.estimatedMinutes, 0);
 
           return (
             <Link
-              key={level}
-              href={`/interview-questions/${technology}/${encodeURIComponent(level.toLowerCase().replace(/\s+/g, '-'))}`}
+              key={level.slug}
+              href={`/interview-questions/${technology}/${level.slug}`}
               className="group flex flex-col rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
             >
               <div className="mb-3 flex items-center gap-3">
                 <span className="text-2xl leading-none" aria-hidden="true">
-                  {LEVEL_ICONS[level] ?? '📝'}
+                  {level.icon}
                 </span>
                 <h3 className="font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
-                  {level}
+                  {level.title}
                 </h3>
               </div>
               <p className="mb-4 text-sm leading-relaxed text-fg-muted">

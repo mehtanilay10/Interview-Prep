@@ -6,6 +6,7 @@ import {
   getLessonBySlug,
   getInterviewQuestions,
   getInterviewTechnologies,
+  getInterviewLevelsForTechnology,
 } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
@@ -23,6 +24,16 @@ const TECH_NAME_MAP: Record<string, string> = {
   'behavioral': 'Behavioral',
 };
 
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
+};
+
 const LEVEL_NAME_MAP: Record<string, string> = {
   'beginner': 'Beginner',
   'intermediate': 'Intermediate',
@@ -37,16 +48,14 @@ export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   const params: { technology: string; level: string; slug: string }[] = [];
   for (const tech of technologies) {
+    const techSlug = Object.entries(TECH_SLUG_MAP).find(([, v]) => v === tech.toLowerCase())?.[0] ?? tech.toLowerCase();
     const questions = getInterviewQuestions(tech, '');
     const seen = new Set<string>();
     for (const q of questions) {
       const key = `${q.slug}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const techSlug = Object.entries(TECH_NAME_MAP).find(([, v]) => v === tech)?.[0] ?? tech.toLowerCase();
-      const mod = q.moduleSlug;
-      const levelSlug = Object.entries(LEVEL_NAME_MAP).find(([, v]) => v === mod)?.[0] ?? mod;
-      params.push({ technology: techSlug, level: levelSlug, slug: q.slug });
+      params.push({ technology: techSlug, level: q.moduleSlug, slug: q.slug });
     }
   }
   return params;
@@ -67,12 +76,13 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
 export default async function InterviewLessonDetailPage({ params }: { params: Promise<{ technology: string; level: string; slug: string }> }) {
   const { technology, level, slug } = await params;
   const tech = TECH_NAME_MAP[technology] ?? technology;
-  const levelName = LEVEL_NAME_MAP[level] ?? level;
+  const levelInfo = getInterviewLevelsForTechnology(tech).find(l => l.slug === level);
+  const levelTitle = levelInfo?.title ?? level;
 
   const lesson = getLessonBySlug(slug);
   if (!lesson) notFound();
 
-  const moduleQuestions = getInterviewQuestions(tech, levelName);
+  const moduleQuestions = getInterviewQuestions(tech, level);
   const currentIdx = moduleQuestions.findIndex((q) => q.slug === slug);
   const prev = currentIdx > 0 ? moduleQuestions[currentIdx - 1] : null;
   const next = currentIdx < moduleQuestions.length - 1 ? moduleQuestions[currentIdx + 1] : null;
@@ -83,7 +93,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         items={[
           { label: 'Interview Questions', href: '/interview-questions' },
           { label: tech, href: `/interview-questions/${technology}` },
-          { label: levelName, href: `/interview-questions/${technology}/${level}` },
+          { label: levelTitle, href: `/interview-questions/${technology}/${level}` },
           { label: lesson.title },
         ]}
         className="mb-4"

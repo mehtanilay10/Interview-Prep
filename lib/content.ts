@@ -193,25 +193,33 @@ export function getInterviewTechnologies(): string[] {
   return Array.from(techs).sort();
 }
 
-export function getInterviewLevelsForTechnology(technology: string): string[] {
-  const levelMap = new Map<string, Set<string>>();
+export function getInterviewLevelsForTechnology(technology: string): { slug: string; title: string; icon: string; estimatedHours: number }[] {
+  const levelMap = new Map<string, { slug: string; title: string; icon: string; estimatedHours: number }>();
   for (const l of lessons) {
     const tech = (l as Lesson & { technology?: string }).technology;
     const mod = getModuleBySlug(l.moduleSlug);
     if (tech === technology && mod) {
-      if (!levelMap.has(technology)) levelMap.set(technology, new Set());
-      levelMap.get(technology)!.add(mod.title);
+      const slug = mod.slug;
+      if (!levelMap.has(slug)) {
+        levelMap.set(slug, {
+          slug: mod.slug,
+          title: mod.title,
+          icon: mod.icon,
+          estimatedHours: mod.estimatedHours,
+        });
+      }
     }
   }
-  return Array.from(levelMap.get(technology) ?? []).sort();
+  return Array.from(levelMap.values()).sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export function getInterviewQuestions(technology: string, level: string): Lesson[] {
+export function getInterviewQuestions(technology: string, moduleSlug?: string): Lesson[] {
   return lessons
     .filter((l) => {
       const tech = (l as Lesson & { technology?: string }).technology;
-      const mod = getModuleBySlug(l.moduleSlug);
-      return tech === technology && mod?.title === level;
+      if (tech !== technology) return false;
+      if (moduleSlug && l.moduleSlug !== moduleSlug) return false;
+      return true;
     })
     .sort((a, b) => a.order - b.order);
 }
