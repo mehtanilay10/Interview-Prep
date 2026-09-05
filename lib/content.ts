@@ -36,7 +36,7 @@ export function getLessonsForCourse(courseSlug: string): Lesson[] {
   const courseModules = getModulesByCourse(courseSlug);
   const moduleSlugs = new Set(courseModules.map((m) => m.slug));
   return lessons
-    .filter((l) => moduleSlugs.has(l.moduleSlug))
+    .filter((l) => moduleSlugs.has(l.moduleSlug) && l.courseSlug === courseSlug)
     .sort((a, b) => {
       const modA = courseModules.find((m) => m.slug === a.moduleSlug);
       const modB = courseModules.find((m) => m.slug === b.moduleSlug);
