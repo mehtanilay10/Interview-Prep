@@ -66,8 +66,8 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
 
   return (
     <div className="group my-4 overflow-hidden rounded-xl border border-border shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center justify-between border-b border-border bg-canvas-subtle px-4 py-2">
+        <span className="text-xs font-medium text-fg-muted uppercase tracking-wider">
           {displayLanguage}
         </span>
         <button
@@ -77,11 +77,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
-          className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm border border-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-1"
+          className="rounded-md bg-canvas px-2.5 py-1 text-xs font-medium text-fg-default shadow-sm border border-border hover:bg-canvas-subtle hover:text-fg-emphasis focus:outline-none focus:ring-2 focus:ring-accent-fg/20 focus:ring-offset-1"
         >
           {copied ? (
             <span className="flex items-center gap-1">
-              <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-3.5 w-3.5 text-success-fg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               Copied!
@@ -97,7 +97,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
         </button>
       </div>
       <div className="flex overflow-x-auto">
-        <div className="select-none border-r border-gray-200 bg-gray-50 px-4 py-3 text-right text-xs text-gray-400 min-w-[3rem]" aria-hidden="true">
+        <div className="select-none border-r border-border bg-canvas-subtle px-4 py-3 text-right text-xs text-fg-subtle min-w-[3rem]" aria-hidden="true">
           {lines.map((_, i) => (
             <div key={i} className="leading-6 font-mono">
               {i + 1}

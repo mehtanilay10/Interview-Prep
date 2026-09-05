@@ -118,6 +118,7 @@ export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
 
         {/* Body — scrollable image area */}
         <div className="flex-1 overflow-auto p-6 flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
             alt={alt}
