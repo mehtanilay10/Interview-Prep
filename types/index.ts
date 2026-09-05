@@ -210,6 +210,7 @@ export interface Lesson {
   difficulty: Difficulty;
   estimatedMinutes: number;
   tags: string[];
+  technology?: string;
   prerequisites?: string[]; // lesson slugs
   isOptional?: boolean;
   skipLabel?: string;

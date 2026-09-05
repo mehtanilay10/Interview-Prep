@@ -179,3 +179,43 @@ export function getCourseStats() {
     totalHours: Math.round(totalMinutes / 60),
   };
 }
+
+// ── Interview question helpers ────────────────────────────────────────────────
+
+export function getInterviewTechnologies(): string[] {
+  const techs = new Set<string>();
+  for (const l of lessons) {
+    const tech = (l as Lesson & { technology?: string }).technology;
+    if (tech) {
+      techs.add(tech);
+    }
+  }
+  return Array.from(techs).sort();
+}
+
+export function getInterviewLevelsForTechnology(technology: string): string[] {
+  const levelMap = new Map<string, Set<string>>();
+  for (const l of lessons) {
+    const tech = (l as Lesson & { technology?: string }).technology;
+    const mod = getModuleBySlug(l.moduleSlug);
+    if (tech === technology && mod) {
+      if (!levelMap.has(technology)) levelMap.set(technology, new Set());
+      levelMap.get(technology)!.add(mod.title);
+    }
+  }
+  return Array.from(levelMap.get(technology) ?? []).sort();
+}
+
+export function getInterviewQuestions(technology: string, level: string): Lesson[] {
+  return lessons
+    .filter((l) => {
+      const tech = (l as Lesson & { technology?: string }).technology;
+      const mod = getModuleBySlug(l.moduleSlug);
+      return tech === technology && mod?.title === level;
+    })
+    .sort((a, b) => a.order - b.order);
+}
+
+export function getInterviewQuestionCount(technology: string): number {
+  return lessons.filter((l) => (l as Lesson & { technology?: string }).technology === technology).length;
+}
