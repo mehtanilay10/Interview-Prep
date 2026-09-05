@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
 
-function renderInlineMarkdown(text: string): React.ReactNode[] {
+function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
+  if (!text) return [];
   const tokens = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
   return tokens.map((token, i) => {
     if (token.startsWith('**') && token.endsWith('**')) {
