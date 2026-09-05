@@ -18,6 +18,7 @@ const TECH_ICONS: Record<string, string> = {
   'General': '📚',
   'System Design': '🏗️',
   'Behavioral': '💬',
+  'SQL Server': '🗄️',
 };
 
 const TECH_DESCRIPTIONS: Record<string, string> = {
@@ -28,6 +29,18 @@ const TECH_DESCRIPTIONS: Record<string, string> = {
   'General': 'Cross-technology fundamentals, security, performance, and architecture concepts.',
   'System Design': 'Scalable system design, microservices, and real-world architecture problems.',
   'Behavioral': 'Scenario-based problem solving, debugging approaches, and soft skills.',
+  'SQL Server': 'SQL Server database concepts, queries, indexing, and performance optimization.',
+};
+
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
+  'sql server': 'sql-server',
 };
 
 export default function InterviewQuestionsPage() {
@@ -48,7 +61,7 @@ export default function InterviewQuestionsPage() {
           return (
             <Link
               key={tech}
-              href={`/interview-questions/${encodeURIComponent(tech.toLowerCase())}`}
+              href={`/interview-questions/${TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase()}`}
               className="group flex flex-col rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
             >
               <div className="mb-3 flex items-center gap-3">
