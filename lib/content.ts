@@ -37,7 +37,14 @@ export function getLessonsForCourse(courseSlug: string): Lesson[] {
   const moduleSlugs = new Set(courseModules.map((m) => m.slug));
   return lessons
     .filter((l) => moduleSlugs.has(l.moduleSlug))
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => {
+      const modA = courseModules.find((m) => m.slug === a.moduleSlug);
+      const modB = courseModules.find((m) => m.slug === b.moduleSlug);
+      const modOrderA = modA?.order ?? 0;
+      const modOrderB = modB?.order ?? 0;
+      if (modOrderA !== modOrderB) return modOrderA - modOrderB;
+      return a.order - b.order;
+    });
 }
 
 // ── Module helpers ────────────────────────────────────────────────────────────
