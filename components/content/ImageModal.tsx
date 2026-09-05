@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 interface ImageModalProps {
   src: string;
@@ -118,13 +119,18 @@ export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
 
         {/* Body — scrollable image area */}
         <div className="flex-1 overflow-auto p-6 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            style={{ zoom, transition: 'zoom 0.15s ease', maxWidth: '100%' }}
-            className="h-auto rounded-lg border border-border"
-          />
+          <div
+            className="relative"
+            style={{ zoom, transition: 'zoom 0.15s ease', maxWidth: '100%', minHeight: '200px' }}
+          >
+            <Image
+              src={src}
+              alt={alt}
+              fill
+              className="object-contain"
+              sizes="100vw"
+            />
+          </div>
         </div>
 
         {/* Footer caption */}
