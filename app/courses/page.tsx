@@ -15,7 +15,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   frontend: 'Frontend',
   backend: 'Backend',
   language: 'Language & Fundamentals',
-  practices: 'Practices & Patterns',
+  architecture: 'Architecture',
   interview: 'Interview Prep',
 };
 
@@ -29,7 +29,7 @@ export default function CoursesPage() {
   }
 
   const sortedCategories = Object.keys(grouped).sort((a, b) => {
-    const order = ['database', 'frontend', 'backend', 'language', 'practices', 'interview', 'other'];
+    const order = ['backend', 'frontend', 'database', 'architecture', 'language', 'interview', 'other'];
     return order.indexOf(a) - order.indexOf(b);
   });
 

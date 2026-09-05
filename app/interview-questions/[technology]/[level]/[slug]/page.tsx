@@ -34,21 +34,11 @@ const TECH_SLUG_MAP: Record<string, string> = {
   'behavioral': 'behavioral',
 };
 
-const LEVEL_NAME_MAP: Record<string, string> = {
-  'beginner': 'Beginner',
-  'intermediate': 'Intermediate',
-  'advanced': 'Advanced',
-  'scenario': 'Scenario',
-  'system-design': 'System Design',
-  'rapid-fire': 'Rapid Fire',
-  'interview-traps': 'Interview Traps',
-};
-
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   const params: { technology: string; level: string; slug: string }[] = [];
   for (const tech of technologies) {
-    const techSlug = Object.entries(TECH_SLUG_MAP).find(([, v]) => v === tech.toLowerCase())?.[0] ?? tech.toLowerCase();
+    const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
     const questions = getInterviewQuestions(tech, '');
     const seen = new Set<string>();
     for (const q of questions) {
