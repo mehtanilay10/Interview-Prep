@@ -6,6 +6,8 @@ import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
+import { Highlight, themes } from "prism-react-renderer";
+
 
 function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
   if (!text) return [];
@@ -46,72 +48,39 @@ interface ContentBlockRendererProps {
   className?: string;
 }
 
-function highlightCode(code: string, language?: string): string {
-  try {
-    const Prism = require('prismjs');
-    if (language && Prism.languages[language]) {
-      return Prism.highlight(code, Prism.languages[language], language);
-    }
-    return code;
-  } catch {
-    return code;
-  }
-}
-
-function CodeBlock({ code, language }: { code: string; language?: string }) {
-  const [copied, setCopied] = useState(false);
-  const lines = code.split('\n');
+function CustomCodeBlock({ code, language }: { code: string; language?: string }) {
   const displayLanguage = language || 'code';
-  const langClass = language ? `language-${language}` : '';
-
+  
   return (
-    <div className="group my-4 overflow-hidden rounded-xl border border-border shadow-sm">
+    <div className="my-4 overflow-hidden rounded-xl border border-border shadow-sm">
       <div className="flex items-center justify-between border-b border-border bg-canvas-subtle px-4 py-2">
         <span className="text-xs font-medium text-fg-muted uppercase tracking-wider">
           {displayLanguage}
         </span>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard.writeText(code);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-          className="rounded-md bg-canvas px-2.5 py-1 text-xs font-medium text-fg-default shadow-sm border border-border hover:bg-canvas-subtle hover:text-fg-emphasis focus:outline-none focus:ring-2 focus:ring-accent-fg/20 focus:ring-offset-1"
-        >
-          {copied ? (
-            <span className="flex items-center gap-1">
-              <svg className="h-3.5 w-3.5 text-success-fg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Copied!
-            </span>
-          ) : (
-            <span className="flex items-center gap-1">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Copy
-            </span>
-          )}
-        </button>
       </div>
-      <div className="flex overflow-x-auto">
-        <div className="select-none border-r border-border bg-canvas-subtle px-4 py-3 text-right text-xs text-fg-subtle min-w-[3rem]" aria-hidden="true">
-          {lines.map((_, i) => (
-            <div key={i} className="leading-6 font-mono">
-              {i + 1}
+      <div className="overflow-x-auto bg-canvas">
+        <Highlight theme={themes.nightOwl} code={code} language={language || "text"}>
+            {({ style, tokens, getLineProps, getTokenProps }) => (
+            <div className="flex">
+              <div className="select-none border-r border-border bg-canvas-subtle px-4 py-3 text-right text-xs text-fg-subtle min-w-[3rem]" aria-hidden="true">
+                {tokens.map((_, i) => (
+                  <div key={i} className="leading-6 font-mono">
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+              <div className="flex-1 p-4">
+                {tokens.map((line, i) => (
+                  <div key={i} {...getLineProps({ line })} className="table-row">
+                    {line.map((token, key) => (
+                      <span key={key} {...getTokenProps({ token })} />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-        {/* 
-          Prism highlightCode() returns HTML. The `code` prop originates from
-          static lesson JSON content, not user input, so this is trusted.
-          If user-generated content is ever highlighted here, sanitize first.
-        */}
-        <pre className={`flex-1 p-4 text-sm leading-6 overflow-x-auto ${langClass}`}>
-          <code className={`font-mono ${langClass}`} dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
-        </pre>
+          )}
+        </Highlight>
       </div>
     </div>
   );
@@ -310,9 +279,9 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
             {content && code && (
               <p className="mb-3 text-sm text-fg-default leading-relaxed">{content}</p>
             )}
-{code && (
-               <CodeBlock code={code} language={language} />
-             )}
+            {code && (
+              <CustomCodeBlock code={code} language={language} />
+            )}
           </div>
         </div>
       );
@@ -501,23 +470,6 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
 }
 
 export function ContentBlockRenderer({ blocks, className }: ContentBlockRendererProps) {
-  const [prismLoaded, setPrismLoaded] = useState(false);
-
-  useEffect(() => {
-    async function loadPrism() {
-      try {
-        await import('prismjs');
-        await import('prismjs/components/prism-csharp');
-        await import('prismjs/components/prism-sql');
-        await import('prismjs/themes/prism-solarizedlight.css');
-        setPrismLoaded(true);
-      } catch {
-        // prismjs unavailable — code will render as plain text
-      }
-    }
-    loadPrism();
-  }, []);
-
   return (
     <div className={cn('lesson-prose', className)}>
       {blocks.map((block, idx) => renderBlock(block, idx))}

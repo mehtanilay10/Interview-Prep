@@ -4,6 +4,7 @@ import { PWARegistration } from '@/components/ui/PWARegistration';
 import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { SkipLink } from '@/components/ui/SkipLink';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -43,9 +44,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="flex min-h-screen flex-col bg-canvas text-fg-default antialiased transition-theme">
+      <body className="flex min-h-screen flex-col bg-canvas text-fg-default antialiased transition-theme" style={{ fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' }}>
+        <SkipLink />
         <PWARegistration />
         <ContinuePrompt />
         <ThemeProvider>
