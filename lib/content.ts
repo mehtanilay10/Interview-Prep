@@ -35,13 +35,12 @@ export function getModulesForCourse(courseSlug: string): Module[] {
 export function getLessonsForCourse(courseSlug: string): Lesson[] {
   const courseModules = getModulesByCourse(courseSlug);
   const moduleSlugs = new Set(courseModules.map((m) => m.slug));
+  const moduleOrder = new Map(courseModules.map((m) => [m.slug, m.order]));
   return lessons
     .filter((l) => moduleSlugs.has(l.moduleSlug) && l.courseSlug === courseSlug)
     .sort((a, b) => {
-      const modA = courseModules.find((m) => m.slug === a.moduleSlug);
-      const modB = courseModules.find((m) => m.slug === b.moduleSlug);
-      const modOrderA = modA?.order ?? 0;
-      const modOrderB = modB?.order ?? 0;
+      const modOrderA = moduleOrder.get(a.moduleSlug) ?? 0;
+      const modOrderB = moduleOrder.get(b.moduleSlug) ?? 0;
       if (modOrderA !== modOrderB) return modOrderA - modOrderB;
       return a.order - b.order;
     });
@@ -82,11 +81,12 @@ export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Le
 }
 
 export function getAdjacentLessons(
-  lesson: Lesson
+  lesson: Lesson,
+  courseSlug?: string
 ): { prev: Lesson | null; next: Lesson | null } {
-  const orderedLessons = getAllModules()
-    .flatMap((m) => getLessonsByModule(m.slug))
-    .filter((l) => Boolean(l));
+  const orderedLessons = courseSlug
+    ? getLessonsForCourse(courseSlug)
+    : getAllModules().flatMap((m) => getLessonsByModule(m.slug));
 
   const idx = orderedLessons.findIndex((l) => l.slug === lesson.slug);
 

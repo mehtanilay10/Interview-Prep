@@ -3,12 +3,13 @@ import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCh
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ModuleCard } from '@/components/course/ModuleCard';
-import { getCourseStats, getAllModules } from '@/lib/content';
+import { getCourseStats, getAllModules, getAllCourses } from '@/lib/content';
 import Head from 'next/head';
 
 export default function HomePage() {
   const stats = getCourseStats();
   const modules = getAllModules().slice(0, 3);
+  const firstCourse = getAllCourses().find((c) => !c.isInterview);
 
   const featureCards = [
     {
@@ -122,7 +123,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/courses/sql-server"
+              href={firstCourse ? `/courses/${firstCourse.slug}` : '/courses'}
               className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
             >
               Start Preparing

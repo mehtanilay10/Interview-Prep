@@ -41,6 +41,15 @@ const TECH_SLUG_MAP: Record<string, string> = {
   'ci/cd pipelines': 'cicd-pipelines',
 };
 
+/**
+ * Maintenance rule:
+ * When adding a new interview question technology, update BOTH:
+ * - The lesson JSON `technology` field
+ * - TECH_NAME_MAP and TECH_SLUG_MAP in both interview question pages
+ *   (`app/interview-questions/[technology]/page.tsx` and
+ *    `app/interview-questions/[technology]/[slug]/page.tsx`)
+ */
+
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   const params: { technology: string; slug: string }[] = [];

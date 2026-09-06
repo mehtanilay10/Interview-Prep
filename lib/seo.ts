@@ -52,7 +52,7 @@ export function buildLessonMetadata(opts: {
   return buildMetadata({
     title: opts.title,
     description: opts.description,
-    path: `/modules/${opts.moduleSlug}/${opts.lessonSlug}`,
+    path: `/courses/${opts.moduleSlug}/${opts.lessonSlug}`,
   });
 }
 
@@ -64,6 +64,6 @@ export function buildModuleMetadata(opts: {
   return buildMetadata({
     title: opts.title,
     description: opts.description,
-    path: `/modules/${opts.moduleSlug}`,
+    path: `/courses/${opts.moduleSlug}`,
   });
 }

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const NAV_LINKS = [
   { href: "/courses", label: "Courses" },
   { href: "/interview-questions", label: "Interview Questions" },
+  { href: "/search", label: "Search" },
 ];
 
 export function Navbar() {

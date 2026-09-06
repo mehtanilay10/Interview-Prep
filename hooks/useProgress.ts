@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import type { CourseProgress, LessonProgress } from '@/types';
 import { safePercent } from '@/lib/utils';
@@ -14,10 +14,16 @@ const DEFAULT_PROGRESS: CourseProgress = {
 };
 
 export function useProgress() {
+  const [storageKey] = useState(() => STORAGE_KEY);
   const [progress, setProgress, resetProgress] = useLocalStorage<CourseProgress>(
-    STORAGE_KEY,
+    storageKey,
     DEFAULT_PROGRESS
   );
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /** Check if a lesson is completed */
   const isCompleted = useCallback(
@@ -31,7 +37,6 @@ export function useProgress() {
   const markComplete = useCallback(
     (lessonSlug: string, moduleSlug: string) => {
       setProgress((prev) => {
-        // Avoid duplicates
         if (prev.completedLessons.some((l) => l.lessonSlug === lessonSlug)) {
           return prev;
         }
@@ -115,5 +120,6 @@ export function useProgress() {
     getModuleProgress,
     resetProgress,
     stats,
+    mounted,
   };
 }

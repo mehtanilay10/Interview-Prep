@@ -120,8 +120,8 @@ export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
         {/* Body — scrollable image area */}
         <div className="flex-1 overflow-auto p-6 flex justify-center">
           <div
-            className="relative"
-            style={{ zoom, transition: 'zoom 0.15s ease', maxWidth: '100%', minHeight: '200px' }}
+            className="relative origin-center"
+            style={{ transform: `scale(${zoom})`, transition: 'transform 0.15s ease', maxWidth: '100%', minHeight: '200px' }}
           >
             <Image
               src={src}

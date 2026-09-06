@@ -1,30 +1,52 @@
 import { MetadataRoute } from 'next';
-import { getAllCourses } from '@/lib/content';
+import { getAllCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions } from '@/lib/content';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
+function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRoute.Sitemap[0]['changeFrequency'] = 'monthly'): MetadataRoute.Sitemap[0] {
+  return {
+    url,
+    lastModified: new Date(),
+    changeFrequency,
+    priority,
+  };
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
+  const entries: MetadataRoute.Sitemap = [
+    toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/courses`, 0.9, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/interview-questions`, 0.9, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/search`, 0.8, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/safety`, 0.8, 'monthly'),
+    toSitemapEntry(`${BASE_URL}/advanced`, 0.8, 'monthly'),
+  ];
+
   const courses = getAllCourses().filter((c) => !c.isInterview);
 
-  const staticRoutes = [
-    '/',
-    '/courses',
-    '/interview-questions',
-    '/safety',
-    '/advanced',
-  ].map((route) => ({
-    url: `${BASE_URL}${route}`,
-    lastModified: new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: route === '/' ? 1 : 0.8,
-  }));
+  for (const course of courses) {
+    entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}`));
 
-  const courseRoutes = courses.map((course) => ({
-    url: `${BASE_URL}/courses/${course.slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.8,
-  }));
+    const modules = getModulesForCourse(course.slug);
+    for (const mod of modules) {
+      entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}/${mod.slug}`));
 
-  return [...staticRoutes, ...courseRoutes];
+      const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
+      for (const lesson of lessons) {
+        entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}/${mod.slug}/${lesson.slug}`));
+      }
+    }
+  }
+
+  const technologies = getInterviewTechnologies();
+  for (const tech of technologies) {
+    entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${tech.toLowerCase()}`));
+
+    const questions = getInterviewQuestions(tech);
+    for (const q of questions) {
+      entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${tech.toLowerCase()}/${q.slug}`));
+    }
+  }
+
+  return entries;
 }

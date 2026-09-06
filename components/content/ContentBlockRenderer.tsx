@@ -104,6 +104,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
             </div>
           ))}
         </div>
+        {/* 
+          Prism highlightCode() returns HTML. The `code` prop originates from
+          static lesson JSON content, not user input, so this is trusted.
+          If user-generated content is ever highlighted here, sanitize first.
+        */}
         <pre className={`flex-1 p-4 text-sm leading-6 overflow-x-auto ${langClass}`}>
           <code className={`font-mono ${langClass}`} dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }} />
         </pre>
