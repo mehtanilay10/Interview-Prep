@@ -1,0 +1,171 @@
+{
+  "id": "lesson-react-adv-019",
+  "slug": "state-sharing-between-hooks",
+  "moduleSlug": "custom-hooks-architecture",
+  "courseSlug": "react-advanced-patterns",
+  "title": "State Sharing Between Hooks",
+  "description": "Explore strategies for sharing state between custom hooks using refs, contexts, and external stores.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["custom-hooks", "state-sharing", "refs", "context", "external-stores"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When multiple hooks need access to the same state, you need explicit sharing mechanisms. React provides several patterns for this: refs for mutable containers, contexts for dependency injection, and external stores for global state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sharing State with Refs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Refs are the simplest mechanism for sharing mutable state between hooks. Because refs persist across renders without triggering re-renders, they are ideal for synchronizing values that hooks read but do not display directly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Shared State via useRef",
+        "content": "Two hooks sharing a counter without re-rendering on every change.",
+        "language": "tsx",
+        "code": "function useSharedCounter(initial = 0) {\n  const countRef = useRef(initial);\n  const countState = useState(initial);\n\n  const increment = useCallback(() => {\n    countRef.current += 1;\n    countState[1](countRef.current); // Re-render when needed\n  }, []);\n\n  return { count: countState[0], increment, countRef };\n}\n\nfunction useLogCount() {\n  const { countRef } = useSharedCounter();\n\n  useEffect(() => {\n    console.log('Count changed:', countRef.current);\n  }, [countRef.current]);\n\n  return countRef.current;\n}\n\n// In component\nfunction Counter() {\n  const { count, increment } = useSharedCounter();\n  const loggedCount = useLogCount();\n\n  return (\n    <button onClick={increment}>\n      Count: {count} (logged: {loggedCount})\n    </button>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Refs vs State",
+        "text": "Use refs when you need to share mutable data without causing re-renders. Use state when changes should trigger a re-render. In most UI scenarios, you will use both together."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dependency Injection with Context"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Context allows you to inject shared state into hooks without prop drilling. This is especially useful when a hook needs access to configuration or a store that lives higher in the tree."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Theme Hook via Context",
+        "content": "Injecting theme configuration into custom hooks using React Context.",
+        "language": "tsx",
+        "code": "type Theme = 'light' | 'dark' | 'system';\n\ninterface ThemeContextValue {\n  theme: Theme;\n  setTheme: (theme: Theme) => void;\n}\n\nconst ThemeContext = createContext<ThemeContextValue | undefined>(undefined);\n\nfunction useTheme() {\n  const context = useContext(ThemeContext);\n  if (!context) {\n    throw new Error('useTheme must be used within a ThemeProvider');\n  }\n  return context;\n}\n\nfunction useThemedClassName(baseClass: string) {\n  const { theme } = useTheme();\n  return `${baseClass}--${theme}`;\n}\n\nfunction useThemedColor(light: string, dark: string) {\n  const { theme } = useTheme();\n  return theme === 'dark' ? dark : light;\n}\n\n// Both hooks share the same theme state via context\nfunction Button() {\n  const className = useThemedClassName('btn');\n  const bgColor = useThemedColor('#ffffff', '#1a1a1a');\n  return <button className={className} style={{ backgroundColor: bgColor }}>Click</button>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "External Store Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React 18 introduced the `useSyncExternalStore` hook for subscribing to external data sources. This pattern is perfect for sharing state between hooks when you want to avoid context re-render overhead."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "External Store Hook",
+        "content": "A lightweight reactive store shared between multiple hooks.",
+        "language": "tsx",
+        "code": "type Listener = () => void;\n\nclass Store<T> {\n  private state: T;\n  private listeners = new Set<Listener>();\n\n  constructor(initial: T) {\n    this.state = initial;\n  }\n\n  getState() {\n    return this.state;\n  }\n\n  setState(partial: Partial<T> | ((prev: T) => T)) {\n    this.state = { ...this.state, ...(typeof partial === 'function' ? partial(this.state) : partial) };\n    this.listeners.forEach(l => l());\n  }\n\n  subscribe(listener: Listener) {\n    this.listeners.add(listener);\n    return () => this.listeners.delete(listener);\n  }\n}\n\nconst userStore = new Store({ name: '', loggedIn: false });\n\nfunction useUserStore() {\n  return useSyncExternalStore(\n    userStore.subscribe.bind(userStore),\n    userStore.getState.bind(userStore)\n  );\n}\n\nfunction useUserName() {\n  const user = useUserStore();\n  return user.name;\n}\n\nfunction useLoginStatus() {\n  const user = useUserStore();\n  return user.loggedIn;\n}\n\n// Both hooks read from the same external store\nfunction Profile() {\n  const name = useUserName();\n  const loggedIn = useLoginStatus();\n  return <div>{loggedIn ? `Hello, ${name}` : 'Please log in'}</div>;\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "state-sharing-strategies",
+        "caption": "Three strategies for sharing state between hooks",
+        "definition": "graph TD\n    A[Component] --> B[useRef Sharing]\n    A --> C[Context Injection]\n    A --> D[External Store]\n    B --> E[No Re-render]\n    C --> F[Provider Re-render]\n    D --> G[useSyncExternalStore]\n    style A fill:#1e293b,stroke:#38bdf8,color:#f1f5f9\n    style B fill:#1e293b,stroke:#a855f7,color:#f1f5f9\n    style C fill:#1e293b,stroke:#22c55e,color:#f1f5f9\n    style D fill:#1e293b,stroke:#f97316,color:#f1f5f9"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "State Sharing Strategies",
+        "cards": [
+          {
+            "title": "Refs",
+            "description": "Mutable containers that persist across renders without causing re-renders.",
+            "pros": ["No re-render overhead", "Simple API", "Works anywhere"],
+            "cons": ["Not reactive by default", "Easy to misuse", "No devtools support"],
+            "tags": ["lightweight", "mutable"]
+          },
+          {
+            "title": "Context",
+            "description": "Dependency injection that propagates changes through the tree.",
+            "pros": ["React-native", "Great DX", "Type-safe"],
+            "cons": ["Can cause re-renders", "Provider hell", "Harder to test in isolation"],
+            "tags": ["react", "tree-based"]
+          },
+          {
+            "title": "External Store",
+            "description": "Subscribe to external data sources with useSyncExternalStore.",
+            "pros": ["No re-render overhead", "Concurrent-safe", "Works outside React"],
+            "cons": ["More boilerplate", "Manual subscription cleanup", "Less common pattern"],
+            "tags": ["advanced", "concurrent"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use Each"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Decision Guide",
+        "items": [
+          "Use refs when sharing mutable data that does not need to trigger renders",
+          "Use context when multiple components at different levels need the same state",
+          "Use external stores when you need concurrent-safe subscriptions or want to share state outside React",
+          "Combine patterns: context can provide a store instance, and hooks use useSyncExternalStore to subscribe"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Refs share mutable state without re-rendering",
+          "Context injects shared state through the component tree",
+          "External stores provide concurrent-safe subscriptions via useSyncExternalStore",
+          "Choose the lightest pattern that satisfies your re-rendering requirements"
+        ],
+        "takeaway": "State sharing between hooks is about choosing the right balance between simplicity and reactivity."
+      }
+    }
+  ],
+  "courseSlug": "react-advanced-patterns"
+}

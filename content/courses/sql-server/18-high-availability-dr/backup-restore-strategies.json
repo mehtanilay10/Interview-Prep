@@ -1,0 +1,176 @@
+{
+  "id": "lesson-sql-155",
+  "slug": "backup-restore-strategies",
+  "moduleSlug": "high-availability-dr",
+  "courseSlug": "sql-server",
+  "title": "Backup & Restore Strategies",
+  "description": "Design and implement comprehensive backup and restore strategies aligned with RPO and RTO objectives.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "backup",
+    "restore",
+    "rpo",
+    "rto",
+    "recovery-model",
+    "disaster-recovery",
+    "point-in-time"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Backup & Restore Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A well-designed backup and restore strategy is the last line of defense when high-availability technologies cannot prevent data loss. It defines how often you back up data, where backups are stored, how long they are retained, and how quickly you can restore a database to a usable state. Strategy design starts with two business metrics: Recovery Point Objective (RPO) and Recovery Time Objective (RTO)."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "RPO and RTO Drive Strategy",
+        "text": "RPO is the maximum acceptable data loss measured in time. RTO is the maximum acceptable downtime before services must be restored. A strategy that backs up every 15 minutes and restores in 10 minutes supports an RPO of 15 minutes and an RTO of 10 minutes. Always align technical controls with business requirements."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovery Models"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Recovery Model",
+          "Log Backup Allowed",
+          "Work Loss Exposure",
+          "Typical Use Case"
+        ],
+        "rows": [
+          [
+            "FULL",
+            "Yes",
+            "Minimal (since last log backup)",
+            "Production OLTP databases"
+          ],
+          [
+            "BULK_LOGGED",
+            "Yes",
+            "Minimal (except bulk operations)",
+            "Databases with large batch imports"
+          ],
+          [
+            "SIMPLE",
+            "No",
+            "Changes since last full backup",
+            "Development or read-only reporting"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Backup Types"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Full Backup: A complete copy of the entire database. The foundation of any restore strategy.",
+          "Differential Backup: Captures only data changed since the last full backup. Faster than full, but grows as the database changes.",
+          "Transaction Log Backup: Captures every transaction since the last log backup. Enables point-in-time recovery and is only available in FULL or BULK_LOGGED mode."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "backup-strategy-flow",
+        "caption": "Typical full/differential/log backup schedule for a production OLTP database",
+        "definition": "graph LR\n    FB[Full Backup Sunday 00:00] --> DB[Differential Backup Daily 06:00]\n    FB --> LB1[Log Backup Every 15 min]\n    DB --> LB2[Log Backup Every 15 min]\n    LB1 --> R[Restore: Full + Differential + Logs]\n    LB2 --> R"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Backups with T-SQL"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Set recovery model and create a full backup",
+        "content": "Ensures the database is in FULL recovery model before taking a full backup.",
+        "language": "sql",
+        "code": "ALTER DATABASE SalesDB SET RECOVERY FULL;\nGO\nBACKUP DATABASE SalesDB\nTO DISK = N'D:\\Backups\\SalesDB_Full.bak'\nWITH FORMAT, INIT, SKIP, NOREWIND, NOUNLOAD, STATS = 10;"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a transaction log backup",
+        "content": "Captures all transactions since the previous log backup, enabling point-in-time restore.",
+        "language": "sql",
+        "code": "BACKUP LOG SalesDB\nTO DISK = N'D:\\Backups\\SalesDB_Log.trn'\nWITH FORMAT, INIT, SKIP, NOREWIND, NOUNLOAD, STATS = 10;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Tail-Log Backup",
+        "text": "Before restoring over an existing database, take a tail-log backup to capture the remaining active portion of the transaction log. This prevents data loss of transactions that occurred after the last log backup."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Restore Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A restore strategy defines the sequence of restore operations and the recovery point you target. The simplest restore applies a full backup followed by any differential backups and then all transaction log backups up to the desired point in time. For point-in-time recovery, use the STOPAT clause on the final RESTORE LOG statement."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Point-in-time restore sequence",
+        "content": "Restores a full backup, a differential backup, and stops log recovery at a specific time.",
+        "language": "sql",
+        "code": "RESTORE DATABASE SalesDB\nFROM DISK = N'D:\\Backups\\SalesDB_Full.bak'\nWITH NORECOVERY, REPLACE;\n\nRESTORE DATABASE SalesDB\nFROM DISK = N'D:\\Backups\\SalesDB_Diff.bak'\nWITH NORECOVERY;\n\nRESTORE LOG SalesDB\nFROM DISK = N'D:\\Backups\\SalesDB_Log.trn'\nWITH RECOVERY, STOPAT = N'2025-06-15T14:30:00';"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Backup & Restore Strategy Key Points",
+        "points": [
+          "FULL recovery model is required for transaction log backups and point-in-time recovery.",
+          "A full backup is the foundation; differential and log backups reduce restore time.",
+          "RPO and RTO should drive your backup frequency and retention policy.",
+          "The 3-2-1 rule: keep three copies of data, on two media types, with one copy offsite.",
+          "Always test restores in a non-production environment to validate recovery time."
+        ],
+        "takeaway": "Backups protect against data corruption, human error, and catastrophic hardware failure. Pair them with high-availability technologies like Always On AGs to meet both availability and recoverability requirements."
+      }
+    }
+  ],
+  "courseSlug": "sql-server"
+}

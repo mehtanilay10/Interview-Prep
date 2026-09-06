@@ -1,0 +1,199 @@
+{
+  "id": "lesson-auth-037",
+  "slug": "session-management",
+  "moduleSlug": "security-best-practices",
+  "courseSlug": "authentication-authorization",
+  "title": "Session Management",
+  "description": "Implement secure session management including cookie configuration, session fixation prevention, and proper expiration strategies.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["session", "cookies", "session-fixation", "expiration", "security"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Session management** tracks authenticated users across requests. While JWT is popular, server-side sessions remain the most secure option for many applications because the sensitive data never leaves the server."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Session vs Token"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Session vs Token Authentication",
+        "cards": [
+          {
+            "title": "Server-Side Session",
+            "description": "Session ID stored in cookie, data stored server-side",
+            "pros": ["Easy revocation", "Small payload", "Server controls data"],
+            "cons": ["Scales with sticky sessions or shared store", "CSRF risk"]
+          },
+          {
+            "title": "JWT",
+            "description": "Self-contained token with claims",
+            "pros": ["Stateless", "Easy horizontal scaling"],
+            "cons": ["Hard to revoke", "Larger payload", "Stored in localStorage (XSS risk)"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Secure Cookie Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cookies are the most common transport for session IDs. Misconfigured cookies are a frequent source of vulnerabilities. Every cookie must be hardened against interception and tampering."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Secure Cookie Policy (C#)",
+        "content": "Configuring secure session cookies in ASP.NET Core",
+        "language": "csharp",
+        "code": "builder.Services.ConfigureApplicationCookie(options =>\n{\n    options.Cookie.Name = \"AppAuth\";\n    options.Cookie.HttpOnly = true; // Prevent JavaScript access\n    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // HTTPS only\n    options.Cookie.SameSite = SameSiteMode.Lax; // CSRF protection\n    options.Cookie.MaxAge = TimeSpan.FromHours(1);\n\n    options.ExpireTimeSpan = TimeSpan.FromMinutes(30);\n    options.SlidingExpiration = true;\n\n    options.Events.OnValidatePrincipal = async context =>\n    {\n        if (context.Principal == null) return;\n\n        var userId = context.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        if (string.IsNullOrEmpty(userId)) return;\n\n        // Check if user still exists and is active\n        var user = await _userManager.FindByIdAsync(userId);\n        if (user == null || !await _userManager.IsEmailConfirmedAsync(user))\n        {\n            context.RejectPrincipal();\n            await _context.SignOutAsync();\n        }\n    };\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "HttpOnly Cookies",
+        "text": "Always set HttpOnly on authentication cookies. This prevents JavaScript (including XSS payloads) from reading the cookie value."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Session Fixation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Session fixation** occurs when an attacker sets a victim's session ID before login, then waits for the victim to authenticate with that known ID. After login, the attacker uses the same session ID to hijack the session."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Attacker visits site and receives session ID `S123`",
+          "Attacker tricks victim into clicking a link that sets `S123`",
+          "Victim logs in with `S123`",
+          "Server upgrades `S123` to an authenticated session",
+          "Attacker uses `S123` to access victim's account"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Prevention",
+        "text": "Always regenerate the session ID after authentication. ASP.NET Core does this automatically when signing in, but verify if you implement custom session stores."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Session Expiration Strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Absolute expiration**: Session expires after a fixed time (e.g., 8 hours)",
+          "**Sliding expiration**: Session is extended with activity up to a max (e.g., 30 min idle, 8 hours max)",
+          "**Idle timeout**: Session expires after inactivity",
+          "**Hard logout on role change**: Invalidate session if user permissions change"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sliding Expiration with Redis",
+        "content": "Storing session state in Redis with automatic expiration",
+        "language": "csharp",
+        "code": "public async Task SetSessionAsync(string sessionId, ClaimsPrincipal principal)\n{\n    var sessionData = new SessionData\n    {\n        UserId = principal.FindFirst(ClaimTypes.NameIdentifier)!.Value,\n        CreatedAt = DateTime.UtcNow,\n        LastAccessed = DateTime.UtcNow,\n        ExpiresAt = DateTime.UtcNow.AddMinutes(30)\n    };\n\n    await _redis.StringSetAsync(\n        $\"session:{sessionId}\",\n        JsonSerializer.Serialize(sessionData),\n        expiry: TimeSpan.FromMinutes(30));\n}\n\npublic async Task<ClaimsPrincipal?> GetSessionAsync(string sessionId)\n{\n    var data = await _redis.StringGetAsync($\"session:{sessionId}\");\n    if (!data.HasValue) return null;\n\n    var session = JsonSerializer.Deserialize<SessionData>(data!);\n    if (session == null || session.ExpiresAt < DateTime.UtcNow) return null;\n\n    // Sliding expiration: extend on access\n    await _redis.KeyExpireAsync($\"session:{sessionId}\", TimeSpan.FromMinutes(30));\n    session.LastAccessed = DateTime.UtcNow;\n\n    return CreatePrincipal(session);\n}\n\npublic async Task RemoveSessionAsync(string sessionId)\n{\n    await _redis.KeyDeleteAsync($\"session:{sessionId}\");\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Concurrent Session Limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Limit the number of concurrent sessions per user. If a user logs in from a new device, invalidate older sessions. This prevents credential sharing and limits the blast radius of a stolen session cookie."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Session Security Checklist",
+        "items": [
+          {
+            "text": "Set HttpOnly, Secure, and SameSite on all auth cookies",
+            "hint": "SameSite=Lax blocks most CSRF while preserving UX"
+          },
+          {
+            "text": "Regenerate session ID after login",
+            "hint": "Prevents session fixation attacks"
+          },
+          {
+            "text": "Use absolute and sliding expiration together",
+            "hint": "Sliding alone can keep sessions alive indefinitely"
+          },
+          {
+            "text": "Store session data server-side with a short TTL",
+            "hint": "Redis or database-backed sessions"
+          },
+          {
+            "text": "Implement concurrent session limits",
+            "hint": "e.g., max 3 active sessions per user"
+          },
+          {
+            "text": "Invalidate sessions on password change or role change",
+            "hint": "Critical for privilege escalation prevention"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Always use HttpOnly and Secure cookies",
+          "Regenerate session ID after authentication",
+          "Combine absolute and sliding expiration",
+          "Limit concurrent sessions per user",
+          "Invalidate sessions on security events"
+        ],
+        "takeaway": "Proper session management prevents hijacking and limits the damage from stolen credentials."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "authentication-authorization"
+}

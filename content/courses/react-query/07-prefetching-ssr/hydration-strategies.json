@@ -1,0 +1,154 @@
+{
+  "id": "lesson-react-query-026",
+  "slug": "hydration-strategies",
+  "moduleSlug": "prefetching-ssr",
+  "courseSlug": "react-query",
+  "title": "Hydration Strategies",
+  "description": "Master hydration techniques to coordinate server-side and client-side data in React Query.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["hydration", "ssr", "cache-sync", "parallel-fetching", "nextjs"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hydration is the process of transferring server-fetched data into the client-side React Query cache. When done correctly, hydration makes your app feel instant because the client never needs to refetch data that the server already loaded."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Hydration?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In React Query, hydration means calling `hydrate` with the serialized cache state from the server. This merges the server data into the client QueryClient before any components render. As a result, `useQuery` immediately returns the server data instead of showing a loading state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding Hydration Mismatches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A hydration mismatch happens when the server-rendered HTML does not match the client's initial render. React Query's hydration system prevents this by ensuring cached data is available synchronously. However, you must still follow strict rules to avoid subtle bugs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Correct Hydration Pattern",
+        "content": "Using HydrationBoundary for safe hydration",
+        "language": "tsx",
+        "code": "import { QueryClient, dehydrate, HydrationBoundary } from '@tanstack/react-query';\n\nasync function Page({ params }: { params: { id: string } }) {\n  const queryClient = new QueryClient({\n    defaultOptions: {\n      queries: {\n        staleTime: 1000 * 60 * 5\n      }\n    }\n  });\n\n  await queryClient.prefetchQuery({\n    queryKey: ['todos', params.id],\n    queryFn: () => fetchTodos(params.id)\n  });\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <TodoDetail id={params.id} />\n    </HydrationBoundary>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Consistent Query Keys",
+        "text": "Use identical query keys on the server and client. A mismatch between `['user', id]` on the server and `['user', String(id)]` on the client creates a cache miss and forces a refetch."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Parallel Data Fetching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Server-side, you can prefetch multiple queries in parallel using `Promise.all`. This is critical for avoiding waterfalls where each query waits for the previous one to finish. Parallel fetching reduces total server response time and improves Time to First Byte (TTFB)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Parallel Prefetching",
+        "content": "Fetching multiple queries concurrently on the server",
+        "language": "tsx",
+        "code": "async function DashboardPage() {\n  const queryClient = new QueryClient();\n\n  await Promise.all([\n    queryClient.prefetchQuery({ queryKey: ['revenue'], queryFn: fetchRevenue }),\n    queryClient.prefetchQuery({ queryKey: ['users'], queryFn: fetchUsers }),\n    queryClient.prefetchQuery({ queryKey: ['orders'], queryFn: fetchOrders })\n  ]);\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <DashboardClient />\n    </HydrationBoundary>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "parallel-vs-sequential",
+        "caption": "Parallel vs sequential prefetching",
+        "definition": "graph TD\n    A[Start] --> B{Parallel?}\n    B -->|Yes| C[Query A]\n    B -->|Yes| D[Query B]\n    B -->|Yes| E[Query C]\n    C --> F[All Complete]\n    D --> F\n    E --> F\n    B -->|No| G[Query A]\n    G --> H[Query B]\n    H --> I[Query C]\n    I --> J[All Complete]\n    F --> K[Total: Max(A,B,C)]\n    J --> L[Total: A+B+C]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Time Considerations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Server-fetched data should generally have a longer `staleTime` because it was just fetched. Setting `staleTime` to a few minutes ensures the client does not immediately refetch fresh data. However, `gcTime` controls how long inactive data stays in memory, so balance these based on your app's memory constraints."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Memory Leaks",
+        "text": "Setting `gcTime` to Infinity keeps data forever, which can cause memory leaks in long-running apps. Use a reasonable value like 5 minutes unless you have a specific reason to extend it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Partial Hydration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You do not need to hydrate every query. If a query is only used client-side or depends on user interaction, skip it during SSR. Partial hydration reduces serialized payload size and keeps your initial HTML focused on above-the-fold content."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Selective Hydration",
+        "content": "Hydrating only critical queries",
+        "language": "tsx",
+        "code": "async function ProductPage({ params }: { params: { id: string } }) {\n  const queryClient = new QueryClient();\n\n  // Hydrate critical above-the-fold data\n  await queryClient.prefetchQuery({\n    queryKey: ['product', params.id],\n    queryFn: () => fetchProduct(params.id)\n  });\n\n  // Skip hydrating reviews; fetch client-side\n  // await queryClient.prefetchQuery({ queryKey: ['reviews', params.id], ... });\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <ProductClient id={params.id} />\n    </HydrationBoundary>\n  );\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Hydration transfers server cache to the client",
+          "Use identical query keys to prevent cache misses",
+          "Promise.all enables parallel server-side fetching",
+          "Selective hydration reduces payload size",
+          "Match staleTime to data freshness needs",
+          "Guard against memory leaks with reasonable gcTime"
+        ],
+        "takeaway": "Proper hydration ensures zero duplicate requests and instant client-side rendering."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["query-options"]
+}

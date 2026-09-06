@@ -1,0 +1,167 @@
+{
+  "id": "lesson-react-adv-030",
+  "slug": "flexible-component-apis",
+  "moduleSlug": "component-composition-strategies",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Flexible Component APIs",
+  "description": "Design component APIs that balance flexibility with simplicity using union props, variant objects, and sensible defaults.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 40,
+  "tags": ["api-design", "union-props", "variants", "defaults", "typescript", "usability"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The API Design Spectrum"
+    },
+    {
+      "type": "paragraph",
+      "text": "Component API design lives on a spectrum. On one end, the monolithic prop object where every possible configuration is flattened into a single interface. On the other end, the highly composable primitive that requires ten wrapper components to render a button. The sweet spot is a flexible API that covers common cases with sensible defaults while still letting power users reach into the internals when they need to."
+    },
+    {
+      "type": "quote",
+      "text": "Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.",
+      "attribution": "Antoine de Saint-Exupéry"
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "API Design Principles",
+      "text": "A great component API is discoverable, predictable, and minimal. It should be obvious how to do the common thing, and possible to do the uncommon thing without fighting the abstraction."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Union Props for Context-Dependent Behavior"
+    },
+    {
+      "type": "paragraph",
+      "text": "Many components behave differently depending on what props they receive. A button with an href should render as an anchor. A button with an onClick but no href should render as a button. Instead of forcing the consumer to choose the element type explicitly, you can use discriminated unions so TypeScript infers the correct behavior from the props present. This is both ergonomic and type-safe."
+    },
+    {
+      "type": "example",
+      "title": "Discriminated Union Button Props",
+      "content": "A button API that changes behavior based on whether href is present.",
+      "code": "type ButtonAsLink = {\n  href: string;\n  target?: '_blank' | '_self';\n  rel?: string;\n} & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>;\n\ntype ButtonAsButton = {\n  type?: 'button' | 'submit' | 'reset';\n  disabled?: boolean;\n} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'>;\n\ntype ButtonProps = {\n  variant?: 'primary' | 'secondary';\n  size?: 'sm' | 'md' | 'lg';\n  children: React.ReactNode;\n} & (ButtonAsLink | ButtonAsButton);\n\nfunction Button(props: ButtonProps) {\n  const { variant = 'primary', size = 'md', children, ...rest } = props;\n\n  const className = cn(\n    'btn',\n    `btn-${variant}`,\n    `btn-${size}`\n  );\n\n  if ('href' in rest) {\n    const { href, target, rel, ...anchorRest } = rest as ButtonAsLink;\n    return (\n      <a\n        href={href}\n        target={target}\n        rel={rel || (target === '_blank' ? 'noopener noreferrer' : undefined)}\n        className={className}\n        {...anchorRest}\n      >\n        {children}\n      </a>\n    );\n  }\n\n  const { type = 'button', disabled, ...buttonRest } = rest as ButtonAsButton;\n  return (\n    <button\n      type={type}\n      disabled={disabled}\n      className={className}\n      {...buttonRest}\n    >\n      {children}\n    </button>\n  );\n}\n\n// TypeScript knows exactly which props are valid in each branch\n<Button href=\"/home\" variant=\"secondary\">Home</Button>\n<Button variant=\"primary\" onClick={handleClick} disabled={isDisabled}>\n  Submit\n</Button>",
+      "language": "tsx"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Variant Objects Over Boolean Flags"
+    },
+    {
+      "type": "paragraph",
+      "text": "Boolean flags like isPrimary, isSecondary, isLarge, and isDisabled explode combinatorially. Variant objects replace them with a single config object that groups related options. A variant object is extensible: you can add new variants without changing the component signature, and consumers get autocomplete for valid combinations."
+    },
+    {
+      "type": "example",
+      "title": "Variant Object Pattern",
+      "content": "Replace multiple boolean flags with a single variants object.",
+      "code": "type BadgeVariants = {\n  intent?: 'neutral' | 'success' | 'warning' | 'danger';\n  size?: 'sm' | 'md';\n  shape?: 'rounded' | 'pill';\n};\n\nconst defaultVariants: BadgeVariants = {\n  intent: 'neutral',\n  size: 'md',\n  shape: 'rounded',\n};\n\nfunction Badge({\n  children,\n  intent,\n  size,\n  shape,\n  className,\n}: BadgeVariants & { children: React.ReactNode; className?: string }) {\n  const classes = cn(\n    'badge',\n    `badge-${intent || defaultVariants.intent}`,\n    `badge-${size || defaultVariants.size}`,\n    `badge-${shape || defaultVariants.shape}`,\n    className\n  );\n\n  return <span className={classes}>{children}</span>;\n}\n\n// Usage with defaults\n<Badge>Default neutral</Badge>\n<Badge intent=\"success\" size=\"sm\">Verified</Badge>\n<Badge intent=\"danger\" shape=\"pill\">Error</Badge>",
+      "language": "tsx"
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to Use Variant Objects",
+      "items": [
+        "A component has three or more style or behavior variants.",
+        "Variants are orthogonal and can be combined freely.",
+        "You expect to add new variants in the future without breaking the API.",
+        "Consumers should see a curated list of valid options in IDE autocomplete."
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Sensible Defaults"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every component prop should have a default that produces a usable, accessible result. Defaults reduce cognitive load because consumers only need to override what they care about. A Button with defaultVariant='primary' and defaultSize='md' renders correctly out of the box. If a consumer wants a secondary button, they specify only variant='secondary'. Defaults also prevent broken states where required props are accidentally omitted."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "text": "Use TypeScript optional properties with default values inside the component body instead of making props required. Required props force consumers to think about every parameter, even when the default would have been fine."
+    },
+    {
+      "type": "table",
+      "headers": ["Pattern", "Example", "Pros", "Cons"],
+      "rows": [
+        ["Boolean Flags", "isPrimary, isDisabled", "Simple to add", "Combinatorial explosion"],
+        ["Union Props", "href in props", "Type-safe branching", "More type definitions"],
+        ["Variant Object", "variants={{ intent, size }}", "Extensible, grouped", "Slightly more verbose"],
+        ["Render Props", "children={(api) => ...}", "Maximum flexibility", "Complex consumer code"],
+        ["Compound Components", "<Button.Icon />", "Intuitive nesting", "Requires context setup"]
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Compound Component Variants"
+    },
+    {
+      "type": "paragraph",
+      "text": "Some components benefit from both a simple variant prop and a compound component escape hatch. The variant prop handles the eighty percent case quickly. The compound sub-components let the remaining twenty percent rearrange, replace, or extend parts of the UI. A List component might accept a variant='divided' prop for standard use, but also expose List.Header, List.Item, and List.Footer for custom layouts."
+    },
+    {
+      "type": "example",
+      "title": "List with Variant and Compound Parts",
+      "content": "A list that supports both simple variants and compound composition.",
+      "code": "type ListProps = {\n  variant?: 'divided' | 'bordered' | 'plain';\n  children?: React.ReactNode;\n};\n\nfunction List({ variant = 'plain', children }: ListProps) {\n  const context = React.useMemo(() => ({ variant }), [variant]);\n  return (\n    <ListContext.Provider value={context}>\n      <ul className={cn('list', `list-${variant}`)}>{children}</ul>\n    </ListContext.Provider>\n  );\n}\n\nList.Item = function ListItem({ children, className }: { children: React.ReactNode; className?: string }) {\n  const { variant } = React.useContext(ListContext);\n  return (\n    <li className={cn('list-item', `list-item-${variant}`, className)}>\n      {children}\n    </li>\n  );\n};\n\nList.Header = function ListHeader({ children, className }: { children: React.ReactNode; className?: string }) {\n  return (\n    <li className={cn('list-header', className)}>\n      {children}\n    </li>\n  );\n};\n\n// Simple variant usage\n<List variant=\"divided\">\n  <List.Item>First</List.Item>\n  <List.Item>Second</List.Item>\n</List>\n\n// Compound composition usage\n<List>\n  <List.Header>Custom Header</List.Header>\n  <List.Item className=\"highlight\">Highlighted</List.Item>\n  <List.Item>Normal</List.Item>\n</List>",
+      "language": "tsx"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Testing Component APIs"
+    },
+    {
+      "type": "paragraph",
+      "text": "A component API is only as good as its ergonomics under pressure. Test your API by implementing the three most common use cases, one moderately complex use case, and one edge case. If any of those feel awkward, the API needs adjustment. Use TypeScript's type checking as a test: if the IDE suggests invalid props or fails to suggest valid ones, the types are wrong."
+    },
+    {
+      "type": "checklist",
+      "title": "Component API Review Checklist",
+      "items": [
+        {
+          "text": "Can the most common use case be written in one line?",
+          "hint": "If it takes three props for a simple button, simplify."
+        },
+        {
+          "text": "Do variant names match their visual or behavioral intent?",
+          "hint": "Avoid vague names like style1, style2, or type1."
+        },
+        {
+          "text": "Are required props actually required, or do they have sensible defaults?",
+          "hint": "Default to the safest, most accessible option."
+        },
+        {
+          "text": "Does the API support composition without forcing it?",
+          "hint": "Provide both simple props and compound sub-components."
+        },
+        {
+          "text": "Are the TypeScript types exported so consumers can extend them?",
+          "hint": "Export prop interfaces and variant types from the component package."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Design APIs for the common case first, then add escape hatches for advanced use cases.",
+        "Union props let TypeScript infer behavior from the presence of specific keys like href.",
+        "Variant objects group related options and prevent boolean flag explosion.",
+        "Sensible defaults make components usable with zero configuration.",
+        "Compound components and simple variants can coexist in the same API surface."
+      ],
+      "takeaway": "A flexible API is not a complex API. It is a simple API with well-placed seams where power users can extend behavior."
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["compound-basics"]
+}

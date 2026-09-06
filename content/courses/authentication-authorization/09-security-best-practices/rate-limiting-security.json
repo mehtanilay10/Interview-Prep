@@ -1,0 +1,232 @@
+{
+  "id": "lesson-auth-039",
+  "slug": "rate-limiting-security",
+  "moduleSlug": "security-best-practices",
+  "courseSlug": "authentication-authorization",
+  "title": "Rate Limiting and Security Hardening",
+  "description": "Implement rate limiting for authentication endpoints and apply security hardening techniques including security headers and anomaly detection.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["rate-limiting", "brute-force", "security-headers", "anomaly-detection", "hardening"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Rate limiting** restricts how many requests a client can make in a given time window. For authentication endpoints, rate limiting is critical because it slows down brute-force attacks, credential stuffing, and denial-of-service attempts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Threat Model"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Brute force**: Attackers try every possible password combination",
+          "**Credential stuffing**: Automated replay of leaked username/password pairs",
+          "**Password spraying**: Try a few common passwords against many accounts",
+          " **DoS**: Flood login endpoint to exhaust resources or lock accounts"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Account Lockout vs Rate Limiting",
+        "text": "Account lockout after 5 failed attempts is a denial-of-service vector. Attackers can lock out legitimate users. Rate limiting with exponential backoff is more user-friendly and harder to exploit."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limiting Algorithms"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The **token bucket** algorithm is the most common. It allows bursts of traffic up to a bucket size, then refills at a steady rate. For login endpoints, a token bucket with a small burst size and slow refill prevents brute force without blocking legitimate retries."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rate-limit-token-bucket",
+        "caption": "Token bucket rate limiting algorithm",
+        "definition": "graph LR\n    A[Request arrives] --> B{Bucket has tokens?}\n    B -->|Yes| C[Allow request, remove token]\n    B -->|No| D[Reject request 429]\n    E[Time passes] --> F[Refill tokens at rate R]\n    F --> B"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation in ASP.NET Core"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core provides middleware for rate limiting. You can configure fixed-window or token-bucket policies. For auth endpoints, apply stricter limits than general API endpoints."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rate Limiting Middleware (C#)",
+        "content": "Configuring rate limiting for login and auth endpoints",
+        "language": "csharp",
+        "code": "builder.Services.AddRateLimiter(options =>\n{\n    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>\n    {\n        return RateLimitPartition.GetFixedWindowLimiter(\n            partitionKey: context.User.Identity?.Name ??\n                context.Request.Headers[\"X-Forwarded-For\"].ToString(),\n            factory: key => new FixedWindowRateLimiterOptions\n            {\n                PermitLimit = 5,\n                Window = TimeSpan.FromMinutes(5),\n                QueueLimit = 0,\n                QueueProcessingOrder = QueueProcessingOrder.OldestFirst\n            });\n    });\n\n    options.AddPolicy(\"auth\", context =>\n    {\n        return RateLimitPartition.GetTokenBucketLimiter(\n            partitionKey: context.Request.Path,\n            factory: _ => new TokenBucketRateLimiterOptions\n            {\n                TokenLimit = 3,\n                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,\n                QueueLimit = 0,\n                ReplenishmentPeriod = TimeSpan.FromMinutes(1),\n                TokensPerPeriod = 1,\n                AutoReplenishment = true\n            });\n    });\n});\n\napp.UseRateLimiter();\n\n// Apply to login endpoint\n[RateLimiter(\"auth\")]\n[HttpPost(\"login\")]\npublic async Task<IActionResult> Login(LoginRequest request)\n{\n    // Login logic...\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Anomaly Detection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limiting catches volume-based attacks but not sophisticated ones. **Anomaly detection** monitors behavioral patterns to spot suspicious activity that falls within rate limits."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Impossible travel**: Login from two locations too far apart in time",
+          "**New device**: First login from an unrecognized device",
+          "**Time-of-day anomalies**: Account accessed at unusual hours",
+          "**IP reputation**: Requests from known malicious IPs"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Progressive Friction",
+        "text": "Instead of hard-blocking anomalies, apply progressive friction: step-up MFA, CAPTCHA, or email verification. Hard blocks frustrate legitimate users on new devices."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Security Headers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "HTTP security headers instruct browsers to enforce security policies. They are simple to deploy and provide broad protection against common attacks."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Header", "Purpose", "Recommended Value"],
+        "rows": [
+          ["Strict-Transport-Security", "Enforce HTTPS", "max-age=31536000; includeSubDomains"],
+          ["X-Content-Type-Options", "Prevent MIME sniffing", "nosniff"],
+          ["X-Frame-Options", "Prevent clickjacking", "DENY"],
+          ["Content-Security-Policy", "Prevent XSS", "default-src 'self'"],
+          ["Referrer-Policy", "Control referrer info", "strict-origin-when-cross-origin"],
+          ["Permissions-Policy", "Restrict browser features", "geolocation=(), microphone=()"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CAPTCHA Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For public endpoints like login and registration, CAPTCHAs add friction for bots while remaining invisible to most users. hCaptcha and reCAPTCHA v3 score users based on behavior and only challenge suspicious ones."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "reCAPTCHA Verification",
+        "content": "Validating reCAPTCHA tokens server-side",
+        "language": "csharp",
+        "code": "public async Task<bool> VerifyRecaptchaAsync(string token, string remoteIp)\n{\n    var secret = _configuration[\"Recaptcha:SecretKey\"];\n    var client = new HttpClient();\n    var response = await client.PostAsync(\n        $\"https://www.google.com/recaptcha/api/siteverify?secret={secret}&response={token}&remoteip={remoteIp}\",\n        null);\n\n    var json = await response.Content.ReadAsStringAsync();\n    var result = JsonSerializer.Deserialize<RecaptchaResponse>(json);\n\n    return result != null && result.Success && result.Score >= 0.5;\n}\n\n[HttpPost(\"login\")]\npublic async Task<IActionResult> Login(LoginRequest request)\n{\n    var isValidCaptcha = await VerifyRecaptchaAsync(\n        request.CaptchaToken, HttpContext.Connection.RemoteIpAddress?.ToString() ?? \"\");\n\n    if (!isValidCaptcha)\n    {\n        ModelState.AddModelError(\"\", \"Please complete the CAPTCHA.\");\n        return BadRequest(ModelState);\n    }\n\n    // Proceed with login...\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "IP Allowlisting and Geo-Blocking"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For admin portals, restrict access to known IP ranges using firewalls, API gateways, or application-level checks. Geo-blocking can prevent access from sanctioned countries but should not be the sole security control."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Security Hardening Checklist",
+        "items": [
+          {
+            "text": "Apply rate limiting to all authentication endpoints",
+            "hint": "Stricter limits for login than general API"
+          },
+          {
+            "text": "Implement anomaly detection for login patterns",
+            "hint": "New device, impossible travel, unusual hours"
+          },
+          {
+            "text": "Deploy all recommended security headers",
+            "hint": "Use a library like NWebsec to avoid mistakes"
+          },
+          {
+            "text": "Add CAPTCHA after repeated failed login attempts",
+            "hint": "Progressive friction is better than immediate block"
+          },
+          {
+            "text": "Log all authentication events with IP and user agent",
+            "hint": "Essential for incident response"
+          },
+          {
+            "text": "Regularly audit auth endpoint logs",
+            "hint": "Look for credential stuffing patterns"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Rate limiting slows brute-force and credential stuffing",
+          "Anomaly detection catches sophisticated attacks within rate limits",
+          "Security headers provide broad browser-side protection",
+          "CAPTCHAs add friction for bots without annoying users",
+          "Log everything for forensic analysis"
+        ],
+        "takeaway": "Security hardening is a layered approach. No single control prevents all attacks."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "authentication-authorization"
+}

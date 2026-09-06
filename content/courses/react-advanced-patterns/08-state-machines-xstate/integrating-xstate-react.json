@@ -1,0 +1,117 @@
+{
+  "id": "lesson-react-adv-025",
+  "slug": "integrating-xstate-react",
+  "moduleSlug": "state-machines-xstate",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Integrating XState with React",
+  "description": "Connect XState machines to React components using @xstate/react, including useMachine, useSelector, and testing strategies.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 40,
+  "tags": ["@xstate-react", "useMachine", "useSelector", "actor", "react-integration", "testing"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "XState and React"
+    },
+    {
+      "type": "paragraph",
+      "text": "XState is framework-agnostic by design, but it ships with first-class React bindings in the @xstate/react package. These bindings handle subscribing to actor state changes, re-rendering components only when relevant state slices change, and cleaning up listeners on unmount. The two primary hooks are useMachine for simple cases and useSelector when you need to select specific pieces of state from a larger machine."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Actor Model in XState v5",
+      "text": "XState v5 uses the actor model terminology. A machine becomes an actor when you pass it to createActor. The useMachine hook is syntactic sugar that creates, starts, and stops an actor for you."
+    },
+    {
+      "type": "mermaid",
+      "id": "xstate-react-flow",
+      "caption": "Data flow from an XState actor into a React component.",
+      "definition": "flowchart LR\n    Machine[XState Machine] --> Actor[createActor]\n    Actor --> Service[Running Service]\n    Service --> |state changes| Hook[useMachine / useSelector]\n    Hook --> |derived state| Component[React Component]\n    Component --> |send event| Actor"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "The useMachine Hook"
+    },
+    {
+      "type": "paragraph",
+      "text": "useMachine is the simplest way to connect a machine to a React component. It returns a tuple containing the current actor snapshot and a send function. When the machine transitions, the component re-renders with the new snapshot. The send function accepts event objects or strings, matching the event types declared in your machine configuration."
+    },
+    {
+      "type": "example",
+      "title": "useMachine with a Fetch Machine",
+      "content": "A practical example connecting a data-fetching machine to a React component.",
+      "code": "import { useMachine } from '@xstate/react';\nimport { fetchMachine } from './fetchMachine';\n\nfunction UserProfile({ userId }: { userId: string }) {\n  const [state, send] = useMachine(fetchMachine, {\n    input: { userId },\n  });\n\n  const { data, error, isLoading } = state;\n\n  if (isLoading.matches('loading')) {\n    return <div className=\"spinner\" />;\n  }\n\n  if (state.matches('failure')) {\n    return (\n      <div className=\"error\">\n        <p>{error?.message}</p>\n        <button onClick={() => send('RETRY')}>Retry</button>\n      </div>\n    );\n  }\n\n  return (\n    <div>\n      <h1>{data.name}</h1>\n      <button onClick={() => send('RESET')}>Reset</button>\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "text": "Prefer state.matches('stateName') over string equality on state.value. matches() is type-safe and works correctly with nested and parallel states."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Selecting Specific State with useSelector"
+    },
+    {
+      "type": "paragraph",
+      "text": "When a machine is large, you do not want your component to re-render on every state change. useMachine always returns the full snapshot, but you can derive only the data you need using useSelector. The selector function receives the full snapshot and returns a value. React will only re-render when that selected value changes by reference, just like Redux selectors."
+    },
+    {
+      "type": "example",
+      "title": "useSelector for Granular Updates",
+      "content": "Subscribe only to the data you need to avoid unnecessary renders.",
+      "code": "import { useSelector } from '@xstate/react';\nimport { gameMachine } from './gameMachine';\n\nfunction ScoreBoard() {\n  const score = useSelector(\n    gameActor,\n    (snapshot) => snapshot.context.score\n  );\n  const isGameOver = useSelector(\n    gameActor,\n    (snapshot) => snapshot.matches('gameOver')\n  );\n\n  return (\n    <div>\n      <p>Score: {score}</p>\n      {isGameOver && <p>Game Over</p>}\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to Use useMachine vs useSelector",
+      "items": [
+        "useMachine: the component renders different UI for every state (loading, error, success).",
+        "useSelector: the machine is large, and the component only cares about a small slice of state or context.",
+        "useMachine: simpler mental model for small to medium machines.",
+        "useSelector: better performance characteristics for high-frequency state updates."
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Testing XState Machines in React"
+    },
+    {
+      "type": "paragraph",
+      "text": "Because XState machines are pure logic, the best tests run against the machine itself, not the React wrapper. Use XState's built-in test utilities to simulate event sequences and assert on the final state and context. React component tests can verify that the correct UI renders for each machine state using testing-library queries."
+    },
+    {
+      "type": "example",
+      "title": "Testing a Machine Without React",
+      "content": "Unit test the machine logic directly with XState's test utilities.",
+      "code": "import { createActor } from 'xstate';\nimport { toggleMachine } from './toggleMachine';\n\ndescribe('toggleMachine', () => {\n  it('starts in inactive state', () => {\n    const actor = createActor(toggleMachine).start();\n    expect(actor.getSnapshot().matches('inactive')).toBe(true);\n    actor.stop();\n  });\n\n  it('transitions to active on TOGGLE', () => {\n    const actor = createActor(toggleMachine).start();\n    actor.send({ type: 'TOGGLE' });\n    expect(actor.getSnapshot().matches('active')).toBe(true);\n    actor.stop();\n  });\n\n  it('returns to inactive on second TOGGLE', () => {\n    const actor = createActor(toggleMachine).start();\n    actor.send({ type: 'TOGGLE' });\n    actor.send({ type: 'TOGGLE' });\n    expect(actor.getSnapshot().matches('inactive')).toBe(true);\n    actor.stop();\n  });\n});",
+      "language": "typescript"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "text": "Never test statechart logic inside React component tests alone. If the machine logic is buggy, the component test will still pass because it only verifies the UI. Unit-test the machine first, then write thin component tests to verify rendering."
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "useMachine is the simplest hook for connecting an XState actor to a React component.",
+        "useMachine returns the full snapshot and a send function on every render.",
+        "useSelector subscribes to derived slices of actor state to minimize unnecessary re-renders.",
+        "Prefer state.matches() over checking state.value directly for type-safe state checks.",
+        "Test machines in isolation first using createActor and send, then verify UI rendering separately."
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["state-reducer-basics"]
+}

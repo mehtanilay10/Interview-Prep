@@ -1,0 +1,134 @@
+{
+  "id": "lesson-auth-026",
+  "slug": "token-rotation",
+  "moduleSlug": "refresh-token-strategies",
+  "courseSlug": "authentication-authorization",
+  "title": "Token Rotation",
+  "description": "Learn how refresh token rotation detects token theft by issuing a new refresh token on every use.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["token-rotation", "refresh-tokens", "security", "oauth2"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What is Token Rotation?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Token rotation is a refresh token security mechanism where the authorization server issues a new refresh token every time the client uses the current refresh token to obtain a new access token. The old refresh token is immediately invalidated. This means that if a refresh token is stolen, it can only be used once before the legitimate client refreshes again and detects the theft."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Why Rotation Matters",
+      "text": "Without rotation, a stolen refresh token remains valid until it expires, potentially giving an attacker persistent access. Rotation limits the attack window to a single use."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Rotation Works"
+    },
+    {
+      "type": "numbered-list",
+      "title": "Token Rotation Steps",
+      "items": [
+        "Client sends a refresh token to the token endpoint",
+        "Server validates the refresh token",
+        "Server generates a new refresh token (and new access token)",
+        "Server invalidates the old refresh token",
+        "Server returns the new tokens to the client",
+        "Client replaces the old refresh token with the new one"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Detecting Theft with Reuse Detection"
+    },
+    {
+      "type": "paragraph",
+      "text": "The strongest protection comes from reuse detection. When a server sees the same refresh token presented twice, it knows the token was either cloned or reused. The server should immediately revoke both the current token and any descendant tokens, then notify the user or force re-authentication."
+    },
+    {
+      "type": "mermaid",
+      "id": "token-rotation-detection",
+      "caption": "Token rotation with reuse detection",
+      "definition": "sequenceDiagram\n  participant Client\n  participant Attacker\n  participant AuthServer\n  Client->>AuthServer: POST /token (refresh_token=A)\n  AuthServer-->>Client: access_token + refresh_token=B\n  Note right of Attacker: Attacker stole A\n  Attacker->>AuthServer: POST /token (refresh_token=A)\n  AuthServer->>AuthServer: Detects reuse of A\n  AuthServer-->>Attacker: 403 Invalid token\n  AuthServer->>AuthServer: Revokes B and all descendants\n  Client->>AuthServer: POST /token (refresh_token=B)\n  AuthServer-->>Client: 403 Invalid token (revoked)"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Implementation Considerations"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Critical Implementation Details",
+      "items": [
+        "Generate cryptographically secure random refresh tokens using a CSPRNG",
+        "Store refresh tokens hashed in the database, similar to passwords",
+        "Track a token family or identifier to detect reuse across generations",
+        "Set a short absolute lifetime (e.g., 24 hours) even with rotation",
+        "Limit the number of rotations allowed within a time window"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Database Requirement",
+      "text": "Token rotation requires server-side storage of refresh tokens. You cannot implement robust rotation with pure stateless JWTs because the server needs to remember which tokens have been issued and which have been revoked."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Example: Token Rotation with Database"
+    },
+    {
+      "type": "example",
+      "title": "Express token rotation implementation",
+      "content": "A refresh endpoint that rotates tokens and detects reuse.",
+      "code": "app.post('/api/auth/refresh', async (req, res) => {\n  const { refreshToken } = req.body;\n\n  if (!refreshToken) {\n    return res.status(401).json({ message: 'Refresh token required' });\n  }\n\n  const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');\n  const storedToken = await RefreshToken.findOne({ token: hashedToken });\n\n  if (!storedToken) {\n    return res.status(403).json({ message: 'Invalid refresh token' });\n  }\n\n  if (storedToken.revoked) {\n    await RefreshToken.updateMany(\n      { familyId: storedToken.familyId },\n      { $set: { revoked: true } }\n    );\n    return res.status(403).json({ message: 'Token reuse detected' });\n  }\n\n  storedToken.revoked = true;\n  await storedToken.save();\n\n  const newRefreshToken = generateSecureToken();\n  const newHashedToken = crypto.createHash('sha256').update(newRefreshToken).digest('hex');\n\n  await RefreshToken.create({\n    token: newHashedToken,\n    familyId: storedToken.familyId,\n    userId: storedToken.userId,\n    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)\n  });\n\n  const accessToken = generateAccessToken(storedToken.userId);\n  res.json({ accessToken, refreshToken: newRefreshToken });\n});",
+      "language": "javascript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Handling Concurrent Requests"
+    },
+    {
+      "type": "paragraph",
+      "text": "A common edge case is concurrent refresh requests. If a client sends two refresh requests simultaneously with the same token, the second request may find the token already rotated. Implement idempotency keys or optimistic concurrency control. Alternatively, allow a short grace period where the previous token is still accepted after rotation."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Concurrency Strategy",
+      "text": "Use an idempotency key header in refresh requests. If the server sees the same key twice, return the same new tokens instead of creating additional token families."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Rotation in OAuth 2.0"
+    },
+    {
+      "type": "paragraph",
+      "text": "OAuth 2.0 Security Best Current Practice (BCP) recommends refresh token rotation as mandatory for public clients and strongly recommended for confidential clients. RFC 6749 does not mandate rotation, but RFC 6819 and BCP 212 both encourage it as a critical defense against token leakage."
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Token rotation issues a new refresh token on every use and invalidates the old one",
+        "Reuse detection revokes all tokens in a family when theft is suspected",
+        "Requires server-side storage with hashed tokens",
+        "Handle concurrent requests with idempotency or grace periods",
+        "OAuth 2.0 BCP strongly recommends rotation for all clients"
+      ],
+      "takeaway": "Token rotation transforms refresh tokens from a long-lived credential into a short-lived credential that changes on every use, dramatically reducing the impact of token theft."
+    }
+  ],
+  "relatedLessons": ["refresh-token-basics"],
+  "furtherReading": [],
+  "prerequisites": ["refresh-token-basics"]
+}

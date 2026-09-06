@@ -1,0 +1,261 @@
+{
+    "id":  "lesson-sql-156",
+    "slug":  "star-snowflake-schema",
+    "moduleSlug":  "data-warehousing",
+    "courseSlug":  "sql-server",
+    "title":  "Star \u0026 Snowflake Schema",
+    "description":  "Learn dimensional modeling with star and snowflake schemas for building efficient data warehouses in SQL Server.",
+    "order":  1,
+    "difficulty":  "advanced",
+    "estimatedMinutes":  25,
+    "tags":  [
+                 "star-schema",
+                 "snowflake",
+                 "dimensional-modeling",
+                 "fact-table",
+                 "dimension-table"
+             ],
+    "blocks":  [
+                   {
+                       "type":  "heading",
+                       "level":  2,
+                       "text":  "What Is Dimensional Modeling?"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "Dimensional modeling is the foundation of data warehouse design. Unlike transactional (OLTP) databases optimized for writes and real-time operations, a data warehouse is optimized for reads and analytical queries. Dimensional modeling structures data around business processes by separating measurements (facts) from descriptive context (dimensions), making queries intuitive and performant."
+                   },
+                   {
+                       "type":  "callout",
+                       "variant":  "important",
+                       "title":  "Why Dimensional Modeling Matters",
+                       "text":  "If you design a data warehouse like an OLTP system — highly normalized with dozens of tables — analysts will face complex multi-table joins for every report. Dimensional modeling denormalizes strategically to put the most commonly queried attributes directly in dimension tables, dramatically simplifying SQL and improving query speed."
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  3,
+                       "text":  "Facts and Dimensions"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "Every dimensional model centers on a business process event — a sale, a shipment, a click. That event is captured in a fact table. The who, what, where, when, and why surrounding the event live in dimension tables. Fact tables are narrow (few columns) and deep (millions of rows). Dimension tables are wide (many descriptive attributes) and relatively small."
+                   },
+                   {
+                       "type":  "key-terms",
+                       "terms":  [
+                                     {
+                                         "term":  "Fact Table",
+                                         "definition":  "A central table containing quantitative measurements (measures) of a business process, linked to dimension tables via foreign keys."
+                                     },
+                                     {
+                                         "term":  "Dimension Table",
+                                         "definition":  "A descriptive table that provides context for facts — who, what, where, when — enabling filtering, grouping, and labeling in queries."
+                                     },
+                                     {
+                                         "term":  "Measure",
+                                         "definition":  "A numeric value stored in a fact table that can be aggregated (SUM, COUNT, AVG). Examples: sales amount, quantity sold, discount applied."
+                                     },
+                                     {
+                                         "term":  "Grain",
+                                         "definition":  "The level of detail stored in a fact table. Grain must be declared before modeling — e.g., \u0027one row per sales order line item\u0027 or \u0027one row per daily store product summary\u0027."
+                                     }
+                                 ]
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  2,
+                       "text":  "Star Schema"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "The star schema is the simplest and most common dimensional model. A single fact table sits at the center, surrounded by denormalized dimension tables. The shape resembles a star: the fact table is the core, and dimension tables are the points. Because dimensions are denormalized, query writers need only join the fact table to a handful of dimension tables to produce rich reports."
+                   },
+                   {
+                       "type":  "mermaid",
+                       "id":  "star-schema-sales",
+                       "caption":  "Star schema for a sales data warehouse. FactSales connects to denormalized dimension tables.",
+                       "definition":  "erDiagram\n    FactSales {\n        int SalesKey PK\n        int DateKey FK\n        int ProductKey FK\n        int StoreKey FK\n        int CustomerKey FK\n        decimal Quantity\n        decimal UnitPrice\n        decimal Discount\n        decimal SalesAmount\n        int PromotionKey FK\n    }\n    DimDate {\n        int DateKey PK\n        date FullDate\n        int Year\n        int Quarter\n        int Month\n        int DayOfWeek\n        varchar HolidayName\n    }\n    DimProduct {\n        int ProductKey PK\n        varchar ProductName\n        varchar Category\n        varchar Subcategory\n        varchar Brand\n        decimal ListPrice\n        int ColorID\n    }\n    DimStore {\n        int StoreKey PK\n        varchar StoreName\n        varchar City\n        varchar State\n        varchar Country\n        varchar StoreType\n    }\n    DimCustomer {\n        int CustomerKey PK\n        varchar CustomerName\n        varchar Email\n        varchar Segment\n        varchar Region\n    }\n    DimPromotion {\n        int PromotionKey PK\n        varchar PromotionName\n        varchar Type\n        decimal DiscountPct\n        date StartDate\n        date EndDate\n    }\n    FactSales ||--|| DimDate : \"has\"\n    FactSales ||--|| DimProduct : \"has\"\n    FactSales ||--|| DimStore : \"has\"\n    FactSales ||--|| DimCustomer : \"has\"\n    FactSales ||--|| DimPromotion : \"has\""
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  3,
+                       "text":  "Creating a Star Schema in SQL Server"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "When implementing a star schema in SQL Server, use integer surrogate keys for all dimension foreign keys in the fact table. Dates should be stored as integer keys (e.g., 20240101) joining to a rich DimDate table. This approach speeds up joins and keeps fact table storage compact."
+                   },
+                   {
+                       "type":  "example",
+                       "title":  "Star Schema Table Definitions",
+                       "language":  "sql",
+                       "code":  "-- Fact table: one row per order line\nCREATE TABLE FactSales (\n    SalesKey INT IDENTITY(1,1) PRIMARY KEY,\n    DateKey INT NOT NULL,\n    ProductKey INT NOT NULL,\n    StoreKey INT NOT NULL,\n    CustomerKey INT NOT NULL,\n    PromotionKey INT NOT NULL,\n    Quantity DECIMAL(10,2) NOT NULL,\n    UnitPrice DECIMAL(10,2) NOT NULL,\n    Discount DECIMAL(4,2) DEFAULT 0,\n    SalesAmount AS (Quantity * UnitPrice * (1 - Discount)),\n    CONSTRAINT FK_FactSales_Date FOREIGN KEY (DateKey) REFERENCES DimDate(DateKey),\n    CONSTRAINT FK_FactSales_Product FOREIGN KEY (ProductKey) REFERENCES DimProduct(ProductKey),\n    CONSTRAINT FK_FactSales_Store FOREIGN KEY (StoreKey) REFERENCES DimStore(StoreKey),\n    CONSTRAINT FK_FactSales_Customer FOREIGN KEY (CustomerKey) REFERENCES DimCustomer(CustomerKey)\n);\n\n-- Denormalized dimension: attributes directly in the dimension\nCREATE TABLE DimProduct (\n    ProductKey INT PRIMARY KEY,\n    ProductName NVARCHAR(200) NOT NULL,\n    Category NVARCHAR(100) NOT NULL,\n    Subcategory NVARCHAR(100) NOT NULL,\n    Brand NVARCHAR(100),\n    ListPrice DECIMAL(10,2),\n    Color NVARCHAR(30),\n    Size NVARCHAR(20),\n    IsActive BIT DEFAULT 1\n);\n\n-- Denormalized date dimension with rich attributes\nCREATE TABLE DimDate (\n    DateKey INT PRIMARY KEY,\n    FullDate DATE NOT NULL,\n    Year INT NOT NULL,\n    Quarter INT NOT NULL,\n    Month INT NOT NULL,\n    MonthName NVARCHAR(20),\n    DayOfMonth INT NOT NULL,\n    DayOfWeek INT NOT NULL,\n    WeekdayName NVARCHAR(20),\n    IsWeekend BIT NOT NULL,\n    IsHoliday BIT DEFAULT 0,\n    HolidayName NVARCHAR(100)\n);"
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  2,
+                       "text":  "Snowflake Schema"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "The snowflake schema is a normalized variant of the star schema. Dimension tables are split into multiple related tables, reducing redundancy but increasing the number of joins required for queries. For example, instead of storing Category and Subcategory directly in DimProduct, you create a separate DimCategory table. The schema visually resembles a snowflake because dimension branches outward into sub-dimensions."
+                   },
+                   {
+                       "type":  "mermaid",
+                       "id":  "snowflake-schema-sales",
+                       "caption":  "Snowflake schema normalizes dimension tables into sub-dimensions, reducing redundancy at the cost of additional joins.",
+                       "definition":  "erDiagram\n    FactSales {\n        int SalesKey PK\n        int DateKey FK\n        int ProductKey FK\n        int StoreKey FK\n        int CustomerKey FK\n        int PromotionKey FK\n        decimal Quantity\n        decimal UnitPrice\n        decimal SalesAmount\n    }\n    DimDate {\n        int DateKey PK\n        date FullDate\n        int Year\n        int Quarter\n    }\n    DimProduct {\n        int ProductKey PK\n        varchar ProductName\n        decimal ListPrice\n        int CategoryKey FK\n        int BrandKey FK\n    }\n    DimCategory {\n        int CategoryKey PK\n        varchar CategoryName\n        int SubcategoryKey FK\n    }\n    DimSubcategory {\n        int SubcategoryKey PK\n        varchar SubcategoryName\n    }\n    DimBrand {\n        int BrandKey PK\n        varchar BrandName\n        varchar BrandCountry\n    }\n    DimStore {\n        int StoreKey PK\n        varchar StoreName\n        int CityKey FK\n    }\n    DimCity {\n        int CityKey PK\n        varchar CityName\n        varchar StateKey FK\n    }\n    DimState {\n        int StateKey PK\n        varchar StateName\n        varchar CountryKey FK\n    }\n    DimCountry {\n        int CountryKey PK\n        varchar CountryName\n        varchar Region\n    }\n    FactSales ||--|| DimDate : \"has\"\n    FactSales ||--|| DimProduct : \"has\"\n    FactSales ||--|| DimStore : \"has\"\n    DimProduct ||--|| DimCategory : \"has\"\n    DimCategory ||--|| DimSubcategory : \"has\"\n    DimProduct ||--|| DimBrand : \"has\"\n    DimStore ||--|| DimCity : \"has\"\n    DimCity ||--|| DimState : \"has\"\n    DimState ||--|| DimCountry : \"has\""
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  3,
+                       "text":  "Snowflake Schema SQL Example"
+                   },
+                   {
+                       "type":  "paragraph",
+                       "text":  "In a snowflake schema, the product dimension is split into separate category, subcategory, and brand tables. While this eliminates redundant category names across thousands of products, every product query now requires additional joins to retrieve the full descriptive context."
+                   },
+                   {
+                       "type":  "example",
+                       "title":  "Snowflake Dimension Tables",
+                       "language":  "sql",
+                       "code":  "-- Normalized sub-dimensions\nCREATE TABLE DimCategory (\n    CategoryKey INT PRIMARY KEY,\n    CategoryName NVARCHAR(100) NOT NULL\n);\n\nCREATE TABLE DimSubcategory (\n    SubcategoryKey INT PRIMARY KEY,\n    SubcategoryName NVARCHAR(100) NOT NULL,\n    CategoryKey INT NOT NULL,\n    CONSTRAINT FK_DimSubcategory_Category FOREIGN KEY (CategoryKey) REFERENCES DimCategory(CategoryKey)\n);\n\nCREATE TABLE DimBrand (\n    BrandKey INT PRIMARY KEY,\n    BrandName NVARCHAR(100) NOT NULL,\n    BrandCountry NVARCHAR(100)\n);\n\n-- Product dimension now references normalized tables\nCREATE TABLE DimProduct (\n    ProductKey INT PRIMARY KEY,\n    ProductName NVARCHAR(200) NOT NULL,\n    ListPrice DECIMAL(10,2),\n    SubcategoryKey INT NOT NULL,\n    BrandKey INT NOT NULL,\n    CONSTRAINT FK_DimProduct_Subcategory FOREIGN KEY (SubcategoryKey) REFERENCES DimSubcategory(SubcategoryKey),\n    CONSTRAINT FK_DimProduct_Brand FOREIGN KEY (BrandKey) REFERENCES DimBrand(BrandKey)\n);"
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  2,
+                       "text":  "Star vs. Snowflake Comparison"
+                   },
+                   {
+                       "type":  "table",
+                       "headers":  [
+                                       "Aspect",
+                                       "Star Schema",
+                                       "Snowflake Schema"
+                                   ],
+                       "rows":  [
+                                    [
+                                        "Normalization",
+                                        "Denormalized dimensions",
+                                        "Normalized dimensions"
+                                    ],
+                                    [
+                                        "Join Count",
+                                        "Fewer joins",
+                                        "More joins"
+                                    ],
+                                    [
+                                        "Query Complexity",
+                                        "Simpler SQL",
+                                        "More complex SQL"
+                                    ],
+                                    [
+                                        "Storage",
+                                        "Higher (duplicate text)",
+                                        "Lower (no duplicates)"
+                                    ],
+                                    [
+                                        "Query Performance",
+                                        "Faster for most reports",
+                                        "Can be slower due to joins"
+                                    ],
+                                    [
+                                        "ETL Complexity",
+                                        "Simpler load process",
+                                        "More complex due to multiple tables"
+                                    ],
+                                    [
+                                        "Data Integrity",
+                                        "Redundant data risk",
+                                        "Stronger referential integrity"
+                                    ],
+                                    [
+                                        "Typical Use",
+                                        "Enterprise data marts, Power BI",
+                                        "Highly governed shared dimensions"
+                                    ]
+                                ]
+                   },
+                   {
+                       "type":  "callout",
+                       "variant":  "warning",
+                       "title":  "Avoid Over-Normalizing",
+                       "text":  "Modern BI tools and SQL Server\u0027s columnstore indexes handle star schemas extremely well. Over-normalizing into a snowflake is rarely necessary for performance in SQL Server 2019+. The primary benefit of snowflaking is eliminating redundant categorical data in very large dimensions — but even then, surrogate key integers are compact and duplicates are cheap compared to the cost of extra joins at query time."
+                   },
+                   {
+                       "type":  "heading",
+                       "level":  2,
+                       "text":  "Choosing the Right Schema"
+                   },
+                   {
+                       "type":  "bullet-list",
+                       "title":  "Use a Star Schema When",
+                       "items":  [
+                                     "Building enterprise data marts or data warehouse marts",
+                                     "Query performance and simplicity are priorities",
+                                     "Dimensions have moderate-to-high cardinality",
+                                     "Your BI tool (Power BI, SSRS) benefits from flat dimensions",
+                                     "Most reports slice by the same set of attributes"
+                                 ]
+                   },
+                   {
+                       "type":  "bullet-list",
+                       "title":  "Consider a Snowflake Schema When",
+                       "items":  [
+                                     "Dimensions are shared across multiple fact tables and must be centrally governed",
+                                     "You need to eliminate massive redundant text in very large dimensions",
+                                     "Your organization has strict data integrity rules requiring normalized structures",
+                                     "Slowly changing dimensions require historical tracking at multiple hierarchy levels"
+                                 ]
+                   },
+                   {
+                       "type":  "exercise",
+                       "title":  "Design a Star Schema for a University",
+                       "description":  "Design a star schema for a university data warehouse that tracks course enrollments, grades, and student demographics.",
+                       "steps":  [
+                                     "Identify the core business process: student course enrollment and grade recording",
+                                     "Define the grain: one row per student per course section per semester",
+                                     "Design the fact table (FactEnrollment) with measures like CreditHours, GradePoints, AttendanceDays",
+                                     "Create dimension tables: DimStudent, DimCourse, DimInstructor, DimTerm, DimDate",
+                                     "List at least 5 descriptive attributes for each dimension table",
+                                     "Draw the schema or describe the relationships between the fact and each dimension",
+                                     "Write a sample query: \u0027Show average GPA by department and term\u0027 using your schema",
+                                     "Explain why a star schema fits this analytical workload better than an OLTP schema"
+                                 ],
+                       "expectedOutcome":  "A complete star schema design with fact table, 4-5 dimension tables, and a sample analytical query demonstrating the simplicity of dimensional modeling."
+                   },
+                   {
+                       "type":  "divider"
+                   },
+                   {
+                       "type":  "faq-block",
+                       "items":  [
+                                     {
+                                         "question":  "Can I mix star and snowflake in the same model?",
+                                         "answer":  "Yes. It is common to keep frequently queried dimensions in a star (denormalized) form while snowflaking rarely used dimensions. The key is consistency for attributes that analysts regularly slice and dice."
+                                     },
+                                     {
+                                         "question":  "Do I need to enforce foreign keys in a star schema?",
+                                         "answer":  "In SQL Server, enforcing foreign keys on large fact tables can slow down ETL loads. Many production warehouses disable FK constraints on fact tables and enforce them in the ETL pipeline instead, relying on dimensional modeling discipline for integrity."
+                                     },
+                                     {
+                                         "question":  "What is a galaxy schema?",
+                                         "answer":  "A galaxy schema (or fact constellation) contains multiple fact tables that share dimension tables. It is more complex than a single star but enables cross-business-process analysis — for example, sharing DimProduct between a sales fact and an inventory fact."
+                                     }
+                                 ]
+                   },
+                   {
+                       "type":  "summary-box",
+                       "title":  "Key Takeaways",
+                       "points":  [
+                                      "Dimensional modeling separates measurable facts from descriptive dimensions",
+                                      "Star schemas use denormalized dimensions for simple, fast queries",
+                                      "Snowflake schemas normalize dimensions to reduce redundancy at the cost of more joins",
+                                      "Choose star schemas for most enterprise data marts and BI workloads",
+                                      "Snowflake schemas are best for shared, governed dimensions with massive cardinality",
+                                      "Grain must be defined before building any dimensional model"
+                                  ],
+                       "takeaway":  "Star schemas are the default choice for SQL Server data warehouses because they align with how analysts think and query data, delivering simplicity and speed without sacrificing accuracy."
+                   }
+               ]
+}

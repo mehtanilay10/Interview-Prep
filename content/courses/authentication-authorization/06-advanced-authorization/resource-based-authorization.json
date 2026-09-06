@@ -1,0 +1,178 @@
+{
+  "id": "lesson-auth-023",
+  "slug": "resource-based-authorization",
+  "moduleSlug": "advanced-authorization",
+  "courseSlug": "authentication-authorization",
+  "title": "Resource-Based Authorization",
+  "description": "Apply resource-based authorization for entity-level security where access depends on the specific resource being accessed.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["authorization", "resource-based", "entity-level", "ownership", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Resource-Based Authorization** is the pattern where access to a resource depends on the specific resource instance, not just the user's roles or claims. For example, a user should be able to edit their own documents but not documents owned by other users. This is also known as **entity-level authorization**."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use Resource-Based Authorization"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Scenarios",
+        "items": [
+          "A user can edit only their own blog posts",
+          "A manager can view reports for their department only",
+          "A project owner can invite members to their project",
+          "A support agent can access tickets assigned to them",
+          "A tenant can access only their organization's data in multi-tenant apps"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The IAuthorizationService Approach"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core provides `IAuthorizationService` for imperative authorization checks inside your code. You pass both the user and the resource to `AuthorizeAsync`, which evaluates the appropriate policy or requirement against that specific resource instance."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Document Owner Authorization",
+        "language": "csharp",
+        "code": "public class DocumentsController : ControllerBase\n{\n    private readonly AppDbContext _dbContext;\n    private readonly IAuthorizationService _authService;\n    \n    public DocumentsController(AppDbContext dbContext, IAuthorizationService authService)\n    {\n        _dbContext = dbContext;\n        _authService = authService;\n    }\n    \n    [HttpPut(\"{id}\")]\n    public async Task<IActionResult> UpdateDocument(string id, UpdateDto dto)\n    {\n        var document = await _dbContext.Documents.FindAsync(id);\n        if (document == null) return NotFound();\n        \n        // Check if the current user owns this document\n        var result = await _authService.AuthorizeAsync(\n            User, document, \"CanEditDocument\");\n        \n        if (!result.Succeeded)\n        {\n            return Forbid(\"You can only edit your own documents.\");\n        }\n        \n        document.Title = dto.Title;\n        document.Content = dto.Content;\n        document.UpdatedAt = DateTime.UtcNow;\n        \n        await _dbContext.SaveChangesAsync();\n        return NoContent();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Resource Handler"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Resource handlers inherit from `AuthorizationHandler<TRequirement, TResource>`. The `TResource` is the type of the resource you're authorizing. In the handler, you have access to both the user and the specific resource instance, enabling rich authorization logic."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Document Owner Requirement and Handler",
+        "language": "csharp",
+        "code": "// Requirement class\npublic class DocumentOwnerRequirement : IAuthorizationRequirement { }\n\n// Handler with resource type\npublic class DocumentOwnerHandler : \n    AuthorizationHandler<DocumentOwnerRequirement, Document>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        DocumentOwnerRequirement requirement,\n        Document document)\n    {\n        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        \n        if (userId != null && document.OwnerId == userId)\n        {\n            context.Succeed(requirement);\n        }\n        \n        return Task.CompletedTask;\n    }\n}\n\n// Policy registration\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"CanEditDocument\", policy =>\n        policy.Requirements.Add(new DocumentOwnerRequirement()));\n});\n\nbuilder.Services.AddScoped<\n    IAuthorizationHandler, DocumentOwnerHandler>();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always Load the Resource First",
+        "text": "In resource-based authorization, you must fetch the resource from the database before calling AuthorizeAsync. Never rely on an ID parameter alone - always verify the resource exists and load it with proper includes to avoid null reference exceptions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Multi-Tenant Resource Authorization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In multi-tenant applications, resource authorization often involves checking both ownership and tenant membership. A user might belong to Organization A and should never access Organization B's data, even if they guess a valid document ID."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Multi-Tenant Authorization Handler",
+        "language": "csharp",
+        "code": "public class TenantDocumentHandler : \n    AuthorizationHandler<TenantDocumentRequirement, Document>\n{\n    private readonly AppDbContext _dbContext;\n    \n    public TenantDocumentHandler(AppDbContext dbContext)\n    {\n        _dbContext = dbContext;\n    }\n    \n    protected override async Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        TenantDocumentRequirement requirement,\n        Document document)\n    {\n        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        if (string.IsNullOrEmpty(userId)) return;\n        \n        // Verify user's tenant matches document's tenant\n        var userTenantId = await _dbContext.Users\n            .Where(u => u.Id == userId)\n            .Select(u => u.OrganizationId)\n            .FirstOrDefaultAsync();\n        \n        if (userTenantId == document.OrganizationId)\n        {\n            context.Succeed(requirement);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React: Client-Side Resource Guards"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In React, you typically perform resource-based authorization after fetching data. The server is the ultimate authority, but you can improve UX by hiding UI elements before the API call completes. Use route guards and conditional rendering based on resource attributes returned from the API."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resource Authorization in React",
+        "language": "tsx",
+        "code": "import { useQuery } from '@tanstack/react-query';\nimport { useParams } from 'react-router-dom';\n\nfunction DocumentPage() {\n  const { id } = useParams<{ id: string }>();\n  const { user } = useAuth();\n  \n  const { data: document, isLoading } = useQuery({\n    queryKey: ['document', id],\n    queryFn: () => fetchDocument(id!)\n  });\n  \n  if (isLoading) return <div>Loading...</div>;\n  if (!document) return <div>Document not found</div>;\n  \n  // Resource-based check: can this user edit this specific document?\n  const canEdit = document.ownerId === user?.id;\n  \n  return (\n    <div>\n      <h1>{document.title}</h1>\n      <p>{document.content}</p>\n      {canEdit && (\n        <button onClick={() => editDocument(document.id)}>\n          Edit Document\n        </button>\n      )}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authorization Caching Considerations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Resource-based authorization checks are not typically cached because the resource state can change. However, for read-heavy scenarios, you can cache the authorization result with a short TTL or use a cache-aside pattern. Never cache authorization decisions longer than the resource's expected mutation interval."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid N+1 Authorization Queries",
+        "text": "When authorizing lists of resources (e.g., 'show all documents the user can edit'), avoid running individual authorization checks per item. Use a single query with WHERE clauses that incorporate the user's permissions."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "resource-auth-flow",
+        "caption": "Resource-based authorization flow for document editing",
+        "definition": "sequenceDiagram\n    participant C as Client\n    participant A as API Controller\n    participant DB as Database\n    participant Auth as AuthService\n    C->>A: PUT /documents/123\n    A->>DB: Load document 123\n    DB-->>A: Document {id: 123, OwnerId: \"user-42\"}\n    A->>Auth: AuthorizeAsync(User, document, \"CanEdit\")\n    Auth->>Auth: Check OwnerId == User.Id\n    alt Authorized\n        Auth-->>A: Success\n        A->>DB: Save changes\n        A-->>C: 204 No Content\n    else Not Authorized\n        Auth-->>A: Forbidden\n        A-->>C: 403 Forbidden\n    end"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Resource-based authorization checks specific resource instances",
+          "Use IAuthorizationService.AuthorizeAsync with a resource parameter",
+          "Handlers can access the resource via generic TResource parameter",
+          "Always load the resource before authorizing",
+          "Multi-tenant apps require additional tenant validation"
+        ],
+        "takeaway": "Resource-based authorization is essential for entity-level security in multi-user applications."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["auth-overview"]
+}

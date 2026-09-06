@@ -1,0 +1,163 @@
+{
+  "id": "lesson-auth-015",
+  "slug": "authorization-code-flow",
+  "moduleSlug": "oauth2-flows-deep-dive",
+  "courseSlug": "authentication-authorization",
+  "title": "Authorization Code Flow",
+  "description": "Implement the OAuth2 Authorization Code flow with security best practices for web applications.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["oauth2", "authorization-code", "web-applications", "security"],
+  "prerequisites": ["oauth-overview"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Authorization Code flow is the most common OAuth 2.0 flow for server-side web applications. It uses a two-step process where the client first receives an authorization code, then exchanges it for tokens on the backend. This separation ensures that access tokens are never exposed to the user's browser, which is why it is the recommended flow for confidential clients that can securely store a client secret."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How the Authorization Code Flow Works"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "The client redirects the user to the authorization server with client_id, redirect_uri, response_type=code, scope, and a state parameter.",
+          "The user authenticates and grants the requested permissions at the authorization server.",
+          "The authorization server redirects back to the client's redirect_uri with an authorization code and the original state value.",
+          "The client's backend verifies the state parameter matches the one it sent.",
+          "The backend sends a POST request to the token endpoint with the authorization code, client_id, client_secret, and redirect_uri.",
+          "The authorization server responds with an access_token (and optionally a refresh_token and id_token).",
+          "The backend uses the access token to call protected APIs and stores tokens securely server-side."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "auth-code-flow-diagram",
+        "caption": "Authorization Code Flow sequence diagram",
+        "definition": "sequenceDiagram\n    participant User\n    participant Client\n    participant AuthServer\n    participant API\n    User->>Client: Click Login\n    Client->>AuthServer: Redirect (client_id, redirect_uri, response_type=code, state)\n    AuthServer->>User: Login & Consent\n    User->>AuthServer: Submit credentials\n    AuthServer->>Client: Redirect back with code + state\n    Client->>AuthServer: POST code + client_secret to token endpoint\n    AuthServer->>Client: access_token + refresh_token + id_token\n    Client->>API: Request with access_token\n    API->>Client: Protected resource"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Critical Security Parameters: state and nonce"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "CSRF Protection with state",
+        "text": "The state parameter is your defense against CSRF attacks. Generate a cryptographically random value, store it in the user's session, and verify it matches on callback. If an attacker can trigger a login flow on your site, they could hijack a session — the state parameter binds the response to a request you initiated."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Replay Attack Protection with nonce",
+        "text": "When using OpenID Connect, include a nonce parameter. The authorization server will include it in the id_token. Your application must verify the nonce matches the one you sent. This prevents token replay attacks where a stolen id_token is used later."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server-Side Token Exchange",
+        "content": "Handling the callback and exchanging the code for tokens",
+        "language": "tsx",
+        "code": "import { Router, Request, Response } from 'express';\nimport axios from 'axios';\nimport { generateRandomString, verifyState } from './security';\n\nconst router = Router();\nconst CLIENT_ID = process.env.CLIENT_ID;\nconst CLIENT_SECRET = process.env.CLIENT_SECRET;\nconst REDIRECT_URI = process.env.REDIRECT_URI;\nconst TOKEN_URL = process.env.TOKEN_URL;\n\nrouter.get('/callback', async (req: Request, res: Response) => {\n  const { code, state } = req.query;\n  const storedState = req.session.oauthState;\n\n  // Verify CSRF state parameter\n  if (!verifyState(state as string, storedState)) {\n    return res.status(400).send('Invalid state parameter');\n  }\n\n  // Verify authorization code exists\n  if (!code) {\n    return res.status(400).send('Missing authorization code');\n  }\n\n  try {\n    // Exchange code for tokens — this happens server-side so the\n    // token never touches the browser\n    const params = new URLSearchParams();\n    params.append('grant_type', 'authorization_code');\n    params.append('code', code as string);\n    params.append('client_id', CLIENT_ID);\n    params.append('client_secret', CLIENT_SECRET);\n    params.append('redirect_uri', REDIRECT_URI);\n\n    const response = await axios.post(TOKEN_URL, params, {\n      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    });\n\n    const { access_token, refresh_token, id_token, expires_in } = response.data;\n\n    // Store tokens securely in session (or a server-side store)\n    req.session.accessToken = access_token;\n    req.session.refreshToken = refresh_token;\n    req.session.idToken = id_token;\n    req.session.expiresAt = Date.now() + expires_in * 1000;\n\n    // Clear the state to prevent reuse\n    delete req.session.oauthState;\n\n    res.redirect('/dashboard');\n  } catch (error: any) {\n    console.error('Token exchange failed:', error.response?.data || error.message);\n    res.status(500).send('Authentication failed');\n  }\n});"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Frontend Login Redirect",
+        "content": "Initiating the OAuth flow from the browser",
+        "language": "javascript",
+        "code": "const AUTHORIZATION_URL = 'https://auth.example.com/authorize';\nconst CLIENT_ID = 'your-client-id';\nconst REDIRECT_URI = 'https://your-app.com/auth/callback';\nconst SCOPES = 'openid profile email api.read';\n\nfunction login() {\n  // Generate a cryptographically random state value\n  // In production, use crypto.getRandomValues\n  const state = btoa(Math.random().toString(36).substring(2));\n\n  // Generate a nonce to bind the id_token\n  const nonce = btoa(Math.random().toString(36).substring(2));\n\n  // Store state and nonce in session storage for verification\n  sessionStorage.setItem('oauth_state', state);\n  sessionStorage.setItem('oauth_nonce', nonce);\n\n  // Build the authorization URL with all required parameters\n  const params = new URLSearchParams({\n    client_id: CLIENT_ID,\n    redirect_uri: REDIRECT_URI,\n    response_type: 'code',\n    scope: SCOPES,\n    state: state,\n    nonce: nonce,\n  });\n\n  // Redirect the browser to the authorization server\n  window.location.href = `${AUTHORIZATION_URL}?${params.toString()}`;\n}\n\ndocument.getElementById('login-btn').addEventListener('click', login);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Exchange Response"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Field", "Description", "Always Present"],
+        "rows": [
+          ["access_token", "Bearer token used to call APIs. Short-lived (typically 5-60 min).", "Yes"],
+          ["token_type", "Usually 'Bearer'. Tells the client how to use the token.", "Yes"],
+          ["expires_in", "Lifetime in seconds. Client should calculate expiration timestamp.", "Yes"],
+          ["refresh_token", "Long-lived token to obtain new access tokens. Store securely server-side.", "Often"],
+          ["id_token", "JWT containing user identity claims (OIDC only).", "If OIDC scope"],
+          ["scope", "Space-delimited list of granted scopes. May be narrower than requested.", "Sometimes"]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Bearer Token",
+            "definition": "An opaque token string sent in the Authorization header. The server trusts the bearer to use it properly — if someone intercepts it, they can use it."
+          },
+          {
+            "term": "Confidential Client",
+            "definition": "A client that can securely store a client secret, such as a backend server. Cannot be inspected by end users."
+          },
+          {
+            "term": "Token Endpoint",
+            "definition": "The authorization server endpoint (typically /oauth/token) where clients exchange authorization codes or refresh tokens for access tokens."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Never expose tokens to the browser",
+        "text": "Once you receive the access_token on the backend, keep it server-side. Do not send it to the browser and do not store it in localStorage. Use server-side sessions or secure, HttpOnly cookies with SameSite attributes to maintain the user's authenticated state."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Authorization Code flow is for confidential (server-side) clients only",
+          "Always use a random state parameter and verify it to prevent CSRF",
+          "Use a nonce with OpenID Connect to prevent replay attacks",
+          "Token exchange happens server-to-server — tokens never reach the browser",
+          "Store tokens in secure server-side sessions, never in localStorage",
+          "Handle the full token response including refresh tokens and id tokens"
+        ],
+        "takeaway": "Authorization Code flow keeps tokens off the frontend, but only works when you can protect the client secret server-side."
+      }
+    }
+  ],
+  "relatedLessons": ["pkce-flow", "openid-connect"],
+  "furtherReading": [
+    {
+      "title": "RFC 6749 Section 4.1 — Authorization Code Grant",
+      "url": "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1",
+      "type": "article",
+      "description": "The official specification for the OAuth 2.0 Authorization Code flow."
+    }
+  ]
+}

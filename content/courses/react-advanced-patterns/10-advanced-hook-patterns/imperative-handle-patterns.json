@@ -1,0 +1,136 @@
+{
+  "id": "lesson-react-adv-032",
+  "slug": "imperative-handle-patterns",
+  "moduleSlug": "advanced-hook-patterns",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Imperative Handle Patterns",
+  "description": "Learn how to use useImperativeHandle and forwardRef to expose imperative methods from child components to parents.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["useImperativeHandle", "forwardRef", "refs", "imperative", "parent-child"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React's declarative model encourages parents to pass props down and children to render UI up. But some interactions—focusing an input, triggering an animation, or scrolling to an element—are inherently imperative. **useImperativeHandle** lets a child selectively expose methods to a parent ref without breaking encapsulation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Not Just Use ref?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A DOM ref gives a parent direct access to a child's DOM node. That is powerful but brittle: the parent becomes coupled to the child's internal markup. If the child changes its structure, every parent that reached into it breaks. `useImperativeHandle` lets the child define a stable, intentional API surface."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Encapsulation Trade-off",
+        "text": "Imperative handles are a deliberate escape hatch from declarative programming. Use them sparingly and document the exposed API clearly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Basic Pattern"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Focusable Input with useImperativeHandle",
+        "content": "A child component exposes a focus method to the parent.",
+        "language": "tsx",
+        "code": "import { forwardRef, useImperativeHandle, useRef } from 'react';\n\ninterface InputHandle {\n  focus: () => void;\n  clear: () => void;\n}\n\ninterface InputProps {\n  label: string;\n  value: string;\n  onChange: (value: string) => void;\n}\n\nconst Input = forwardRef<InputHandle, InputProps>(\n  ({ label, value, onChange }, ref) => {\n    const inputRef = useRef<HTMLInputElement>(null);\n\n    useImperativeHandle(ref, () => ({\n      focus() {\n        inputRef.current?.focus();\n      },\n      clear() {\n        onChange('');\n        inputRef.current?.focus();\n      },\n    }));\n\n    return (\n      <label className=\"flex flex-col gap-1\">\n        <span className=\"text-sm font-medium\">{label}</span>\n        <input\n          ref={inputRef}\n          value={value}\n          onChange={(e) => onChange(e.target.value)}\n          className=\"rounded border px-3 py-2\"\n        />\n      </label>\n    );\n  }\n);\n\nfunction Form() {\n  const inputRef = useRef<InputHandle>(null);\n\n  return (\n    <form>\n      <Input ref={inputRef} label=\"Email\" value={email} onChange={setEmail} />\n      <button type=\"button\" onClick={() => inputRef.current?.focus()}>Focus</button>\n      <button type=\"button\" onClick={() => inputRef.current?.clear()}>Clear</button>\n    </form>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "forwardRef and TypeScript"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`forwardRef` takes two generic parameters: the handle type and the props type. TypeScript will enforce that parents only call methods defined on the handle, preventing accidental access to internal refs or private state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Type-Safe Imperative Handle",
+        "content": "Defining a strict handle interface for compile-time safety.",
+        "language": "tsx",
+        "code": "interface ModalHandle {\n  open: () => void;\n  close: () => void;\n  isOpen: boolean;\n}\n\nconst Modal = forwardRef<ModalHandle, { title: string }>(\n  ({ title }, ref) => {\n    const [isOpen, setIsOpen] = useState(false);\n\n    useImperativeHandle(ref, () => ({\n      get isOpen() {\n        return isOpen;\n      },\n      open() {\n        setIsOpen(true);\n      },\n      close() {\n        setIsOpen(false);\n      },\n    }), [isOpen]);\n\n    if (!isOpen) return null;\n    return <div className=\"modal\">{title}</div>;\n  }\n);\n\n// Parent usage with full type safety\nconst modalRef = useRef<ModalHandle>(null);\nmodalRef.current?.open();   // OK\nmodalRef.current?.close();  // OK\nmodalRef.current?.isOpen;   // OK\nmodalRef.current?.hidden;   // TypeScript error!"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Use Cases"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Use Case", "Exposed API", "Benefit"],
+        "rows": [
+          ["Focus management", "focus(), blur()", "Parent controls input focus without DOM traversal"],
+          ["Media playback", "play(), pause(), seek()", "Parent triggers video/animation"],
+          ["Modal dialogs", "open(), close()", "Parent opens/closes overlay without lifting state"],
+          ["Scroll containers", "scrollTo(x, y)", "Parent scrolls child to position"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Dependency Array",
+        "text": "The third argument to useImperativeHandle is a dependency array. If your handle closes over changing values, include them so the handle stays in sync."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Create a Scrollable Container",
+        "description": "Build a component that exposes a scrollTo method via useImperativeHandle.",
+        "steps": [
+          "Create a forwardRef component with a scrollable div.",
+          "Use useImperativeHandle to expose scrollTo(top, behavior).",
+          "Wire the internal ref to the div and call scrollIntoView or scrollTo.",
+          "Consume it from a parent with a button that scrolls to a specific item."
+        ],
+        "expectedOutcome": "A reusable scrollable container with a clean imperative API."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "useImperativeHandle lets children expose a curated API to parent refs.",
+          "forwardRef bridges React's ref system with TypeScript generics.",
+          "Always provide a dependency array to avoid stale closures.",
+          "Prefer declarative data flow; use imperative handles only for truly imperative interactions."
+        ],
+        "takeaway": "Imperative handles give you escape valves when declarative props are not enough."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["reducer-hooks-patterns"]
+}

@@ -1,0 +1,153 @@
+{
+  "id": "lesson-auth-027",
+  "slug": "sliding-expiration",
+  "moduleSlug": "refresh-token-strategies",
+  "courseSlug": "authentication-authorization",
+  "title": "Sliding Expiration",
+  "description": "Implement sliding expiration to keep active users logged in while still expiring inactive sessions.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["sliding-expiration", "refresh-tokens", "sessions", "security", "timeout"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What is Sliding Expiration?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sliding expiration is a session management strategy where the expiration time of a token is extended each time the user is actively using the application. Instead of a fixed expiration date, each refresh or activity event pushes the expiration forward by a configured window. Inactive users are eventually logged out, while active users remain authenticated seamlessly."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Analogy",
+      "text": "Think of sliding expiration like a library book renewal. As long as you keep renewing the book, you can keep it. If you stop renewing, the book eventually expires and must be returned."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Absolute vs Sliding Expiration"
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Expiration Strategies",
+      "cards": [
+        {
+          "title": "Absolute Expiration",
+          "description": "The token expires at a fixed time regardless of activity.",
+          "pros": [
+            "Simple to reason about",
+            "Guaranteed maximum session length",
+            "Easy to implement"
+          ],
+          "cons": [
+            "Active users get logged out unexpectedly",
+            "Poor user experience for long tasks",
+            "Requires re-authentication"
+          ],
+          "tags": ["absolute", "fixed"]
+        },
+        {
+          "title": "Sliding Expiration",
+          "description": "The token expiration moves forward with each use, keeping active sessions alive.",
+          "pros": [
+            "Seamless for active users",
+            "No forced logouts during work",
+            "Balances security and UX"
+          ],
+          "cons": [
+            "Inactive sessions can live indefinitely without limits",
+            "Requires a maximum absolute lifetime",
+            "More complex to implement correctly"
+          ],
+          "tags": ["sliding", "renewal"]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Sliding Expiration Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "With sliding expiration, each time the client refreshes its access token using a refresh token, the refresh token expiration is pushed forward. For example, if the sliding window is 30 minutes and the refresh token is used at minute 25 of its life, it now expires at minute 55. If the refresh token is never used again, it expires at its original time."
+    },
+    {
+      "type": "mermaid",
+      "id": "sliding-expiration-timeline",
+      "caption": "Sliding expiration timeline",
+      "definition": "gantt\n  title Sliding Expiration Example (30 minute window)\n  dateFormat  HH:mm\n  section Token Life\n  Original Expiration     :a1, 00:00, 30m\n  Refresh at 25m          :milestone, m1, 25m, 0m\n  New Expiration          :a2, after m1, 30m\n  section Without Refresh\n  User inactive           :a3, 00:00, 30m\n  Token expires at 30m    :milestone, m2, 30m, 0m"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Implementation Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sliding expiration is implemented in the refresh token endpoint. When a refresh request is received, check the current refresh token expiration. If it is within a certain threshold of expiring, issue a new refresh token with a fresh expiration. Otherwise, return a new access token but keep the same refresh token. Always enforce a maximum absolute lifetime to prevent tokens from sliding forever."
+    },
+    {
+      "type": "example",
+      "title": "Sliding expiration refresh endpoint",
+      "content": "Express implementation that extends refresh token expiration on each use.",
+      "code": "const SLIDING_WINDOW_MS = 30 * 60 * 1000;\nconst MAX_REFRESH_TOKEN_AGE_MS = 7 * 24 * 60 * 60 * 1000;\n\napp.post('/api/auth/refresh', async (req, res) => {\n  const { refreshToken } = req.body;\n\n  if (!refreshToken) {\n    return res.status(401).json({ message: 'Refresh token required' });\n  }\n\n  const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');\n  const storedToken = await RefreshToken.findOne({ token: hashedToken });\n\n  if (!storedToken || storedToken.revoked) {\n    return res.status(403).json({ message: 'Invalid refresh token' });\n  }\n\n  const now = Date.now();\n  const tokenAge = now - storedToken.createdAt.getTime();\n  const timeRemaining = storedToken.expiresAt.getTime() - now;\n  let newRefreshToken = refreshToken;\n\n  if (timeRemaining < SLIDING_WINDOW_MS && tokenAge < MAX_REFRESH_TOKEN_AGE_MS) {\n    storedToken.revoked = true;\n    await storedToken.save();\n\n    newRefreshToken = generateSecureToken();\n    const newHashedToken = crypto.createHash('sha256').update(newRefreshToken).digest('hex');\n\n    await RefreshToken.create({\n      token: newHashedToken,\n      familyId: storedToken.familyId,\n      userId: storedToken.userId,\n      expiresAt: new Date(now + SLIDING_WINDOW_MS),\n      createdAt: new Date(now)\n    });\n  }\n\n  const accessToken = generateAccessToken(storedToken.userId);\n  res.json({ accessToken, refreshToken: newRefreshToken });\n});",
+      "language": "javascript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Setting the Sliding Window"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Guidelines for Window Size",
+      "items": [
+        "Match the window to your access token lifetime plus a small buffer (e.g., access token = 15 min, window = 30 min)",
+        "Shorter windows force more frequent refreshes, improving security but reducing convenience",
+        "Longer windows keep users logged in longer but increase the window for token theft",
+        "Consider user expectations: if users expect to work for hours, use a longer window"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Maximum Absolute Lifetime",
+      "text": "Always enforce a maximum absolute lifetime on refresh tokens, even with sliding expiration. Without this limit, an active user could stay logged in indefinitely, which violates most security policies."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Client-Side Handling"
+    },
+    {
+      "type": "paragraph",
+      "text": "Clients should proactively refresh access tokens before they expire. A common pattern is to refresh when the access token has less than 5 minutes remaining. When the server returns a new refresh token, the client must update its stored token. If the refresh fails, the client should redirect the user to the login page."
+    },
+    {
+      "type": "example",
+      "title": "Client-side token refresh logic",
+      "content": "React hook for proactive token refreshing with sliding expiration.",
+      "code": "function useAuth() {\n  const [accessToken, setAccessToken] = useState<string | null>(null);\n  const [refreshToken, setRefreshToken] = useState<string | null>(null);\n\n  const refreshAccessToken = useCallback(async () => {\n    if (!refreshToken) return null;\n\n    try {\n      const res = await fetch('/api/auth/refresh', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ refreshToken })\n      });\n\n      if (!res.ok) throw new Error('Refresh failed');\n\n      const data = await res.json();\n      setAccessToken(data.accessToken);\n      if (data.refreshToken) {\n        setRefreshToken(data.refreshToken);\n      }\n      return data.accessToken;\n    } catch (err) {\n      setAccessToken(null);\n      setRefreshToken(null);\n      return null;\n    }\n  }, [refreshToken]);\n\n  return { accessToken, refreshToken, refreshAccessToken };\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Sliding expiration extends the refresh token lifetime with each use",
+        "Combine sliding expiration with a maximum absolute lifetime",
+        "Implement sliding logic on the server during token refresh",
+        "Proactively refresh access tokens on the client before they expire",
+        "Set the sliding window to match access token lifetime plus a buffer"
+      ],
+      "takeaway": "Sliding expiration keeps active users authenticated while still ensuring inactive sessions eventually expire, striking the right balance between security and user experience."
+    }
+  ],
+  "relatedLessons": ["refresh-token-basics", "token-rotation"],
+  "furtherReading": [],
+  "prerequisites": ["refresh-token-basics"]
+}

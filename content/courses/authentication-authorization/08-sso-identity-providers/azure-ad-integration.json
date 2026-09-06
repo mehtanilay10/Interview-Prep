@@ -1,0 +1,181 @@
+{
+  "id": "lesson-auth-032",
+  "slug": "azure-ad-integration",
+  "moduleSlug": "sso-identity-providers",
+  "courseSlug": "authentication-authorization",
+  "title": "Azure AD Integration",
+  "description": "Set up Azure Active Directory authentication for ASP.NET Core applications using OpenID Connect and MSAL.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["azure-ad", "microsoft", "entra-id", "oidc", "asp.net-core", "msal", "enterprise"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Azure Active Directory (Azure AD)**, now part of Microsoft Entra ID, is Microsoft's cloud-based identity and access management service. It is the most common enterprise identity provider for organizations using Microsoft 365, Office 365, and Azure cloud services. Integrating with Azure AD enables your ASP.NET Core application to leverage enterprise-grade authentication, conditional access, and MFA without building them yourself."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Azure AD?"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Enterprise Benefits",
+        "items": [
+          "Pre-integrated with millions of enterprise user accounts",
+          "Supports conditional access policies (location, device, risk)",
+          "Built-in MFA and passwordless authentication",
+          "SCIM provisioning for automatic user lifecycle management",
+          "Comprehensive audit logs and security reporting",
+          "B2B and B2C scenarios supported in the same tenant"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use Microsoft.Identity.Web",
+        "text": "The Microsoft.Identity.Web library simplifies Azure AD integration in ASP.NET Core. It handles token acquisition, cache serialization, and downstream API calls with minimal configuration."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prerequisites in Azure Portal"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Registration Steps",
+        "items": [
+          "Navigate to Azure AD > App Registrations > New Registration.",
+          "Name your application and select supported account types.",
+          "Set the redirect URI to https://localhost:5001/signin-oidc for development.",
+          "Note the Application (client) ID and Directory (tenant) ID.",
+          "Under Certificates & Secrets, create a client secret or upload a certificate.",
+          "Under API Permissions, add Microsoft Graph permissions (e.g., User.Read).",
+          "Grant admin consent if required for your application."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Azure AD Authentication Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "azure-ad-flow",
+        "caption": "Azure AD OpenID Connect flow for an ASP.NET Core web application.",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant App as ASP.NET Core App\n    participant Azure as Azure AD\n    U->>App: Access protected page\n    App->>U: 302 Redirect to Azure AD authorize endpoint\n    U->>Azure: Authenticate (credentials + MFA)\n    Azure->>U: 302 Redirect back with auth code\n    U->>App: Callback with authorization code\n    App->>Azure: POST token endpoint (code + client secret)\n    Azure->>App: Return ID token, access token, refresh token\n    App->>App: Validate tokens, create auth cookie\n    App->>U: Serve protected content"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Implementation: ASP.NET Core with Microsoft.Identity.Web"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — Azure AD OpenID Connect",
+        "content": "Configure Azure AD authentication using the Microsoft.Identity.Web library.",
+        "code": "using Microsoft.Identity.Web;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)\n    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection(\"AzureAd\"))\n    .EnableTokenAcquisitionToCallDownstreamApi()\n    .AddInMemoryTokenCaches();\n\nbuilder.Services.AddAuthorization(options =>\n{\n    options.FallbackPolicy = new AuthorizationPolicyBuilder()\n        .RequireAuthenticatedUser()\n        .Build();\n});\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthentication();\napp.UseAuthorization();\n\napp.MapGet(\"/\", [Microsoft.AspNetCore.Authorization.Authorize] () => \"Hello, Enterprise User!\");\n\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "appsettings.json Configuration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "appsettings.json — Azure AD Settings",
+        "content": "Store Azure AD configuration in appsettings.json.",
+        "code": "{\n  \"AzureAd\": {\n    \"Instance\": \"https://login.microsoftonline.com/\",\n    \"Domain\": \"contoso.com\",\n    \"TenantId\": \"common\",\n    \"ClientId\": \"your-client-id-guid\",\n    \"ClientSecret\": \"your-client-secret\",\n    \"CallbackPath\": \"/signin-oidc\",\n    \"SignedOutCallbackPath\": \"/signout-callback-oidc\",\n    \"SignedOutRedirectUri\": \"/\"\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Calling Microsoft Graph"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Accessing downstream APIs with acquired tokens",
+        "content": "Use TokenAcquisition to get tokens for Microsoft Graph or other protected APIs.",
+        "code": "public class UserProfileService\n{\n    private readonly ITokenAcquisition _tokenAcquisition;\n    \n    public UserProfileService(ITokenAcquisition tokenAcquisition)\n    {\n        _tokenAcquisition = tokenAcquisition;\n    }\n    \n    public async Task<UserProfile> GetProfileAsync()\n    {\n        var token = await _tokenAcquisition.GetAccessTokenForUserAsync(\n            scopes: new[] { \"User.Read\" });\n        \n        using var client = new HttpClient();\n        client.DefaultRequestHeaders.Authorization = \n            new AuthenticationHeaderValue(\"Bearer\", token);\n        \n        var response = await client.GetAsync(\"https://graph.microsoft.com/v1.0/me\");\n        response.EnsureSuccessStatusCode();\n        \n        var json = await response.Content.ReadAsStringAsync();\n        return JsonSerializer.Deserialize<UserProfile>(json);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Token Cache in Production",
+        "text": "In production, use a distributed token cache (e.g., Redis or SQL) instead of in-memory caching. In-memory caches do not work across multiple server instances and are lost on app restart."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Conditional Access Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure AD Conditional Access policies allow administrators to enforce access rules based on user location, device compliance, risk level, and application sensitivity. When a policy blocks access, Azure AD returns specific error codes and descriptions in the authentication response. Your application should gracefully handle these scenarios — for example, displaying a message that the user must enroll a compliant device rather than showing a generic error."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Do Not Build Your Own MFA",
+        "text": "If Azure AD is your IdP, always use its built-in MFA and Conditional Access. Building custom MFA logic in your application defeats the purpose of centralizing authentication and often creates security gaps."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Azure AD (Microsoft Entra ID) is the standard enterprise IdP for Microsoft shops",
+          "Register your app in the Azure Portal to get client ID and tenant ID",
+          "Microsoft.Identity.Web simplifies token acquisition and cache management",
+          "Use distributed token caches in production for scalability",
+          "Leverage Conditional Access instead of building custom MFA logic"
+        ],
+        "takeaway": "Azure AD integration turns your ASP.NET Core app into an enterprise-ready application with minimal custom authentication code."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["sso-fundamentals"],
+  "courseSlug": "authentication-authorization"
+}

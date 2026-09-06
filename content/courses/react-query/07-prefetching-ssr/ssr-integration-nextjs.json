@@ -1,0 +1,140 @@
+{
+  "id": "lesson-react-query-025",
+  "slug": "ssr-integration-nextjs",
+  "moduleSlug": "prefetching-ssr",
+  "courseSlug": "react-query",
+  "title": "SSR Integration with Next.js",
+  "description": "Learn how to integrate React Query with Next.js SSR and SSG for optimal server-side data fetching.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["ssr", "ssg", "nextjs", "server-components", "dehydrate", "hydrate"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Server-Side Rendering (SSR) and Static Site Generation (SSG) allow you to fetch data on the server before sending HTML to the client. React Query integrates seamlessly with these patterns through `dehydrate` and `hydrate`, giving you the best of both worlds: server-rendered HTML and client-side caching."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The SSR Challenge"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query is designed for client-side data fetching. When you move fetching to the server, you face a new challenge: how do you transfer server-fetched data to the client cache so that `useQuery` does not refetch data that is already fresh? The answer is `dehydrate` and `hydrate`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "dehydrate and hydrate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`dehydrate` serializes the QueryClient cache into a format that can be embedded in your HTML. On the client, `hydrate` restores the cache from that serialized data. Together, they ensure the client starts with the same data the server fetched, eliminating duplicate requests."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SSR with dehydrate and hydrate",
+        "content": "Fetching data on the server and hydrating the client",
+        "language": "tsx",
+        "code": "// app/users/[id]/page.tsx\nimport { QueryClient, dehydrate, HydrationBoundary } from '@tanstack/react-query';\n\nasync function getUser(id: string) {\n  const res = await fetch(`https://api.example.com/users/${id}`);\n  return res.json();\n}\n\nexport default async function UserPage({ params }: { params: { id: string } }) {\n  const queryClient = new QueryClient();\n\n  await queryClient.prefetchQuery({\n    queryKey: ['user', params.id],\n    queryFn: () => getUser(params.id)\n  });\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <UserClient userId={params.id} />\n    </HydrationBoundary>\n  );\n}\n\n// app/users/[id]/user-client.tsx\n'use client';\n\nimport { useQuery } from '@tanstack/react-query';\n\nfunction UserClient({ userId }: { userId: string }) {\n  const { data: user } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId)\n  });\n\n  return <h1>{user?.name}</h1>;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "QueryClient Lifecycle",
+        "text": "Create a new QueryClient for every SSR request. Do not reuse a single QueryClient across requests, as this causes cache leakage between users."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Next.js App Router Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In Next.js App Router, Server Components can fetch data directly. You can prefetch queries inside a Server Component and pass the dehydrated state to a Client Component boundary. This pattern keeps your data fetching close to where it is consumed while still leveraging React Query's caching."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server Component Prefetch",
+        "content": "Prefetching in a Next.js Server Component",
+        "language": "tsx",
+        "code": "// app/dashboard/page.tsx\nimport { QueryClient, dehydrate } from '@tanstack/react-query';\nimport { HydrationBoundary } from '@tanstack/react-query';\nimport DashboardClient from './dashboard-client';\n\nexport default async function DashboardPage() {\n  const queryClient = new QueryClient();\n\n  await queryClient.prefetchQuery({\n    queryKey: ['dashboard-metrics'],\n    queryFn: fetchDashboardMetrics\n  });\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <DashboardClient />\n    </HydrationBoundary>\n  );\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Client Component Consumption",
+        "content": "Consuming server-prefetched data in a Client Component",
+        "language": "tsx",
+        "code": "'use client';\n\nimport { useQuery } from '@tanstack/react-query';\n\nfunction DashboardClient() {\n  const { data: metrics } = useQuery({\n    queryKey: ['dashboard-metrics'],\n    queryFn: fetchDashboardMetrics\n  });\n\n  if (!metrics) return <p>Loading...</p>;\n\n  return (\n    <div>\n      <h2>Dashboard</h2>\n      <p>Revenue: ${metrics.revenue}</p>\n      <p>Users: {metrics.activeUsers}</p>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "ssr-hydration-flow",
+        "caption": "SSR data flow with React Query",
+        "definition": "sequenceDiagram\n    participant S as Server\n    participant Q as QueryClient\n    participant C as Client\n    participant H as HydrationBoundary\n\n    S->>Q: Create new QueryClient\n    S->>Q: prefetchQuery(key, fn)\n    Q->>S: Data fetched and cached\n    S->>S: dehydrate(queryClient)\n    S->>C: Send HTML + serialized cache\n    C->>H: Restore cache state\n    H->>C: useQuery reads from hydrated cache\n    C->>C: No refetch needed (data is fresh)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding Hydration Mismatches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A hydration mismatch occurs when the server-rendered HTML differs from the initial client render. React Query's `hydrate` function prevents this by ensuring the client cache is populated before the first render. However, you must avoid accessing browser-only APIs like `window` or `localStorage` during the initial server render."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Client-Only Code",
+        "text": "Any code that accesses `window`, `document`, or `localStorage` must be inside a `'use client'` component with proper guards or loaded dynamically to prevent SSR errors."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "dehydrate serializes the cache for HTML embedding",
+          "hydrate restores the cache on the client",
+          "Create a new QueryClient per SSR request",
+          "HydrationBoundary marks the client boundary",
+          "Avoid browser APIs during server rendering"
+        ],
+        "takeaway": "SSR with React Query eliminates duplicate requests and provides instant first paints."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["query-options"]
+}

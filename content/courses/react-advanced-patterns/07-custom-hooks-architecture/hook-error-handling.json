@@ -1,0 +1,149 @@
+{
+  "id": "lesson-react-adv-020",
+  "slug": "hook-error-handling",
+  "moduleSlug": "custom-hooks-architecture",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Hook Error Handling",
+  "description": "Implement robust error handling in custom hooks, covering loading states, retry logic, and graceful degradation.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["custom-hooks", "error-handling", "loading", "retry", "resilience"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real-world hooks interact with APIs, side effects, and user input that can fail. A well-designed custom hook should expose its error state clearly, provide recovery mechanisms, and never crash the entire component tree."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Three States Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every async operation in a hook should consider three states: loading, error, and success. Exposing all three gives the consuming component full control over the UI."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "useAsync with Three States",
+        "content": "A reusable hook that manages loading, error, and success states.",
+        "language": "tsx",
+        "code": "interface AsyncState<T> {\n  data: T | null;\n  loading: boolean;\n  error: Error | null;\n}\n\nfunction useAsync<T>(asyncFn: () => Promise<T>, deps: any[] = []) {\n  const [state, setState] = useState<AsyncState<T>>({\n    data: null,\n    loading: true,\n    error: null,\n  });\n\n  useEffect(() => {\n    let cancelled = false;\n\n    setState({ data: null, loading: true, error: null });\n\n    asyncFn()\n      .then(data => {\n        if (!cancelled) {\n          setState({ data, loading: false, error: null });\n        }\n      })\n      .catch(error => {\n        if (!cancelled) {\n          setState({ data: null, loading: false, error });\n        }\n      });\n\n    return () => { cancelled = true; };\n  }, deps);\n\n  const retry = useCallback(() => {\n    setState({ data: null, loading: true, error: null });\n  }, []);\n\n  return { ...state, retry };\n}\n\n// Usage\nfunction UserProfile({ userId }: { userId: string }) {\n  const { data, loading, error, retry } = useAsync(\n    () => fetch(`/api/users/${userId}`).then(r => r.json()),\n    [userId]\n  );\n\n  if (loading) return <Spinner />;\n  if (error) return <ErrorView error={error} onRetry={retry} />;\n  return <Profile data={data!} />;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Cancellation Safety",
+        "text": "Always use a cancellation flag inside useEffect to prevent state updates after unmounting. This avoids memory leaks and React warnings about setting state on unmounted components."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry and Exponential Backoff"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Transient failures are common in networked applications. Providing a retry mechanism with exponential backoff prevents overwhelming failing services."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hook with Exponential Backoff",
+        "content": "Adding automatic retry logic with increasing delays.",
+        "language": "tsx",
+        "code": "function useRetryableQuery<T>(asyncFn: () => Promise<T>, maxRetries = 3) {\n  const [attempt, setAttempt] = useState(0);\n  const [error, setError] = useState<Error | null>(null);\n  const [data, setData] = useState<T | null>(null);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    let cancelled = false;\n\n    const execute = async () => {\n      try {\n        const result = await asyncFn();\n        if (!cancelled) {\n          setData(result);\n          setLoading(false);\n        }\n      } catch (err) {\n        if (cancelled) return;\n\n        if (attempt < maxRetries) {\n          const delay = Math.min(1000 * 2 ** attempt, 10000);\n          setTimeout(() => setAttempt(a => a + 1), delay);\n        } else {\n          setError(err as Error);\n          setLoading(false);\n        }\n      }\n    };\n\n    execute();\n\n    return () => { cancelled = true; };\n  }, [attempt, asyncFn, maxRetries]);\n\n  const reset = useCallback(() => {\n    setAttempt(0);\n    setError(null);\n    setData(null);\n    setLoading(true);\n  }, []);\n\n  return { data, loading, error, retry: reset };\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "retry-backoff-flow",
+        "caption": "Exponential backoff retry flow inside a custom hook",
+        "definition": "graph TD\n    A[Start] --> B{Success?}\n    B -->|Yes| C[Return Data]\n    B -->|No| D{Retries Left?}\n    D -->|Yes| E[Wait 2^attempt ms]\n    E --> F[Increment Attempt]\n    F --> B\n    D -->|No| G[Set Error State]\n    style A fill:#1e293b,stroke:#38bdf8,color:#f1f5f9\n    style C fill:#1e293b,stroke:#22c55e,color:#f1f5f9\n    style G fill:#1e293b,stroke:#ef4444,color:#f1f5f9"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Graceful Degradation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a hook fails, the component should still render something useful. Design your hooks to expose fallback data or allow the component to render a degraded UI."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Degradation Strategies",
+        "items": [
+          "Return cached data alongside the error so the UI does not go blank",
+          "Expose an `isFromCache` flag so the component can indicate stale data",
+          "Allow the hook to accept a fallback value when all retries fail",
+          "Provide an `onError` callback for side effects like logging"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Graceful Degradation Hook",
+        "content": "Returning cached data on failure to keep the UI usable.",
+        "language": "tsx",
+        "code": "function useCachedQuery<T>(key: string, fetcher: () => Promise<T>) {\n  const [state, setState] = useState<AsyncState<T> & { cached: T | null }>({\n    data: null,\n    cached: null,\n    loading: true,\n    error: null,\n  });\n\n  useEffect(() => {\n    const cached = sessionStorage.getItem(`cache-${key}`);\n    let initial: T | null = null;\n\n    if (cached) {\n      initial = JSON.parse(cached);\n      setState(s => ({ ...s, cached: initial, data: initial }));\n    }\n\n    fetcher()\n      .then(data => {\n        sessionStorage.setItem(`cache-${key}`, JSON.stringify(data));\n        setState({ data, cached: initial, loading: false, error: null });\n      })\n      .catch(error => {\n        setState({\n          data: initial, // Show cached data\n          cached: initial,\n          loading: false,\n          error,\n        });\n      });\n  }, [key, fetcher]);\n\n  return {\n    data: state.data,\n    cached: state.cached,\n    loading: state.loading,\n    error: state.error,\n    isStale: state.error !== null && state.cached !== null,\n  };\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Boundaries for Hooks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hooks cannot catch errors in other components, but they can implement internal error boundaries by catching synchronous errors in event handlers and async functions."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncaught Errors Crash Hooks",
+        "text": "An uncaught error inside a hook will propagate up and potentially unmount the component. Always wrap async operations in try-catch blocks and provide meaningful error states."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Expose loading, error, and data states from async hooks",
+          "Use cancellation flags to prevent state updates after unmount",
+          "Implement retry with exponential backoff for transient failures",
+          "Return cached data alongside errors for graceful degradation"
+        ],
+        "takeaway": "Robust error handling in hooks transforms crashes into recoverable states."
+      }
+    }
+  ],
+  "courseSlug": "react-advanced-patterns"
+}

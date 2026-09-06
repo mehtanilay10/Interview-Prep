@@ -1,0 +1,214 @@
+{
+  "id": "lesson-auth-034",
+  "slug": "identity-federation",
+  "moduleSlug": "sso-identity-providers",
+  "courseSlug": "authentication-authorization",
+  "title": "Identity Federation",
+  "description": "Build identity federation for multi-tenant SaaS applications and understand trust relationships between identity systems.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["federation", "multi-tenant", "saas", "b2b", "b2c", "saml", "oidc", "dynamic-provider"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Identity Federation** is the trust relationship between two identity domains that allows users from one domain to access resources in another. In a multi-tenant SaaS application, federation enables each customer (tenant) to use their own identity provider — such as Azure AD, Okta, or Google Workspace — while your application treats them all through a unified interface."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Federation in SaaS Applications"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "federation-saas",
+        "caption": "Multi-tenant federation where each tenant connects their own identity provider to the SaaS application.",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant SP as SaaS App\n    participant IdP as Tenant IdP (Azure AD / Okta)\n    U->>SP: Visit app.myapp.com/tenant-a\n    SP->>SP: Detect tenant from domain or subdomain\n    SP->>U: Redirect to Tenant A's IdP\n    U->>IdP: Authenticate with corporate credentials\n    IdP->>U: Return SAML/OIDC assertion\n    U->>SP: Present assertion\n    SP->>SP: Validate against Tenant A's metadata\n    SP->>U: Logged into Tenant A workspace"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "B2B vs B2C Federation"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Federation Scenarios",
+        "cards": [
+          {
+            "title": "B2B Federation",
+            "description": "Business-to-business trust where partner organizations access your application using their corporate IdP.",
+            "pros": [
+              "Users keep existing corporate credentials",
+              "Centralized user lifecycle management",
+              "Reduced onboarding friction for partners"
+            ],
+            "cons": [
+              "Requires per-tenant configuration",
+              "Complex metadata management",
+              "Support burden for multiple IdP types"
+            ],
+            "tags": ["b2b", "enterprise", "partner"]
+          },
+          {
+            "title": "B2C Federation",
+            "description": "Business-to-consumer federation allowing consumers to use social or email identities.",
+            "pros": [
+              "Broad user reach",
+              "Social login convenience",
+              "Standardized protocols (OIDC)"
+            ],
+            "cons": [
+              "Less control over user attributes",
+              "Social provider API changes",
+              "Privacy regulation complexity (GDPR, CCPA)"
+            ],
+            "tags": ["b2c", "social", "consumer"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dynamic Identity Provider Selection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The core technical challenge in federated SaaS is routing each authentication request to the correct identity provider. Common strategies include subdomain-based routing (tenant-a.app.com), email domain matching (users @acme.com go to Acme's IdP), or a pre-login tenant selection page. Once the tenant is identified, your application loads the appropriate metadata, initiates the correct protocol flow, and validates the assertion against the tenant-specific configuration."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Implementation: Dynamic Provider Selection"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tenant-aware authentication middleware",
+        "content": "Resolve the tenant from the hostname and store it for the authentication handler.",
+        "code": "public class TenantResolutionMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ITenantRepository _tenantRepo;\n    \n    public TenantResolutionMiddleware(RequestDelegate next, ITenantRepository tenantRepo)\n    {\n        _next = next;\n        _tenantRepo = tenantRepo;\n    }\n    \n    public async Task InvokeAsync(HttpContext context)\n    {\n        var host = context.Request.Host.Host;\n        var subdomain = host.Split('.').FirstOrDefault();\n        \n        if (!string.IsNullOrEmpty(subdomain))\n        {\n            var tenant = await _tenantRepo.GetBySubdomainAsync(subdomain);\n            if (tenant != null)\n            {\n                context.Items[\"TenantId\"] = tenant.Id;\n                context.Items[\"IdpEntityId\"] = tenant.IdpEntityId;\n                context.Items[\"IdpMetadataUrl\"] = tenant.IdpMetadataUrl;\n            }\n        }\n        \n        await _next(context);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Metadata Management"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "SAML Metadata Best Practices",
+        "items": [
+          "Store IdP metadata XML per tenant in a database or secure blob storage.",
+          "Refresh metadata on a schedule (e.g., every 24 hours) to capture certificate rotations.",
+          "Validate metadata signatures before trusting federation data.",
+          "Cache metadata aggressively to avoid network calls during authentication.",
+          "Alert when a tenant's signing certificate is nearing expiry."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Metadata Refresh Is Critical",
+        "text": "Enterprise IdPs rotate certificates periodically. If your SaaS application caches metadata indefinitely, authentication will fail silently when a certificate expires. Implement background metadata refresh with monitoring and alerting."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Just-In-Time (JIT) Provisioning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a user authenticates via federation for the first time, your application must create a local user account or link the external identity to an existing account. This process is called Just-In-Time provisioning. The external identity provider supplies attributes like email, name, and groups. Your application maps these to local roles and permissions. Be cautious with group mapping — always validate that the incoming group claims match expected values for the tenant to prevent privilege escalation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Implementation: JIT Provisioning"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Handling federated user creation on login",
+        "content": "Create or update a local user profile when a federated user signs in.",
+        "code": "public async Task<User> HandleFederatedLoginAsync(\n    string tenantId, \n    ClaimsPrincipal principal)\n{\n    var email = principal.FindFirst(ClaimTypes.Email)?.Value \n             ?? principal.FindFirst(\"email\")?.Value;\n    \n    if (string.IsNullOrEmpty(email))\n        throw new InvalidOperationException(\"Email claim is required.\");\n    \n    var user = await _userRepo.GetByEmailAsync(email);\n    \n    if (user == null)\n    {\n        user = new User\n        {\n            Id = Guid.NewGuid().ToString(),\n            Email = email,\n            DisplayName = principal.Identity.Name,\n            TenantId = tenantId,\n            IdentityProvider = principal.FindFirst(\"idp\")?.Value ?? \"saml\",\n            CreatedAt = DateTime.UtcNow\n        };\n        \n        // Map tenant-specific roles\n        var groups = principal.FindAll(\"groups\").Select(c => c.Value).ToList();\n        user.Roles = MapGroupsToRoles(tenantId, groups);\n        \n        await _userRepo.CreateAsync(user);\n    }\n    else if (user.TenantId != tenantId)\n    {\n        throw new InvalidOperationException(\"User does not belong to this tenant.\");\n    }\n    \n    return user;\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Security Considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Federation Security Checklist",
+        "items": [
+          "Validate the AudienceRestriction in SAML assertions against the expected tenant entity ID.",
+          "Replay-protect SAML assertions by caching used InResponseTo values.",
+          "Verify token signatures using the correct tenant-specific public key.",
+          "Rate-limit authentication endpoints to prevent brute-force attacks against the IdP.",
+          "Log federation events (login, provisioning, errors) for audit and debugging.",
+          "Enforce HTTPS for all metadata endpoints and callback URLs."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Replay Attacks",
+        "text": "SAML assertions can be replayed if intercepted. Always check that the AssertionID or InResponseTo value has not been seen before. Store processed IDs in a short-lived cache (e.g., Redis with TTL)."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Federation connects separate identity systems through trust relationships",
+          "B2B federation uses enterprise IdPs; B2C uses social or database providers",
+          "Dynamic provider selection is essential for multi-tenant SaaS",
+          "Metadata must be refreshed to handle certificate rotations",
+          "JIT provisioning creates local accounts on first federated login",
+          "Always validate audience, signatures, and replay-protect SAML assertions"
+        ],
+        "takeaway": "Identity federation turns a single-tenant application into a multi-tenant platform, but it requires careful tenant isolation, metadata management, and security validation."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["sso-fundamentals", "saml2-basics"],
+  "courseSlug": "authentication-authorization"
+}

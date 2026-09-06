@@ -1,0 +1,218 @@
+{
+  "id": "lesson-auth-029",
+  "slug": "secure-storage-strategies",
+  "moduleSlug": "refresh-token-strategies",
+  "courseSlug": "authentication-authorization",
+  "title": "Secure Storage Strategies",
+  "description": "Store refresh tokens securely across web, mobile, and desktop platforms using HTTP-only cookies, secure storage, and keychain services.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["secure-storage", "cookies", "xss", "csrf", "mobile", "keychain"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Storage Problem"
+    },
+    {
+      "type": "paragraph",
+      "text": "Refresh tokens are powerful credentials. If stolen, they grant persistent access to a user account. Storing them securely is as important as issuing them correctly. The storage mechanism depends heavily on the platform: browsers, mobile apps, desktop apps, and server-side applications each have different security characteristics and available mechanisms."
+    },
+    {
+      "type": "callout",
+      "variant": "danger",
+      "title": "Never Store in localStorage",
+      "text": "localStorage is accessible to any JavaScript running on the page, making it vulnerable to XSS attacks. An attacker who injects script can read all localStorage values and steal refresh tokens. Use HTTP-only cookies in browsers instead."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "HTTP-Only Cookies (Browser)"
+    },
+    {
+      "type": "paragraph",
+      "text": "HTTP-only cookies are the recommended storage mechanism for refresh tokens in web applications. The browser automatically includes cookies in requests to the same domain. Setting the HTTP-only flag prevents JavaScript from accessing the cookie, which mitigates XSS attacks. Additional flags like Secure, SameSite, and Path further strengthen security."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Cookie Security Flags",
+      "items": [
+        "HttpOnly: Prevents JavaScript access via document.cookie",
+        "Secure: Ensures the cookie is only sent over HTTPS",
+        "SameSite=Strict or Lax: Mitigates CSRF attacks",
+        "Path: Restricts the cookie to specific paths",
+        "Max-Age or Expires: Sets the cookie lifetime"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Setting a secure refresh token cookie",
+      "content": "Express code to set a secure HTTP-only refresh token cookie.",
+      "code": "res.cookie('refreshToken', newRefreshToken, {\n  httpOnly: true,\n  secure: process.env.NODE_ENV === 'production',\n  sameSite: 'strict',\n  maxAge: 7 * 24 * 60 * 60 * 1000,\n  path: '/api/auth/refresh'\n});",
+      "language": "javascript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "CSRF Protection with Cookies"
+    },
+    {
+      "type": "paragraph",
+      "text": "When using cookies, CSRF becomes a concern because the browser automatically sends cookies with cross-site requests. Protect your refresh endpoint with anti-CSRF measures: use SameSite cookies, implement double-submit cookie patterns, or require custom headers like X-CSRF-Token for state-changing requests."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "SameSite Cookies",
+      "text": "Setting SameSite=Lax blocks cookies on most cross-site requests while still allowing them for top-level navigation. SameSite=Strict provides stronger protection but may break legitimate cross-site flows. Use SameSite=None only when necessary and always with Secure."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Mobile Storage (React Native / Native)"
+    },
+    {
+      "type": "paragraph",
+      "text": "Mobile platforms offer secure storage options that are more robust than browser storage. On iOS, use the Keychain. On Android, use EncryptedSharedPreferences or the Keystore. For React Native, use libraries like react-native-keychain or expo-secure-store, which wrap the native secure storage APIs."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Mobile Storage Options",
+      "cards": [
+        {
+          "title": "iOS Keychain",
+          "description": "Apple's encrypted storage for sensitive data like tokens and passwords.",
+          "pros": [
+            "Encrypted at rest",
+            "Survives app reinstall (with care)",
+            "Backed up to iCloud optionally"
+          ],
+          "cons": [
+            "iOS only",
+            "Complex API",
+            "Backup behavior must be configured"
+          ],
+          "tags": ["ios", "keychain"]
+        },
+        {
+          "title": "Android Keystore",
+          "description": "Android's hardware-backed encryption for storing cryptographic keys and data.",
+          "pros": [
+            "Hardware-backed security",
+            "Requires user authentication",
+            "Keys never leave TEE"
+          ],
+          "cons": [
+            "Android only",
+            "Device support varies",
+            "Complex migration path"
+          ],
+          "tags": ["android", "keystore"]
+        },
+        {
+          "title": "React Native Keychain",
+          "description": "Cross-platform library that wraps native keychain and keystore APIs.",
+          "pros": [
+            "Works on iOS and Android",
+            "Simple unified API",
+            "Supports biometry"
+          ],
+          "cons": [
+            "Native linking required",
+            "Occasional platform bugs",
+            "Less control over settings"
+          ],
+          "tags": ["react-native", "cross-platform"]
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Storing refresh token in React Native Keychain",
+      "content": "Using react-native-keychain to store and retrieve a refresh token.",
+      "code": "import * as Keychain from 'react-native-keychain';\n\nasync function storeRefreshToken(token: string) {\n  await Keychain.setInternetCredentials(\n    'com.myapp.auth',\n    'refresh_token',\n    token,\n    {\n      accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET,\n      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY\n    }\n  );\n}\n\nasync function getRefreshToken() {\n  const credentials = await Keychain.getInternetCredentials('com.myapp.auth');\n  return credentials?.password ?? null;\n}\n\nasync function deleteRefreshToken() {\n  await Keychain.resetInternetCredentials('com.myapp.auth');\n}",
+      "language": "typescript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Desktop and Server Storage"
+    },
+    {
+      "type": "paragraph",
+      "text": "For desktop applications, use platform-specific secure storage: Windows DPAPI, macOS Keychain, or Linux Secret Service API. For server-side applications that act as OAuth clients (confidential clients), store refresh tokens in encrypted database columns or secrets managers like AWS Secrets Manager or HashiCorp Vault. Never store secrets in environment variables in production."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Server-Side Storage",
+      "text": "Server-side applications should store refresh tokens encrypted at rest using AES-256-GCM or similar authenticated encryption. Rotate encryption keys periodically and use envelope encryption with a master key stored in a KMS."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Storage Security Checklist"
+    },
+    {
+      "type": "checklist",
+      "title": "Refresh Token Storage Checklist",
+      "items": [
+        {
+          "text": "Browser: Store refresh tokens in HTTP-only cookies",
+          "hint": "Never use localStorage, sessionStorage, or plain cookies"
+        },
+        {
+          "text": "Browser: Set Secure, HttpOnly, and SameSite flags on cookies",
+          "hint": "Use Strict in production; Lax if you need some cross-site requests"
+        },
+        {
+          "text": "Mobile: Use platform keychain or secure storage libraries",
+          "hint": "Avoid AsyncStorage or plain files on mobile"
+        },
+        {
+          "text": "Desktop: Use OS-provided encrypted storage APIs",
+          "hint": "DPAPI on Windows, Keychain on macOS, Secret Service on Linux"
+        },
+        {
+          "text": "Server: Encrypt tokens at rest with authenticated encryption",
+          "hint": "Use AES-256-GCM or let your database handle transparent encryption"
+        },
+        {
+          "text": "All platforms: Rotate encryption keys periodically",
+          "hint": "Use envelope encryption with a KMS for key management"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Migration Between Storage Mechanisms"
+    },
+    {
+      "type": "paragraph",
+      "text": "When changing storage mechanisms, you must migrate existing refresh tokens safely. A common pattern is to issue a new refresh token during the next refresh cycle and store it in the new mechanism. Avoid bulk migrations that require decrypting and re-encrypting all tokens at once, as this creates a large window of vulnerability."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Gradual Migration",
+      "text": "When migrating storage, issue new refresh tokens in the new format on the next successful refresh. Old tokens remain valid until naturally rotated, ensuring zero downtime."
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Never store refresh tokens in localStorage or sessionStorage",
+        "Use HTTP-only cookies with Secure, HttpOnly, and SameSite flags in browsers",
+        "Use platform keychains on mobile and desktop",
+        "Encrypt refresh tokens at rest on the server",
+        "Migrate storage mechanisms gradually during refresh cycles"
+      ],
+      "takeaway": "The security of your refresh tokens is only as strong as the storage mechanism. Choose the right storage for each platform and never compromise on encryption and access controls."
+    }
+  ],
+  "relatedLessons": ["refresh-token-basics", "token-revocation"],
+  "furtherReading": [],
+  "prerequisites": ["refresh-token-basics", "token-revocation"]
+}

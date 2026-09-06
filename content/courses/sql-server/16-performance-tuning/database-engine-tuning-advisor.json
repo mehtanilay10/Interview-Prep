@@ -1,0 +1,183 @@
+{
+  "id": "lesson-sql-146",
+  "slug": "database-engine-tuning-advisor",
+  "moduleSlug": "performance-tuning",
+  "courseSlug": "sql-server",
+  "title": "Database Engine Tuning Advisor",
+  "description": "Use Database Engine Tuning Advisor to receive automated recommendations for indexes, indexed views, and partitioning strategies.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 35,
+  "tags": ["dta", "index-tuning", "indexed-views", "partitioning", "recommendations"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What is Database Engine Tuning Advisor?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Database Engine Tuning Advisor (DTA) is a SQL Server tool that analyzes database workloads and recommends physical design changes to improve performance. It evaluates queries against existing indexes and suggests new indexes, indexed views, or partitioning strategies based on the actual workload you provide."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "How DTA Works",
+      "text": "DTA runs your workload queries against a test environment, simulates the execution with various index configurations, and recommends the changes that would produce the lowest estimated query cost."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Launching Database Engine Tuning Advisor"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can launch DTA from SSMS by navigating to Tools → Database Engine Tuning Advisor. You can also invoke it programmatically using the dta command-line utility or the dta XML input file format. DTA requires a workload — either a SQL Server Profiler trace, an Extended Events session, or a batch of T-SQL statements saved to a file."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Workload",
+          "definition": "A set of queries representing real database usage, captured in a trace file, XML file, or table."
+        },
+        {
+          "term": "Index Recommendation",
+          "definition": "A suggestion to create, drop, or modify indexes based on workload analysis."
+        },
+        {
+          "term": "Partitioning Recommendation",
+          "definition": "A suggestion to partition large tables or indexes to improve manageability and query performance."
+        },
+        {
+          "term": "Indexed View",
+          "definition": "A view with a unique clustered index whose result set is materialized and stored in the database."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Using DTA from SSMS"
+    },
+    {
+      "type": "paragraph",
+      "text": "The SSMS interface guides you through selecting a database, providing a workload, configuring tuning options, and reviewing recommendations. You can specify tuning time limits, maximum disk space for new indexes, and whether DTA should consider indexed views or partitioning."
+    },
+    {
+      "type": "example",
+      "title": "Capture a Workload with SQL Server Profiler"
+      ,
+      "language": "sql",
+      "code": "-- Step 1: Create a trace to capture queries\nDECLARE @TraceID INT;\nEXEC sp_trace_create @TraceID OUTPUT, 0, N'C:\\Traces\\WorkloadTrace.trc';\n\n-- Step 2: Set events to capture\nEXEC sp_trace_setevent @TraceID, 10, 1, 1;  -- RPC:Completed, TextData\nEXEC sp_trace_setevent @TraceID, 12, 1, 1;  -- SQL:BatchCompleted, TextData\n\n-- Step 3: Set filter on database\nEXEC sp_trace_setfilter @TraceID, 11, 0, 6, N'AdventureWorks'; -- DatabaseID filter\n\n-- Step 4: Start the trace\nEXEC sp_trace_setstatus @TraceID, 1;\n\n-- After capturing workload, stop the trace\nEXEC sp_trace_setstatus @TraceID, 0;\nEXEC sp_trace_setstatus @TraceID, 2;"
+    },
+    {
+      "type": "paragraph",
+      "text": "The captured trace file becomes the workload input for DTA. You can also use Extended Events or the Query Store as a workload source for more modern capturing approaches."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Using DTA Programmatically"
+    },
+    {
+      "type": "paragraph",
+      "text": "The dta utility allows you to run DTA from the command line with an XML configuration file. This approach is ideal for automation and CI/CD pipelines where you want to regularly validate index recommendations as your workload evolves."
+    },
+    {
+      "type": "example",
+      "title": "DTA Command-Line Example",
+      "language": "sql",
+      "code": "-- dta command line (run from command prompt, not SSMS)\n-- dta -S ServerName -d AdventureWorks -if Workload.sql -s DatabaseName -ox Recommendations.xml -fx Script.sql\n\n-- For programmatic execution from T-SQL:\nDECLARE @dta_xml XML = N'\n<DTAXML xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/dta\">\n  <DTAInput>\n    <Workload>\n      <File>Workload.sql</File>\n    </Workload>\n    <TuningOptions>\n      <TuningTimeInMin>60</TuningTimeInMin>\n      <MaxDiskSpaceInMB>5000</MaxDiskSpaceInMB>\n      <MaxKeyColumnsInIndex>16</MaxKeyColumnsInIndex>\n      <FreqCutoff>100</FreqCutoff>\n      <EnableOnlineIndexOperations>True</EnableOnlineIndexOperations>\n    </TuningOptions>\n  </DTAInput>\n</DTAXML>';\n\n-- Execute tuning\nEXEC dta.sp_control_database_tuning\n    @database_name = N'AdventureWorks',\n    @xml_dta = @dta_xml;"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Interpreting Recommendations"
+    },
+    {
+      "type": "paragraph",
+      "text": "DTA returns recommendations categorized by type: CREATE INDEX, DROP INDEX, CREATE STATISTICS, CREATE PARTITION SCHEME/FUNCTION, and CREATE INDEXED VIEW. Each recommendation includes an estimated improvement percentage. Review recommendations carefully before applying them — DTA may suggest indexes that overlap with existing ones or that are not needed in production due to write-heavy workloads."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Evaluating Recommendations",
+      "items": [
+        "Check for overlapping indexes — multiple indexes on the same columns waste space and slow writes",
+        "Consider write overhead — each index speeds reads but slows INSERT, UPDATE, and DELETE",
+        "Verify the tuning set represents your production workload accurately",
+        "Test recommendations in a staging environment before applying to production",
+        "Review indexed view recommendations carefully — they have strict creation requirements"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Combine with Query Store",
+      "text": "Use Query Store to capture your production workload, then feed it to DTA for recommendations based on actual user queries rather than simulated test data."
+    },
+    {
+      "type": "mermaid",
+      "id": "dta-workflow",
+      "caption": "Database Engine Tuning Advisor workflow from workload capture to recommendation review.",
+      "definition": "flowchart LR\n    A[Capture Workload] --> B[Profiler / XEvents / Query Store]\n    B --> C[Load Workload into DTA]\n    C --> D[DTA Analyzes Queries]\n    D --> E[Simulate Index Configurations]\n    E --> F[Generate Recommendations]\n    F --> G{Review & Validate}\n    G -->|Approve| H[Apply Index Changes]\n    G -->|Reject| I[Discard Recommendations]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Limitations of DTA"
+    },
+    {
+      "type": "paragraph",
+      "text": "DTA is a powerful tool, but it has limitations. It analyzes a static workload snapshot, so it cannot predict future query patterns. It may recommend indexes for queries that rarely execute. It does not consider index maintenance overhead or disk space constraints unless explicitly configured. Always treat DTA recommendations as suggestions that require human review."
+    },
+    {
+      "type": "exercise",
+      "title": "Run Database Engine Tuning Advisor",
+      "description": "Capture a workload from AdventureWorks, analyze it with DTA, and implement a recommended index.",
+      "steps": [
+        "Open SQL Server Profiler and create a new trace against the AdventureWorks database",
+        "Filter events to RPC:Completed and SQL:BatchCompleted",
+        "Run a set of representative queries against AdventureWorks while the trace captures them",
+        "Stop the trace and save the trace file",
+        "Open Database Engine Tuning Advisor and load the trace file as the workload",
+        "Select the AdventureWorks database and start tuning",
+        "Review the recommendations, focusing on indexes with high estimated improvement",
+        "Create one recommended index and verify its impact by examining execution plans"
+      ],
+      "expectedOutcome": "You will have successfully used DTA to identify and implement at least one index that improves query performance."
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "Should I implement all DTA recommendations?",
+          "answer": "No. DTA recommendations should be evaluated in context. Over-indexing increases write overhead. Prioritize indexes with high improvement percentages and verify they do not duplicate existing indexes."
+        },
+        {
+          "question": "Can DTA recommend dropping existing indexes?",
+          "answer": "Yes, DTA can identify unused or redundant indexes and recommend dropping them. This is valuable for reducing write overhead and freeing disk space."
+        },
+        {
+          "question": "What is a good tuning time for DTA?",
+          "answer": "For small databases, 15-30 minutes is sufficient. For large, complex workloads, 1-2 hours allows DTA to explore more index configurations. Longer tuning times typically yield better recommendations but have diminishing returns."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "DTA analyzes a workload and recommends physical design changes to improve query performance",
+        "Capture a representative workload using Profiler, Extended Events, or Query Store",
+        "Review recommendations for overlaps, write overhead, and practical applicability",
+        "Test recommended indexes in a non-production environment before deploying",
+        "Use DTA alongside Query Store for comprehensive index strategy management"
+      ],
+      "takeaway": "Database Engine Tuning Advisor automates the index discovery process, but human judgment is essential for evaluating trade-offs between read performance and write overhead."
+    }
+  ]
+}

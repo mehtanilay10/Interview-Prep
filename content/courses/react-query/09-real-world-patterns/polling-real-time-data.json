@@ -1,0 +1,167 @@
+{
+  "id": "lesson-react-query-034",
+  "slug": "polling-real-time-data",
+  "moduleSlug": "real-world-patterns",
+  "courseSlug": "react-query",
+  "title": "Polling & Real-Time Data",
+  "description": "Set up polling for real-time data updates and learn smart strategies for efficient data synchronization.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["polling", "real-time", "refetch-interval", "websocket", "live-data"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some applications need data that updates continuously—stock prices, live notifications, or collaborative editing. React Query provides built-in polling capabilities that automatically refetch data at specified intervals, keeping your UI in sync with the server."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Polling Fundamentals"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "When to Use Polling",
+        "items": [
+          "Dashboards showing live metrics or KPIs",
+          "Stock prices or cryptocurrency tickers",
+          "Real-time notifications and alerts",
+          "Collaborative document status",
+          "Server health monitoring"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Polling vs WebSockets",
+        "text": "Polling is simpler to implement but less efficient than WebSockets. Use polling when data changes infrequently or when real-time infrastructure is unavailable."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "polling-lifecycle",
+        "caption": "Polling lifecycle with React Query",
+        "definition": "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Fetching: Component mounts\n    Fetching --> Success: Data received\n    Success --> Waiting: Wait interval\n    Waiting --> Fetching: refetchInterval triggers\n    Success --> Error: Network failure\n    Error --> Waiting: Retry after delay\n    Waiting --> [*]: Component unmounts"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Polling Setup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Polling with refetchInterval",
+        "content": "The simplest way to poll is to set refetchInterval on a query.",
+        "language": "tsx",
+        "code": "const { data: ticker } = useQuery({\n  queryKey: ['btc-price'],\n  queryFn: fetchBitcoinPrice,\n  refetchInterval: 5000, // Poll every 5 seconds\n  refetchIntervalInBackground: false, // Don't poll when tab hidden\n  staleTime: 0 // Consider data stale immediately\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Background Polling",
+        "text": "refetchIntervalInBackground controls whether polling continues when the user switches tabs. Set it to false to save bandwidth and battery."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Smart Polling Strategies"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Conditional Polling",
+        "content": "Poll only when the user is viewing the data. Stop polling when the component is hidden or the user navigates away.",
+        "language": "tsx",
+        "code": "const { data } = useQuery({\n  queryKey: ['notifications'],\n  queryFn: fetchNotifications,\n  refetchInterval: (query) => {\n    // Poll faster if there are unread notifications\n    if (query.state.data?.unreadCount > 0) {\n      return 3000; // 3 seconds\n    }\n    return 10000; // 10 seconds when all read\n  },\n  enabled: isUserActive // Only poll when user is active\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pausing and Resuming Polling"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pause Polling When Hidden",
+        "content": "Use the Page Visibility API to pause polling when the user is not looking.",
+        "language": "tsx",
+        "code": "const useVisibilityPolling = (queryKey, queryFn, interval = 5000) => {\n  const [isVisible, setIsVisible] = useState(true);\n\n  useEffect(() => {\n    const handleVisibilityChange = () => {\n      setIsVisible(document.visibilityState === 'visible');\n    };\n\n    document.addEventListener('visibilitychange', handleVisibilityChange);\n    return () => {\n      document.removeEventListener('visibilitychange', handleVisibilityChange);\n    };\n  }, []);\n\n  return useQuery({\n    queryKey,\n    queryFn,\n    enabled: isVisible,\n    refetchInterval: isVisible ? interval : false\n  });\n};"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pause with External Control",
+        "content": "Allow users or parent components to control polling state.",
+        "language": "tsx",
+        "code": "const LiveDashboard = () => {\n  const [isLive, setIsLive] = useState(true);\n\n  const { data: metrics } = useQuery({\n    queryKey: ['metrics'],\n    queryFn: fetchMetrics,\n    refetchInterval: isLive ? 2000 : false,\n    enabled: true\n  });\n\n  return (\n    <div>\n      <button onClick={() => setIsLive(!isLive)}>\n        {isLive ? 'Pause Live Updates' : 'Resume Live Updates'}\n      </button>\n      <MetricsDisplay data={metrics} />\n    </div>\n  );\n};"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "WebSocket Integration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "WebSocket + React Query",
+        "content": "Combine WebSockets for push updates with React Query for caching and state management.",
+        "language": "tsx",
+        "code": "const useWebSocketTicker = (symbol: string) => {\n  const queryClient = useQueryClient();\n\n  useEffect(() => {\n    const ws = new WebSocket(`wss://stream.example.com/${symbol}`);\n\n    ws.onmessage = (event) => {\n      const tick = JSON.parse(event.data);\n\n      queryClient.setQueryData(['ticker', symbol], (old: TickerData) => ({\n        ...old,\n        price: tick.price,\n        change: tick.change,\n        lastUpdated: new Date().toISOString()\n      }));\n    };\n\n    ws.onclose = () => {\n      console.log('WebSocket disconnected');\n    };\n\n    return () => ws.close();\n  }, [symbol, queryClient]);\n\n  return useQuery({\n    queryKey: ['ticker', symbol],\n    queryFn: () => fetchTicker(symbol),\n    staleTime: Infinity\n  });\n};"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Real-Time Data Checklist",
+        "items": [
+          { "text": "Polling interval is appropriate for data volatility", "hint": "Fast-changing data needs shorter intervals" },
+          { "text": "Background polling disabled by default", "hint": "Save resources when tab is hidden" },
+          { "text": "Polling pauses when user navigates away", "hint": "Use enabled flag or visibility API" },
+          { "text": "WebSocket updates write to React Query cache", "hint": "setQueryData keeps cache in sync" },
+          { "text": "Stale time configured for data type", "hint": "Real-time data often needs staleTime: 0" }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use refetchInterval for simple polling",
+          "Control polling with enabled and refetchIntervalInBackground",
+          "WebSocket updates integrate via setQueryData",
+          "Always pause polling when not visible",
+          "Choose intervals based on data change frequency"
+        ],
+        "takeaway": "Real-time data requires balancing freshness with performance. React Query makes it easy to configure smart polling strategies."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["use-query"]
+}

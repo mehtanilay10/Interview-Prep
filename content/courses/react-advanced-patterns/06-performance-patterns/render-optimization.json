@@ -1,0 +1,191 @@
+{
+  "id": "lesson-react-adv-017",
+  "slug": "render-optimization",
+  "moduleSlug": "performance-patterns",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Render Optimization Strategies",
+  "description": "Profile React rendering, identify bottlenecks, and apply strategies to minimize unnecessary work.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["profiling", "devtools", "re-renders", "performance", "optimization", "memo"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Profiling React Components",
+      "anchor": "profiling"
+    },
+    {
+      "type": "paragraph",
+      "text": "Before optimizing, you need data. React DevTools Profiler records component renders and shows how long each render takes. It also highlights why components re-rendered and which props changed."
+    },
+    {
+      "type": "example",
+      "title": "Recording a Profile",
+      "content": "Open React DevTools, go to the Profiler tab, and click Record. Interact with your app, then stop recording. The flame graph shows render durations.",
+      "code": "// No code changes required\n// Use React DevTools Profiler UI\n\n// You can also programmatically measure:\nconsole.time('render');\n// ... component logic\nconsole.timeEnd('render');",
+      "language": "tsx"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Use Production Builds for Accurate Metrics",
+      "text": "Development builds add extra overhead. Always measure performance in a production build to get realistic numbers."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Identifying Unnecessary Re-renders",
+      "anchor": "identifying-re-renders"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Profiler shows which components re-rendered and why. Look for patterns such as a parent re-rendering many children, or components re-rendering when their props have not meaningfully changed."
+    },
+    {
+      "type": "mermaid",
+      "id": "render-debug",
+      "caption": "Diagnosing render paths",
+      "definition": "graph TD\n    A[Profiler Trace] --> B{Render Time > 16ms?}\n    B -->|Yes| C[Find Hot Component]\n    B -->|No| D[Performance Acceptable]\n    C --> E{Props Actually Changed?}\n    E -->|No| F[Add React.memo]\n    E -->|Yes| G[Optimize Computation or Split State]"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Component Composition to Reduce Re-renders",
+      "anchor": "composition"
+    },
+    {
+      "type": "paragraph",
+      "text": "One of the most effective ways to reduce re-renders is to restructure your component tree. If only a small part of a component needs dynamic data, lift that part into a separate component so the rest of the UI is stable."
+    },
+    {
+      "type": "example",
+      "title": "Extracting Dynamic Content",
+      "content": "Before: the entire list re-renders when count changes. After: only the counter re-renders.",
+      "code": "// Before\nfunction List({ items }: { items: string[] }) {\n  const [count, setCount] = useState(0);\n  return (\n    <div>\n      <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>\n      {items.map(item => <p key={item}>{item}</p>)}\n    </div>\n  );\n}\n\n// After\nfunction Counter({ onIncrement }: { onIncrement: () => void }) {\n  const [count, setCount] = useState(0);\n  return (\n    <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>\n  );\n}\n\nfunction List({ items }: { items: string[] }) {\n  return (\n    <div>\n      <Counter onIncrement={() => {}} />\n      {items.map(item => <p key={item}>{item}</p>)}\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "State Colocation",
+      "anchor": "state-colocation"
+    },
+    {
+      "type": "paragraph",
+      "text": "State colocation means keeping state as close as possible to where it is used. Global or lifted state forces unrelated components to re-render. By colocating state, only the components that truly need it subscribe to updates."
+    },
+    {
+      "type": "bullet-list",
+      "title": "State Colocation Strategies",
+      "items": [
+        "Move state into the component that consumes it",
+        "Use local state for UI-only concerns like toggles and inputs",
+        "Avoid lifting state to the top of the tree for one-off interactions",
+        "Consider component composition before context or global stores"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Avoiding Inline Objects and Functions",
+      "anchor": "inline-objects"
+    },
+    {
+      "type": "paragraph",
+      "text": "Inline objects and arrow functions in JSX create new references on every render. When these are passed to memoized children, they break memoization. Use useMemo and useCallback to stabilize references."
+    },
+    {
+      "type": "example",
+      "title": "Avoiding Prop Drift",
+      "content": "Use useMemo and useCallback to keep prop references stable across renders.",
+      "code": "import { useMemo, useCallback } from 'react';\n\nfunction Parent({ filters }: { filters: { category: string } }) {\n  const handleClick = useCallback((id: string) => {\n    console.log('Clicked', id);\n  }, []);\n\n  const sortedItems = useMemo(() => {\n    return items.sort((a, b) => a.name.localeCompare(b.name));\n  }, [items]);\n\n  return (\n    <div>\n      <FilterPanel filters={filters} onChange={handleClick} />\n      <ItemGrid items={sortedItems} />\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Batching and Concurrent Features",
+      "anchor": "batching-concurrent"
+    },
+    {
+      "type": "paragraph",
+      "text": "React 18+ automatically batches state updates, even inside promises and event handlers. This reduces the number of renders and improves perceived performance. Use startTransition to mark non-urgent updates as interruptible."
+    },
+    {
+      "type": "example",
+      "title": "Using startTransition",
+      "content": "Mark heavy UI updates as transitions so React can prioritize urgent input.",
+      "code": "import { startTransition, useState } from 'react';\n\nfunction SearchPage() {\n  const [query, setQuery] = useState('');\n  const [results, setResults] = useState([]);\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    const value = e.target.value;\n    setQuery(value);\n\n    startTransition(() => {\n      setResults(search(value));\n    });\n  };\n\n  return (\n    <div>\n      <input value={query} onChange={handleChange} />\n      <ResultsList results={results} />\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Optimization Techniques",
+      "cards": [
+        {
+          "title": "React.memo",
+          "description": "Prevents re-renders when props are shallowly equal.",
+          "pros": ["Simple to apply", "No hook overhead"],
+          "cons": ["Shallow comparison only", "Reference instability breaks it"]
+        },
+        {
+          "title": "useMemo / useCallback",
+          "description": "Stabilizes values and function references between renders.",
+          "pros": ["Fixes prop instability", "Caches expensive work"],
+          "cons": ["Memory overhead", "Can be overused"]
+        },
+        {
+          "title": "Component Splitting",
+          "description": "Moves dynamic parts into isolated components.",
+          "pros": ["No memoization needed", "Clear boundaries"],
+          "cons": ["More components to maintain", "Potential prop drilling"]
+        },
+        {
+          "title": "Transitions",
+          "description": "Marks updates as non-urgent for better responsiveness.",
+          "pros": ["Improves input latency", "Native React 18 feature"],
+          "cons": ["Requires React 18+", "Not for critical state"]
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "Render Optimization Checklist",
+      "items": [
+        {
+          "text": "Profile with React DevTools before optimizing",
+          "hint": "Find the actual bottleneck, do not guess"
+        },
+        {
+          "text": "Memoize props passed to expensive children",
+          "hint": "Use React.memo combined with useCallback"
+        },
+        {
+          "text": "Colocate state near where it is used",
+          "hint": "Avoid lifting state unnecessarily"
+        },
+        {
+          "text": "Use startTransition for non-urgent updates",
+          "hint": "Keep the UI responsive during heavy work"
+        },
+        {
+          "text": "Verify improvements with the Profiler",
+          "hint": "Ensure your change actually reduced render time"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Profile first using React DevTools to find real bottlenecks",
+        "Use composition to isolate dynamic parts of the UI",
+        "Colocate state to reduce unnecessary subscribers",
+        "Stabilize prop references with useMemo and useCallback",
+        "Use React 18 transitions to keep the UI responsive during heavy updates"
+      ]
+    }
+  ]
+}

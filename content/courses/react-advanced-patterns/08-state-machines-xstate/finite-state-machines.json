@@ -1,0 +1,133 @@
+{
+  "id": "lesson-react-adv-022",
+  "slug": "finite-state-machines",
+  "moduleSlug": "state-machines-xstate",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Finite State Machines",
+  "description": "Understand the theory and practical application of finite state machines for managing complex UI state in React.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["fsm", "state-machine", "states", "transitions", "impossible-states"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is a Finite State Machine?"
+    },
+    {
+      "type": "paragraph",
+      "text": "A finite state machine (FSM) is a mathematical model of computation consisting of a finite number of states, transitions between those states, and actions triggered by those transitions. In the context of React, an FSM is an elegant way to model UI state that has a clear, predictable flow and absolutely no impossible states."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Why This Matters",
+      "text": "Impossible states are combinations of boolean flags that can never logically coexist—like isSubmitting = true and isSuccess = true simultaneously. FSMs prevent these by design: the UI can only ever be in exactly one valid state."
+    },
+    {
+      "type": "mermaid",
+      "id": "fsm-traffic-light",
+      "caption": "A simple traffic light is a classic finite state machine example.",
+      "definition": "stateDiagram-v2\n    [*] --> Green\n    Green --> Yellow: timer\n    Yellow --> Red: timer\n    Red --> Green: timer"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "State",
+          "definition": "A finite, mutually exclusive condition that the system can be in at any given time."
+        },
+        {
+          "term": "Transition",
+          "definition": "A directed edge from one state to another, triggered by an event or condition."
+        },
+        {
+          "term": "Event",
+          "definition": "An input or action that triggers a transition between states."
+        },
+        {
+          "term": "Impossible State",
+          "definition": "A state combination that can be reached in boolean-flag models but is logically invalid."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "The Boolean Flag Problem"
+    },
+    {
+      "type": "paragraph",
+      "text": "Most React components manage complex UI state using multiple boolean flags. Consider a form submission component that tracks idle, submitting, success, and error conditions. A naive implementation might use four separate booleans: isIdle, isSubmitting, isSuccess, and isError. The problem is that React gives you no guarantee that only one flag is true at a time. A race condition or careless state update can leave the form in an impossible state where both isSubmitting and isSuccess are true."
+    },
+    {
+      "type": "example",
+      "title": "Antipattern: Multiple Boolean Flags",
+      "content": "This approach is fragile because React does not prevent invalid state combinations.",
+      "code": "function Form() {\n  const [isIdle, setIsIdle] = useState(true);\n  const [isSubmitting, setIsSubmitting] = useState(false);\n  const [isSuccess, setIsSuccess] = useState(false);\n  const [isError, setIsError] = useState(false);\n\n  const handleSubmit = async () => {\n    setIsIdle(false);\n    setIsSubmitting(true);\n    try {\n      await api.submit();\n      setIsSubmitting(false);\n      setIsSuccess(true); // Who sets isError to false?\n    } catch (e) {\n      setIsSubmitting(false);\n      setIsError(true); // Who sets isSuccess to false?\n    }\n  };\n\n  if (isSubmitting) return <Spinner />;\n  if (isSuccess) return <Success />;\n  if (isError) return <Error />;\n  return <Form onSubmit={handleSubmit} />;\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "text": "If both isSuccess and isError are true, the component renders the error UI instead of the success UI because the checks happen sequentially. This is an impossible state that real users will eventually encounter."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Modeling UI as a Finite State Machine"
+    },
+    {
+      "type": "paragraph",
+      "text": "An FSM replaces these booleans with a single state variable that can hold exactly one value. For the form submission flow, the valid states are: idle, submitting, success, and error. There are exactly four states, and the machine can only be in one at a time. Transitions are explicit events: SUBMIT, RESOLVE, and REJECT."
+    },
+    {
+      "type": "mermaid",
+      "id": "fsm-form-submission",
+      "caption": "Form submission modeled as a finite state machine with explicit transitions.",
+      "definition": "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Submitting: SUBMIT\n    Submitting --> Success: RESOLVE\n    Submitting --> Error: REJECT\n    Error --> Submitting: SUBMIT\n    Success --> Idle: RESET"
+    },
+    {
+      "type": "table",
+      "headers": ["Approach", "State Guarantees", "Transition Logic", "Complexity"],
+      "rows": [
+        ["Multiple booleans", "None", "Scattered", "O(2^n) combinations"],
+        ["Reducers", "Invariant enforcement", "Centralized", "O(2^n) if nested"],
+        ["Finite State Machine", "Mutual exclusivity", "Explicit transitions", "O(1) per state"]
+      ]
+    },
+    {
+      "type": "bullet-list",
+      "title": "Properties of a Proper Finite State Machine",
+      "items": [
+        "A finite number of states",
+        "Exactly one active state at any given time",
+        "Transitions triggered by discrete events",
+        "No transitions allowed from impossible states because they do not exist",
+        "Deterministic: the same event in the same state always produces the same result"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Conceptual FSM Implementation",
+      "content": "A minimal FSM can be represented as a state object with a transition function.",
+      "code": "type State = 'idle' | 'submitting' | 'success' | 'error';\n\ninterface Machine<S, E> {\n  state: S;\n  transition(event: E): Machine<S, E>;\n}\n\nclass FormMachine implements Machine<State, FormEvent> {\n  state: State = 'idle';\n\n  transition(event: FormEvent): FormMachine {\n    switch (this.state) {\n      case 'idle':\n        if (event.type === 'SUBMIT') {\n          return { ...this, state: 'submitting' };\n        }\n        break;\n      case 'submitting':\n        if (event.type === 'RESOLVE') {\n          return { ...this, state: 'success' };\n        }\n        if (event.type === 'REJECT') {\n          return { ...this, state: 'error' };\n        }\n        break;\n    }\n    return this;\n  }\n}",
+      "language": "typescript"
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Finite state machines guarantee mutual exclusivity: only one state can be active.",
+        "Multiple boolean flags create 2^n possible state combinations, most of which are impossible or invalid.",
+        "Transitions are explicit, typed events that move the machine from one state to another.",
+        "FSMs are deterministic: the same event in the same state always leads to the same outcome.",
+        "This pattern scales far better than scattered useState calls as UI complexity grows."
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["state-reducer-basics"]
+}

@@ -1,0 +1,145 @@
+{
+  "id": "lesson-react-adv-023",
+  "slug": "xstate-fundamentals",
+  "moduleSlug": "state-machines-xstate",
+  "courseSlug": "react-advanced-patterns",
+  "title": "XState Fundamentals",
+  "description": "Learn how to create, configure, and reason about XState machine definitions for real-world React applications.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["xstate", "machine", "createMachine", "interpret", "transitions", "context"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is XState?"
+    },
+    {
+      "type": "paragraph",
+      "text": "XState is a library for creating, interpreting, and executing finite state machines and statecharts. It provides a declarative configuration object that describes every state, transition, and side effect in your application logic. Because XState machines are pure objects, they are easy to test, visualize, and reason about without running your UI."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "XState Version Note",
+      "text": "This lesson covers XState v5, which is the current major version. The core concepts remain the same as v4, but the import paths and some API names have changed."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Anatomy of a Machine"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every XState machine is created with the createMachine function. The function accepts a configuration object with id, initial, context, and states properties. The id uniquely identifies the machine. The initial property declares the starting state. Context holds dynamic data that changes over time but is not a state. The states object maps state names to their transitions and nested configuration."
+    },
+    {
+      "type": "mermaid",
+      "id": "xstate-machine-anatomy",
+      "caption": "The four core parts of any XState machine configuration.",
+      "definition": "flowchart TD\n    Config[Machine Config] --> ID[id]\n    Config --> Initial[initial]\n    Config --> Context[context]\n    Config --> States[states]\n    States --> StateA[idle]\n    States --> StateB[loading]\n    States --> StateC[success]\n    StateA -->|FETCH| StateB\n    StateB -->|RESOLVE| StateC\n    StateB -->|REJECT| StateA"
+    },
+    {
+      "type": "numbered-list",
+      "title": "Essential Machine Properties",
+      "items": [
+        "id: A unique string identifier used for debugging and devtools visualization.",
+        "initial: The name of the state the machine starts in when first interpreted.",
+        "context: An object of arbitrary data that the machine can read and update during transitions.",
+        "states: A map of state names to their configuration, including on transitions and any nested states or effects."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "createMachine",
+          "definition": "XState function that returns a machine configuration object. It does not start the machine by itself."
+        },
+        {
+          "term": "interpret / createActor",
+          "definition": "In XState v5, createActor takes a machine and starts an active service that can send events and listen to state changes."
+        },
+        {
+          "term": "Event",
+          "definition": "A plain object or string sent to the actor to trigger transitions. Conventionally typed as { type: 'EVENT_NAME', ...payload }."
+        },
+        {
+          "term": "Guard",
+          "definition": "A condition function that must return true for a guarded transition to proceed."
+        },
+        {
+          "term": "Action",
+          "definition": "Side effects executed during transitions, such as calling an API, updating context, or emitting analytics."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Your First Machine"
+    },
+    {
+      "type": "paragraph",
+      "text": "Let's build a simple toggle machine. The machine has two states: inactive and active. A TOGGLE event flips between them. This example introduces the basic structure without any side effects or context."
+    },
+    {
+      "type": "example",
+      "title": "Minimal Toggle Machine",
+      "content": "A minimal toggle machine that switches between two states.",
+      "code": "import { setup, assign, fromPromise } from 'xstate';\n\nconst toggleMachine = setup({\n  types: {\n    context: {} as { count: number },\n    events: {} as { type: 'TOGGLE' } | { type: 'INCREMENT' },\n  },\n  actions: {\n    increment: assign({\n      count: ({ context }) => context.count + 1,\n    }),\n  },\n}).createMachine({\n  id: 'toggle',\n  initial: 'inactive',\n  context: { count: 0 },\n  states: {\n    inactive: {\n      on: {\n        TOGGLE: 'active',\n      },\n    },\n    active: {\n      on: {\n        TOGGLE: 'inactive',\n        INCREMENT: {\n          actions: 'increment',\n        },\n      },\n    },\n  },\n});",
+      "language": "typescript"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "text": "Use the setup() function in XState v5 for full type safety. It lets you declare the shape of context, events, and actions upfront so TypeScript can catch mistakes at compile time."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Transitions and Events"
+    },
+    {
+      "type": "paragraph",
+      "text": "Transitions are defined inside the on property of each state. The on object maps event types to target states or transition objects. A simple string target is shorthand for { target: 'stateName' }. When you need guards or actions, you replace the string with a full transition object."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Common Transition Patterns",
+      "items": [
+        "Simple target: on: { SUBMIT: 'loading' }",
+        "Guarded transition: on: { SUBMIT: { target: 'loading', guard: 'isValid' } }",
+        "Internal transition: on: { INCREMENT: { actions: 'increment' } }",
+        "Reentrant self-transition: on: { RETRY: { target: 'loading' } }"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Guarded Transition with Context",
+      "content": "Use a guard function to control when a transition is allowed.",
+      "code": "const authMachine = setup({\n  types: {\n    context: {} as {\n      user: { email: string } | null;\n      error: string | null;\n    },\n    events: {} as\n      | { type: 'LOGIN'; email: string; password: string }\n      | { type: 'LOGOUT' }\n      | { type: 'RETRY' },\n  },\n  guards: {\n    hasUser: ({ context }) => context.user !== null,\n  },\n}).createMachine({\n  id: 'auth',\n  initial: 'idle',\n  context: {\n    user: null,\n    error: null,\n  },\n  states: {\n    idle: {\n      on: {\n        LOGIN: {\n          target: 'loading',\n          guard: 'hasUser',\n        },\n      },\n    },\n    loading: {\n      on: {\n        LOGOUT: 'idle',\n      },\n    },\n  },\n});",
+      "language": "typescript"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "text": "Guards run synchronously. If your guard needs to call an API, use an invoke node instead, or transform the guard into a state that resolves before proceeding."
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "createMachine returns a configuration object, not a running service.",
+        "The setup() helper in XState v5 enables full TypeScript inference for context, events, and actions.",
+        "State transitions are declarative mappings inside each state's on property.",
+        "Guards add conditional logic to transitions, preventing them from firing unless a predicate is true.",
+        "Actions are side effects executed during transitions, commonly used to update context with assign()."
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["state-reducer-basics"]
+}

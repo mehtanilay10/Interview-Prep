@@ -1,0 +1,201 @@
+{
+  "id": "lesson-auth-033",
+  "slug": "auth0-integration",
+  "moduleSlug": "sso-identity-providers",
+  "courseSlug": "authentication-authorization",
+  "title": "Auth0 Integration",
+  "description": "Integrate Auth0 for authentication, user management, and social identity providers in ASP.NET Core applications.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 26,
+  "tags": ["auth0", "okta", "identity", "social-login", "asp.net-core", "rules", "actions"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Auth0** is a flexible, drop-in authentication and authorization platform that supports social providers (Google, GitHub, Facebook), enterprise providers (SAML, OIDC, AD), and database-connected users. It abstracts the complexity of identity protocols, letting developers add authentication to any application in minutes while giving security teams fine-grained control through extensibility hooks."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Auth0 Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "auth0-flow",
+        "caption": "Auth0 authentication flow showing the application, Auth0 tenant, and identity providers.",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant App as Application\n    participant Auth0 as Auth0 Tenant\n    participant IdP as External IdP (Google/AD)\n    U->>App: Click Login\n    App->>Auth0: Redirect to /authorize\n    Auth0->>U: Present login page\n    alt Social/Enterprise Login\n        U->>Auth0: Choose Google/AD\n        Auth0->>IdP: Redirect to provider\n        IdP->>U: Authenticate\n        IdP->>Auth0: Return with token\n    else Database Login\n        U->>Auth0: Enter username/password\n        Auth0->>Auth0: Validate credentials\n    end\n    Auth0->>App: Redirect with ID Token + Access Token\n    App->>App: Validate tokens, create session\n    App->>U: Logged in"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Auth0 Concepts"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Tenant",
+            "definition": "An isolated Auth0 instance (e.g., your-company.auth0.com) containing users, connections, rules, and settings."
+          },
+          {
+            "term": "Application",
+            "definition": "A logical representation of your app in Auth0. Types include Native, SPA, Regular Web, and Machine-to-Machine."
+          },
+          {
+            "term": "Connection",
+            "definition": "An identity source: database (Auth0-hosted), social (Google, GitHub), or enterprise (SAML, OIDC, AD)."
+          },
+          {
+            "term": "Rule",
+            "definition": "JavaScript functions that run during authentication to modify tokens or enforce access policies. (Deprecated in favor of Actions.)"
+          },
+          {
+            "term": "Action",
+            "definition": "Auth0's newer extensibility mechanism for post-login, pre-registration, and other lifecycle events."
+          },
+          {
+            "term": " Tenant Rules",
+            "definition": "Legacy extensibility hooks that execute JavaScript during the authentication pipeline."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Setting Up Auth0 for ASP.NET Core"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Initial Setup",
+        "items": [
+          "Create an Auth0 account and tenant.",
+          "Create a new Application of type 'Regular Web Application'.",
+          "Note the Domain, Client ID, and Client Secret from Settings.",
+          "Configure Allowed Callback URLs, Allowed Logout URLs, and Allowed Web Origins.",
+          "Enable connections (e.g., Username-Password-Authentication, Google).",
+          "Add the Auth0.AspNetCore.Authentication NuGet package to your project."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Allowed URLs Are Mandatory",
+        "text": "Auth0 will reject authentication requests if the callback URL is not explicitly listed in Allowed Callback URLs. This is a security feature to prevent open redirect attacks. Always include your localhost URLs during development."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Implementation: ASP.NET Core"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — Auth0 OpenID Connect",
+        "content": "Configure Auth0 authentication using OpenID Connect with the Auth0 ASP.NET Core SDK.",
+        "code": "using Auth0.AspNetCore.Authentication;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddAuth0WebAppAuthentication(options =>\n{\n    options.Domain = builder.Configuration[\"Auth0:Domain\"]!;\n    options.ClientId = builder.Configuration[\"Auth0:ClientId\"]!;\n    options.ClientSecret = builder.Configuration[\"Auth0:ClientSecret\"]!;\n    \n    options.CallbackPath = new PathString(\"/callback\");\n    options.LogoutPath = new PathString(\"/logout\");\n});\n\nbuilder.Services.AddAuthorization();\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\n\napp.UseAuthentication();\napp.UseAuthorization();\n\napp.MapGet(\"/\", async context =>\n{\n    if (!context.User.Identity?.IsAuthenticated == true)\n    {\n        var redirect = context.Request.GetEncodedPathAndQuery();\n        context.ChallengeAsync(\"Auth0\", new AuthenticationProperties\n        {\n            RedirectUri = redirect\n        });\n        return;\n    }\n    await context.Response.WriteAsync($\"Hello, {context.User.Identity.Name}!\");\n});\n\napp.MapGet(\"/logout\", async context =>\n{\n    await context.SignOutAsync(\"Auth0\", new AuthenticationProperties\n    {\n        RedirectUri = \"/\"\n    });\n});\n\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Auth0 Actions Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Post-Login Action: Enrich User Profile",
+        "content": "An Auth0 Action that enriches the ID token with user metadata after login.",
+        "code": "exports.onExecutePostLogin = async (event) => {\n  if (event.authorization) {\n    // Add user metadata to ID token\n    event.idToken.setCustomClaim(\n      'https://app.example.com/roles',\n      event.user.user_metadata?.roles || []\n    );\n    \n    // Add tenant info for multi-tenant apps\n    event.idToken.setCustomClaim(\n      'tenant_id',\n      event.user.user_metadata?.tenant_id\n    );\n    \n    // Log for debugging\n    console.log('User logged in:', event.user.email);\n    console.log('Client:', event.client.name);\n  }\n};",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Social Provider Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Auth0 simplifies social login by handling the OAuth 2.0 dance with providers like Google, GitHub, Facebook, and LinkedIn. In the Auth0 Dashboard, simply toggle the desired social connections. Auth0 provides pre-built login pages that can be customized with CSS to match your brand. For deeper control, you can use the Auth0 Authentication API to build a fully embedded login experience."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use Auth0 Rules for Legacy Systems",
+        "text": "If you need to integrate with a legacy user database that Auth0 does not support natively, use a Custom Database Connection. Auth0 can call your existing authentication API during login, allowing gradual migration without forcing password resets."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When Auth0 Makes Sense"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Ideal Use Cases",
+        "items": [
+          "Startups and MVPs that need production-ready auth quickly",
+          "B2C applications requiring social and enterprise login",
+          "Applications needing advanced user management without building it",
+          "Multi-tenant apps where each tenant may use different identity sources",
+          "Teams that want to offload security compliance (SOC 2, HIPAA BAA) to a vendor"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cost Considerations",
+        "text": "Auth0 pricing is based on monthly active users (MAUs). At scale, costs can exceed self-hosted alternatives. Evaluate alternatives like Keycloak, Ory, or custom OIDC implementations if your MAU count is high and your identity needs are standard."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Auth0 provides a complete identity platform with social, enterprise, and database connections",
+          "Use the Auth0.AspNetCore.Authentication package for ASP.NET Core",
+          "Actions replace Rules for post-login extensibility",
+          "Always configure Allowed Callback URLs explicitly",
+          "Auth0 is ideal for B2C and rapid prototyping but evaluate cost at scale"
+        ],
+        "takeaway": "Auth0 lets you add production-grade authentication to your application in hours, not months."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["sso-fundamentals"],
+  "courseSlug": "authentication-authorization"
+}

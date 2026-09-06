@@ -1,0 +1,172 @@
+{
+  "id": "lesson-auth-020",
+  "slug": "role-based-authorization",
+  "moduleSlug": "advanced-authorization",
+  "courseSlug": "authentication-authorization",
+  "title": "Role-Based Authorization",
+  "description": "Implement role-based authorization in ASP.NET Core and React applications for access control.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["authorization", "roles", "aspnet-core", "identity"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Role-Based Authorization (RBAC)** is the most common approach to controlling access in applications. Instead of granting permissions to individual users, you assign users to **roles** and grant permissions to those roles. This makes managing access scalable and maintainable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Role-Based Authorization Matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a typical application, you might have thousands of users but only a handful of distinct access patterns. Without roles, you would need to configure permissions for each user individually - a maintenance nightmare. RBAC solves this by abstracting permissions into named roles."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Application Roles",
+        "items": [
+          "**Admin**: Full system access, user management, configuration",
+          "**Manager**: Department-level access, reporting, team oversight",
+          "**Editor**: Content creation and modification",
+          "**Viewer**: Read-only access to published content",
+          "**Support**: Limited access for customer assistance"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ASP.NET Core Identity Roles"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core Identity provides built-in role management. Roles are stored in the `AspNetRoles` table, and the many-to-many relationship between users and roles is maintained in `AspNetUserRoles`. The framework handles role creation, assignment, and validation automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring Role Services",
+        "language": "csharp",
+        "code": "public class Program\n{\n    public static void Main(string[] args)\n    {\n        var builder = WebApplication.CreateBuilder(args);\n        \n        builder.Services.AddDbContext<AppDbContext>(options =>\n            options.UseSqlServer(builder.Configuration.GetConnectionString(\"DefaultConnection\")));\n        \n        builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>\n            {\n                options.Password.RequireDigit = true;\n                options.Password.RequiredLength = 8;\n                options.Password.RequireNonAlphanumeric = true;\n            })\n            .AddEntityFrameworkStores<AppDbContext>()\n            .AddDefaultTokenProviders();\n        \n        var app = builder.Build();\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Protecting Endpoints with Roles",
+        "language": "csharp",
+        "code": "[Authorize(Roles = \"Admin,Manager\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ReportsController : ControllerBase\n{\n    [HttpGet]\n    public IActionResult GetSalesReport()\n    {\n        // Only Admin and Manager roles can access this\n        return Ok(new { Report = \"Q4 Sales Report\", Total = 150000 });\n    }\n}\n\n[Authorize(Roles = \"Admin\")]\npublic class AdminController : ControllerBase\n{\n    [HttpPost(\"users/{userId}/roles\")]\n    public async Task<IActionResult> AssignRole(string userId, string role)\n    {\n        var user = await _userManager.FindByIdAsync(userId);\n        await _userManager.AddToRoleAsync(user, role);\n        return Ok();\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Role Hierarchy is Not Automatic",
+        "text": "ASP.NET Core Identity does not implement role hierarchy out of the box. A user in the 'Manager' role does NOT automatically inherit 'Editor' permissions. You must explicitly check for multiple roles or implement a custom role provider."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Checking Roles in Code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can check roles programmatically inside controllers, services, or UI components. In ASP.NET Core, use `User.IsInRole(\"Admin\")`. In React, you typically pass role information from the API in the JWT claims or a separate `/me` endpoint."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Checking Roles in a Service",
+        "language": "csharp",
+        "code": "public class ReportService\n{\n    private readonly IHttpContextAccessor _httpContextAccessor;\n    \n    public ReportService(IHttpContextAccessor httpContextAccessor)\n    {\n        _httpContextAccessor = httpContextAccessor;\n    }\n    \n    public bool CanViewSensitiveReports()\n    {\n        var user = _httpContextAccessor.HttpContext?.User;\n        return user != null && (user.IsInRole(\"Admin\") || user.IsInRole(\"Manager\"));\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Conditional UI Rendering in React",
+        "language": "tsx",
+        "code": "import { useAuth } from '@/hooks/useAuth';\n\nfunction AdminPanel() {\n  const { user } = useAuth();\n  \n  if (!user?.roles?.includes('Admin')) {\n    return <div className=\"access-denied\">You do not have permission.</div>;\n  }\n  \n  return (\n    <div>\n      <h1>Admin Dashboard</h1>\n      <UserManagement />\n      <SystemSettings />\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authorization Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "role-auth-flow",
+        "caption": "Role-based authorization flow from login to endpoint access",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant A as ASP.NET Core\n    participant DB as Database\n    participant R as RoleManager\n    U->>A: POST /login (credentials)\n    A->>DB: Validate credentials\n    DB-->>A: User found\n    A->>R: GetRolesAsync(user)\n    R-->>A: [Admin, Editor]\n    A->>A: Generate JWT with role claims\n    A-->>U: Return JWT\n    U->>A: GET /api/admin/dashboard (JWT)\n    A->>A: Validate token + roles\n    alt User has required role\n        A-->>U: 200 OK + data\n    else Missing role\n        A-->>U: 403 Forbidden\n    end"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use Role Claims in JWT",
+        "text": "When issuing JWTs, include the user's roles as claims. This avoids a database lookup on every request and enables stateless role validation in APIs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "RBAC Best Practices",
+        "items": [
+          "Keep roles coarse-grained - fewer, well-defined roles are easier to manage",
+          "Never hardcode role names in multiple places - use constants or enums",
+          "Always validate roles server-side, never trust client-side role checks alone",
+          "Use role-based access for broad categories and combine with policies for specific actions",
+          "Document role responsibilities clearly for administrators and auditors"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RBAC groups permissions into roles rather than assigning them per user",
+          "ASP.NET Core Identity provides built-in role management",
+          "Use [Authorize(Roles = \"...\")] for declarative endpoint protection",
+          "Always validate roles server-side",
+          "Combine roles with policies for fine-grained control"
+        ],
+        "takeaway": "Role-Based Authorization is the foundation of access control. Master it before moving to more advanced patterns."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["auth-overview"]
+}

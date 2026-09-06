@@ -1,0 +1,180 @@
+{
+  "id": "lesson-sql-153",
+  "slug": "always-on-availability-groups",
+  "moduleSlug": "high-availability-dr",
+  "courseSlug": "sql-server",
+  "title": "Always On Availability Groups",
+  "description": "Configure and manage Always On Availability Groups for high availability and disaster recovery in SQL Server.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "always-on",
+    "availability-groups",
+    "ag",
+    "failover",
+    "replica",
+    "high-availability"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Always On Availability Groups"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always On Availability Groups (AGs) are the flagship high-availability feature in SQL Server. An AG groups one or more user databases into a failover unit. Each database in the group replicates between one primary replica and up to eight secondary replicas. If the primary replica fails, the group can fail over to a secondary replica, keeping your applications running with minimal downtime."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Enterprise vs. Standard Edition",
+        "text": "Always On AGs are available in both Enterprise and Standard editions, though Standard Edition limits you to a Basic AG with one database and no automatic failover. Enterprise Edition unlocks up to eight secondary replicas and multiple Availability Group Listeners."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Components"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Availability Group (AG): A container for one or more databases that fail over together.",
+          "Availability Replica: A hosted instance of the AG. One replica is primary; others are secondary.",
+          "Availability Group Listener: A virtual network name that enables client applications to connect without knowing the current primary replica.",
+          "Quorum: A voting mechanism that ensures the AG cluster has enough nodes to make a failover decision and prevents split-brain scenarios."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "AG Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "ag-topology",
+        "caption": "Always On Availability Group topology with one primary, two secondary replicas, and a listener",
+        "definition": "graph LR\n    A[Client App] --> B[AG Listener]\n    B --> C[Primary Replica]\n    B --> D[Secondary Replica 1]\n    B --> E[Secondary Replica 2]\n    C --> F[User DB]\n    D --> G[User DB Readable Secondary]\n    E --> H[User DB Readable Secondary]\n    I[Cluster Nodes] --> C\n    I --> D\n    I --> E"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Synchronization Modes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each secondary replica can operate in either synchronous-commit or asynchronous-commit mode. Synchronous mode guarantees that transactions are committed on both primary and secondary before acknowledging to the client, which protects data but adds latency. Asynchronous mode acknowledges the client after the primary commits and sends changes to the secondary without waiting, which minimizes latency but can lose recent transactions during failover."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Synchronous vs. Asynchronous Commit",
+        "cards": [
+          {
+            "title": "Synchronous Commit",
+            "description": "Waits for each secondary replica to harden the log before acknowledging the client.",
+            "pros": [
+              "Zero data loss on failover",
+              "Automatic failover possible with quorum"
+            ],
+            "cons": [
+              "Higher transaction latency",
+              "Can be slowed by slow network links"
+            ],
+            "tags": ["zero-data-loss", "auto-failover"]
+          },
+          {
+            "title": "Asynchronous Commit",
+            "description": "Acknowledges the client immediately after the primary commits without waiting for secondaries.",
+            "pros": [
+              "Lower transaction latency",
+              "Better for geographically dispersed replicas"
+            ],
+            "cons": [
+              "Potential data loss on failover",
+              "Automatic failover not allowed"
+            ],
+            "tags": ["low-latency", "geo-distributed"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Quorum Is Critical",
+        "text": "Always On uses a quorum-based voting system. If the cluster loses quorum, the AG goes offline, not into a split-brain state. Ensure you have enough cluster nodes and configure an appropriate quorum model (node majority, node and file share majority, etc.) before going live."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating an Availability Group"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create an Availability Group with T-SQL",
+        "content": "This example creates an AG named AG_Sales with one primary and two secondary replicas using synchronous commit.",
+        "language": "sql",
+        "code": "CREATE AVAILABILITY GROUP AG_Sales\nFOR\n(\n    DATABASE SalesDB\n)\nREPLICA ON\n    N'SQL01' WITH\n    (\n        ENDPOINT_URL = N'tcp://SQL01:5022',\n        AVAILABILITY_MODE = SYNCHRONOUS_COMMIT,\n        FAILOVER_MODE = AUTOMATIC,\n        SEEDING_MODE = AUTOMATIC\n    ),\n    N'SQL02' WITH\n    (\n        ENDPOINT_URL = N'tcp://SQL02:5022',\n        AVAILABILITY_MODE = SYNCHRONOUS_COMMIT,\n        FAILOVER_MODE = AUTOMATIC,\n        SEEDING_MODE = AUTOMATIC\n    ),\n    N'SQL03' WITH\n    (\n        ENDPOINT_URL = N'tcp://SQL03:5022',\n        AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,\n        FAILOVER_MODE = MANUAL,\n        SEEDING_MODE = AUTOMATIC\n    );"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Monitoring Availability Groups"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Key DMVs and Tools",
+        "items": [
+          "sys.availability_groups: Returns one row per AG in the failover instance.",
+          "sys.dm_hadr_database_replica_states: Provides per-replica health, synchronization state, and log send/redo queue information.",
+          "sys.dm_hadr_availability_replica_states: Tells you the role and connection state of each replica.",
+          "Always On Dashboard (SSMS): Visual summary of AG health, synchronization state, and failover readiness."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Always On AG Key Points",
+        "points": [
+          "Always On AGs protect user databases with automatic or manual failover.",
+          "Use synchronous commit when data loss is unacceptable; use asynchronous for geo-distributed replicas.",
+          "The listener provides a stable connection point for client applications.",
+          "Quorum voting prevents split-brain scenarios during network partitions.",
+          "Monitor AG health with DMVs and the Always On Dashboard."
+        ],
+        "takeaway": "Design your AG topology around RPO and RTO goals. Synchronous replicas near the primary give you zero data loss with automatic failover, while asynchronous replicas extend geographic reach at the cost of potential data loss."
+      }
+    }
+  ],
+  "courseSlug": "sql-server"
+}

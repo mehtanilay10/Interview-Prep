@@ -20,6 +20,7 @@ import oopsCourse from './oops-concepts/content.json';
 import interviewQaCourse from './interview-qa/content.json';
 import graphQlCourse from './graphql-dotnet/content.json';
 import designPatternsCourse from './design-patterns/content.json';
+import fullstackSecurityCourse from './fullstack-security/content.json';
 
 const rawCourses = [
   sqlServerCourse,
@@ -41,7 +42,8 @@ const rawCourses = [
   oopsCourse,
   interviewQaCourse,
   graphQlCourse,
-  designPatternsCourse
+  designPatternsCourse,
+  fullstackSecurityCourse
 ];
 
 export const courses: Course[] = rawCourses as unknown as Course[];

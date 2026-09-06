@@ -1,0 +1,152 @@
+{
+  "id": "lesson-react-adv-027",
+  "slug": "headless-components",
+  "moduleSlug": "component-composition-strategies",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Headless Components",
+  "description": "Build headless components that encapsulate logic and state while leaving markup and styling entirely to the consumer.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["headless", "logic", "state", "separation-of-concerns", "render-props", "hooks"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Are Headless Components?"
+    },
+    {
+      "type": "paragraph",
+      "text": "A headless component is a component that provides all the behavioral logic—state management, event handlers, accessibility calculations, and side effects—without rendering any HTML or applying any styles by default. It hands control of the markup back to the consumer via render props, compound components, or hooks. Headless components are the backbone of design systems because they let teams standardize behavior while allowing full visual customization."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Headless vs Styled",
+      "text": "A styled component couples markup and behavior. A headless component couples only behavior. The consumer is responsible for the DOM output. This separation is why libraries like Downshift, React Aria, and Headless UI are so powerful: they solve accessibility and state once, and you solve design once."
+    },
+    {
+      "type": "mermaid",
+      "id": "headless-architecture",
+      "caption": "Headless component architecture separates logic from presentation.",
+      "definition": "flowchart TD\n    A[Headless Component] --> B[State & Logic]\n    A --> C[Event Handlers]\n    A --> D[A11y Attributes]\n    A --> E[Render Prop / Compound API]\n    E --> F[Consumer Markup]\n    E --> G[Consumer Styles]\n    F --> H[Final UI]\n    G --> H"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Why Use Headless Components?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every interactive UI element has two concerns: what it does and what it looks like. When you merge them into a single component, changing the design requires forking or overriding styles, which is brittle. Headless components let you swap the entire visual layer without touching the logic. They also make testing easier because you can unit test state transitions in isolation from DOM structure."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Benefits of Headless Architecture",
+      "items": [
+        "Complete control over markup, className, and CSS framework integration",
+        "Accessibility built in once and reused across every design variation",
+        "Easier testing because state logic is decoupled from the DOM",
+        "Consistent behavior across light mode, dark mode, and brand themes",
+        "Supports any styling approach: CSS Modules, Tailwind, styled-components, or plain CSS"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Building a Headless Toggle"
+    },
+    {
+      "type": "paragraph",
+      "text": "Let's build a headless Toggle component. It manages on/off state, keyboard interaction, and ARIA attributes, but it does not render a button or a switch by itself. Instead, it returns state and handlers through a render prop. The consumer renders a div, a button, or any other element and wires the returned props to it."
+    },
+    {
+      "type": "example",
+      "title": "Headless Toggle with Render Prop",
+      "content": "A toggle component that exposes state and props without dictating markup.",
+      "code": "interface ToggleProps {\n  defaultOn?: boolean;\n  onChange?: (on: boolean) => void;\n  children: (api: ToggleAPI) => React.ReactNode;\n}\n\ninterface ToggleAPI {\n  on: boolean;\n  toggle: () => void;\n  getToggleProps: (props?: React.ButtonHTMLAttributes<HTMLButtonElement>) => {\n    role: 'switch';\n    'aria-checked': boolean;\n    onClick: () => void;\n    onKeyDown: (e: React.KeyboardEvent) => void;\n  };\n}\n\nfunction Toggle({ defaultOn = false, onChange, children }: ToggleProps) {\n  const [on, setOn] = React.useState(defaultOn);\n\n  const toggle = () => {\n    const next = !on;\n    setOn(next);\n    onChange?.(next);\n  };\n\n  const getToggleProps = (extra?: React.ButtonHTMLAttributes<HTMLButtonElement>) => ({\n    role: 'switch' as const,\n    'aria-checked': on,\n    onClick: toggle,\n    onKeyDown: (e: React.KeyboardEvent) => {\n      if (e.key === ' ' || e.key === 'Enter') {\n        e.preventDefault();\n        toggle();\n      }\n    },\n    ...extra,\n  });\n\n  return children({ on, toggle, getToggleProps });\n}\n\n// Usage with fully custom markup\n<Toggle defaultOn={false} onChange={(on) => console.log(on)}>\n  {({ on, getToggleProps }) => (\n    <button {...getToggleProps({ className: on ? 'active' : '' })}>\n      {on ? 'ON' : 'OFF'}\n    </button>\n  )}\n</Toggle>",
+      "language": "tsx"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "text": "Expose a getToggleProps helper instead of returning raw props directly. It lets consumers merge their own event handlers and className without overwriting the accessibility attributes."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Headless Components as Hooks"
+    },
+    {
+      "type": "paragraph",
+      "text": "Not every headless component needs a wrapper JSX element. You can extract the logic into a custom hook and let consumers call it from their own component. This is the lightest-weight form of headless architecture. The hook returns state, computed values, and actions. The consumer decides how to render them."
+    },
+    {
+      "type": "example",
+      "title": "useToggle Hook",
+      "content": "Extract toggle logic into a reusable hook.",
+      "code": "interface UseToggleOptions {\n  defaultOn?: boolean;\n  onChange?: (on: boolean) => void;\n}\n\ninterface UseToggleReturn {\n  on: boolean;\n  toggle: () => void;\n  setOn: (on: boolean) => void;\n  getButtonProps: (props?: React.ButtonHTMLAttributes<HTMLButtonElement>) => Record<string, unknown>;\n}\n\nfunction useToggle(options: UseToggleOptions = {}): UseToggleReturn {\n  const { defaultOn = false, onChange } = options;\n  const [on, setOn] = React.useState(defaultOn);\n\n  const toggle = () => {\n    const next = !on;\n    setOn(next);\n    onChange?.(next);\n  };\n\n  const getButtonProps = (extra?: React.ButtonHTMLAttributes<HTMLButtonElement>) => ({\n    role: 'switch' as const,\n    'aria-checked': on,\n    onClick: toggle,\n    onKeyDown: (e: React.KeyboardEvent) => {\n      if (e.key === ' ' || e.key === 'Enter') {\n        e.preventDefault();\n        toggle();\n      }\n    },\n    ...extra,\n  });\n\n  return { on, toggle, setOn, getButtonProps };\n}\n\n// Usage in any component\nfunction SettingsRow() {\n  const { on, getButtonProps } = useToggle({ defaultOn: true });\n\n  return (\n    <div className=\"setting\">\n      <span>Notifications</span>\n      <button {...getButtonProps({ className: 'toggle' })}>\n        {on ? 'Enabled' : 'Disabled'}\n      </button>\n    </div>\n  );\n}",
+      "language": "tsx"
+    },
+    {
+      "type": "table",
+      "headers": ["Approach", "Bundle Size", "Flexibility", "DX", "Best For"],
+      "rows": [
+        ["Render Prop Component", "Medium", "High", "High", "Design systems, shared libraries"],
+        ["Custom Hook", "Smallest", "Highest", "Medium", "App-level logic reuse"],
+        ["Compound Component", "Medium", "High", "High", "Complex widgets with many sub-parts"],
+        ["Full Styled Component", "Largest", "Low", "Highest", "Internal apps with fixed design"]
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Headless Component Checklist"
+    },
+    {
+      "type": "paragraph",
+      "text": "When building a headless component, you should ask yourself a few questions before shipping. The answers determine whether a render prop, hook, or compound component is the right API surface. You also want to document the expected return shape clearly so consumers know what state and handlers are available."
+    },
+    {
+      "type": "checklist",
+      "title": "Headless Component Checklist",
+      "items": [
+        {
+          "text": "Does the component manage any state that consumers cannot easily replicate?",
+          "hint": "If not, a hook might be enough."
+        },
+        {
+          "text": "Are accessibility attributes calculated from state and passed to the consumer?",
+          "hint": "Consumers should not have to recompute aria-* values."
+        },
+        {
+          "text": "Is the render prop or hook API documented with TypeScript types?",
+          "hint": "Explicit interfaces prevent guesswork."
+        },
+        {
+          "text": "Does the component avoid rendering any DOM elements itself?",
+          "hint": "If it renders a div, it is not fully headless."
+        },
+        {
+          "text": "Are event handlers composable so consumers can add their own side effects?",
+          "hint": "Use a getProps helper pattern to merge handler props."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Headless components encapsulate logic and accessibility while leaving markup to the consumer.",
+        "Render props are the classic headless API, but custom hooks are lighter when no wrapper element is needed.",
+        "Separating behavior from presentation makes components themeable and testable.",
+        "The getProps helper pattern lets consumers merge their own props without breaking internal behavior.",
+        "Headless architecture is the foundation of mature design systems and component libraries."
+      ],
+      "takeaway": "Build the behavior once, render it everywhere. Headless components are the most reusable abstraction in React UI development."
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["state-reducer-basics"]
+}

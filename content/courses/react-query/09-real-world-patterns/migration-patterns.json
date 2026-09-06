@@ -1,0 +1,192 @@
+{
+  "id": "lesson-react-query-035",
+  "slug": "migration-patterns",
+  "moduleSlug": "real-world-patterns",
+  "courseSlug": "react-query",
+  "title": "Migration Patterns",
+  "description": "Migrate from legacy data fetching patterns to React Query with practical migration strategies.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["migration", "axios", "custom-hooks", "refactoring", "best-practices"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most React applications have existing data fetching code before React Query is introduced. Whether you are using useState + useEffect, Axios wrappers, or custom data hooks, migrating to React Query requires understanding the mental model shift from imperative fetching to declarative queries."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Migrate to React Query"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Legacy vs React Query",
+        "cards": [
+          {
+            "title": "useState + useEffect",
+            "description": "Manual data fetching with local state management.",
+            "pros": ["Simple for small cases", "No new dependencies"],
+            "cons": ["No caching", "No deduplication", "Error handling is manual", "No background refetching"]
+          },
+          {
+            "title": "Custom fetch hooks",
+            "description": "Reusable hooks that wrap fetch or Axios.",
+            "pros": ["Reusable logic", "Centralized config"],
+            "cons": ["Still manual caching", "Hard to share between components", "No stale-while-revalidate"]
+          },
+          {
+            "title": "React Query",
+            "description": "Declarative server state management with caching, deduplication, and devtools.",
+            "pros": ["Automatic caching", "Background refetching", "Deduplication", "Devtools", "Type-safe"],
+            "cons": ["Learning curve", "Additional dependency"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migrating from useState + useEffect"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Before: useEffect Pattern",
+        "content": "Typical data fetching with useState and useEffect that lacks caching and deduplication.",
+        "language": "tsx",
+        "code": "const UserList = () => {\n  const [users, setUsers] = useState<User[]>([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState<Error | null>(null);\n\n  useEffect(() => {\n    let mounted = true;\n\n    fetch('/api/users')\n      .then(res => res.json())\n      .then(data => {\n        if (mounted) {\n          setUsers(data);\n          setLoading(false);\n        }\n      })\n      .catch(err => {\n        if (mounted) {\n          setError(err);\n          setLoading(false);\n        }\n      });\n\n    return () => { mounted = false; };\n  }, []);\n\n  if (loading) return <p>Loading...</p>;\n  if (error) return <p>Error: {error.message}</p>;\n\n  return <UserList users={users} />;\n};"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "After: useQuery Pattern",
+        "content": "The same component rewritten with React Query. Notice how much simpler the component becomes.",
+        "language": "tsx",
+        "code": "const UserList = () => {\n  const { data: users = [], isLoading, error } = useQuery({\n    queryKey: ['users'],\n    queryFn: () => fetch('/api/users').then(res => res.json())\n  });\n\n  if (isLoading) return <p>Loading...</p>;\n  if (error) return <p>Error: {error.message}</p>;\n\n  return <UserList users={users} />;\n};"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Migration Tip",
+        "text": "Migrate one component at a time. You can run React Query alongside existing data fetching code. Use queryClient.invalidateQueries to keep both systems in sync during the transition."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migrating from Axios"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Axios Wrapper to queryFn",
+        "content": "Replace Axios calls with React Query queryFn. React Query works with any HTTP client.",
+        "language": "tsx",
+        "code": "// Before: Axios service\nconst userService = {\n  getUsers: () => axios.get('/api/users').then(res => res.data),\n  getUser: (id) => axios.get(`/api/users/${id}`).then(res => res.data),\n  createUser: (data) => axios.post('/api/users', data).then(res => res.data)\n};\n\n// After: React Query queryFns\nconst queryFns = {\n  users: () => fetch('/api/users').then(res => res.json()),\n  user: (id: string) => fetch(`/api/users/${id}`).then(res => res.json()),\n  createUser: async (data) => {\n    const res = await fetch('/api/users', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(data)\n    });\n    return res.json();\n  }\n};\n\n// Usage stays the same pattern\nconst { data } = useQuery({ queryKey: ['users'], queryFn: queryFns.users });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migrating Custom Hooks"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Hook to React Query",
+        "content": "Replace a custom data fetching hook with React Query equivalents.",
+        "language": "tsx",
+        "code": "// Before: Custom hook\nconst useUser = (id: string) => {\n  const [user, setUser] = useState<User | null>(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState<Error | null>(null);\n\n  useEffect(() => {\n    fetchUser(id)\n      .then(setUser)\n      .catch(setError)\n      .finally(() => setLoading(false));\n  }, [id]);\n\n  return { user, loading, error };\n};\n\n// After: React Query hook\nconst useUser = (id: string) => {\n  return useQuery({\n    queryKey: ['user', id],\n    queryFn: () => fetchUser(id),\n    enabled: !!id\n  });\n};\n\n// Component usage becomes identical\nconst { data: user, isLoading, error } = useUser(userId);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Breaking Changes to Watch",
+        "text": "React Query handles caching differently than custom hooks. A query for the same data in two components now shares cache instead of making two requests. Verify your data freshness assumptions after migration."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Shared State"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Replacing Context for Server State",
+        "content": "Often teams use React Context to share data across components. React Query can replace this entirely for server state.",
+        "language": "tsx",
+        "code": "// Before: Context for shared user data\nconst UserContext = createContext<User | null>(null);\n\nconst UserProvider = ({ children }) => {\n  const [user, setUser] = useState<User | null>(null);\n  // ...fetch and provide user\n};\n\n// After: React Query as global store\nconst App = () => {\n  return (\n    <QueryClientProvider client={queryClient}>\n      <UserProfile />\n      <UserSettings />\n    </QueryClientProvider>\n  );\n};\n\n// Both components share the same cached user\nconst UserProfile = () => {\n  const { data: user } = useQuery({ queryKey: ['currentUser'] });\n  // ...\n};"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Migration Checklist",
+        "items": [
+          { "text": "Identify all data fetching components", "hint": "Search for useState + useEffect patterns" },
+          { "text": "Map custom hooks to useQuery/useMutation", "hint": "Keep the same queryKey strategy" },
+          { "text": "Replace Axios with fetch or keep Axios in queryFn", "hint": "React Query is client-agnostic" },
+          { "text": "Remove manual loading/error state", "hint": "Use React Query built-in states" },
+          { "text": "Verify cache keys don't conflict", "hint": "Check for duplicate queryKeys" }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Migration FAQ",
+        "items": [
+          {
+            "question": "Do I need to migrate everything at once?",
+            "answer": "No. React Query can coexist with existing data fetching. Migrate one component or feature at a time."
+          },
+          {
+            "question": "What about my Axios interceptors?",
+            "answer": "You can keep Axios interceptors in queryFn, or move auth logic to the queryFn level. React Query doesn't care which HTTP client you use."
+          },
+          {
+            "question": "Will my tests break?",
+            "answer": "Tests may need updates because React Query provides different props (isLoading vs loading). Update assertions to match React Query's return values."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Migrate incrementally, one component at a time",
+          "Replace useState + useEffect with useQuery",
+          "Map custom hooks to React Query equivalents",
+          "Use setQueryData or context for shared state",
+          "Verify cache keys during migration"
+        ],
+        "takeaway": "Migration is a journey, not a rewrite. Start with new features and gradually replace legacy patterns."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["use-query"]
+}

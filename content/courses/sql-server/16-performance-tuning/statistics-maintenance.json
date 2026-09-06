@@ -1,0 +1,180 @@
+{
+  "id": "lesson-sql-145",
+  "slug": "statistics-maintenance",
+  "moduleSlug": "performance-tuning",
+  "courseSlug": "sql-server",
+  "title": "Statistics Maintenance",
+  "description": "Understand how SQL Server uses statistics for cardinality estimation and learn to maintain them for optimal query performance.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 40,
+  "tags": ["statistics", "auto-update", "cardinality", "histogram", "index-maintenance"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Are Statistics?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Statistics are data objects that describe the distribution of values in a column or set of columns. The Query Optimizer uses statistics to estimate how many rows will be returned by various operations in a query plan. Accurate statistics lead to accurate cardinality estimates, which lead to optimal plan choices. Stale or missing statistics lead to poor estimates and suboptimal plans."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Statistics Are Critical",
+      "text": "Statistics are often the hidden cause of performance problems. A query that runs fast one day and slow the next is frequently due to statistics becoming stale as data changes, causing the optimizer to choose a different, slower plan."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Components of Statistics"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every statistic object contains a header, a histogram, and optionally density vectors. The header stores metadata about when the statistics were created and how many rows were sampled. The histogram shows the distribution of data values in the first column of the statistic. Density vectors store information about the uniqueness of values in multi-column statistics."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Histogram",
+          "definition": "A statistical snapshot of up to 200 data value ranges (steps) for a column, showing the frequency of values within each range."
+        },
+        {
+          "term": "Density Vector",
+          "definition": "Information about the distribution of values across columns in a multi-column statistic. Higher density means more duplicate values."
+        },
+        {
+          "term": "Cardinality Estimate",
+          "definition": "The number of rows the optimizer predicts will be returned by an operation. Derived from statistics using histograms and density vectors."
+        },
+        {
+          "term": "Auto Update Statistics",
+          "definition": "A database-level setting that automatically triggers statistics updates when a threshold of data modifications is reached."
+        },
+        {
+          "term": "Fullscan",
+          "definition": "A statistics update that reads all rows in the table, producing the most accurate histogram at the cost of I/O."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Statistics Are Created and Updated"
+    },
+    {
+      "type": "paragraph",
+      "text": "SQL Server automatically creates statistics on index columns and columns referenced in WHERE clauses. The auto update statistics threshold triggers a resample when a significant percentage of rows change. For large tables, SQL Server may use a partial sample rather than a full scan to keep the update fast, though this produces slightly less accurate statistics."
+    },
+    {
+      "type": "table",
+      "headers": ["Threshold", "Table Type", "Trigger"],
+      "rows": [
+        ["Rows changed >= 500 + 20% of rows", "Table with < 500 rows", "Auto update statistics"],
+        ["Rows changed >= 500 + (rows / 2)", "Table with >= 500 rows", "Auto update statistics"],
+        ["Manual UPDATE STATISTICS", "Any table", "DBA-triggered full or sample scan"]
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Auto Update Can Be Slow",
+      "text": "Auto update statistics runs during query execution and can cause sudden, unpredictable performance spikes. For large tables, consider scheduling regular UPDATE STATISTICS with a full scan during maintenance windows."
+    },
+    {
+      "type": "example",
+      "title": "Managing Statistics",
+      "language": "sql",
+      "code": "-- View current statistics on a table\nEXEC sp_helpstats 'dbo.Orders', 'ALL';\n\n-- Display detailed statistics information\nDBCC SHOW_STATISTICS('dbo.Orders', 'IX_Orders_OrderDate') WITH HISTOGRAM;\n\n-- Update statistics with a full scan (most accurate)\nUPDATE STATISTICS dbo.Orders IX_Orders_OrderDate WITH FULLSCAN;\n\n-- Update all statistics on a table\nUPDATE STATISTICS dbo.Orders WITH FULLSCAN;\n\n-- Enable auto update statistics at the database level\nALTER DATABASE [YourDB] SET AUTO_UPDATE_STATISTICS ON;\n\n-- Enable async auto update (prevents query blocking during stats update)\nALTER DATABASE [YourDB] SET AUTO_UPDATE_STATISTICS_ASYNC ON;"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Filtered Statistics"
+    },
+    {
+      "type": "paragraph",
+      "text": "Filtered statistics target specific data subsets, providing more accurate cardinality estimates for queries with selective predicates. For example, a filtered statistic on IsActive = 1 helps the optimizer estimate queries that filter active customers more accurately than a table-wide statistic."
+    },
+    {
+      "type": "example",
+      "title": "Creating Filtered Statistics",
+      "language": "sql",
+      "code": "-- Create a filtered statistic for active customers only\nCREATE STATISTICS Stats_ActiveCustomers_City\nON dbo.Customers (City)\nWHERE IsActive = 1;\n\n-- Query benefits from the filtered statistic\nSELECT * FROM dbo.Customers\nWHERE IsActive = 1\n  AND City = 'Seattle';"
+    },
+    {
+      "type": "mermaid",
+      "id": "statistics-flow",
+      "caption": "How SQL Server uses statistics to estimate query row counts and choose execution plans.",
+      "definition": "flowchart LR\n    A[Query Submitted] --> B[Query Optimizer]\n    B --> C[Check Statistics Exists]\n    C -->|Yes| D[Read Histogram & Density]\n    C -->|No| E[Create Auto Statistics]\n    E --> D\n    D --> F[Estimate Row Counts]\n    F --> G[Choose Join Order & Algorithms]\n    G --> H[Generate Execution Plan]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Statistics Maintenance Strategy"
+    },
+    {
+      "type": "paragraph",
+      "text": "A robust statistics maintenance strategy balances accuracy with I/O overhead. Full scans provide the highest accuracy but are expensive for large tables. Sample scans are faster but may miss skewed data distributions. The right approach depends on your workload patterns and data volatility."
+    },
+    {
+      "type": "numbered-list",
+      "title": "Maintenance Best Practices",
+      "items": [
+        "Enable AUTO_UPDATE_STATISTICS and AUTO_UPDATE_STATISTICS_ASYNC for OLTP databases",
+        "Schedule weekly fullscan updates for large, frequently changing tables during off-peak hours",
+        "Use filtered statistics on heavily partitioned or logically segmented tables",
+        "Monitor for performance regressions after large data loads or bulk operations",
+        "Set AUTO_CREATE_STATISTICS ON so the optimizer can create statistics on missing columns",
+        "Avoid updating statistics too frequently on static lookup tables"
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Diagnose Stale Statistics",
+      "description": "Identify tables with stale statistics by examining when they were last updated and comparing that to data modification patterns.",
+      "steps": [
+        "Query sys.dm_db_stats_properties to find the last update date and modification counts for statistics on a large table",
+        "Calculate the percentage of rows modified since the last update",
+        "Determine if the auto update threshold has been exceeded",
+        "Run UPDATE STATISTICS with FULLSCAN on an outdated statistic",
+        "Capture the execution plan of a key query before and after the update to compare cardinality estimates"
+      ],
+      "expectedOutcome": "You will observe improved cardinality estimates and potentially a different, more efficient execution plan after refreshing statistics."
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "How often should I update statistics?",
+          "answer": "For heavily modified tables, weekly updates are common. For static lookup tables, monthly or even less frequent updates suffice. Enable async auto update for OLTP systems to prevent query-time blocking."
+        },
+        {
+          "question": "What is the difference between FULLSCAN and SAMPLE?",
+          "answer": "FULLSCAN reads every row in the table, producing a histogram with 200 steps covering the full data range. SAMPLE reads a percentage of rows, which is faster but may miss outliers and skewed distributions."
+        },
+        {
+          "question": "Should I disable auto update statistics?",
+          "answer": "Generally no. Disabling auto update shifts the responsibility entirely to manual maintenance. If you have a robust scheduled maintenance plan, you can disable auto update for predictable behavior, but most systems benefit from keeping it enabled."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Statistics describe data distribution and drive cardinality estimation in the Query Optimizer",
+        "Stale statistics are a leading cause of unexpected query plan regressions",
+        "Auto update statistics triggers based on modification thresholds — large tables may use partial samples",
+        "Filtered statistics improve estimates for selective queries on segmented data",
+        "Schedule regular maintenance for large, frequently changing tables; enable async auto update for OLTP"
+      ],
+      "takeaway": "Statistics are the foundation of query optimization. Keeping them accurate is one of the highest-impact maintenance tasks a DBA can perform."
+    }
+  ]
+}

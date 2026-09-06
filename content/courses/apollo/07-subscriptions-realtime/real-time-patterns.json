@@ -1,0 +1,189 @@
+{
+  "id": "lesson-apollo-026",
+  "slug": "real-time-patterns",
+  "moduleSlug": "subscriptions-realtime",
+  "courseSlug": "apollo",
+  "title": "Real-Time Patterns",
+  "description": "Build production-ready real-time features including live notifications, dashboards, and cache-aware subscriptions.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 28,
+  "tags": ["notifications", "dashboard", "cache", "optimistic-ui", "performance"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Subscriptions are most powerful when combined with thoughtful UI patterns. In this lesson, you will learn production-ready patterns for live notifications, real-time dashboards, cache synchronization, and handling high-frequency updates without overwhelming your users or your app."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Live Notifications"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A notification system is one of the most common subscription use cases. The pattern involves listening to a subscription, deduplicating incoming events, and updating a local list that the UI can render efficiently."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Live Notification Bell",
+        "content": "Real-time notification component",
+        "language": "tsx",
+        "code": "import { gql, useSubscription } from '@apollo/client';\nimport { useState } from 'react';\n\nconst NOTIFICATIONS_SUB = gql`\n  subscription OnNotification {\n    notificationReceived {\n      id\n      message\n      type\n      read\n      createdAt\n    }\n  }\n`;\n\nfunction NotificationBell() {\n  const [notifications, setNotifications] = useState([]);\n  const [unreadCount, setUnreadCount] = useState(0);\n\n  useSubscription(NOTIFICATIONS_SUB, {\n    onSubscriptionData: ({ subscriptionData }) => {\n      const notification = subscriptionData.data.notificationReceived;\n\n      setNotifications((prev) => {\n        const exists = prev.some((n) => n.id === notification.id);\n        if (exists) return prev;\n        return [notification, ...prev];\n      });\n\n      if (!notification.read) {\n        setUnreadCount((c) => c + 1);\n      }\n    },\n  });\n\n  return (\n    <div className=\"relative\">\n      <button aria-label=\"Notifications\">\n        🔔 {unreadCount > 0 && <span>{unreadCount}</span>}\n      </button>\n      <ul>\n        {notifications.slice(0, 10).map((n) => (\n          <li key={n.id} className={n.read ? 'read' : 'unread'}>\n            {n.message}\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Real-Time Dashboards"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Dashboards need to aggregate multiple subscription streams into a coherent view. The key challenges are batching rapid updates, avoiding UI thrashing, and keeping the Apollo cache consistent when many values change simultaneously."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Debounce Rapid Updates",
+        "text": "When a server pushes multiple events per second, batch UI updates with requestAnimationFrame or a short debounce. This prevents the browser from re-rendering more than once per frame."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Live Metrics Dashboard",
+        "content": "Aggregating subscription data into a dashboard",
+        "language": "tsx",
+        "code": "import { gql, useSubscription } from '@apollo/client';\nimport { useMemo, useCallback } from 'react';\n\nconst METRICS_SUB = gql`\n  subscription OnMetricsUpdate {\n    metricsUpdated {\n      cpu\n      memory\n      requestsPerSecond\n      timestamp\n    }\n  }\n`;\n\nfunction MetricsDashboard() {\n  const [metrics, setMetrics] = useState([]);\n\n  useSubscription(METRICS_SUB, {\n    onSubscriptionData: ({ subscriptionData }) => {\n      const point = subscriptionData.data.metricsUpdated;\n      setMetrics((prev) => {\n        const next = [...prev, point];\n        return next.slice(-100); // Keep last 100 points\n      });\n    },\n  });\n\n  const latestCpu = useMemo(() => {\n    return metrics[metrics.length - 1]?.cpu ?? 0;\n  }, [metrics]);\n\n  return (\n    <div className=\"grid grid-cols-2 gap-4\">\n      <MetricCard label=\"CPU\" value={latestCpu} unit=\"%\" />\n      <MetricCard label=\"Memory\" value={latestMemory} unit=\"%\" />\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Updates with Subscriptions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "By default, subscription results are written to the Apollo cache using the same normalization rules as queries. However, you often need custom logic to merge new data into existing lists or update cached entities without overwriting unrelated fields."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Updating the Cache Manually",
+        "content": "Merging subscription data into cached queries",
+        "language": "tsx",
+        "code": "useSubscription(ON_TASK_UPDATED, {\n  onSubscriptionData: ({ client, subscriptionData }) => {\n    const updatedTask = subscriptionData.data.taskUpdated;\n\n    client.cache.updateFragment({\n      id: client.cache.identify({ __typename: 'Task', id: updatedTask.id }),\n      fragment: gql`\n        fragment TaskFragment on Task {\n          status\n          progress\n          updatedAt\n        }\n      `,\n      data: {\n        status: updatedTask.status,\n        progress: updatedTask.progress,\n        updatedAt: updatedTask.updatedAt,\n      },\n    });\n  },\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic UI for Subscriptions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Optimistic responses are typically associated with mutations, but they can also apply to subscriptions in certain scenarios. For example, if your subscription triggers a local action that the user can see immediately, you can update the cache optimistically while waiting for the server confirmation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Optimistic Cache Update",
+        "content": "Updating the cache before server confirmation",
+        "language": "tsx",
+        "code": "useSubscription(ON_USER_STATUS_CHANGED, {\n  onSubscriptionData: ({ client, subscriptionData }) => {\n    const { userId, status } = subscriptionData.data.userStatusChanged;\n\n    client.cache.modify({\n      id: client.cache.identify({ __typename: 'User', id: userId }),\n      fields: {\n        status: () => status,\n        lastSeen: () => new Date().toISOString(),\n      },\n    });\n  },\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performance Considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Unsubscribe from subscriptions when the user navigates away to save bandwidth",
+          "Batch multiple rapid updates using a microtask queue or requestAnimationFrame",
+          "Limit the number of concurrent subscriptions per user to avoid server overload",
+          "Use field policies to control how subscription data merges with cached query results",
+          "Consider server-side throttling for high-frequency events like stock ticks"
+        ],
+        "title": "Best Practices"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid Subscription Storms",
+        "text": "Opening hundreds of subscriptions simultaneously can overwhelm both client and server. Use a single subscription where possible, or multiplex events through a single channel rather than creating one subscription per entity."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "realtime-dashboard-architecture",
+        "caption": "Architecture of a real-time dashboard with multiple subscription streams",
+        "definition": "flowchart TD\n    S[Server] -->|WebSocket| WS[Apollo WebSocket Link]\n    WS --> C[Apollo Client Cache]\n\n    subgraph Client\n        WS --> H1[useSubscription Tasks]\n        WS --> H2[useSubscription Metrics]\n        WS --> H3[useSubscription Notifications]\n        H1 --> C\n        H2 --> C\n        H3 --> C\n        C --> UI[Dashboard UI]\n    end\n\n    subgraph Server\n        SE1[Task Events]\n        SE2[Metric Events]\n        SE3[Notification Events]\n        SE1 --> S\n        SE2 --> S\n        SE3 --> S\n    end"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Should I use subscriptions for everything real-time?",
+            "answer": "No. Subscriptions are best for event-driven data. For simple polling or periodic snapshots, use query pollInterval. SSE may be simpler for one-way server-to-client streams."
+          },
+          {
+            "question": "What happens if the cache already has data?",
+            "answer": "Apollo merges subscription results using field policies. If a field policy specifies a merge function, use it to combine old and new data. Otherwise, the new result replaces the old one."
+          },
+          {
+            "question": "Can I pause a subscription temporarily?",
+            "answer": "Yes. In graphql-ws, use the `pause` method on the client. In Apollo hooks, set `skip: true` to temporarily stop sending the subscription without unmounting the component."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Deduplicate incoming events before updating local state",
+          "Use cache.updateFragment or cache.modify for precise cache control",
+          "Debounce high-frequency updates to keep the UI responsive",
+          "Avoid subscription storms by multiplexing events"
+        ],
+        "takeaway": "Great real-time UX is about controlling the flow of data, not just receiving it."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["subscriptions-basics"],
+  "courseSlug": "apollo"
+}

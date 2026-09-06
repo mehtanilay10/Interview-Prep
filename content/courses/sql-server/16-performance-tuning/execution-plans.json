@@ -1,0 +1,185 @@
+{
+  "id": "lesson-sql-143",
+  "slug": "execution-plans",
+  "moduleSlug": "performance-tuning",
+  "courseSlug": "sql-server",
+  "title": "Execution Plans",
+  "description": "Learn to read and interpret SQL Server execution plans to identify query bottlenecks and optimization opportunities.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 45,
+  "tags": ["execution-plans", "query-plan", "performance", "indexing", "bottlenecks"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What is an Execution Plan?"
+    },
+    {
+      "type": "paragraph",
+      "text": "An execution plan is a roadmap that SQL Server's Query Optimizer creates to retrieve data efficiently. It shows the operations the database engine will perform to satisfy your query — such as table scans, index seeks, joins, and sorts. By reading execution plans, you can see exactly how SQL Server intends to execute your query and identify where performance problems might occur."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Why Execution Plans Matter",
+      "text": "Execution plans reveal whether SQL Server is using indexes effectively, performing expensive scans, or choosing inefficient join strategies. They are the single most important diagnostic tool for query performance troubleshooting."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Execution Plans Are Generated"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you submit a query, SQL Server's Query Optimizer analyzes many possible execution strategies and selects the one it estimates will be fastest. The resulting plan is either estimated (created during optimization) or actual (captured during execution with actual row counts and runtime metrics)."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Estimated Execution Plan",
+          "definition": "A plan generated during query optimization without actually executing the query. Shows estimated rows, operator costs, and logical operations."
+        },
+        {
+          "term": "Actual Execution Plan",
+          "definition": "A plan generated during query execution that includes actual row counts, elapsed time, and runtime statistics in addition to the operator tree."
+        },
+        {
+          "term": "Query Optimizer",
+          "definition": "SQL Server component that evaluates multiple execution strategies and selects the optimal plan based on cost-based heuristics."
+        },
+        {
+          "term": "Cost",
+          "definition": "Relative unit of work (CPU, memory, I/O) the Query Optimizer assigns to each operation. Lower cost means less resource consumption."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Reading an Execution Plan"
+    },
+    {
+      "type": "paragraph",
+      "text": "Execution plans flow from right to left, starting with data source operations and ending with the final output. Each icon represents a specific operation. The thickness of arrows indicates the volume of rows flowing between operators — thicker arrows mean more rows, which often signal potential performance issues."
+    },
+    {
+      "type": "heading",
+      "level": 4,
+      "text": "Common Operators"
+    },
+    {
+      "type": "table",
+      "headers": ["Operator", "Description", "Performance Impact"],
+      "rows": [
+        ["Clustered Index Scan", "Reads all rows from a clustered index", "High — full table read"],
+        ["Clustered Index Seek", "Directly locates rows via B-tree navigation", "Low — targeted read"],
+        ["Nonclustered Index Seek", "Locates rows in a nonclustered index", "Very low — highly selective"],
+        ["Key Lookup", "Fetches additional columns from the clustered index", "Moderate — per-row overhead"],
+        ["Hash Match", "Builds a hash table for joins or aggregates", "Moderate — memory-dependent"],
+        ["Nested Loops", "Iterates outer rows against inner rows", "Low for small sets, high for large"],
+        ["Merge Join", "Streams two sorted inputs together", "Low — efficient for sorted data"],
+        ["Sort", "Explicitly sorts result rows", "High — may spill to tempdb"],
+        ["Filter", "Applies a predicate to rows", "Low — should happen early"]
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Displaying an Execution Plan",
+      "language": "sql",
+      "code": "SET STATISTICS IO ON;\nSET STATISTICS TIME ON;\n\nSELECT \n    o.OrderID,\n    o.OrderDate,\n    c.CustomerName,\n    p.ProductName,\n    od.Quantity * od.UnitPrice AS LineTotal\nFROM dbo.Orders o\nINNER JOIN dbo.Customers c ON o.CustomerID = c.CustomerID\nINNER JOIN dbo.OrderDetails od ON o.OrderID = od.OrderID\nINNER JOIN dbo.Products p ON od.ProductID = p.ProductID\nWHERE o.OrderDate >= '2024-01-01'\n  AND od.Quantity > 10\nORDER BY o.OrderDate DESC;\n\n-- In SSMS: Click the 'Include Actual Execution Plan' button (Ctrl+M) before running"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Key Metrics to Analyze"
+    },
+    {
+      "type": "bullet-list",
+      "title": "What to Look For",
+      "items": [
+        "Missing Indexes — green text suggestions for indexes SQL Server would like to use",
+        "High-Cost Operators — any operator consuming >30% of total query cost deserves investigation",
+        "Warnings — yellow triangles indicate potential issues such as implicit conversions or cardinality estimate problems",
+        "Thick Arrows — indicate large row counts flowing between operators, suggesting insufficient filtering",
+        "Actual vs Estimated Rows — large discrepancies indicate stale statistics or parameter sniffing issues"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Implicit Conversions",
+      "text": "When comparing columns to parameters of different data types, SQL Server may implicitly convert the column, preventing index usage. Always match parameter types to column types exactly."
+    },
+    {
+      "type": "example",
+      "title": "Implicit Conversion Problem",
+      "language": "sql",
+      "code": "-- Bad: varchar column compared to nvarchar parameter\n-- This forces a conversion on every row, blocking index usage\nSELECT * FROM dbo.Customers\nWHERE CustomerCode = N'CUST1234'; -- N prefix makes it nvarchar\n\n-- Good: matching data types\nSELECT * FROM dbo.Customers\nWHERE CustomerCode = 'CUST1234'; -- varchar to varchar"
+    },
+    {
+      "type": "mermaid",
+      "id": "execution-plan-flow",
+      "caption": "Logical flow of a typical execution plan from data sources through processing operators to final output.",
+      "definition": "flowchart LR\n    A[Clustered Index Scan] --> B[Hash Match Inner Join]\n    C[Nonclustered Index Seek] --> B\n    B --> D[Sort]\n    D --> E[SELECT Result]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Plan Caching and Reuse"
+    },
+    {
+      "type": "paragraph",
+      "text": "SQL Server caches execution plans in the plan cache to avoid recompiling identical queries. Plan reuse improves performance, but parameter sniffing — when the first execution's parameter values produce a suboptimal plan for subsequent executions — can degrade performance. Understanding plan caching is essential for diagnosing intermittent slow queries."
+    },
+    {
+      "type": "exercise",
+      "title": "Analyze a Query Execution Plan",
+      "description": "Open SSMS, enable Actual Execution Plan (Ctrl+M), and run a query against AdventureWorks. Identify the three highest-cost operators and determine whether indexes are being used effectively.",
+      "steps": [
+        "Open SSMS and connect to your SQL Server instance",
+        "Enable Actual Execution Plan by pressing Ctrl+M or clicking the button in the toolbar",
+        "Run a SELECT query with multiple JOINs against AdventureWorks (e.g., Sales.SalesOrderHeader joined to Sales.Customer and Person.Person)",
+        "Examine the plan tree flowing from right to left",
+        "Note the percentage cost for each operator in the top section",
+        "Check for any green 'Missing Index' suggestions",
+        "Look for yellow warning triangles and read their tooltips",
+        "Compare estimated rows to actual rows for any scan or seek operators"
+      ],
+      "expectedOutcome": "You will identify at least one high-cost operator and any missing index suggestions, understanding how to prioritize optimization efforts."
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "Should I always trust the estimated plan?",
+          "answer": "No. Estimated plans are based on statistics and may not reflect actual runtime behavior. Always verify with actual execution plans when troubleshooting real performance issues."
+        },
+        {
+          "question": "Why does my plan change between executions?",
+          "answer": "Parameter sniffing, plan eviction from cache, or schema changes can cause plan variation. Use Query Store to track plan history and identify when suboptimal plans were introduced."
+        },
+        {
+          "question": "Are execution plans the same as query plans?",
+          "answer": "In SQL Server documentation, the terms are often used interchangeably. An execution plan specifically includes the physical operators chosen, while a query plan may refer to the broader strategy. In practice, execution plans are the tool you analyze."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Execution plans show the step-by-step operations SQL Server performs for a query",
+        "Read plans right-to-left: data sources first, final output last",
+        "Arrow thickness indicates row volume — thicker arrows may signal filtering issues",
+        "Missing index suggestions and warnings are valuable optimization hints",
+        "Always compare estimated rows to actual rows to detect stale statistics"
+      ],
+      "takeaway": "Execution plans are your primary window into SQL Server query performance. Learning to read them fluently is the foundation of all performance tuning work."
+    }
+  ]
+}

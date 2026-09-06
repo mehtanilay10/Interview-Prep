@@ -1,0 +1,203 @@
+{
+  "id": "lesson-sql-147",
+  "slug": "query-store",
+  "moduleSlug": "performance-tuning",
+  "courseSlug": "sql-server",
+  "title": "Query Store",
+  "description": "Leverage Query Store to track query performance over time, identify regressions, and force optimal query plans.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 40,
+  "tags": ["query-store", "plan-regression", "forced-plan", "performance-tracking", "monitoring"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What is Query Store?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query Store is a SQL Server feature that automatically captures query execution history, tracks plan changes over time, and provides a persistent store of query performance data. Unlike the plan cache, which loses history on restarts or eviction, Query Store retains performance data in user-managed tables, enabling long-term trend analysis and plan regression detection."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Query Store Is Essential",
+      "text": "Starting with SQL Server 2016, Query Store should be enabled on every production database. It is the most effective tool for answering the question: 'Why did this query suddenly get slow?'"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Query Store Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query Store captures queries and their execution plans during normal operation. It stores this data in internal tables within the database, partitioned by time. Each query has a query_id, and each plan has a plan_id. Performance metrics — duration, CPU, memory, I/O — are tracked for each plan over time."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Query ID",
+          "definition": "A unique identifier for a query text string within Query Store. Identical text maps to the same query_id."
+        },
+        {
+          "term": "Plan ID",
+          "definition": "A unique identifier for an execution plan associated with a query_id. Different plans for the same query have different plan_ids."
+        },
+        {
+          "term": "Runtime Stats",
+          "definition": "Performance metrics collected per plan_id per time interval, including average duration, CPU time, logical reads, and execution count."
+        },
+        {
+          "term": "Forced Plan",
+          "definition": "A mechanism to pin a specific execution plan to a query, forcing SQL Server to use it regardless of what the optimizer would otherwise choose."
+        },
+        {
+          "term": "Plan Regression",
+          "definition": "When a query's performance degrades because SQL Server switched to a slower execution plan, typically due to statistics changes or cardinality estimate shifts."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Enabling and Configuring Query Store"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query Store is disabled by default. Enable it at the database level with ALTER DATABASE. You can configure the capture mode to ALL, AUTO, or NONE, and set retention policies for how long data is kept."
+    },
+    {
+      "type": "example",
+      "title": "Configuring Query Store",
+      "language": "sql",
+      "code": "-- Enable Query Store for a database\nALTER DATABASE [AdventureWorks]\nSET QUERY_STORE = ON;\n\n-- Configure Query Store options\nALTER DATABASE [AdventureWorks]\nSET QUERY_STORE (\n    OPERATION_MODE = READ_WRITE,\n    CLEANUP_POLICY = (STALE_QUERY_THRESHOLD_DAYS = 30),\n    DATA_FLUSH_INTERVAL_SECONDS = 900,\n    MAX_STORAGE_SIZE_MB = 5000,\n    QUERY_CAPTURE_MODE = AUTO,\n    MAX_PLANS_PER_QUERY = 200\n);\n\n-- Verify Query Store status\nSELECT \n    name AS database_name,\n    is_query_store_on,\n    query_store_capture_mode,\n    query_store_flush_interval_seconds,\n    max_storage_size_mb\nFROM sys.databases\nWHERE name = 'AdventureWorks';"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Using Query Store Reports"
+    },
+    {
+      "type": "paragraph",
+      "text": "SSMS provides built-in Query Store reports accessible via the database's Query Store folder in Object Explorer. The most valuable reports are: Top Resource Consuming Queries, Regressed Queries, Queries With Forced Plans, and Query Wait Statistics. These reports help you quickly identify performance problems and trends."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Core Query Store Reports",
+      "items": [
+        "Regressed Queries — queries whose performance has degraded since their previous execution",
+        "Top Resource Consuming Queries — queries ranked by duration, CPU, memory, or I/O",
+        "Queries With Forced Plans — queries currently using a forced execution plan",
+        "Query Wait Statistics — time spent waiting for resources broken down by wait type"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Identifying and Fixing Plan Regressions"
+    },
+    {
+      "type": "paragraph",
+      "text": "A plan regression occurs when SQL Server switches to a slower plan for a query that previously ran efficiently. Query Store makes regressions visible by tracking multiple plans per query and their associated performance metrics. When a regression is detected, you can force the previous good plan to restore performance immediately while investigating the root cause."
+    },
+    {
+      "type": "example",
+      "title": "Force a Plan with T-SQL",
+      "language": "sql",
+      "code": "-- Find the query_id and plan_id from Query Store\nSELECT \n    q.query_id,\n    p.plan_id,\n    q.query_text,\n    rs.avg_duration,\n    rs.execution_type_desc\nFROM sys.query_store_query_text AS qt\nINNER JOIN sys.query_store_query AS q ON qt.query_text_id = q.query_text_id\nINNER JOIN sys.query_store_plan AS p ON q.query_id = p.query_id\nINNER JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id\nWHERE q.query_id = 42;\n\n-- Force the last known good plan\nEXEC sp_query_store_force_plan\n    @query_id = 42,\n    @plan_id = 1;\n\n-- Unforce the plan when the underlying issue is resolved\nEXEC sp_query_store_unforce_plan\n    @query_id = 42;"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Forcing Plans Is Temporary",
+      "text": "Forcing a plan restores performance immediately but masks the root cause. Always investigate why the optimizer chose a different plan — typically stale statistics or parameter sniffing. Resolve the underlying issue and then unforce the plan."
+    },
+    {
+      "type": "mermaid",
+      "id": "query-store-regression",
+      "caption": "How Query Store detects a plan regression and enables forced plan recovery.",
+      "definition": "flowchart LR\n    A[Query Executes] --> B[New Plan Generated]\n    B --> C[Query Store Records Plan]\n    C --> D[Compare to Previous Plans]\n    D -->|Performance Degraded| E[Regression Detected]\n    E --> F[Force Previous Good Plan]\n    F --> G[Performance Restored]\n    D -->|Performance OK| H[Continue]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Query Store Catalog Views"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query Store exposes its data through a set of catalog views in the database. The core views are sys.query_store_query, sys.query_store_plan, sys.query_store_runtime_stats, and sys.query_store_wait_stats. You can query these views to build custom performance dashboards and alerts."
+    },
+    {
+      "type": "example",
+      "title": "Query Store Custom Report",
+      "language": "sql",
+      "code": "SELECT \n    qt.query_sql_text,\n    q.query_id,\n    p.plan_id,\n    rs.avg_duration / 1000.0 AS avg_duration_ms,\n    rs.avg_cpu_time / 1000.0 AS avg_cpu_ms,\n    rs.avg_logical_io_reads,\n    rs.execution_type_desc,\n    CONVERT(DATE, rs.last_execution_time) AS stat_date\nFROM sys.query_store_query_text AS qt\nINNER JOIN sys.query_store_query AS q ON qt.query_text_id = q.query_text_id\nINNER JOIN sys.query_store_plan AS p ON q.query_id = p.query_id\nINNER JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id\nWHERE CONVERT(DATE, rs.last_execution_time) >= DATEADD(DAY, -7, GETDATE())\nORDER BY rs.avg_duration DESC;"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Best Practices"
+    },
+    {
+      "type": "numbered-list",
+      "items": [
+        "Enable Query Store on all production databases at the READ_WRITE operational mode",
+        "Set an appropriate MAX_STORAGE_SIZE_MB to retain at least 30 days of history",
+        "Monitor the Query Store size and clean up unnecessary data with sp_query_store_force_plan cleanup",
+        "Use forced plans as a temporary fix, not a permanent solution",
+        "Review regressed queries weekly and investigate root causes",
+        "Combine Query Store data with execution plan analysis for complete diagnosis"
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Detect and Resolve a Plan Regression",
+      "description": "Simulate a plan regression by updating statistics on a table, then use Query Store to identify the regression and force the original plan.",
+      "steps": [
+        "Enable Query Store on your test database with READ_WRITE mode",
+        "Run a complex query multiple times and capture the plan_id from Query Store",
+        "Update statistics on the underlying table with FULLSCAN to trigger a plan change",
+        "Run the same query again and observe a new plan_id with different performance metrics",
+        "Query Query Store to compare the old and new plans side by side",
+        "Force the original good plan using sp_query_store_force_plan",
+        "Run the query again to confirm performance is restored",
+        "Document the root cause (statistics change) and create a fix strategy"
+      ],
+      "expectedOutcome": "You will have detected a plan regression, forced a good plan, and understood the relationship between statistics changes and plan quality."
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "Does Query Store add significant overhead?",
+          "answer": "No. Query Store is designed for minimal overhead. The default configuration (AUTO capture, 900-second flush interval) adds less than 1% overhead for most workloads. You can tune the DATA_FLUSH_INTERVAL_SECONDS if needed."
+        },
+        {
+          "question": "Can I use Query Store on Azure SQL Database?",
+          "answer": "Yes. Query Store is fully supported on Azure SQL Database and Azure SQL Managed Instance. The configuration options and catalog views are identical to on-premises SQL Server."
+        },
+        {
+          "question": "What happens when Query Store storage fills up?",
+          "answer": "Query Store automatically switches to READ_ONLY mode when the MAX_STORAGE_SIZE_MB limit is reached, stopping new data capture. Increase the size limit or reduce the STALE_QUERY_THRESHOLD_DAYS to continue capturing."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Query Store captures query execution history persistently, surviving server restarts and plan cache evictions",
+        "Enable it on all production databases — it is essential for diagnosing plan regressions",
+        "Use built-in reports to identify regressed queries and top resource consumers",
+        "Forced plans provide immediate relief for regressions while you investigate root causes",
+        "Catalog views enable custom monitoring, alerting, and historical trend analysis"
+      ],
+      "takeaway": "Query Store transforms performance troubleshooting from a reactive guess-and-check process into a data-driven investigation with complete historical context."
+    }
+  ]
+}

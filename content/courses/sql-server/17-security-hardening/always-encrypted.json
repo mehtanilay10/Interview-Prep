@@ -1,0 +1,197 @@
+{
+  "id": "lesson-sql-152",
+  "slug": "always-encrypted",
+  "moduleSlug": "security-hardening",
+  "courseSlug": "sql-server",
+  "title": "Always Encrypted",
+  "description": "Secure sensitive columns with Always Encrypted, ensuring data is never exposed to the SQL Server process in plaintext.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["always-encrypted", "column-encryption", "enclave", "column-master-key", "column-encryption-key", "client-driver"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Always Encrypted Promise"
+    },
+    {
+      "type": "paragraph",
+      "text": "Always Encrypted ensures that sensitive data such as credit card numbers, government IDs, and health records remains encrypted inside the client application. The SQL Server process, including administrators, never sees plaintext values. Encryption and decryption happen in the client driver using keys stored outside the database, such as in the Windows Certificate Store, Azure Key Vault, or a hardware security module."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "How It Works",
+      "text": "The client driver intercepts queries, encrypts parameter values before sending them to SQL Server, and decrypts result sets after receiving them. SQL Server stores only ciphertext and performs operations on encrypted values."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Encryption Types"
+    },
+    {
+      "type": "paragraph",
+      "text": "Always Encrypted supports two encryption types. Deterministic encryption always produces the same ciphertext for the same plaintext, enabling equality joins, lookups, and grouping. Randomized encryption produces different ciphertext each time, providing stronger security but preventing equality operations and indexes."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Deterministic vs Randomized Encryption",
+      "cards": [
+        {
+          "title": "Deterministic",
+          "description": "Same plaintext always generates the same ciphertext.",
+          "pros": [
+            "Supports equality searches and joins",
+            "Can create indexes and primary keys",
+            "Grouping and distinct operations work"
+          ],
+          "cons": [
+            "Patterns may be detectable",
+            "Less secure against statistical attacks"
+          ],
+          "tags": ["searchable", "indexed"]
+        },
+        {
+          "title": "Randomized",
+          "description": "Same plaintext generates different ciphertext each time.",
+          "pros": [
+            "Stronger security guarantees",
+            "No pattern leakage across rows"
+          ],
+          "cons": [
+            "Cannot join or group on encrypted values",
+            "No equality searches allowed",
+            "Cannot use as index key"
+          ],
+          "tags": ["maximum-security", "non-searchable"]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Key Types"
+    },
+    {
+      "type": "paragraph",
+      "text": "Always Encrypted uses two key types. The Column Master Key (CMK) is a key-protecting key stored outside SQL Server. The Column Encryption Key (CEK) is an encrypted symmetric key that actually encrypts the column data. The CEK is encrypted by the CMK and stored in the database as ciphertext."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Column Master Key (CMK)",
+          "definition": "An asymmetric key or certificate stored outside SQL Server, typically in the Windows Certificate Store or Azure Key Vault."
+        },
+        {
+          "term": "Column Encryption Key (CEK)",
+          "definition": "A symmetric key that encrypts column data. It is encrypted by the CMK and stored in the database."
+        },
+        {
+          "term": "Enclave",
+          "definition": "A secure, trusted execution environment within the client driver that can perform computations on encrypted data without exposing plaintext to the host process."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Create Column Master Key and Column Encryption Key",
+      "content": "Create the encryption keys using SSMS or T-SQL. The CMK path points to the external key store location.",
+      "code": "-- Create Column Master Key in database\nCREATE COLUMN MASTER KEY AppCMK\nWITH (\n    KEY_STORE_PROVIDER_NAME = N'MSSQL_CERTIFICATE_STORE',\n    KEY_PATH = N'CurrentUser/My/3F9B8A2C1D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8'\n);\nGO\n\n-- Create Column Encryption Key protected by the CMK\nCREATE COLUMN ENCRYPTION KEY AppCEK\nWITH VALUES (\n    COLUMN_MASTER_KEY = AppCMK,\n    ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',\n    ENCRYPTED_VALUE = 0x0123456789ABCDEF...\n);\nGO",
+      "language": "sql"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Driver Requirements",
+      "text": "Always Encrypted requires a client driver that supports it, such as .NET Framework 4.6+, .NET Core, or the ODBC Driver 13+ for SQL Server. Applications using older drivers will receive errors when querying encrypted columns."
+    },
+    {
+      "type": "example",
+      "title": "Create a Table with Encrypted Columns",
+      "content": "Define encrypted columns using deterministic or randomized encryption.",
+      "code": "CREATE TABLE [dbo].[Patients] (\n    PatientId INT IDENTITY PRIMARY KEY,\n    NationalId NVARCHAR(20) COLLATE Latin1_General_BIN2\n        ENCRYPTED WITH (\n            COLUMN_ENCRYPTION_KEY = AppCEK,\n            ENCRYPTION_TYPE = DETERMINISTIC,\n            ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256'\n        ),\n    Ssn CHAR(11)\n        ENCRYPTED WITH (\n            COLUMN_ENCRYPTION_KEY = AppCEK,\n            ENCRYPTION_TYPE = RANDOMIZED,\n            ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256'\n        ),\n    BirthDate DATE\n);",
+      "language": "sql"
+    },
+    {
+      "type": "mermaid",
+      "id": "always-encrypted-flow",
+      "caption": "Always Encrypted data flow between application and SQL Server",
+      "definition": "flowchart TD\n    A[Client Application] --> B[SQL Client Driver]\n    B --> C{Encrypted Column?}\n    C -->|Yes| D[Encrypt Parameters Using CEK]\n    C -->|No| E[Send Plaintext]\n    D --> F[Send Encrypted Query to SQL Server]\n    E --> F\n    F --> G[SQL Server Process]\n    G --> H[Store Ciphertext Only]\n    H --> I[Data File on Disk]\n    I --> J[Return Ciphertext Results]\n    J --> B\n    B --> K[Decrypt Using CEK]\n    K --> L[Return Plaintext to Application]\n    M[Column Master Key in External Store] --> B"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Enclave Computations"
+    },
+    {
+      "type": "paragraph",
+      "text": "Enclave computations extend Always Encrypted by performing computations inside a secure enclave. This allows richer operations such as pattern matching, range comparisons, and aggregations on encrypted data without exposing plaintext to the SQL Server process. Enclave technologies include Intel SGX, AMD SEV-SNP, and VBS on Windows."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Always Encrypted Limitations",
+      "items": [
+        "LIKE patterns on encrypted columns require enclave computations",
+        "Bulk import operations may not work with encrypted columns",
+        "Full-text search does not work on encrypted columns",
+        "Columnstore indexes cannot include encrypted columns",
+        "Change data capture does not capture encrypted values"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Rotate the Column Encryption Key",
+      "content": "Rotate the CEK without downtime by creating a new key and re-encrypting data.",
+      "code": "-- Step 1: Create a new CEK\nCREATE COLUMN ENCRYPTION KEY AppCEK_V2\nWITH VALUES (\n    COLUMN_MASTER_KEY = AppCMK,\n    ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',\n    ENCRYPTED_VALUE = 0xNEWENCRYPTEDVALUE...\n);\nGO\n\n-- Step 2: Alter table to use new CEK (requires application restart)\nALTER TABLE [dbo].[Patients]\nALTER COLUMN NationalId\n    ENCRYPTED WITH (\n        COLUMN_ENCRYPTION_KEY = AppCEK_V2,\n        ENCRYPTION_TYPE = DETERMINISTIC,\n        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256'\n    );\nGO",
+      "language": "sql"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Key Rotation Strategy",
+      "text": "Rotate CEKs annually or after any suspected key compromise. Use a rolling strategy: create a new CEK, update the application to use it, then drop the old CEK."
+    },
+    {
+      "type": "checklist",
+      "title": "Always Encrypted Checklist",
+      "items": [
+        {
+          "text": "Generate the CMK and store it in an external key store",
+          "hint": "Azure Key Vault or Windows Certificate Store"
+        },
+        {
+          "text": "Create the CEK and protect it with the CMK",
+          "hint": "Use AES-256 CBC HMAC SHA-256"
+        },
+        {
+          "text": "Enable Column Encryption Setting in the connection string",
+          "hint": "Required for driver-side encryption"
+        },
+        {
+          "text": "Test deterministic vs randomized encryption for each column",
+          "hint": "Deterministic for lookups, randomized for maximum security"
+        },
+        {
+          "text": "Document key rotation schedule and recovery procedures",
+          "hint": "Without the CMK, encrypted data is unrecoverable"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Always Encrypted keeps plaintext out of SQL Server by using client-side encryption.",
+        "Deterministic encryption supports equality operations; randomized does not.",
+        "The CMK stays outside SQL Server, and the CEK encrypts column data.",
+        "Enclave computations allow richer queries without exposing plaintext."
+      ],
+      "takeaway": "Use Always Encrypted when you need strong guarantees that even DBAs cannot read sensitive data. Plan key rotation and recovery carefully."
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["encryption-tde"]
+}

@@ -1,0 +1,186 @@
+{
+  "id": "lesson-auth-024",
+  "slug": "custom-authorization-handlers",
+  "moduleSlug": "advanced-authorization",
+  "courseSlug": "authentication-authorization",
+  "title": "Custom Authorization Handlers",
+  "description": "Build custom authorization handlers for complex business rules that go beyond built-in role and claim checks.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 40,
+  "tags": ["authorization", "handlers", "custom", "business-rules", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Custom Authorization Handlers** are where ASP.NET Core's authorization system becomes truly powerful. While built-in role and claim checks cover common scenarios, real-world applications often have complex business rules that require custom logic. Handlers give you full control over the authorization decision."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Build a Custom Handler"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Use Cases",
+        "items": [
+          "Time-based access (business hours only, feature flags with expiration)",
+          "Geolocation restrictions (access from approved countries only)",
+          "License validation (active subscription required for features)",
+          "Approval workflows (document requires manager approval before editing)",
+          "Quota enforcement (user has exceeded API call limit)",
+          "Combination rules (seniority + department + project assignment)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handler Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every custom handler inherits from `AuthorizationHandler<TRequirement>`. The framework calls `HandleRequirementAsync` for each registered requirement. Inside, you have access to the `AuthorizationHandlerContext` (which contains the user) and the requirement instance. You can inject any service you need via constructor DI."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Business Hours Authorization Handler",
+        "language": "csharp",
+        "code": "public class BusinessHoursRequirement : IAuthorizationRequirement\n{\n    public TimeSpan StartTime { get; }\n    public TimeSpan EndTime { get; }\n    public bool AllowWeekends { get; }\n    \n    public BusinessHoursRequirement(\n        TimeSpan startTime, \n        TimeSpan endTime, \n        bool allowWeekends = false)\n    {\n        StartTime = startTime;\n        EndTime = endTime;\n        AllowWeekends = allowWeekends;\n    }\n}\n\npublic class BusinessHoursHandler : \n    AuthorizationHandler<BusinessHoursRequirement>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        BusinessHoursRequirement requirement)\n    {\n        var now = DateTime.UtcNow.TimeOfDay;\n        var day = DateTime.UtcNow.DayOfWeek;\n        \n        // Check time\n        if (now < requirement.StartTime || now > requirement.EndTime)\n        {\n            return Task.CompletedTask;\n        }\n        \n        // Check weekend\n        if (!requirement.AllowWeekends && \n            (day == DayOfWeek.Saturday || day == DayOfWeek.Sunday))\n        {\n            return Task.CompletedTask;\n        }\n        \n        context.Succeed(requirement);\n        return Task.CompletedTask;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Combining Multiple Handlers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A single policy can have multiple requirements, each with its own handler. The authorization system evaluates all of them. This enables complex rules while keeping each piece of logic isolated and testable."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Complex Policy with Multiple Handlers",
+        "language": "csharp",
+        "code": "// Requirements\npublic class SubscriptionTierRequirement : IAuthorizationRequirement\n{\n    public string MinimumTier { get; }\n    public SubscriptionTierRequirement(string minimumTier) => MinimumTier = minimumTier;\n}\n\npublic class LicenseValidityRequirement : IAuthorizationRequirement { }\n\n// Handlers\npublic class SubscriptionHandler : \n    AuthorizationHandler<SubscriptionTierRequirement>\n{\n    private readonly ISubscriptionService _subscriptionService;\n    \n    public SubscriptionHandler(ISubscriptionService subscriptionService)\n    {\n        _subscriptionService = subscriptionService;\n    }\n    \n    protected override async Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        SubscriptionTierRequirement requirement)\n    {\n        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        if (string.IsNullOrEmpty(userId)) return;\n        \n        var tier = await _subscriptionService.GetUserTierAsync(userId);\n        if (IsTierSufficient(tier, requirement.MinimumTier))\n        {\n            context.Succeed(requirement);\n        }\n    }\n    \n    private bool IsTierSufficient(string current, string minimum)\n    {\n        var tiers = new[] { \"Free\", \"Pro\", \"Enterprise\" };\n        return tiers.ToList().IndexOf(current) >= tiers.ToList().IndexOf(minimum);\n    }\n}\n\npublic class LicenseHandler : \n    AuthorizationHandler<LicenseValidityRequirement>\n{\n    private readonly ILicenseService _licenseService;\n    \n    public LicenseHandler(ILicenseService licenseService)\n    {\n        _licenseService = licenseService;\n    }\n    \n    protected override async Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        LicenseValidityRequirement requirement)\n    {\n        var orgId = context.User.FindFirst(\"OrganizationId\")?.Value;\n        if (string.IsNullOrEmpty(orgId)) return;\n        \n        var isValid = await _licenseService.IsLicenseValidAsync(orgId);\n        if (isValid)\n        {\n            context.Succeed(requirement);\n        }\n    }\n}\n\n// Policy registration\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"RequireProSubscription\", policy =>\n    {\n        policy.Requirements.Add(new SubscriptionTierRequirement(\"Pro\"));\n        policy.Requirements.Add(new LicenseValidityRequirement());\n    });\n});\n\nbuilder.Services.AddScoped<IAuthorizationHandler, SubscriptionHandler>();\nbuilder.Services.AddScoped<IAuthorizationHandler, LicenseHandler>();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Handlers Must Be Thread-Safe",
+        "text": "Authorization handlers may be called concurrently for the same request or across multiple requests. Avoid storing state in instance fields. Use scoped services only for the lifetime of a single authorization operation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Custom Handlers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Handlers are plain classes with no framework dependencies beyond `AuthorizationHandlerContext`. This makes them easy to unit test. Create mock users, requirements, and resources, then verify the handler calls `Succeed` or not."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Unit Testing a Custom Handler",
+        "language": "csharp",
+        "code": "public class BusinessHoursHandlerTests\n{\n    [Theory]\n    [InlineData(\"14:00:00\", true)]   // 2 PM UTC - within hours\n    [InlineData(\"06:00:00\", false)]  // 6 AM UTC - outside hours\n    [InlineData(\"22:00:00\", false)]  // 10 PM UTC - outside hours\n    public async Task Handle_ValidatesBusinessHours(string time, bool expectedSuccess)\n    {\n        // Arrange\n        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]\n        {\n            new Claim(ClaimTypes.NameIdentifier, \"user-123\")\n        }, \"TestAuth\"));\n        \n        var context = new AuthorizationHandlerContext(\n            new[] { new BusinessHoursRequirement(\n                TimeSpan.Parse(\"09:00:00\"),\n                TimeSpan.Parse(\"17:00:00\")) \n            },\n            user,\n            null);\n        \n        var requirement = new BusinessHoursRequirement(\n            TimeSpan.Parse(\"09:00:00\"),\n            TimeSpan.Parse(\"17:00:00\"));\n        \n        // Mock DateTime.UtcNow (in real tests, abstract time via ITimeProvider)\n        // For simplicity, we test the logic directly\n        var handler = new BusinessHoursHandler();\n        await handler.HandleAsync(context, requirement);\n        \n        // Assert\n        Assert.Equal(expectedSuccess, context.HasSucceeded);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authorization in Frontend: A Complementary Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "While handlers run server-side, you can mirror the authorization logic in React using a custom hook or HOC. This is not a security measure but improves UX by hiding UI elements before the API rejects the request."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Authorization Hook in React",
+        "language": "tsx",
+        "code": "import { useAuth } from './useAuth';\n\ntype Permission = 'document:read' | 'document:write' | 'report:export';\n\nfunction useHasPermission(requiredPermission: Permission): boolean {\n  const { user } = useAuth();\n  \n  if (!user?.permissions) return false;\n  \n  // Supports wildcard: 'report:*' covers 'report:export'\n  const hasExact = user.permissions.includes(requiredPermission);\n  const [resource] = requiredPermission.split(':');\n  const hasWildcard = user.permissions.includes(`${resource}:*`);\n  \n  return hasExact || hasWildcard;\n}\n\nfunction DocumentActions({ documentId }: { documentId: string }) {\n  const canWrite = useHasPermission('document:write');\n  const canDelete = useHasPermission('document:delete');\n  \n  return (\n    <div className=\"flex gap-2\">\n      <button onClick={() => editDocument(documentId)} disabled={!canWrite}>\n        Edit\n      </button>\n      <button onClick={() => deleteDocument(documentId)} disabled={!canDelete} className=\"text-red-600\">\n        Delete\n      </button>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Client-Side Authorization is Not Security",
+        "text": "React hooks and conditional rendering are UX patterns, not security boundaries. An attacker can call your API directly with crafted requests. Always enforce authorization server-side in handlers or middleware."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Advanced Patterns"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Advanced Handler Techniques",
+        "items": [
+          "**Async resource loading**: Fetch additional data inside handlers using injected services",
+          "**Caching handlers**: Use `IAuthorizationCacheProvider` to cache expensive authorization decisions",
+          "**Fallback handlers**: Use `FallbackPolicy` to apply authorization globally with exceptions",
+          "**Dynamic requirements**: Create requirements at runtime based on configuration or feature flags",
+          " **Audit logging**: Log authorization decisions in handlers for compliance and debugging"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "custom-handler-flow",
+        "caption": "Custom authorization handler execution pipeline",
+        "definition": "flowchart LR\n    A[Incoming Request] --> B[Authentication]\n    B --> C[Load Policy]\n    C --> D[Resolve Handlers from DI]\n    D --> E[Handler 1: SubscriptionTier]\n    D --> F[Handler 2: LicenseValidity]\n    D --> G[Handler 3: BusinessHours]\n    E --> H{Auth Pass?}\n    F --> H\n    G --> H\n    H -->|All Pass| I[200 OK]\n    H -->|Any Fail| J[403 Forbidden]"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Custom handlers implement complex business authorization rules",
+          "Requirements are simple data carriers; handlers contain the logic",
+          "Multiple handlers can be combined in a single policy",
+          "Handlers should be thread-safe and easily unit-testable",
+          "Frontend authorization is UX-only; always enforce server-side"
+        ],
+        "takeaway": "Custom handlers transform ASP.NET Core's authorization from a simple gatekeeper into a flexible, business-aware security layer."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["auth-overview"]
+}

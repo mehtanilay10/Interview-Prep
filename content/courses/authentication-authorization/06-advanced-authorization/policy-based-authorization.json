@@ -1,0 +1,173 @@
+{
+  "id": "lesson-auth-022",
+  "slug": "policy-based-authorization",
+  "moduleSlug": "advanced-authorization",
+  "courseSlug": "authentication-authorization",
+  "title": "Policy-Based Authorization",
+  "description": "Create policy-based authorization with requirements and handlers for complex, reusable access rules.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["authorization", "policies", "requirements", "handlers", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Policy-Based Authorization** is ASP.NET Core's most powerful authorization pattern. It lets you define reusable, named authorization rules (policies) composed of **requirements** and evaluated by **handlers**. This separates your authorization logic from your controllers and keeps your code clean and testable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Policy Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A policy consists of one or more requirements. Each requirement is an object that represents a specific authorization rule. Handlers contain the logic that evaluates whether a requirement is met. The authorization system invokes all handlers for all requirements in a policy and succeeds only if every handler approves."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Why Policies Over Inline Checks",
+        "text": "Policies centralize authorization logic, making it reusable across controllers, pages, and even Blazor components. They're also easier to unit test because requirements and handlers are plain C# classes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Requirement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Requirements are simple marker classes that implement `IAuthorizationRequirement`. They typically carry the data needed for the authorization decision. For example, a `MinimumAgeRequirement` might carry the minimum age value."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Defining Requirements",
+        "language": "csharp",
+        "code": "// Requirement: User must have a specific permission\npublic class PermissionRequirement : IAuthorizationRequirement\n{\n    public string Permission { get; }\n    \n    public PermissionRequirement(string permission)\n    {\n        Permission = permission ?? throw new ArgumentNullException(nameof(permission));\n    }\n}\n\n// Requirement: User must belong to an approved domain\npublic class DomainRequirement : IAuthorizationRequirement\n{\n    public string[] AllowedDomains { get; }\n    \n    public DomainRequirement(params string[] allowedDomains)\n    {\n        AllowedDomains = allowedDomains;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Handler"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Handlers inherit from `AuthorizationHandler<TRequirement>` and implement the `HandleRequirementAsync` method. This method receives the `AuthorizationHandlerContext` and the requirement to evaluate. You call `context.Succeed(requirement)` to approve or simply return without calling it to deny."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Implementing a Permission Handler",
+        "language": "csharp",
+        "code": "public class PermissionHandler : \n    AuthorizationHandler<PermissionRequirement>\n{\n    private readonly UserManager<ApplicationUser> _userManager;\n    \n    public PermissionHandler(UserManager<ApplicationUser> userManager)\n    {\n        _userManager = userManager;\n    }\n    \n    protected override async Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        PermissionRequirement requirement)\n    {\n        var user = await _userManager.GetUserAsync(context.User);\n        if (user == null)\n        {\n            return; // No user, deny by default\n        }\n        \n        var claims = await _userManager.GetClaimsAsync(user);\n        var hasPermission = claims.Any(c => \n            c.Type == \"Permission\" && \n            c.Value == requirement.Permission);\n        \n        if (hasPermission)\n        {\n            context.Succeed(requirement);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Registering Policies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Policies are registered in `Program.cs` using `AddAuthorization`. You can combine multiple requirements in a single policy. The authorization system requires ALL requirements to succeed for the policy to pass."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Policies in Program.cs",
+        "language": "csharp",
+        "code": "builder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"RequireAdmin\", policy =>\n        policy.RequireRole(\"Admin\"));\n    \n    options.AddPolicy(\"RequireReportAccess\", policy =>\n        policy.RequireClaim(\"Permission\", \"report:read\", \"report:export\"));\n    \n    options.AddPolicy(\"RequireEngineeringAccess\", policy =>\n    {\n        policy.RequireClaim(\"Department\", \"Engineering\");\n        policy.RequireClaim(\"ClearanceLevel\", \"5\");\n        policy.Requirements.Add(new DomainRequirement(\"internal\", \"secure\"));\n    });\n});\n\nbuilder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();\nbuilder.Services.AddScoped<IAuthorizationHandler, DomainHandler>();"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Applying Policies to Endpoints",
+        "language": "csharp",
+        "code": "[Authorize(Policy = \"RequireReportAccess\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ReportsController : ControllerBase\n{\n    [HttpGet(\"sales\")]\n    public IActionResult GetSalesReport()\n    {\n        return Ok(new { Report = \"Q4 Sales\", Amount = 150000 });\n    }\n}\n\n// Policy with parameters using dynamic policy provider\n[Authorize(Policy = \"RequireDocumentAccess\")]\npublic async Task<IActionResult> GetDocument(string documentId)\n{\n    // Access granted by policy handler\n    var doc = await _service.GetDocumentAsync(documentId);\n    return Ok(doc);\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Handler Registration is Required",
+        "text": "Custom handlers must be registered in DI (AddScoped or AddSingleton). If a handler is not registered, requirements will never be evaluated and authorization will fail silently."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resource-Based Policies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes authorization depends on the resource being accessed. For example, a user can edit a document only if they are the author. ASP.NET Core supports this through `IAuthorizationService` and `AuthorizeAsync` with resource parameters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resource-Based Authorization",
+        "language": "csharp",
+        "code": "public class DocumentsController : ControllerBase\n{\n    private readonly IAuthorizationService _authService;\n    \n    public DocumentsController(IAuthorizationService authService)\n    {\n        _authService = authService;\n    }\n    \n    [HttpPut(\"{id}\")]\n    public async Task<IActionResult> UpdateDocument(string id, UpdateDto dto)\n    {\n        var document = await _dbContext.Documents.FindAsync(id);\n        if (document == null) return NotFound();\n        \n        // Authorize based on the actual resource\n        var result = await _authService.AuthorizeAsync(\n            User, document, \"CanEditDocument\");\n        \n        if (!result.Succeeded)\n        {\n            return Forbid();\n        }\n        \n        document.Title = dto.Title;\n        document.Content = dto.Content;\n        await _dbContext.SaveChangesAsync();\n        return NoContent();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Policy Evaluation Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "policy-auth-flow",
+        "caption": "Policy-based authorization evaluation flow",
+        "definition": "flowchart TD\n    A[Incoming Request] --> B[Authentication Middleware]\n    B --> C{Valid Token?}\n    C -->|No| D[401 Unauthorized]\n    C -->|Yes| E[Authorization Middleware]\n    E --> F[Load Policy: RequireEngineeringAccess]\n    F --> G[Requirement: Department=Engineering]\n    F --> H[Requirement: ClearanceLevel=5]\n    F --> I[Requirement: Domain=internal]\n    G --> J{Handler: Pass?}\n    H --> K{Handler: Pass?}\n    I --> L{Handler: Pass?}\n    J -->|No| D\n    K -->|No| D\n    L -->|No| D\n    J -->|Yes| M[All Requirements Met]\n    K -->|Yes| M\n    L -->|Yes| M\n    M --> N[200 OK - Execute Controller]"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Policies separate authorization logic from controllers",
+          "Requirements define what must be true for access",
+          "Handlers contain the evaluation logic",
+          "Register policies and handlers in DI",
+          "Use resource-based authorization for entity-level rules"
+        ],
+        "takeaway": "Policy-Based Authorization is the recommended approach for complex, maintainable access control in ASP.NET Core."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["auth-overview"]
+}

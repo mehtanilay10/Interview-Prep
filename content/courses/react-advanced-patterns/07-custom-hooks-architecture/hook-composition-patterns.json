@@ -1,0 +1,142 @@
+{
+  "id": "lesson-react-adv-018",
+  "slug": "hook-composition-patterns",
+  "moduleSlug": "custom-hooks-architecture",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Hook Composition Patterns",
+  "description": "Learn how to compose multiple custom hooks together to build complex stateful logic while maintaining clean separation of concerns.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["custom-hooks", "composition", "state", "reusability"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Custom hooks become exponentially more powerful when you compose them together. Rather than building monolithic hooks that handle everything, you can break logic into small, focused hooks and combine them to create sophisticated behaviors."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Composition Beats Monoliths"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A single hook that manages fetching, caching, error handling, and retry logic quickly becomes impossible to test and reuse. By composing smaller hooks like `useFetch`, `useDebounce`, and `useRetry`, you gain flexibility and testability."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Single Responsibility",
+        "text": "Each custom hook should do one thing well. If you cannot describe a hook's purpose in one sentence, it is probably doing too much."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sequential Composition"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest form of composition is calling hooks sequentially inside another hook. The parent hook orchestrates the child hooks and returns a unified API."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Composing useToggle and useLocalStorage",
+        "content": "A hook that persists a boolean toggle to localStorage by composing two simpler hooks.",
+        "language": "tsx",
+        "code": "function useToggle(key: string, defaultValue = false) {\n  const [value, setValue] = useState(defaultValue);\n  const toggle = useCallback(() => setValue(v => !v), []);\n  return [value, toggle] as const;\n}\n\nfunction useLocalStorage<T>(key: string, initialValue: T) {\n  const [value, setValue] = useState<T>(() => {\n    const stored = localStorage.getItem(key);\n    return stored ? JSON.parse(stored) : initialValue;\n  });\n\n  useEffect(() => {\n    localStorage.setItem(key, JSON.stringify(value));\n  }, [key, value]);\n\n  return [value, setValue] as const;\n}\n\n// Composed hook\nfunction usePersistentToggle(key: string) {\n  const [value, setValue] = useLocalStorage(key, false);\n  const toggle = useCallback(() => setValue(v => !v), [setValue]);\n  return [value, toggle] as const;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hook Dependency Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hook-composition-flow",
+        "caption": "Data and control flow when composing custom hooks",
+        "definition": "graph LR\n    A[usePersistentToggle] --> B[useLocalStorage]\n    A --> C[useToggle logic]\n    B --> D[(localStorage)]\n    C --> E[Component]\n    A --> E\n    style A fill:#1e293b,stroke:#38bdf8,color:#f1f5f9\n    style B fill:#1e293b,stroke:#a855f7,color:#f1f5f9"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Parallel Composition"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some hooks run independently and can be composed in parallel. A common pattern is a `useAsync` hook that composes `useLoading`, `useError`, and `useData` states."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Parallel Async State Hook",
+        "content": "Composing three state hooks into one async data hook.",
+        "language": "tsx",
+        "code": "function useLoading(initial = false) {\n  return useState(initial)[0];\n}\n\nfunction useError<T = Error>() {\n  return useState<T | null>(null);\n}\n\nfunction useAsync<T>(asyncFn: () => Promise<T>, deps: any[]) {\n  const dataState = useState<T | null>(null);\n  const errorState = useError<T>();\n  const loading = useLoading(true);\n\n  useEffect(() => {\n    let cancelled = false;\n\n    asyncFn()\n      .then(result => {\n        if (!cancelled) dataState[1](result);\n      })\n      .catch(err => {\n        if (!cancelled) errorState[1](err);\n      })\n      .finally(() => {\n        if (!cancelled) {\n          loading(false); // This won't work directly, see note\n        }\n      });\n\n    return () => { cancelled = true; };\n  }, deps);\n\n  return { data: dataState[0], error: errorState[0], loading };\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Setter Closures",
+        "text": "When composing hooks, remember that state setters are stable across renders. However, if you need reactive loading state, manage it inside the composed hook rather than relying on a child hook's internal state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Composition Guidelines",
+        "items": [
+          "Keep hooks pure in their inputs and outputs",
+          "Return stable references with useCallback and useMemo",
+          "Accept configuration objects as the last parameter",
+          "Name composed hooks with a `use` prefix",
+          "Document which hooks are safe to compose together"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Compose small, single-purpose hooks instead of building monoliths",
+          "Sequential composition orchestrates child hooks inside a parent hook",
+          "Parallel composition runs independent hooks side by side",
+          "Always return stable references from composed hooks"
+        ],
+        "takeaway": "Hook composition is the primary mechanism for building scalable stateful logic in React."
+      }
+    }
+  ],
+  "courseSlug": "react-advanced-patterns"
+}

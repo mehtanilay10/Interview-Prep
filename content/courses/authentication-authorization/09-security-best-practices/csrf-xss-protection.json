@@ -1,0 +1,206 @@
+{
+  "id": "lesson-auth-038",
+  "slug": "csrf-xss-protection",
+  "moduleSlug": "security-best-practices",
+  "courseSlug": "authentication-authorization",
+  "title": "CSRF and XSS Protection",
+  "description": "Protect authentication flows against CSRF and XSS attacks with tokens, SameSite cookies, and Content Security Policy.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["csrf", "xss", "csp", "security", "attack-prevention"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**CSRF (Cross-Site Request Forgery)** tricks a logged-in user into performing actions they did not intend. **XSS (Cross-Site Scripting)** injects malicious scripts into web pages viewed by other users. Both attacks exploit authentication mechanisms and require layered defenses."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CSRF Attacks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A CSRF attack works because browsers automatically include cookies with every request. If a user is logged into your app and visits a malicious site, that site can forge requests to your app using the user's session cookie."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CSRF Attack Example",
+        "content": "How a malicious site exploits a logged-in user",
+        "language": "tsx",
+        "code": "<!-- Attacker's malicious page -->\n<form action=\"https://yourapp.com/account/delete\" method=\"POST\">\n  <input type=\"hidden\" name=\"confirm\" value=\"true\" />\n  <button type=\"submit\">Click for Free Prize!</button>\n</form>\n\n<script>\n  // Auto-submit the form when the page loads\n  document.querySelector('form').submit();\n<\/script>\n\n<!-- User's browser sends the request with their session cookie -->\n<!-- App processes the request as if user intentionally clicked -->"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "CSRF Requires Authentication",
+        "text": "CSRF only works when the victim is already authenticated. If the attacker can steal credentials directly, they do not need CSRF."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CSRF Defenses"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**SameSite cookies**: `SameSite=Lax` blocks cross-site POST requests; `Strict` blocks all cross-site navigation",
+          "**CSRF tokens**: Synchronizer token pattern embeds a secret token in forms and validates on submission",
+          "**Double-submit cookie**: Client reads a cookie and echoes it in a custom header",
+          "**Custom headers**: AJAX requests with `X-Requested-With: XMLHttpRequest` are not forged by forms"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CSRF Token Validation (C#)",
+        "content": "Implementing antiforgery token validation in ASP.NET Core",
+        "language": "csharp",
+        "code": "// Startup configuration\nbuilder.Services.AddAntiforgery(options =>\n{\n    options.Cookie.Name = \"XSRF-TOKEN\";\n    options.Cookie.HttpOnly = false; // JavaScript needs to read this\n    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;\n    options.Cookie.SameSite = SameSiteMode.Lax;\n    options.HeaderName = \"X-XSRF-TOKEN\";\n    options.FormFieldName = \"__RequestVerificationToken\";\n});\n\n// In a Razor Page or MVC controller\n[IgnoreAntiforgeryToken]\n[HttpPost]\n[ValidateAntiForgeryToken]\npublic async Task<IActionResult> Transfer(TransferViewModel model)\n{\n    if (!ModelState.IsValid) return BadRequest();\n\n    // Process transfer...\n    return Ok();\n}\n\n// Client-side: send token in header\naxios.post('/api/transfer', data, {\n    headers: {\n        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN')\n    }\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "XSS Attacks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**XSS** allows attackers to inject JavaScript into your application. Stored XSS persists in the database (e.g., malicious comment). Reflected XSS bounces off the server in error pages or search results. DOM-based XSS occurs entirely in client-side JavaScript."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Stored XSS**: Malicious script saved in database and rendered to all viewers",
+          "**Reflected XSS**: Script reflected in URL or form input, executed immediately",
+          "**DOM-based XSS**: Client-side JavaScript writes user input to the DOM unsafely"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "XSS Breaks Everything",
+        "text": "XSS can bypass all other security controls. An attacker with XSS can steal CSRF tokens, read HttpOnly cookies via fetch requests, and perform actions as the victim."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Content Security Policy (CSP)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CSP is an HTTP header that restricts which resources the browser may load. A strict CSP can prevent inline scripts from executing, neutralizing most XSS attacks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Strict CSP Configuration",
+        "content": "Setting Content-Security-Policy headers in ASP.NET Core",
+        "language": "csharp",
+        "code": "app.Use(async (context, next) =>\n{\n    context.Response.Headers.Append(\n        \"Content-Security-Policy\",\n        \"default-src 'self'; \" +\n        \"script-src 'self' 'nonce-{RANDOM}'; \" +\n        \"style-src 'self' 'nonce-{RANDOM}'; \" +\n        \"img-src 'self' data: https:; \" +\n        \"font-src 'self' data:; \" +\n        \"connect-src 'self' https://api.yourapp.com; \" +\n        \"frame-ancestors 'none'; \" +\n        \"base-uri 'self'; \" +\n        \"form-action 'self';\"\n    );\n    context.Response.Headers.Append(\"X-Content-Type-Options\", \"nosniff\");\n    context.Response.Headers.Append(\"X-Frame-Options\", \"DENY\");\n    context.Response.Headers.Append(\"Referrer-Policy\", \"strict-origin-when-cross-origin\");\n    await next();\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React-Specific XSS Defenses"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "React escapes values in JSX by default: `{userInput}` is safe",
+          "Avoid `dangerouslySetInnerHTML` unless absolutely necessary",
+          "Sanitize HTML with DOMPurify if rich text is required",
+          "Never construct URLs or paths from unsanitized user input"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe HTML Rendering in React",
+        "content": "Using DOMPurify to sanitize rich text content",
+        "language": "tsx",
+        "code": "import DOMPurify from 'dompurify';\n\nfunction RichTextContent({ html }: { html: string }) {\n  const clean = DOMPurify.sanitize(html, {\n    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li'],\n    ALLOWED_ATTR: ['href', 'target', 'rel']\n  });\n\n  return (\n    <div\n      dangerouslySetInnerHTML={{ __html: clean }}\n    />\n  );\n}\n\n// Usage: pass server-sanitized HTML only\n<RichTextContent html={post.body} />"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "CSRF and XSS Defense Checklist",
+        "items": [
+          {
+            "text": "Enable SameSite cookies on all authentication cookies",
+            "hint": "Lax blocks CSRF from external sites"
+          },
+          {
+            "text": "Validate antiforgery tokens on all state-changing requests",
+            "hint": "Use Antiforgery services, not custom implementations"
+          },
+          {
+            "text": "Deploy a strict Content Security Policy",
+            "hint": "Start with report-only mode, then enforce"
+          },
+          {
+            "text": "Set X-Content-Type-Options: nosniff",
+            "hint": "Prevents MIME-type sniffing attacks"
+          },
+          {
+            "text": "Set X-Frame-Options: DENY",
+            "hint": "Prevents clickjacking"
+          },
+          {
+            "text": "Avoid dangerouslySetInnerHTML in React",
+            "hint": "Use DOMPurify when rich text is unavoidable"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "CSRF exploits browser cookie behavior; prevent with SameSite + tokens",
+          "XSS injects scripts; prevent with CSP + output encoding",
+          "SameSite cookies are the first line of CSRF defense",
+          "CSP with nonces blocks inline scripts",
+          "React escapes JSX by default but beware dangerouslySetInnerHTML"
+        ],
+        "takeaway": "Layered defenses (cookies, tokens, CSP) are required because each mitigates different attack vectors."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "authentication-authorization"
+}

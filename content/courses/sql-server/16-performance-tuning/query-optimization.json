@@ -1,0 +1,206 @@
+{
+  "id": "lesson-sql-144",
+  "slug": "query-optimization",
+  "moduleSlug": "performance-tuning",
+  "courseSlug": "sql-server",
+  "title": "Query Optimization Techniques",
+  "description": "Apply proven query optimization techniques to improve SQL Server performance through predicate pushdown, join reordering, and efficient query writing.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 50,
+  "tags": ["query-optimization", "predicate-pushdown", "join-strategies", "sargability", "set-based"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Principles of Query Optimization"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query optimization in SQL Server involves writing queries that allow the Query Optimizer to choose the most efficient execution strategy. The optimizer is powerful, but it can only work with what you give it. Poorly written queries — even when logically correct — can force expensive operations that significantly degrade performance."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "The Golden Rule",
+      "text": "Write queries that are SARGable (Search Argument Able), avoid unnecessary operations on large datasets, and let the optimizer do its job. The best optimized query is one that returns exactly the data you need, using the most efficient path."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "SARGability: Making Queries Index-Friendly"
+    },
+    {
+      "type": "paragraph",
+      "text": "A predicate is SARGable if SQL Server can use an index to evaluate it efficiently. SARG stands for Search ARGument. When a WHERE clause is SARGable, SQL Server can perform an index seek rather than a scan, dramatically reducing I/O."
+    },
+    {
+      "type": "bullet-list",
+      "title": "SARGable Patterns",
+      "items": [
+        "Column = constant (e.g., WHERE CustomerID = 42)",
+        "Column LIKE 'prefix%' (e.g., WHERE LastName LIKE 'Sm%')",
+        "Column >= constant AND Column <= constant (range queries)",
+        "Column IN (list of values)",
+        "Column IS NOT NULL"
+      ]
+    },
+    {
+      "type": "bullet-list",
+      "title": "Non-SARGable Patterns",
+      "items": [
+        "Column LIKE '%suffix' or '%middle%' — wildcard at the start",
+        "Functions on columns: WHERE YEAR(OrderDate) = 2024",
+        "Implicit data type conversions",
+        "Column IS NULL when most values are NOT NULL (inefficient for some indexes)",
+        "OR conditions that span different columns"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "SARGable vs Non-SARGable",
+      "language": "sql",
+      "code": "-- Non-SARGable: function on column blocks index usage\nSELECT * FROM dbo.Orders\nWHERE YEAR(OrderDate) = 2024;\n\n-- SARGable: rewrite as range predicate\nSELECT * FROM dbo.Orders\nWHERE OrderDate >= '2024-01-01'\n  AND OrderDate < '2025-01-01';\n\n-- Non-SARGable: leading wildcard\nSELECT * FROM dbo.Customers\nWHERE CustomerName LIKE '%Smith';\n\n-- SARGable: prefix matching (if data supports it)\nSELECT * FROM dbo.Customers\nWHERE CustomerName LIKE 'Smith%';"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Predicate Pushdown"
+    },
+    {
+      "type": "paragraph",
+      "text": "Predicate pushdown is the process of applying filters as early as possible in the query execution. SQL Server's optimizer automatically pushes predicates toward data sources, but certain query constructs can prevent this. Applying filters before JOINs and aggregations reduces the volume of rows processed in subsequent operations."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Early Filtering",
+      "text": "Filter rows as close to the source as possible. Each row eliminated early is a row that never needs to be joined, sorted, or aggregated."
+    },
+    {
+      "type": "example",
+      "title": "Predicate Placement",
+      "language": "sql",
+      "code": "-- Less optimal: filter after join — more rows processed\nSELECT o.OrderID, c.CustomerName, o.TotalAmount\nFROM dbo.Orders o\nINNER JOIN dbo.Customers c ON o.CustomerID = c.CustomerID\nWHERE o.TotalAmount > 1000;\n\n-- More optimal: filter Orders first, then join — fewer rows flow through\nSELECT o.OrderID, c.CustomerName, o.TotalAmount\nFROM dbo.Orders o\nINNER JOIN dbo.Customers c ON o.CustomerID = c.CustomerID\nWHERE o.TotalAmount > 1000; -- optimizer handles this, but explicit filtering in subqueries can help\n\n-- Explicit early filtering with CTE\nWITH HighValueOrders AS (\n    SELECT CustomerID, OrderID, TotalAmount, OrderDate\n    FROM dbo.Orders\n    WHERE TotalAmount > 1000\n      AND OrderDate >= '2024-01-01'\n)\nSELECT h.OrderID, c.CustomerName, h.TotalAmount\nFROM HighValueOrders h\nINNER JOIN dbo.Customers c ON h.CustomerID = c.CustomerID;"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Join Strategies and Reordering"
+    },
+    {
+      "type": "paragraph",
+      "text": "SQL Server's optimizer selects join algorithms based on estimated row counts, available indexes, and memory grants. The three primary join algorithms are Nested Loops, Hash Match, and Merge Join. Each has different performance characteristics depending on data volume and distribution."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Join Algorithm Comparison",
+      "cards": [
+        {
+          "title": "Nested Loops",
+          "description": "Iterates through the outer input and probes the inner input for each row. Best when the outer input is small and the inner input has an index on the join key.",
+          "pros": ["Low memory overhead", "Excellent for small outer sets", "Uses existing indexes efficiently"],
+          "cons": ["Degrades rapidly with large outer sets", "Multiple lookups per row can be expensive"],
+          "tags": ["small-datasets", "indexed"]
+        },
+        {
+          "title": "Hash Match",
+          "description": "Builds a hash table from the smaller input, then probes it with rows from the larger input. Best for large, unsorted inputs where indexes are absent or ineffective.",
+          "pros": ["Scales well with large inputs", "No index required", "Parallelizable"],
+          "cons": ["High memory consumption", "May spill to tempdb if memory insufficient"],
+          "tags": ["large-datasets", "no-index"]
+        },
+        {
+          "title": "Merge Join",
+          "description": "Requires both inputs to be sorted on the join key. Streams rows from both inputs simultaneously, making it memory-efficient and fast for pre-sorted data.",
+          "pros": ["Very low memory overhead", "Excellent for large sorted inputs", "Consistent performance"],
+          "cons": ["Requires sorted inputs", "May add explicit Sort operator if data not sorted", "Less flexible than Hash Match"]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Avoiding Common Anti-Patterns"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Performance Anti-Patterns",
+      "items": [
+        "SELECT * — retrieve only the columns you need to reduce I/O and network traffic",
+        "Scalar UDFs in SELECT/WHERE — prevent parallelization and often cause row-by-row execution",
+        "Cursor-based row-by-row processing — SQL Server is optimized for set-based operations",
+        "N+1 query patterns — avoid executing a query inside a loop; use JOINs or batch operations instead",
+        "Overuse of subqueries when JOINs suffice — correlated subqueries often force repeated execution",
+        "Excessive DISTINCT/ORDER BY on large result sets — these require sorting and memory grants"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Set-Based vs Row-by-Row",
+      "language": "sql",
+      "code": "-- Anti-pattern: cursor processing (row-by-row)\nDECLARE @CustomerID INT;\nDECLARE cust_cursor CURSOR FOR\n    SELECT CustomerID FROM dbo.Customers WHERE IsActive = 1;\nOPEN cust_cursor;\nFETCH NEXT FROM cust_cursor INTO @CustomerID;\nWHILE @@FETCH_STATUS = 0\nBEGIN\n    UPDATE dbo.Orders\n    SET ProcessedFlag = 1\n    WHERE CustomerID = @CustomerID\n      AND ProcessedFlag = 0;\n    FETCH NEXT FROM cust_cursor INTO @CustomerID;\nEND\nCLOSE cust_cursor;\nDEALLOCATE cust_cursor;\n\n-- Set-based alternative: single UPDATE statement\nUPDATE o\nSET ProcessedFlag = 1\nFROM dbo.Orders o\nINNER JOIN dbo.Customers c ON o.CustomerID = c.CustomerID\nWHERE c.IsActive = 1\n  AND o.ProcessedFlag = 0;"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Handling Large Result Sets"
+    },
+    {
+      "type": "paragraph",
+      "text": "Returning millions of rows to a client causes network bottlenecks and client-side memory pressure. Use pagination, filtering, or summary aggregations to limit data transfer. SQL Server supports OFFSET-FETCH for efficient pagination on ordered result sets."
+    },
+    {
+      "type": "example",
+      "title": "Pagination with OFFSET-FETCH",
+      "language": "sql",
+      "code": "SELECT \n    ProductID,\n    ProductName,\n    UnitPrice,\n    CategoryName\nFROM dbo.Products p\nINNER JOIN dbo.Categories c ON p.CategoryID = c.CategoryID\nORDER BY ProductName\nOFFSET 20 ROWS\nFETCH NEXT 10 ROWS ONLY;"
+    },
+    {
+      "type": "exercise",
+      "title": "Optimize a Slow Query",
+      "description": "Given a query with a non-SARGable predicate and a missing join hint, rewrite it to be fully SARGable and analyze how the execution plan changes.",
+      "steps": [
+        "Create a sample table with an index on a date column",
+        "Write a query using a function in the WHERE clause: WHERE YEAR(CreatedDate) = 2024",
+        "Capture the estimated execution plan and note the operator type (likely Clustered Index Scan)",
+        "Rewrite the query using a range predicate",
+        "Capture the new plan and confirm the operator changed to an Index Seek",
+        "Compare the estimated I/O and CPU costs between the two plans"
+      ],
+      "expectedOutcome": "You will see a dramatic reduction in estimated I/O and a switch from Index Scan to Index Seek, confirming the impact of SARGability."
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "Does the Query Optimizer always choose the best plan?",
+          "answer": "The optimizer chooses the plan it estimates will be fastest based on available statistics. When statistics are stale or cardinality estimates are wrong, it can choose a suboptimal plan. That is why maintaining statistics and reviewing execution plans is critical."
+        },
+        {
+          "question": "Should I add query hints to force a specific plan?",
+          "answer": "Query hints like OPTION (FORCESEEK) or OPTION (HASH JOIN) can help in rare cases, but they bypass the optimizer's intelligence and can become brittle as data changes. Use them sparingly and document the rationale."
+        },
+        {
+          "question": "What is cardinality estimation?",
+          "answer": "Cardinality estimation is the process of predicting how many rows will be returned by each operation in a query plan. SQL Server 2014+ uses a refined cardinality estimation model that improves accuracy for modern workloads. You can revert to the legacy model for specific databases if needed."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "SARGable predicates allow index usage; avoid functions on columns in WHERE clauses",
+        "Push filters early — fewer rows processed means faster queries",
+        "Choose the right join strategy: Nested Loops for small sets, Hash Match for large unsorted data, Merge Join for pre-sorted streams",
+        "Replace cursor-based logic with set-based UPDATE, INSERT, and DELETE statements",
+        "Limit result sets with pagination and avoid SELECT *"
+      ],
+      "takeaway": "Writing optimization-friendly queries gives SQL Server the information it needs to generate efficient execution plans automatically."
+    }
+  ]
+}

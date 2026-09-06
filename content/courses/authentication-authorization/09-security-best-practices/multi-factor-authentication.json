@@ -1,0 +1,202 @@
+{
+  "id": "lesson-auth-036",
+  "slug": "multi-factor-authentication",
+  "moduleSlug": "security-best-practices",
+  "courseSlug": "authentication-authorization",
+  "title": "Multi-Factor Authentication",
+  "description": "Implement multi-factor authentication (MFA) with TOTP authenticator apps, SMS, and backup codes in ASP.NET Core and React.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["mfa", "totp", "sms", "backup-codes", "two-factor", "security"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Multi-factor authentication (MFA)** requires users to present two or more verification factors to gain access. Even if a password is compromised, an attacker cannot pass the second factor check."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authentication Factors"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Something you know**: Password, PIN, security question",
+          "**Something you have**: Phone, hardware key, smart card",
+          "**Something you are**: Fingerprint, face, voice"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "NIST Guidance",
+        "text": "NIST SP 800-63B recommends against SMS-based MFA for high-security applications due to SIM-swapping attacks. Prefer TOTP apps or hardware keys."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "TOTP Authenticator Apps"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**TOTP (Time-based One-Time Password)** generates codes that change every 30 seconds. Popular apps include Google Authenticator, Authy, and Microsoft Authenticator. TOTP uses a shared secret and the current timestamp to produce a 6-digit code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TOTP Setup with ASP.NET Core Identity",
+        "content": "Configuring TOTP-based two-factor authentication",
+        "language": "csharp",
+        "code": "public async Task<IActionResult> EnableAuthenticator()\n{\n    var user = await _userManager.GetUserAsync(User);\n    if (user == null) return NotFound();\n\n    await _userManager.ResetAuthenticatorKeyAsync(user);\n\n    var key = await _userManager.GetAuthenticatorKeyAsync(user);\n    if (string.IsNullOrEmpty(key))\n    {\n        await _userManager.ResetAuthenticatorKeyAsync(user);\n        key = await _userManager.GetAuthenticatorKeyAsync(user);\n    }\n\n    var model = new EnableAuthenticatorViewModel\n    {\n        SharedKey = FormatKey(key),\n        QrCodeUrl = $\"otpauth://totp/InterviewPrep:{user.Email}?secret={key}&issuer=InterviewPrep\"\n    };\n\n    return View(model);\n}\n\n[HttpPost]\npublic async Task<IActionResult> EnableAuthenticator(EnableAuthenticatorViewModel model)\n{\n    var user = await _userManager.GetUserAsync(User);\n    if (user == null) return NotFound();\n\n    var isValid = await _userManager.VerifyTwoFactorTokenAsync(\n        user, _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);\n\n    if (!isValid)\n    {\n        ModelState.AddModelError(\"Code\", \"Invalid authenticator code\");\n        return View(model);\n    }\n\n    await _userManager.SetTwoFactorEnabledAsync(user, true);\n    TempData[\"StatusMessage\"] = \"Authenticator app enabled!\";\n    return RedirectToAction(nameof(ShowRecoveryCodes));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Backup Codes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Users can lose access to their second factor (phone breaks, lost hardware key). **Backup codes** are single-use codes generated during MFA enrollment that users can store securely."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Generating Backup Codes",
+        "content": "Generating and storing recovery codes for MFA",
+        "language": "csharp",
+        "code": "public async Task<IActionResult> GenerateRecoveryCodes(int numberOfCodes = 10)\n{\n    var user = await _userManager.GetUserAsync(User);\n    if (user == null) return NotFound();\n\n    var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, numberOfCodes);\n\n    var formattedCodes = codes.Select(code => code.Insert(4, \"-\")\n        .Insert(9, \"-\"));\n\n    ViewBag.RecoveryCodes = formattedCodes.ToArray();\n    return View();\n}\n\n// Stored hashed in database (Identity handles hashing automatically)\n// Each code can be verified with:\nvar result = await _signInManager.TwoFactorRecoveryCodeSignInAsync(code);\nif (result.Succeeded) { /* user is now signed in */ }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SMS-Based MFA"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SMS sends a numeric code via text message. While convenient, it is vulnerable to **SIM-swapping** attacks where an attacker tricks a carrier into transferring the victim's phone number to a SIM card owned by the attacker."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "MFA Methods Comparison",
+        "cards": [
+          {
+            "title": "TOTP App",
+            "description": "Google Authenticator, Authy, 1Password",
+            "pros": ["Offline capable", "No carrier dependency", "Phishing-resistant with WebAuthn"],
+            "cons": ["User must install app", "Initial setup friction"]
+          },
+          {
+            "title": "SMS",
+            "description": "Text message with numeric code",
+            "pros": ["No app required", "Familiar to users"],
+            "cons": ["SIM-swap vulnerable", "Carrier reliability", "Cost per message"]
+          },
+          {
+            "title": "Hardware Key",
+            "description": "YubiKey, Titan Security Key",
+            "pros": ["Highest security", "Phishing-resistant", "No battery"],
+            "cons": ["Physical distribution", "Cost", "Loss risk"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "SMS Risks",
+        "text": "Avoid SMS MFA for privileged accounts. If you must use SMS, combine it with additional risk signals like device recognition and IP anomaly detection."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mfa-flow",
+        "caption": "TOTP-based MFA verification flow",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant C as Client\n    participant S as Server\n    participant A as Authenticator App\n    U->>A: Scan QR code / enter key\n    A->>A: Generate 6-digit code every 30s\n    U->>C: Enter password + 6-digit code\n    C->>S: POST credentials\n    S->>S: Validate password + TOTP\n    S->>C: Return session\n    C->>U: Logged in"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Remember Me and Trusted Devices"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For trusted devices, you can skip MFA for a limited period. Store a persistent, secure cookie with an encrypted device identifier. If the cookie is missing or invalid, prompt for MFA again."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "MFA Implementation Checklist",
+        "items": [
+          {
+            "text": "Require TOTP or hardware keys over SMS when possible",
+            "hint": "SMS is acceptable for low-risk applications only"
+          },
+          {
+            "text": "Generate and display recovery codes during MFA enrollment",
+            "hint": "Force users to download or print codes before enabling MFA"
+          },
+          {
+            "text": "Allow users to manage trusted devices",
+            "hint": "Provide a page to revoke sessions and trusted devices"
+          },
+          {
+            "text": "Enforce MFA for administrative accounts",
+            "hint": "Never allow admin access without MFA"
+          },
+          {
+            "text": "Log all MFA successes and failures",
+            "hint": "Alert on multiple failed attempts"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "MFA adds a critical second layer of security",
+          "TOTP is the preferred method over SMS",
+          "Backup codes prevent lockout when second factors are lost",
+          "Hardware keys provide the highest assurance",
+          "Always enforce MFA for privileged accounts"
+        ],
+        "takeaway": "MFA is one of the most effective controls against account takeover."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "authentication-authorization"
+}

@@ -1,0 +1,182 @@
+{
+  "id": "lesson-sql-148",
+  "slug": "authentication-modes",
+  "moduleSlug": "security-hardening",
+  "courseSlug": "sql-server",
+  "title": "Authentication Modes",
+  "description": "Understand Windows Authentication vs Mixed Mode authentication and how to configure each for SQL Server.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["authentication", "windows-authentication", "mixed-mode", "sql-authentication"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Authentication Mode Matters"
+    },
+    {
+      "type": "paragraph",
+      "text": "SQL Server supports two authentication modes that control how users prove their identity before connecting. Windows Authentication leverages Active Directory credentials, while Mixed Mode allows both Windows and SQL Server authentication. Choosing the right mode is the first line of defense in a defense-in-depth strategy."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Security Default",
+      "text": "Always prefer Windows Authentication when possible. It integrates with domain policies, enforces password complexity, supports Kerberos delegation, and eliminates the need to store passwords in SQL Server."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Windows Authentication Mode"
+    },
+    {
+      "type": "paragraph",
+      "text": "In Windows Authentication mode, SQL Server trusts Windows to validate the user identity. The SQL Server process never sees or stores the password. This mode uses the Windows security token passed during connection and maps Windows principals to SQL Server logins."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Authentication Mode Comparison",
+      "cards": [
+        {
+          "title": "Windows Authentication",
+          "description": "Relies on Windows Active Directory for identity validation.",
+          "pros": [
+            "No passwords stored in SQL Server",
+            "Kerberos and NTLM support",
+            "Account lockout policies enforced",
+            "Single sign-on experience"
+          ],
+          "cons": [
+            "Requires Windows domain or local machine accounts",
+            "Not suitable for external or cross-platform clients"
+          ],
+          "tags": ["recommended", "enterprise"]
+        },
+        {
+          "title": "Mixed Mode",
+          "description": "Allows both Windows and SQL Server authentication.",
+          "pros": [
+            "Supports non-Windows clients",
+            "Useful for legacy applications",
+            "Independent SQL logins"
+          ],
+          "cons": [
+            "Passwords stored in SQL Server (hashed)",
+            "No built-in account lockout by default",
+            "Requires manual password policy management"
+          ],
+          "tags": ["legacy", "compatibility"]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Mixed Mode Authentication"
+    },
+    {
+      "type": "paragraph",
+      "text": "Mixed Mode enables SQL Server authentication in addition to Windows authentication. SQL Server maintains its own login store. When a SQL login connects, SQL Server validates the password hash stored in the master database. Mixed Mode is necessary for applications that cannot use integrated security, such as certain third-party tools or non-Windows platforms."
+    },
+    {
+      "type": "example",
+      "title": "Check Current Authentication Mode",
+      "content": "Query the server property to determine the current authentication mode.",
+      "code": "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly') AS WindowsOnly;\n\n-- Result: 1 = Windows Authentication only\n-- Result: 0 = Mixed Mode (Windows + SQL Auth)",
+      "language": "sql"
+    },
+    {
+      "type": "example",
+      "title": "Enable Mixed Mode via T-SQL",
+      "content": "Use sp_configure to change the authentication mode. A server restart is required for the change to take effect.",
+      "code": "EXEC xp_instance_regwrite\n    N'HKEY_LOCAL_MACHINE',\n    N'Software\\Microsoft\\MSSQLServer\\MSSQLServer',\n    N'LoginMode',\n    REG_DWORD,\n    2;\n\n-- 1 = Windows Authentication only\n-- 2 = Mixed Mode\n\n-- Restart the SQL Server service after running this command.",
+      "language": "sql"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Password Policy for SQL Logins",
+      "text": "When using SQL Server authentication, enforce CHECK_POLICY = ON and CHECK_EXPIRATION = ON on logins. This integrates SQL logins with Windows password policies and reduces credential-related breaches."
+    },
+    {
+      "type": "mermaid",
+      "id": "auth-mode-flow",
+      "caption": "Authentication decision flow for incoming connections",
+      "definition": "flowchart TD\n    A[Incoming Connection] --> B{Authentication Mode?}\n    B -->|Windows Only| C[Validate Windows Token]\n    B -->|Mixed Mode| D{Login Type?}\n    C --> E[Map Windows Principal to Login]\n    E --> F[Grant Access]\n    D -->|Windows| C\n    D -->|SQL Auth| G[Validate SQL Login Password Hash]\n    G --> H{Password Valid?}\n    H -->|Yes| F\n    H -->|No| I[Reject Connection]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring via SQL Server Management Studio"
+    },
+    {
+      "type": "paragraph",
+      "text": "In SSMS, right-click the server instance, select Properties, then navigate to Security. Under Server authentication, choose either Windows Authentication mode or SQL Server and Windows Authentication mode. Changing this setting requires restarting the SQL Server service."
+    },
+    {
+      "type": "example",
+      "title": "Create a SQL Login with Password Policy",
+      "content": "Create a SQL Server-authenticated login with Windows password policy enforced.",
+      "code": "CREATE LOGIN app_user WITH\n    PASSWORD = 'S3cure!Passw0rd',\n    CHECK_POLICY = ON,\n    CHECK_EXPIRATION = ON,\n    DEFAULT_DATABASE = [AppDB];\n\n-- Force password change at next login\nALTER LOGIN app_user WITH PASSWORD = 'N3w!Passw0rd' MUST_CHANGE;",
+      "language": "sql"
+    },
+    {
+      "type": "checklist",
+      "title": "Authentication Configuration Checklist",
+      "items": [
+        {
+          "text": "Confirm current authentication mode with SERVERPROPERTY",
+          "hint": "Query IsIntegratedSecurityOnly"
+        },
+        {
+          "text": "Enable Mixed Mode only if non-Windows clients are required",
+          "hint": "Prefer Windows Authentication"
+        },
+        {
+          "text": "Enforce CHECK_POLICY and CHECK_EXPIRATION on all SQL logins",
+          "hint": "Applies to SQL Auth logins only"
+        },
+        {
+          "text": "Restart SQL Server service after changing authentication mode",
+          "hint": "Service restart is mandatory"
+        },
+        {
+          "text": "Document the justification for any SQL Server authentication usage",
+          "hint": "Audit trail requirement"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Windows Authentication mode is the most secure default because no passwords are stored in SQL Server.",
+        "Mixed Mode is required only when clients cannot use Windows integrated security.",
+        "Use sp_configure or xp_instance_regwrite to change authentication mode, followed by a service restart.",
+        "Always enforce CHECK_POLICY = ON and CHECK_EXPIRATION = ON for SQL logins."
+      ],
+      "takeaway": "Start with Windows Authentication. Introduce Mixed Mode only when you have a verified business requirement."
+    },
+    {
+      "type": "faq-block",
+      "items": [
+        {
+          "question": "Can I switch from Mixed Mode back to Windows-only later?",
+          "answer": "Yes, but any SQL logins will remain in the master database. They will be unable to connect until you switch back to Mixed Mode."
+        },
+        {
+          "question": "Does Windows Authentication work across domains?",
+          "answer": "Yes, through trust relationships between domains or by using contained database users with Windows authentication in Always On availability groups."
+        },
+        {
+          "question": "What happens if the domain controller is unreachable?",
+          "answer": "Windows Authentication may fail. Consider fallback strategies or service account management for critical systems."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["database-schema-table-objects", "grant"]
+}

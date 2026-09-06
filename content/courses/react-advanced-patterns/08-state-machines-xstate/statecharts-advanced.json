@@ -1,0 +1,136 @@
+{
+  "id": "lesson-react-adv-024",
+  "slug": "statecharts-advanced",
+  "moduleSlug": "state-machines-xstate",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Statecharts Advanced",
+  "description": "Explore hierarchical and parallel states in XState statecharts to model complex UI flows that flat state machines cannot express cleanly.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["statecharts", "hierarchical-states", "parallel-states", "history", "compound-states"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "From State Machines to Statecharts"
+    },
+    {
+      "type": "paragraph",
+      "text": "A flat finite state machine works well for simple flows, but real-world UI interactions quickly become unmanageable. A checkout flow has payment states (card, PayPal, crypto), each with their own validation and submission states. A media player has transport controls, buffering states, and error recovery. Statecharts extend FSMs with hierarchical states, parallel states, history, and guarded transitions. XState fully supports the statechart formalism defined by David Harel."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Not Just Fancy Diagrams",
+      "text": "Statecharts are not visual aids—they are a formal specification. Every feature in a statechart has a precise mathematical meaning. Hierarchical states reduce duplication, parallel states model genuinely concurrent concerns, and history states preserve the last active child."
+    },
+    {
+      "type": "mermaid",
+      "id": "statechart-hierarchy",
+      "caption": "Hierarchical (compound) states allow grouping related states under a parent.",
+      "definition": "stateDiagram-v2\n    state Checkout {\n      [*] --> Payment\n      state Payment {\n        [*] --> Card\n        Card --> Processing: submit\n        Processing --> Success: resolve\n        Processing --> Failed: reject\n        Success --> [*]\n        Failed --> Card: retry\n      }\n      Payment --> Shipping: paid\n      Shipping --> [*]\n    }\n    Checkout --> [*]"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Hierarchical States"
+    },
+    {
+      "type": "paragraph",
+      "text": "Hierarchical states let you nest states inside a parent. When the machine enters a parent state, it also enters its initial child state. Transitions targeting the parent default to the initial child unless otherwise specified. This eliminates the need to duplicate transitions across sibling states. For example, an EDITING parent with children DRAFT and REVIEWING both inherit an ESCAPE transition back to VIEWING."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Compound State",
+          "definition": "A state that contains nested child states. The parent must always have an initial child."
+        },
+        {
+          "term": "Shallow History",
+          "definition": "A pseudo-state that remembers which direct child of a compound state was last active."
+        },
+        {
+          "term": "Deep History",
+          "definition": "A pseudo-state that recursively remembers the full last active descendant tree of a compound state."
+        },
+        {
+          "term": "Final State",
+          "definition": "A state with a double-circle border. Reaching it can automatically transition the machine to a parent or complete the entire chart."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Hierarchical State in XState",
+      "content": "A document editor with an editing parent and nested child states.",
+      "code": "const editorMachine = setup({\n  types: {\n    context: {} as { content: string },\n    events: {} as\n      | { type: 'EDIT' }\n      | { type: 'REVIEW' }\n      | { type: 'APPROVE' }\n      | { type: 'SAVE' }\n      | { type: 'ESCAPE' },\n  },\n  actions: {\n    saveContent: () => {\n      console.log('Saved');\n    },\n  },\n}).createMachine({\n  id: 'editor',\n  initial: 'editing',\n  states: {\n    viewing: {\n      on: {\n        EDIT: 'editing',\n      },\n    },\n    editing: {\n      initial: 'draft',\n      states: {\n        draft: {\n          on: {\n            SAVE: { actions: 'saveContent' },\n          },\n        },\n        reviewing: {\n          on: {\n            APPROVE: '#editor.approved',\n          },\n        },\n      },\n      on: {\n        REVIEW: '.reviewing',\n        ESCAPE: 'viewing',\n      },\n    },\n    approved: {\n      type: 'final',\n    },\n  },\n});",
+      "language": "typescript"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "text": "Use #id syntax to reference states across the machine, especially when transitioning to a final or deeply nested state from outside the parent."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Parallel States"
+    },
+    {
+      "type": "paragraph",
+      "text": "Parallel states model concurrent regions of a system that operate independently. A video call UI simultaneously manages audio, video, and screen-share states. In a statechart, a parallel state contains multiple child regions, each with its own initial state. The machine is considered active in the parallel state only when all regions are active. Events can target specific regions or affect the entire machine."
+    },
+    {
+      "type": "mermaid",
+      "id": "statechart-parallel",
+      "caption": "Parallel regions model independent but concurrent UI concerns.",
+      "definition": "stateDiagram-v2\n    state Call {\n      [*] --> Connecting\n      Connecting --> Active\n      Active --> Ending\n      Ending --> [*]\n\n      state Audio {\n        [*] --> Unmuted\n        Unmuted --> Muted\n        Muted --> Unmuted\n      }\n\n      state Video {\n        [*] --> CameraOn\n        CameraOn --> CameraOff\n        CameraOff --> CameraOn\n      }\n    }\n    note right of Call: Audio and Video regions are independent"
+    },
+    {
+      "type": "example",
+      "title": "Parallel State in XState",
+      "content": "A media player with parallel transport and buffering regions.",
+      "code": "const playerMachine = setup({\n  types: {\n    context: {} as {\n      buffered: number;\n      currentTime: number;\n    },\n    events: {} as\n      | { type: 'PLAY' }\n      | { type: 'PAUSE' }\n      | { type: 'BUFFER' }\n      | { type: 'END' },\n  },\n}).createMachine({\n  id: 'player',\n  type: 'parallel',\n  states: {\n    transport: {\n      initial: 'paused',\n      states: {\n        playing: {\n          on: { PAUSE: 'paused' },\n        },\n        paused: {\n          on: { PLAY: 'playing' },\n        },\n      },\n    },\n    buffering: {\n      initial: 'ready',\n      states: {\n        ready: {\n          on: { BUFFER: 'buffering' },\n        },\n        buffering: {\n          on: { END: 'ready' },\n        },\n      },\n    },\n  },\n});",
+      "language": "typescript"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "text": "Parallel states dramatically increase the number of state combinations. Ensure your UI has a deterministic rendering strategy for every possible permutation of active regions."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Flat FSM vs Statechart",
+      "cards": [
+        {
+          "title": "Flat FSM",
+          "description": "All states exist at a single level. Transitions connect any state to any other state.",
+          "pros": ["Simple to draw and reason about", "Low overhead for trivial flows"],
+          "cons": ["Exponential transition explosion", "Duplicate transitions across similar states", "Impossible to express concurrency"]
+        },
+        {
+          "title": "Statechart",
+          "description": "Hierarchical and parallel states reduce duplication and model complex UI concisely.",
+          "pros": ["Compact representation of complex flows", "Built-in concurrency modeling", "Guards, actions, and history states", "Prevents impossible states"],
+          "cons": ["Steeper learning curve", "More tooling required to visualize", "Debugging nested transitions takes practice"]
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Statecharts extend flat FSMs with hierarchy, parallelism, history, and final states.",
+        "Compound states group related child states and default to their initial child.",
+        "Parallel states run multiple independent regions simultaneously.",
+        "History states preserve the last active child when re-entering a compound state.",
+        "XState supports the full statechart formalism, including final states and deep history."
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["state-reducer-basics"]
+}

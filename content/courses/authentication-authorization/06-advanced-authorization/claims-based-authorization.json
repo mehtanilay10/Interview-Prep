@@ -1,0 +1,185 @@
+{
+  "id": "lesson-auth-021",
+  "slug": "claims-based-authorization",
+  "moduleSlug": "advanced-authorization",
+  "courseSlug": "authentication-authorization",
+  "title": "Claims-Based Authorization",
+  "description": "Use claims-based authorization for fine-grained, attribute-based access control in modern applications.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["authorization", "claims", "fine-grained", "aspnet-core", "jwt"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Claims-Based Authorization** takes a more granular approach than roles. Instead of asking \"what role does this user have?\", it asks \"what specific attributes or capabilities does this user possess?\" A claim is a statement about a user - such as their department, clearance level, or subscription tier."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Claims vs Roles"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "While roles are coarse-grained categories, claims are fine-grained attributes. A user with the 'Editor' role might have claims like `Department: Marketing`, `ClearanceLevel: 3`, and `CanPublish: true`. This allows you to build authorization logic that goes far beyond simple role checks."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Roles vs Claims",
+        "cards": [
+          {
+            "title": "Roles",
+            "description": "Group users into categories for broad access control.",
+            "pros": ["Simple to understand", "Easy to manage", "Built into Identity"],
+            "cons": ["Coarse-grained", "Limited flexibility", "Role explosion at scale"]
+          },
+          {
+            "title": "Claims",
+            "description": "Attribute-based statements about users for fine-grained control.",
+            "pros": ["Highly flexible", "Expresses complex rules", "Works well with JWT"],
+            "cons": ["More complex", "Requires careful design", "Can become unwieldy"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Claims in Applications"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Standard and Custom Claims",
+        "items": [
+          "**Name / Email**: Basic identity claims (often in JWT 'sub' claim)",
+          "**Department**: Marketing, Engineering, Sales - used for data isolation",
+          "**ClearanceLevel**: Numeric or string value for security classification",
+          "**SubscriptionTier**: Free, Pro, Enterprise - feature gating",
+          "**Permissions**: Specific actions like 'document:read', 'report:export'"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Claims in ASP.NET Core"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Claims are added to a user's identity when they are created or updated. ASP.NET Core Identity uses the `UserClaimsPrincipalFactory` to transform a `User` and their claims into a `ClaimsPrincipal`. You can also add claims directly during JWT token generation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Adding Claims During User Creation",
+        "language": "csharp",
+        "code": "public async Task<IdentityResult> CreateUserWithClaimsAsync(string email, string password, string department)\n{\n    var user = new ApplicationUser { UserName = email, Email = email };\n    var result = await _userManager.CreateAsync(user, password);\n    \n    if (result.Succeeded)\n    {\n        var claims = new List<Claim>\n        {\n            new Claim(\"Department\", department),\n            new Claim(\"ClearanceLevel\", department == \"Engineering\" ? \"5\" : \"3\"),\n            new Claim(\"CanAccessReports\", \"true\", ClaimValueTypes.Boolean)\n        };\n        \n        await _userManager.AddClaimsAsync(user, claims);\n    }\n    \n    return result;\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Protecting Endpoints with Claims",
+        "language": "csharp",
+        "code": "[Authorize(Policy = \"RequireEngineeringDepartment\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class CodeRepositoryController : ControllerBase\n{\n    [HttpGet(\"repositories/{repoId}/secrets\")]\n    public IActionResult GetRepoSecrets(string repoId)\n    {\n        var department = User.FindFirst(\"Department\")?.Value;\n        var clearance = User.FindFirst(\"ClearanceLevel\")?.Value;\n        \n        if (department != \"Engineering\" || int.Parse(clearance) < 5)\n        {\n            return Forbid();\n        }\n        \n        return Ok(new { RepoId = repoId, Secrets = new[] { \"API_KEY\", \"DB_PASSWORD\" } });\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Never Trust Client-Provided Claims",
+        "text": "Claims in JWTs are base64-encoded, not encrypted. An attacker can modify and re-sign tokens if they know your secret. Always validate claims server-side and never rely solely on client-provided values for authorization decisions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using [Authorize] with Claims"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core provides two primary ways to use claims for authorization: the `[Authorize]` attribute with policy names (which we cover in the next lesson) and direct claim checks using `User.FindFirst()` or `User.HasClaim()`. For simple scenarios, direct checks work well. For complex rules, policy-based authorization is preferred."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Direct Claim Checks",
+        "language": "csharp",
+        "code": "public class DocumentsController : ControllerBase\n{\n    [HttpGet(\"{id}\")]\n    public async Task<IActionResult> GetDocument(string id)\n    {\n        // Check for specific claim value\n        var canRead = User.HasClaim(\"Permission\", \"document:read\");\n        if (!canRead) return Forbid();\n        \n        // Check for claim with minimum value\n        var clearanceClaim = User.FindFirst(\"ClearanceLevel\")?.Value;\n        if (string.IsNullOrEmpty(clearanceClaim) || int.Parse(clearanceClaim) < 3)\n        {\n            return Forbid();\n        }\n        \n        var document = await _dbContext.Documents.FindAsync(id);\n        return Ok(document);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Claims in React"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When using JWT authentication in React, claims are embedded in the token payload. You decode the token client-side to access claims for UI decisions. However, always remember that client-side decisions are convenience features - the real authorization must happen on the server."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Decoding JWT Claims in React",
+        "language": "tsx",
+        "code": "import { jwtDecode } from 'jwt-decode';\n\ninterface DecodedToken {\n  sub: string;\n  email: string;\n  Department: string;\n  ClearanceLevel: string;\n  exp: number;\n}\n\nfunction useClaims() {\n  const token = localStorage.getItem('access_token');\n  \n  if (!token) return null;\n  \n  try {\n    const decoded = jwtDecode<DecodedToken>(token);\n    \n    // Check expiration\n    if (decoded.exp * 1000 < Date.now()) {\n      localStorage.removeItem('access_token');\n      return null;\n    }\n    \n    return decoded;\n  } catch {\n    return null;\n  }\n}\n\nfunction DocumentViewer({ documentId }: { documentId: string }) {\n  const claims = useClaims();\n  const clearance = claims?.ClearanceLevel;\n  \n  if (!clearance || parseInt(clearance) < 3) {\n    return <div>You need clearance level 3+ to view this document.</div>;\n  }\n  \n  return <DocumentContent id={documentId} />;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use a Claims Transformer for Dynamic Claims",
+        "text": "If claims change frequently (like subscription status), implement a `IClaimsTransformation` service in ASP.NET Core to dynamically augment the user's claims principal on each request."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "claims-auth-flow",
+        "caption": "Claims-based authorization decision flow",
+        "definition": "flowchart TD\n    A[User Authenticates] --> B[Identity Issues Claims]\n    B --> C[Claims in JWT / Cookie]\n    C --> D[Request with Claims]\n    D --> E{Has Required Claim?}\n    E -->|Yes| F[Allow Access]\n    E -->|No| G[Check Other Conditions]\n    G --> H{Pass?}\n    H -->|Yes| F\n    H -->|No| I[403 Forbidden]"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Claims are fine-grained attributes about a user",
+          "Use claims for scenarios where roles are too coarse",
+          "Always validate claims server-side",
+          "Claims work excellently with JWT tokens",
+          "Use [Authorize] with policies for complex claim rules"
+        ],
+        "takeaway": "Claims provide the flexibility needed for modern, attribute-based access control."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["auth-overview"]
+}

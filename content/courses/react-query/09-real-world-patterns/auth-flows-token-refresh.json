@@ -1,0 +1,165 @@
+{
+  "id": "lesson-react-query-032",
+  "slug": "auth-flows-token-refresh",
+  "moduleSlug": "real-world-patterns",
+  "courseSlug": "react-query",
+  "title": "Authentication Flows & Token Refresh",
+  "description": "Implement authentication flows with automatic token refresh using React Query interceptors and mutations.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["authentication", "token-refresh", "auth-flow", "interceptors"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Modern web applications almost always require authentication. React Query is well-suited for managing auth state because it understands loading, error, and success states natively. In this lesson, you will learn how to implement a complete authentication flow with automatic token refresh using React Query mutations and query invalidation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Authentication Challenge"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Auth Problems",
+        "items": [
+          "Access tokens expire and cause 401 errors on active queries",
+          "Users see unexpected loading spinners when tokens refresh",
+          "Race conditions between multiple simultaneous requests",
+          "Refreshing the token too often wastes API resources",
+          "Storing tokens securely across client-side routes"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Security Warning",
+        "text": "Never store access tokens or refresh tokens in localStorage. Use secure, HTTP-only cookies whenever possible, or encrypted session storage if cookies are not an option."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "auth-flow-diagram",
+        "caption": "Complete authentication flow with token refresh lifecycle",
+        "definition": "sequenceDiagram\n    participant C as Client\n    participant Q as React Query\n    participant A as Auth API\n    participant P as Protected API\n\n    C->>A: Login with credentials\n    A-->>C: accessToken + refreshToken\n    C->>Q: Store tokens in QueryClient defaults\n\n    loop Every request\n        C->>P: Request with accessToken\n        alt Token valid\n            P-->>C: Data response\n        else Token expired (401)\n            P-->>C: 401 Unauthorized\n            C->>Q: Pause all queries\n            C->>A: Refresh token request\n            A-->>C: New accessToken\n            C->>Q: Resume queries, retry failed\n            C->>P: Retry original request\n            P-->>C: Data response\n        end\n    end"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Refresh Mutation"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "useRefreshToken Mutation",
+        "content": "Create a mutation to handle token refresh. This mutation will be called automatically when a 401 is detected.",
+        "language": "tsx",
+        "code": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nconst useRefreshToken = () => {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: async () => {\n      const response = await fetch('/api/auth/refresh', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({\n          refreshToken: getRefreshToken()\n        })\n      });\n\n      if (!response.ok) {\n        throw new Error('Refresh failed');\n      }\n\n      return response.json();\n    },\n    onSuccess: (data) => {\n      queryClient.setQueryData(['auth'], data);\n    }\n  });\n};"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Optimistic Token Refresh",
+        "text": "Use onMutate to immediately update the auth state before the API call completes. If the refresh fails, use onError to roll back to the previous state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Handling 401 Globally"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global 401 Handler",
+        "content": "Set up a global fetch wrapper or queryFn that intercepts 401 responses and triggers a token refresh before retrying.",
+        "language": "tsx",
+        "code": "const authFetch = async (url: string, options: RequestInit = {}) => {\n  const token = getAccessToken();\n\n  let response = await fetch(url, {\n    ...options,\n    headers: {\n      'Content-Type': 'application/json',\n      Authorization: `Bearer ${token}`,\n      ...options.headers\n    }\n  });\n\n  if (response.status === 401) {\n    const refreshToken = getRefreshToken();\n    const refreshResponse = await fetch('/api/auth/refresh', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ refreshToken })\n    });\n\n    if (refreshResponse.ok) {\n      const { accessToken } = await refreshResponse.json();\n      setAccessToken(accessToken);\n\n      response = await fetch(url, {\n        ...options,\n        headers: {\n          ...options.headers,\n          Authorization: `Bearer ${accessToken}`\n        }\n      });\n    }\n  }\n\n  return response;\n};"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Auth Flow Steps",
+        "items": [
+          "User submits credentials via login mutation",
+          "Store both access and refresh tokens securely",
+          "Include access token in all subsequent requests",
+          "When 401 occurs, pause active queries and refresh token",
+          "Update token storage and retry failed queries",
+          "If refresh fails, redirect to login and clear state"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Login Mutation with Auth Setup",
+        "content": "Complete login flow that stores tokens and initializes auth state.",
+        "language": "tsx",
+        "code": "const useLogin = () => {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: async (credentials) => {\n      const response = await fetch('/api/auth/login', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(credentials)\n      });\n\n      if (!response.ok) {\n        throw new Error('Login failed');\n      }\n\n      return response.json();\n    },\n    onSuccess: (data) => {\n      setAccessToken(data.accessToken);\n      setRefreshToken(data.refreshToken);\n\n      queryClient.setQueryData(['auth'], data.user);\n      queryClient.invalidateQueries({ queryKey: ['protected'] });\n    },\n    onError: () => {\n      clearTokens();\n    }\n  });\n};"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Protecting Queries"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Protected Query Hook",
+        "content": "Create a reusable hook for protected API calls that automatically handles token refresh.",
+        "language": "tsx",
+        "code": "const useProtectedQuery = <T>({\n  queryKey,\n  queryFn\n}: UseQueryOptions<T>) => {\n  const { data: auth } = useQuery({ queryKey: ['auth'] });\n\n  return useQuery({\n    queryKey,\n    queryFn: async () => {\n      const response = await authFetch(queryFn.toString());\n      if (!response.ok) throw new Error('Protected request failed');\n      return response.json() as Promise<T>;\n    },\n    enabled: !!auth,\n    retry: (failureCount, error) => {\n      if (error.message.includes('401')) return false;\n      return failureCount < 3;\n    }\n  });\n};"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Auth Implementation Checklist",
+        "items": [
+          { "text": "Secure token storage implemented", "hint": "Use HTTP-only cookies or encrypted storage" },
+          { "text": "Token refresh mutation created", "hint": "Handle refresh with useMutation" },
+          { "text": "Global fetch wrapper handles 401s", "hint": "Retry once after refresh" },
+          { "text": "Login mutation stores tokens", "hint": "Update QueryClient auth state" },
+          { "text": "Logout clears all query cache", "hint": "Use queryClient.clear()" }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use useMutation for login and token refresh operations",
+          "Store tokens securely, not in localStorage",
+          "Handle 401 errors globally to provide seamless UX",
+          "Use enabled flag to prevent queries when not authenticated",
+          "Always clear cache and tokens on logout"
+        ],
+        "takeaway": "Authentication with React Query requires careful coordination between mutations, queries, and token management."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["use-mutation"]
+}

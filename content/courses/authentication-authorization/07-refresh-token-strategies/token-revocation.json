@@ -1,0 +1,167 @@
+{
+  "id": "lesson-auth-028",
+  "slug": "token-revocation",
+  "moduleSlug": "refresh-token-strategies",
+  "courseSlug": "authentication-authorization",
+  "title": "Token Revocation",
+  "description": "Implement token revocation for logout, security incidents, and user-initiated session termination.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["token-revocation", "logout", "security", "blacklist"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Token Revocation Matters"
+    },
+    {
+      "type": "paragraph",
+      "text": "Token revocation is the process of invalidating a token before its natural expiration. Without revocation, tokens remain valid until they expire, which means stolen tokens, logged-out users, and compromised accounts cannot be secured immediately. Revocation is essential for logout, password changes, account deletion, and responding to security incidents."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Revocation is Non-Negotiable",
+      "text": "Any system that issues refresh tokens must support revocation. Failure to revoke tokens means you cannot log users out, invalidate compromised sessions, or enforce account changes immediately."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Revocation Strategies"
+    },
+    {
+      "type": "paragraph",
+      "text": "There are three main strategies for implementing token revocation: database-backed blocklists, token versioning, and short-lived JWTs with forced re-authentication. Each has trade-offs between simplicity, performance, and revocation speed."
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Revocation Strategies",
+      "cards": [
+        {
+          "title": "Database Blocklist",
+          "description": "Store revoked token identifiers in a database or cache with their expiration time.",
+          "pros": [
+            "Immediate revocation",
+            "Works with stateless JWTs",
+            "Granular control"
+          ],
+          "cons": [
+            "Requires database lookup on every request",
+            "Cache invalidation complexity",
+            "Storage grows with revoked tokens"
+          ],
+          "tags": ["blocklist", "database"]
+        },
+        {
+          "title": "Token Versioning",
+          "description": "Store a version number on the user. Include the version in the token. Incrementing the version invalidates all previous tokens.",
+          "pros": [
+            "Fast validation",
+            "No per-token storage",
+            "Bulk invalidation easy"
+          ],
+          "cons": [
+            "Invalidates all sessions at once",
+            "Cannot revoke a single token",
+            "Requires user record update"
+          ],
+          "tags": ["versioning", "user"]
+        },
+        {
+          "title": "Short-lived JWTs",
+          "description": "Use very short JWT lifetimes (seconds to minutes) and rely on the natural expiration instead of explicit revocation.",
+          "pros": [
+            "No revocation mechanism needed",
+            "Stateless and fast",
+            "Simple architecture"
+          ],
+          "cons": [
+            "Frequent refreshes required",
+            "Cannot handle logout gracefully",
+            "Poor fit for mobile apps"
+          ],
+          "tags": ["jwt", "short-lived"]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Implementing a Blocklist"
+    },
+    {
+      "type": "paragraph",
+      "text": "A blocklist stores identifiers of revoked tokens. For JWTs, the identifier is typically the JTI (JWT ID) claim. For opaque refresh tokens, it is the hashed token value. The blocklist should be stored in a fast-access store like Redis, with a TTL matching the token expiration to automatically clean up old entries."
+    },
+    {
+      "type": "example",
+      "title": "Redis blocklist implementation",
+      "content": "Adding and checking tokens in a Redis blocklist.",
+      "code": "const redis = createClient({ url: process.env.REDIS_URL });\nawait redis.connect();\n\nasync function revokeToken(tokenId: string, expiresInMs: number) {\n  await redis.setex(\n    `revoked:${tokenId}`,\n    Math.ceil(expiresInMs / 1000),\n    '1'\n  );\n}\n\nasync function isTokenRevoked(tokenId: string): Promise<boolean> {\n  const result = await redis.get(`revoked:${tokenId}`);\n  return result === '1';\n}\n\nasync function revokeRefreshToken(userId: string, familyId: string) {\n  const tokens = await RefreshToken.find({ userId, familyId, revoked: false });\n  const pipeline = redis.multi();\n\n  for (const token of tokens) {\n    pipeline.setex(`revoked:${token.jti}`, 86400, '1');\n    token.revoked = true;\n    await token.save();\n  }\n\n  await pipeline.exec();\n}",
+      "language": "typescript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Implementing Logout"
+    },
+    {
+      "type": "paragraph",
+      "text": "A logout endpoint should revoke both the access token and the refresh token. For access tokens, add the JTI to the blocklist. For refresh tokens, mark them as revoked in the database. If using HTTP-only cookies, clear the cookies by setting them to expire in the past. Return a 204 No Content status on successful logout."
+    },
+    {
+      "type": "example",
+      "title": "Logout endpoint implementation",
+      "content": "Express logout endpoint that revokes tokens and clears cookies.",
+      "code": "app.post('/api/auth/logout', async (req, res) => {\n  const accessToken = req.headers.authorization?.split(' ')[1];\n  const refreshToken = req.cookies.refreshToken;\n\n  if (accessToken) {\n    const decoded = jwt.decode(accessToken) as { jti?: string; exp?: number };\n    if (decoded?.jti && decoded?.exp) {\n      const ttl = decoded.exp - Math.floor(Date.now() / 1000);\n      await redis.setex(`revoked:${decoded.jti}`, ttl, '1');\n    }\n  }\n\n  if (refreshToken) {\n    const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');\n    const storedToken = await RefreshToken.findOne({ token: hashedToken });\n\n    if (storedToken && !storedToken.revoked) {\n      storedToken.revoked = true;\n      await storedToken.save();\n\n      await RefreshToken.updateMany(\n        { familyId: storedToken.familyId, revoked: false },\n        { $set: { revoked: true } }\n      );\n    }\n  }\n\n  res.clearCookie('refreshToken', {\n    httpOnly: true,\n    secure: true,\n    sameSite: 'strict'\n  });\n\n  res.status(204).send();\n});",
+      "language": "javascript"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Revoking All User Sessions"
+    },
+    {
+      "type": "paragraph",
+      "text": "For password changes, account deletion, or security incidents, you may need to revoke all active sessions for a user. With token versioning, simply increment the user's tokenVersion field. With a blocklist, iterate through all active refresh tokens for the user and mark them revoked. With opaque tokens, delete or invalidate all entries in the refresh_tokens table for that user."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Security Best Practice",
+      "text": "Always revoke all refresh tokens when a user changes their password. An attacker who stole a refresh token before the password change should not retain access."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Handling Revoked Access Tokens"
+    },
+    {
+      "type": "paragraph",
+      "text": "If an access token is revoked, the resource server must detect this. Add a blocklist check in your authentication middleware. If the token is found in the blocklist, return a 401 Unauthorized response. The client should then clear its tokens and redirect to login. This check adds latency, so use a fast store like Redis."
+    },
+    {
+      "type": "example",
+      "title": "Authentication middleware with blocklist check",
+      "content": "Express middleware that checks the blocklist for revoked JWTs.",
+      "code": "async function authenticate(req: Request, res: Response, next: NextFunction) {\n  const authHeader = req.headers.authorization;\n  if (!authHeader?.startsWith('Bearer ')) {\n    return res.status(401).json({ message: 'Missing token' });\n  }\n\n  const token = authHeader.split(' ')[1];\n\n  try {\n    const decoded = jwt.verify(token, process.env.ACCESS_SECRET!) as { jti: string; sub: string };\n\n    const isRevoked = await redis.get(`revoked:${decoded.jti}`);\n    if (isRevoked) {\n      return res.status(401).json({ message: 'Token revoked' });\n    }\n\n    req.user = { id: decoded.sub };\n    next();\n  } catch (err) {\n    return res.status(401).json({ message: 'Invalid token' });\n  }\n}",
+      "language": "typescript"
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "Revocation allows immediate invalidation of tokens before natural expiration",
+        "Use a database blocklist with Redis for fast access token revocation",
+        "Implement logout by revoking both access and refresh tokens",
+        "Use token versioning to revoke all sessions at once",
+        "Always revoke all refresh tokens on password change"
+      ],
+      "takeaway": "Revocation is the safety valve of your authentication system. Without it, you cannot respond to security incidents, log users out, or enforce account changes in a timely manner."
+    }
+  ],
+  "relatedLessons": ["refresh-token-basics", "token-rotation"],
+  "furtherReading": [],
+  "prerequisites": ["refresh-token-basics", "token-rotation"]
+}

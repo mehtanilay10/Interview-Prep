@@ -1,0 +1,174 @@
+{
+  "id": "lesson-sql-151",
+  "slug": "encryption-tde",
+  "moduleSlug": "security-hardening",
+  "courseSlug": "sql-server",
+  "title": "Transparent Data Encryption",
+  "description": "Protect data at rest with Transparent Data Encryption (TDE) and manage encryption keys and certificates properly.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["encryption", "tde", "data-at-rest", "certificates", "master-key", "backup-encryption"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is Transparent Data Encryption?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Transparent Data Encryption (TDE) encrypts the entire database at the page level. When data is written to disk, SQL Server encrypts the page before storing it. When data is read into memory, SQL Server decrypts the page automatically. Applications see no difference, and no application code changes are required. TDE protects against threats like stolen backup tapes or unauthorized disk access."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "What TDE Protects",
+      "text": "TDE encrypts data files (.mdf, .ndf, .ldf) and backup files. It does not protect data in transit (use TLS for that) and does not encrypt data already held in memory."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "TDE Key Hierarchy"
+    },
+    {
+      "type": "paragraph",
+      "text": "TDE relies on a nested key hierarchy. The Database Master Key (DMK) in master protects the Certificate. The Certificate protects the Database Encryption Key (DEK) in the user database. The DEK encrypts and decrypts page data. Backing up every key in this chain is essential for recovery."
+    },
+    {
+      "type": "mermaid",
+      "id": "tde-hierarchy",
+      "caption": "TDE key hierarchy and encryption flow",
+      "definition": "flowchart TD\n    A[Database Master Key] --> B[Certificate in master]\n    B --> C[Database Encryption Key]\n    C --> D[Encrypts Database Pages]\n    D --> E[Data at Rest on Disk]\n    F[Backup Certificate] --> G[Restore on Another Server]\n    G --> C\n    H[Backup DMK] --> A"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Enabling TDE"
+    },
+    {
+      "type": "paragraph",
+      "text": "To enable TDE, you must first create a master key in master if one does not already exist. Then create a certificate protected by that master key. Finally, create the DEK in the target database and alter the database to set encryption on. The process can take time depending on database size because every page must be read, encrypted, and rewritten."
+    },
+    {
+      "type": "example",
+      "title": "Enable Transparent Data Encryption",
+      "content": "Step-by-step T-SQL to enable TDE on a database.",
+      "code": "USE [master];\nGO\n\n-- Step 1: Create a database master key if it does not exist\nCREATE MASTER KEY ENCRYPTION BY PASSWORD = 'M@st3rK3y!2026';\nGO\n\n-- Step 2: Create a certificate to protect the DEK\nCREATE CERTIFICATE TDECert\n    WITH SUBJECT = 'Certificate for TDE on AppDB';\nGO\n\n-- Step 3: Switch to the target database and create the DEK\nUSE [AppDB];\nGO\n\nCREATE DATABASE ENCRYPTION KEY\n    WITH ALGORITHM = AES_256\n    ENCRYPTION BY SERVER CERTIFICATE TDECert;\nGO\n\n-- Step 4: Enable encryption\nALTER DATABASE [AppDB] SET ENCRYPTION ON;\nGO\n\n-- Step 5: Verify encryption state\nSELECT name, is_encrypted,\n       encryption_state,\n       encryptor_type,\n       percent_complete\nFROM sys.dm_database_encryption_keys;\nGO",
+      "language": "sql"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Encryption State Values",
+      "text": "encryption_state 0 = No encryption, 1 = Encryption in progress, 2 = Encrypted, 3 = Decryption in progress, 5 = Decryption in progress. Do not take unencrypted backups of a database after encryption begins."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Backing Up Encryption Assets"
+    },
+    {
+      "type": "paragraph",
+      "text": "If you lose the certificate or master key, you cannot restore the database on another server. Always back up the certificate and master key immediately after creating them. Store backups in a secure, offsite location with strict access controls."
+    },
+    {
+      "type": "example",
+      "title": "Backup Certificate and Master Key",
+      "content": "Securely export the TDE certificate and master key.",
+      "code": "USE [master];\nGO\n\n-- Backup the TDE certificate\nBACKUP CERTIFICATE TDECert\n    TO FILE = 'C:\\Backup\\TDECert.cer'\n    WITH PRIVATE KEY (\n        FILE = 'C:\\Backup\\TDECertKey.pvk',\n        ENCRYPTION BY PASSWORD = 'C3rtB@ckup!2026'\n    );\nGO\n\n-- Backup the master key\nBACKUP MASTER KEY\n    TO FILE = 'C:\\Backup\\MasterKey.key'\n    ENCRYPTION BY PASSWORD = 'M@st3rK3yB@ckup!2026';\nGO",
+      "language": "sql"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Restoring an Encrypted Database"
+    },
+    {
+      "type": "paragraph",
+      "text": "Restoring an encrypted database to another server requires the same certificate and master key. Restore the master key first, then restore the certificate. Once the certificate exists on the destination server, the backup restore proceeds normally."
+    },
+    {
+      "type": "example",
+      "title": "Restore Certificate on Destination Server",
+      "content": "Prepare a new server to restore an encrypted database backup.",
+      "code": "USE [master];\nGO\n\n-- Restore the master key\nRESTORE MASTER KEY\n    FROM FILE = 'C:\\Backup\\MasterKey.key'\n    DECRYPTION BY PASSWORD = 'M@st3rK3yB@ckup!2026'\n    ENCRYPTION BY PASSWORD = 'N3wM@st3rK3y!2026';\nGO\n\n-- Restore the certificate\nCREATE CERTIFICATE TDECert\n    FROM FILE = 'C:\\Backup\\TDECert.cer'\n    WITH PRIVATE KEY (\n        FILE = 'C:\\Backup\\TDECertKey.pvk',\n        DECRYPTION BY PASSWORD = 'C3rtB@ckup!2026'\n    );\nGO",
+      "language": "sql"
+    },
+    {
+      "type": "comparison-cards",
+      "title": "TDE vs Cell-Level Encryption",
+      "cards": [
+        {
+          "title": "Transparent Data Encryption (TDE)",
+          "description": "Encrypts the entire database at the page level.",
+          "pros": [
+            "Zero application code changes",
+            "Encrypts data and log files",
+            "Simple to enable"
+          ],
+          "cons": [
+            "Encrypts everything including tempdb",
+            "Does not protect data in memory",
+            "Cannot encrypt individual columns"
+          ],
+          "tags": ["data-at-rest", "infrastructure"]
+        },
+        {
+          "title": "Cell-Level Encryption (CLE)",
+          "description": "Encrypts specific columns using keys and functions.",
+          "pros": [
+            "Fine-grained column control",
+            "Data remains encrypted in memory",
+            "Supports Always Encrypted integration"
+          ],
+          "cons": [
+            "Requires application changes",
+            "Key management overhead",
+            "Query performance overhead"
+          ],
+          "tags": ["column-level", "application"]
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "TDE Deployment Checklist",
+      "items": [
+        {
+          "text": "Create a database master key in master",
+          "hint": "Use a strong password and store it securely"
+        },
+        {
+          "text": "Create a certificate to protect the DEK",
+          "hint": "Use AES_256 algorithm"
+        },
+        {
+          "text": "Back up the certificate with private key immediately",
+          "hint": "Store backup separately from the server"
+        },
+        {
+          "text": "Back up the master key immediately",
+          "hint": "Required for disaster recovery"
+        },
+        {
+          "text": "Test restore on a non-production server",
+          "hint": "Validate recovery process quarterly"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "TDE encrypts data files and backups transparently with no application changes.",
+        "The key hierarchy is DMK → Certificate → DEK.",
+        "Always back up the certificate and master key, or the database is unrecoverable on another server.",
+        "TDE protects data at rest but does not protect data in transit or in memory."
+      ],
+      "takeaway": "Enable TDE, back up the keys immediately, and test the restore process before you need it in production."
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["authentication-modes", "principals-users-roles"]
+}

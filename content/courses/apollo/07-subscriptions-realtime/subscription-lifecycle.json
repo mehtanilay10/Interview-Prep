@@ -1,0 +1,160 @@
+{
+  "id": "lesson-apollo-025",
+  "slug": "subscription-lifecycle",
+  "moduleSlug": "subscriptions-realtime",
+  "courseSlug": "apollo",
+  "title": "Subscription Lifecycle",
+  "description": "Master subscription lifecycle events, cleanup patterns, and error handling in Apollo Client.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 22,
+  "tags": ["lifecycle", "cleanup", "error-handling", "useEffect", "unmount"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every subscription in Apollo Client goes through a well-defined lifecycle. Understanding when a subscription connects, receives data, errors, and disconnects helps you write robust real-time features and avoid memory leaks in long-running applications."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Subscription Lifecycle Events"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you call `useSubscription`, Apollo Client establishes the WebSocket connection if needed, sends the subscription payload, and then waits for the server to push results. The hook exposes callbacks for the key events in this lifecycle."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "onSubscriptionData: Fires when the server pushes new data",
+          "onError: Fires when the server sends an error or the connection fails",
+          "onComplete: Fires when the server signals the subscription stream is done"
+        ],
+        "title": "Primary Lifecycle Callbacks"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Lifecycle Callbacks",
+        "content": "Handling subscription events",
+        "language": "tsx",
+        "code": "import { gql, useSubscription } from '@apollo/client';\n\nconst ON_NOTIFICATION = gql`\n  subscription OnNotification {\n    notificationReceived {\n      id\n      message\n      read\n    }\n  }\n`;\n\nfunction NotificationPanel() {\n  const [notifications, setNotifications] = useState([]);\n\n  useSubscription(ON_NOTIFICATION, {\n    onSubscriptionData: ({ subscriptionData }) => {\n      const newNotification = subscriptionData.data.notificationReceived;\n      setNotifications((prev) => [newNotification, ...prev]);\n    },\n    onError: (error) => {\n      console.error('Subscription error:', error);\n      // Show toast or fallback UI\n    },\n    onComplete: () => {\n      console.log('Subscription stream closed by server');\n    },\n  });\n\n  return <NotificationList items={notifications} />;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automatic Cleanup"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React hooks handle cleanup automatically. When a component using `useSubscription` unmounts, Apollo Client sends an unsubscribe message to the server and removes the listener. This prevents memory leaks and stray network traffic."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Automatic Unmount Cleanup",
+        "content": "No manual cleanup needed with hooks",
+        "language": "tsx",
+        "code": "function LiveFeed() {\n  // Subscription auto-starts on mount\n  // Subscription auto-stops on unmount\n  const { data } = useSubscription(ON_POST_ADDED, {\n    variables: { categoryId: 'tech' },\n  });\n\n  return <PostCard post={data?.postAdded} />;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid Manual Subscriptions in useEffect",
+        "text": "Do not use `client.subscribe()` inside useEffect unless you absolutely need to. The hook manages the lifecycle correctly. Manual subscriptions require explicit `unsubscribe()` calls and are error-prone."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Subscription errors fall into two categories: transport errors (network drops, invalid auth) and GraphQL errors (invalid payload, server exception). The `onError` callback receives both, but you should differentiate them to provide the right user experience."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Differentiating Error Types",
+        "content": "Handling transport vs GraphQL errors",
+        "language": "tsx",
+        "code": "useSubscription(ON_CHAT_MESSAGE, {\n  onError: (error) => {\n    if (error.networkError) {\n      showToast('Connection lost. Reconnecting...');\n    } else if (error.graphQLErrors) {\n      error.graphQLErrors.forEach((err) => {\n        if (err.extensions?.code === 'FORBIDDEN') {\n          showToast('You do not have access to this channel');\n        }\n      });\n    }\n  },\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry and Backoff"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some subscription errors are transient. For example, a brief server overload might return a 503. You can implement retry logic by stopping and restarting the subscription, or by using the `graphql-ws` retry configuration."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Exponential Backoff Retry",
+        "content": "Retrying failed subscriptions",
+        "language": "tsx",
+        "code": "import { useState, useEffect } from 'react';\nimport { useSubscription } from '@apollo/client';\n\nfunction useRetryableSubscription(query, variables, maxRetries = 3) {\n  const [retryCount, setRetryCount] = useState(0);\n  const [shouldRetry, setShouldRetry] = useState(true);\n\n  const result = useSubscription(query, {\n    variables,\n    shouldResubscribe: shouldRetry,\n    onError: (error) => {\n      if (retryCount < maxRetries && error.networkError) {\n        const delay = Math.pow(2, retryCount) * 1000;\n        setTimeout(() => {\n          setRetryCount((c) => c + 1);\n          setShouldRetry(true);\n        }, delay);\n        setShouldRetry(false);\n      }\n    },\n  });\n\n  return result;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Server-Side Cleanup",
+        "text": "Always clean up server-side subscription resolvers when the client disconnects. Failing to do so causes memory leaks on the server and may exhaust connection limits. Use the `onComplete` callback or WebSocket close events to trigger server cleanup."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "subscription-lifecycle-states",
+        "caption": "State transitions during a subscription lifecycle",
+        "definition": "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Connecting: Component mounts\n    Connecting --> Subscribed: Connection ack + GQL subscribe\n    Subscribed --> Receiving: onSubscriptionData\n    Receiving --> Receiving: New event\n    Receiving --> Erroring: onError\n    Erroring --> Reconnecting: Network error + retry enabled\n    Erroring --> Completed: Non-retryable error\n    Reconnecting --> Subscribed: Reconnect success\n    Subscribed --> Completed: onComplete / unmount\n    Completed --> [*]"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "useSubscription handles mount and unmount automatically",
+          "onSubscriptionData, onError, and onComplete cover the main lifecycle events",
+          "Differentiate transport errors from GraphQL errors for better UX",
+          "Retry failed subscriptions with exponential backoff for resilience"
+        ],
+        "takeaway": "Understanding the lifecycle prevents memory leaks and builds resilient real-time features."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["subscriptions-basics"],
+  "courseSlug": "apollo"
+}

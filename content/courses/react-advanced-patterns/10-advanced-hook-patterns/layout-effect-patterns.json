@@ -1,0 +1,155 @@
+{
+  "id": "lesson-react-adv-033",
+  "slug": "layout-effect-patterns",
+  "moduleSlug": "advanced-hook-patterns",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Layout Effect Patterns",
+  "description": "Apply useLayoutEffect for DOM measurements, synchronous updates, and visual consistency.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["useLayoutEffect", "useEffect", "dom", "measurements", "synchronous"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**useLayoutEffect** fires synchronously after all DOM mutations but before the browser paints. This timing makes it ideal for reading layout from the DOM and synchronously re-rendering to avoid visual flicker. In contrast, useEffect runs asynchronously after paint, which can cause the user to see an intermediate frame."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "useEffect vs useLayoutEffect"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "effect-timeline",
+        "caption": "React render and commit timeline showing where layout and passive effects fire.",
+        "definition": "sequenceDiagram\n    participant Render as Render phase\n    participant Commit as Commit phase\n    participant Layout as useLayoutEffect\n    participant Paint as Browser paint\n    participant Passive as useEffect\n    Render->>Commit: DOM mutations applied\n    Commit->>Layout: Synchronous flush\n    Layout->>Paint: Block until done\n    Paint->>Passive: Async flush"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use `useEffect` for data fetching, subscriptions, and logging—anything that does not need to block painting. Use `useLayoutEffect` for DOM measurements, synchronously mutating styles, or any logic where a visual flash would degrade UX."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Server-Side Warning",
+        "text": "useLayoutEffect is forbidden during server-side rendering because the DOM does not exist. If you need a universal solution, conditionally skip it on the server or use a custom hook like useIsomorphicLayoutEffect."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Measuring DOM Elements"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auto-Height Textarea",
+        "content": "Resize a textarea to fit its content without layout flicker.",
+        "language": "tsx",
+        "code": "function AutoTextarea({ value, onChange }: { value: string; onChange: (v: string) => void }) {\n  const ref = useRef<HTMLTextAreaElement>(null);\n\n  useLayoutEffect(() => {\n    const el = ref.current;\n    if (!el) return;\n\n    // Reset height to get accurate scrollHeight\n    el.style.height = 'auto';\n    el.style.height = `${el.scrollHeight}px`;\n  }, [value]);\n\n  return (\n    <textarea\n      ref={ref}\n      value={value}\n      onChange={(e) => onChange(e.target.value)}\n      className=\"w-full resize-none overflow-hidden\"\n    />\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Synchronous Visual Updates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a child renders before a parent measures it, `useLayoutEffect` can re-measure and update styles synchronously. A common pattern is a tooltip or dropdown that must position itself relative to a trigger without flickering between old and new positions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Positioning a Tooltip",
+        "content": "Read the trigger's bounding rect and apply styles before paint.",
+        "language": "tsx",
+        "code": "function Tooltip({ trigger, children }: { trigger: React.ReactNode; children: React.ReactNode }) {\n  const triggerRef = useRef<HTMLDivElement>(null);\n  const [coords, setCoords] = useState({ top: 0, left: 0 });\n\n  useLayoutEffect(() => {\n    const rect = triggerRef.current?.getBoundingClientRect();\n    if (rect) {\n      setCoords({\n        top: rect.bottom + window.scrollY + 8,\n        left: rect.left + window.scrollX,\n      });\n    }\n  }, []);\n\n  return (\n    <>\n      <span ref={triggerRef}>{trigger}</span>\n      <div\n        style={{ position: 'absolute', top: coords.top, left: coords.left }}\n        className=\"rounded bg-gray-900 px-2 py-1 text-white\"\n      >\n        {children}\n      </div>\n    </>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Prefer CSS When Possible",
+        "text": "Before reaching for useLayoutEffect, check whether CSS (position: absolute, transforms, or the Popover API) can solve the problem without JavaScript measurements."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "isomorphicLayoutEffect Shim"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Library authors often need effects that run in both SSR and CSR environments. A common pattern is aliasing `useLayoutEffect` to `useEffect` on the server to suppress React's hydration warning."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cross-Environment Layout Effect",
+        "content": "A safe layout effect for libraries and apps.",
+        "language": "tsx",
+        "code": "import { useEffect, useLayoutEffect } from 'react';\n\nconst useIsomorphicLayoutEffect =\n  typeof window !== 'undefined' ? useLayoutEffect : useEffect;\n\nfunction useMeasure(ref: RefObject<HTMLElement>) {\n  const [bounds, setBounds] = useState({ width: 0, height: 0 });\n\n  useIsomorphicLayoutEffect(() => {\n    const el = ref.current;\n    if (!el) return;\n    setBounds({\n      width: el.offsetWidth,\n      height: el.offsetHeight,\n    });\n  }, [ref]);\n\n  return bounds;\n}"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Effect Selection Guide",
+        "cards": [
+          {
+            "title": "useEffect",
+            "description": "Fires after paint. Good for side effects that do not affect visual output.",
+            "pros": ["Does not block rendering", "Works in SSR without warnings"],
+            "cons": ["Cannot prevent visual flicker", "DOM may be stale during execution"],
+            "tags": ["async", "painting"]
+          },
+          {
+            "title": "useLayoutEffect",
+            "description": "Fires before paint. Good for reading layout and synchronously updating DOM.",
+            "pros": ["Prevents flicker", "DOM is fully committed", "Can measure before paint"],
+            "cons": ["Blocks browser paint", "Forbidden in SSR by default"],
+            "tags": ["sync", "layout"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "useLayoutEffect runs before the browser paints, blocking visual updates.",
+          "useEffect runs after paint and should be used for non-visual side effects.",
+          "Measure DOM nodes and apply synchronous styles in layout effects.",
+          "Use an isomorphic shim when writing libraries that support SSR."
+        ],
+        "takeaway": "Choose the effect hook based on whether your logic must block painting or can wait."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["reducer-hooks-patterns"]
+}

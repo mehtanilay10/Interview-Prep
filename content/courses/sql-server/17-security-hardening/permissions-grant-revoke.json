@@ -1,0 +1,160 @@
+{
+  "id": "lesson-sql-150",
+  "slug": "permissions-grant-revoke",
+  "moduleSlug": "security-hardening",
+  "courseSlug": "sql-server",
+  "title": "Permissions: GRANT, REVOKE, DENY",
+  "description": "Control access to SQL Server securables using GRANT, REVOKE, and DENY at both server and database levels.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["permissions", "grant", "revoke", "deny", "securables", "access-control"],
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Permission Model"
+    },
+    {
+      "type": "paragraph",
+      "text": "SQL Server permissions are granted to principals on securables. A securable can be a server, database, schema, table, view, stored procedure, or any other protected resource. Permissions can be granted, revoked, or denied. Understanding how these three operations interact is critical because DENY overrides GRANT and REVOKE removes a grant but does not block access."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "DENY Overrides GRANT",
+      "text": "If a user belongs to two roles and one role is granted SELECT while another is denied SELECT, the DENY wins. This is the most common source of unexpected permission failures in SQL Server."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Permission Types"
+    },
+    {
+      "type": "paragraph",
+      "text": "Permissions are granular. SELECT, INSERT, UPDATE, and DELETE apply to tables and views. EXECUTE applies to stored procedures. CONTROL, ALTER, TAKE OWNERSHIP, and VIEW DEFINITION apply at the schema, database, or server level. The finer the permission, the more precisely you can enforce least privilege."
+    },
+    {
+      "type": "table",
+      "headers": ["Permission", "Applies To", "Typical Use Case"],
+      "rows": [
+        ["SELECT", "Tables, Views, Columns", "Read-only access to data"],
+        ["INSERT", "Tables, Views", "Add new rows"],
+        ["UPDATE", "Tables, Views, Columns", "Modify existing data"],
+        ["DELETE", "Tables, Views", "Remove rows"],
+        ["EXECUTE", "Stored Procedures, Functions", "Run code modules"],
+        ["ALTER", "Schemas, Tables, Procedures", "Modify object definitions"],
+        ["CONTROL", "Any securable", "Full control including ownership"],
+        ["VIEW DEFINITION", "Any securable", "See object metadata without data access"],
+        ["IMPERSONATE", "Logins, Users", "Execute as another principal"]
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "GRANT"
+    },
+    {
+      "type": "paragraph",
+      "text": "GRANT gives a principal a specific permission on a securable. When you GRANT a permission, the principal can perform that action unless a DENY overrides it. You can optionally grant the WITH GRANT OPTION, allowing the grantee to further grant the same permission to others."
+    },
+    {
+      "type": "example",
+      "title": "Grant Database and Schema Permissions",
+      "content": "Grant granular permissions at the database and schema level.",
+      "code": "USE [AppDB];\n\n-- Grant SELECT on a specific table\nGRANT SELECT ON OBJECT::[dbo].[Customers] TO [ReportReaders];\n\n-- Grant SELECT on an entire schema\nGRANT SELECT ON SCHEMA::[Sales] TO [ReportReaders];\n\n-- Grant EXECUTE on a stored procedure\nGRANT EXECUTE ON OBJECT::[dbo].[sp_GetCustomerReport] TO [ReportReaders];\n\n-- Grant with ability to delegate\nGRANT SELECT ON OBJECT::[dbo].[Customers] TO [jane.doe] WITH GRANT OPTION;",
+      "language": "sql"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "REVOKE"
+    },
+    {
+      "type": "paragraph",
+      "text": "REVOKE removes a previously granted permission. It does not deny the permission; it simply removes the grant. If a DENY exists, REVOKE alone will not restore access. To fully restore access, you must REVOKE the DENY and then GRANT the permission again."
+    },
+    {
+      "type": "example",
+      "title": "Revoke and Re-Grant Permissions",
+      "content": "Remove a grant and restore access cleanly.",
+      "code": "USE [AppDB];\n\n-- Revoke SELECT on a table\nREVOKE SELECT ON OBJECT::[dbo].[Customers] FROM [ReportReaders];\n\n-- Revoke the grant option only, keeping the base grant\nREVOKE GRANT OPTION FOR SELECT ON OBJECT::[dbo].[Customers] FROM [jane.doe];\n\n-- Remove all permissions granted through a role\nREVOKE SELECT ON SCHEMA::[Sales] FROM [ReportReaders];",
+      "language": "sql"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "DENY"
+    },
+    {
+      "type": "paragraph",
+      "text": "DENY explicitly blocks a permission. A DENY persists even if the principal is later added to a role that has the same permission granted. DENY is rarely needed in well-designed role-based systems, but it can be useful to explicitly block specific sensitive operations like disabling a constraint or dropping a table."
+    },
+    {
+      "type": "example",
+      "title": "Deny Sensitive Operations",
+      "content": "Explicitly deny dangerous operations to a role.",
+      "code": "USE [AppDB];\n\n-- Deny ALTER on a critical table\nDENY ALTER ON OBJECT::[dbo].[Financials] TO [AppWriters];\n\n-- Deny VIEW DEFINITION on sensitive schemas\nDENY VIEW DEFINITION ON SCHEMA::[HR] TO [ReportReaders];\n\n-- Deny INSERT on an audit table to prevent tampering\nDENY INSERT, UPDATE, DELETE ON OBJECT::[dbo].[AuditLog] TO [AppWriters];",
+      "language": "sql"
+    },
+    {
+      "type": "mermaid",
+      "id": "permission-flow",
+      "caption": "How GRANT, REVOKE, and DENY interact across roles",
+      "definition": "flowchart TD\n    A[Principal Request] --> B{Direct Grant?}\n    B -->|Yes| C{Direct Deny?}\n    B -->|No| D{Role Grant?}\n    C -->|Yes| E[Deny Access]\n    C -->|No| F[Allow Access]\n    D -->|Yes| G{Role Deny?}\n    D -->|No| H[No Access]\n    G -->|Yes| E\n    G -->|No| F\n    I[Revoke] --> J[Remove Grant]\n    J --> D"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Effective Permissions",
+      "text": "SQL Server computes effective permissions by evaluating all direct grants, role memberships, and DENY entries. Use fn_my_permissions to inspect what a specific principal can actually do in a given context."
+    },
+    {
+      "type": "example",
+      "title": "Inspect Effective Permissions",
+      "content": "Use the built-in function to see what a principal can do.",
+      "code": "USE [AppDB];\n\nEXECUTE AS USER = 'jane.doe';\nSELECT *\nFROM fn_my_permissions(NULL, 'DATABASE')\nORDER BY permission_name;\n\nREVERT;",
+      "language": "sql"
+    },
+    {
+      "type": "checklist",
+      "title": "Permission Management Checklist",
+      "items": [
+        {
+          "text": "Grant permissions to roles, never directly to individual users",
+          "hint": "Except for very specific exceptions"
+        },
+        {
+          "text": "Avoid DENY in most permission designs",
+          "hint": "Use role separation instead"
+        },
+        {
+          "text": "Use WITH GRANT OPTION sparingly",
+          "hint": "Can lead to uncontrolled delegation"
+        },
+        {
+          "text": "Audit effective permissions with fn_my_permissions",
+          "hint": "Run after role changes"
+        },
+        {
+          "text": "Document permission rationales in change control",
+          "hint": "Required for compliance"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Key Takeaways",
+      "points": [
+        "GRANT gives access, REVOKE removes a grant, and DENY explicitly blocks access.",
+        "DENY always overrides GRANT, even across role memberships.",
+        "Permissions cascade from server to database to schema to object.",
+        "Use roles for all normal permission assignments and audit effective permissions regularly."
+      ],
+      "takeaway": "Grant to roles, avoid DENY, and always verify effective permissions after changes."
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "prerequisites": ["principals-users-roles"]
+}
