@@ -130,7 +130,11 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       );
 
     case 'heading': {
-      const { level, text, anchor } = block.data;
+      const data = (block as { data?: { level: 2 | 3 | 4; text: string; anchor?: string } }).data;
+      const level = data?.level ?? (block as { level?: 2 | 3 | 4 }).level;
+      const text = data?.text ?? (block as { text?: string }).text;
+      const anchor = data?.anchor;
+      if (!level || !text) return null;
       const Tag = `h${level}` as 'h2' | 'h3' | 'h4';
       const sizeMap = { 2: 'text-xl', 3: 'text-lg', 4: 'text-base' };
       return (
@@ -469,10 +473,151 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
   }
 }
 
+function normalizeBlock(block: ContentBlock): ContentBlock {
+  if ('data' in block && block.data) return block;
+
+  const legacy = block as Record<string, unknown>;
+  const common = { id: legacy.id as string | undefined };
+
+  switch (block.type) {
+    case 'paragraph':
+      return { ...common, type: 'paragraph', data: { text: legacy.text as string } };
+    case 'heading':
+      return {
+        ...common,
+        type: 'heading',
+        data: {
+          level: legacy.level as 2 | 3 | 4,
+          text: legacy.text as string,
+          anchor: legacy.anchor as string | undefined,
+        },
+      };
+    case 'bullet-list':
+      return {
+        ...common,
+        type: 'bullet-list',
+        data: { items: legacy.items as string[], title: legacy.title as string | undefined },
+      };
+    case 'numbered-list':
+      return {
+        ...common,
+        type: 'numbered-list',
+        data: { items: legacy.items as string[], title: legacy.title as string | undefined },
+      };
+    case 'callout':
+      return {
+        ...common,
+        type: 'callout',
+        data: {
+          variant: legacy.variant as 'info' | 'tip' | 'warning' | 'note' | 'important',
+          title: legacy.title as string | undefined,
+          text: legacy.text as string,
+        },
+      };
+    case 'quote':
+      return {
+        ...common,
+        type: 'quote',
+        data: { text: legacy.text as string, attribution: legacy.attribution as string | undefined },
+      };
+    case 'key-terms':
+      return {
+        ...common,
+        type: 'key-terms',
+        data: { terms: legacy.terms as { term: string; definition: string; learnMoreSlug?: string }[] },
+      };
+    case 'table':
+      return {
+        ...common,
+        type: 'table',
+        data: { headers: legacy.headers as string[], rows: legacy.rows as string[][] },
+      };
+    case 'example':
+      return {
+        ...common,
+        type: 'example',
+        data: {
+          title: legacy.title as string | undefined,
+          content: legacy.content as string,
+          code: legacy.code as string | undefined,
+          language: legacy.language as string | undefined,
+        },
+      };
+    case 'exercise':
+      return {
+        ...common,
+        type: 'exercise',
+        data: {
+          title: legacy.title as string,
+          description: legacy.description as string,
+          steps: legacy.steps as string[] | undefined,
+          expectedOutcome: legacy.expectedOutcome as string | undefined,
+        },
+      };
+    case 'checklist':
+      return {
+        ...common,
+        type: 'checklist',
+        data: {
+          title: legacy.title as string | undefined,
+          items: legacy.items as { text: string; hint?: string }[],
+        },
+      };
+    case 'mermaid':
+      return {
+        ...common,
+        type: 'mermaid',
+        data: {
+          id: legacy.id as string,
+          caption: legacy.caption as string | undefined,
+          definition: legacy.definition as string,
+        },
+      };
+    case 'comparison-cards':
+      return {
+        ...common,
+        type: 'comparison-cards',
+        data: {
+          title: legacy.title as string | undefined,
+          cards: legacy.cards as { title: string; description: string; pros?: string[]; cons?: string[]; tags?: string[] }[],
+        },
+      };
+    case 'summary-box':
+      return {
+        ...common,
+        type: 'summary-box',
+        data: {
+          title: legacy.title as string | undefined,
+          points: legacy.points as string[],
+          takeaway: legacy.takeaway as string | undefined,
+        },
+      };
+    case 'faq-block':
+      return {
+        ...common,
+        type: 'faq-block',
+        data: {
+          title: legacy.title as string | undefined,
+          items: legacy.items as { question: string; answer: string }[],
+        },
+      };
+    case 'image':
+      return {
+        ...common,
+        type: 'image',
+        data: { src: legacy.src as string, alt: legacy.alt as string, caption: legacy.caption as string | undefined },
+      };
+    default:
+      return block;
+  }
+}
+
 export function ContentBlockRenderer({ blocks, className }: ContentBlockRendererProps) {
+  const normalizedBlocks = blocks.map(normalizeBlock);
+
   return (
     <div className={cn('lesson-prose', className)}>
-      {blocks.map((block, idx) => renderBlock(block, idx))}
+      {normalizedBlocks.map((block, idx) => renderBlock(block, idx))}
     </div>
   );
 }

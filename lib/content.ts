@@ -114,12 +114,18 @@ export function getLessonBreadcrumb(lesson: Lesson): {
 export function extractTOC(blocks: ContentBlock[]): TocEntry[] {
   const entries: TocEntry[] = [];
   for (const block of blocks) {
-    if (block.type === 'heading' && block.data.anchor) {
-      entries.push({
-        anchor: block.data.anchor,
-        text: block.data.text,
-        level: block.data.level,
-      });
+    if (block.type === 'heading') {
+      const data = (block as { data?: { level: 2 | 3 | 4; text: string; anchor?: string } }).data;
+      const level = data?.level ?? (block as { level?: 2 | 3 | 4 }).level;
+      const text = data?.text ?? (block as { text?: string }).text;
+      const anchor = data?.anchor;
+      if (level && text) {
+        entries.push({
+          anchor: anchor || text.toLowerCase().replace(/\s+/g, '-'),
+          text,
+          level,
+        });
+      }
     }
   }
   return entries;
