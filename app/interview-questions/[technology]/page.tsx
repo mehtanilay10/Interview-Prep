@@ -16,6 +16,9 @@ const TECH_NAME_MAP: Record<string, string> = {
   'system-design': 'System Design',
   'behavioral': 'Behavioral',
   'sql-server': 'SQL Server',
+  'fullstack-scenarios': 'Full-Stack Scenarios',
+  'performance-optimization': 'Performance Optimization',
+  'cicd-pipelines': 'CI/CD Pipelines',
 };
 
 const TECH_SLUG_MAP: Record<string, string> = {
@@ -27,6 +30,9 @@ const TECH_SLUG_MAP: Record<string, string> = {
   'system design': 'system-design',
   'behavioral': 'behavioral',
   'sql server': 'sql-server',
+  'full-stack scenarios': 'fullstack-scenarios',
+  'performance optimization': 'performance-optimization',
+  'ci/cd pipelines': 'cicd-pipelines',
 };
 
 export async function generateStaticParams() {

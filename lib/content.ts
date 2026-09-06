@@ -200,8 +200,8 @@ export function getInterviewTechnologies(): string[] {
   return Array.from(techs).sort();
 }
 
-export function getInterviewLevelsForTechnology(technology: string): { slug: string; title: string; icon: string; estimatedHours: number }[] {
-  const levelMap = new Map<string, { slug: string; title: string; icon: string; estimatedHours: number }>();
+export function getInterviewLevelsForTechnology(technology: string): { slug: string; title: string; icon: string; estimatedHours: number; order: number }[] {
+  const levelMap = new Map<string, { slug: string; title: string; icon: string; estimatedHours: number; order: number }>();
   for (const l of lessons) {
     const tech = (l as Lesson & { technology?: string }).technology;
     const mod = getModuleBySlug(l.moduleSlug);
@@ -213,11 +213,12 @@ export function getInterviewLevelsForTechnology(technology: string): { slug: str
           title: mod.title,
           icon: mod.icon,
           estimatedHours: mod.estimatedHours,
+          order: mod.order,
         });
       }
     }
   }
-  return Array.from(levelMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+  return Array.from(levelMap.values()).sort((a, b) => a.order - b.order);
 }
 
 export function getInterviewQuestions(technology: string, moduleSlug?: string): Lesson[] {

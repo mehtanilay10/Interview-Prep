@@ -6,7 +6,6 @@ import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
-import Image from 'next/image';
 
 function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
   if (!text) return [];
@@ -123,15 +122,12 @@ function ImageBlock({ block }: { block: ContentBlock & { type: 'image' } }) {
         className="cursor-zoom-in rounded-lg border border-border bg-canvas-subtle p-1 transition hover:border-accent-fg focus:outline-none focus:ring-2 focus:ring-accent-fg focus:ring-offset-2"
         aria-label={`Click to enlarge ${block.data.alt}`}
       >
-        <span className="relative inline-block max-h-[50vh] max-w-[150%]">
-          <Image
-            src={block.data.src}
-            alt={block.data.alt}
-            fill
-            className="object-contain"
-            sizes="150vw"
-          />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={block.data.src}
+          alt={block.data.alt}
+          className="max-h-[50vh] w-auto max-w-[150%] object-contain"
+        />
       </button>
       {block.data.caption && (
         <figcaption className="mt-2 text-center text-xs text-fg-muted">
