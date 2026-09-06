@@ -11,10 +11,11 @@ Read this before making any changes.
 Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching AI-powered interview preparation to everyday users. It uses:
 - App Router (server components by default)
 - Tailwind CSS with GitHub-inspired design tokens
-- Structured content in `/content/` TypeScript files
+- Structured content in `/content/` TypeScript/JSON files
 - `localStorage` for progress tracking (no backend)
 - Mermaid for diagrams (rendered client-side)
 - `next-themes` for dark/light mode
+- `prism-react-renderer` for syntax highlighting
 
 ---
 
@@ -56,43 +57,83 @@ Use the `Difficulty` type: `'beginner' | 'intermediate' | 'advanced'`
 - `intermediate`: Comfortable with basic AI tools, ready for more depth
 - `advanced`: Technical concepts that require understanding of preceding modules
 
-### 7. Keep advanced concepts clearly separated
-The `/app/advanced/` page exists specifically for deep technical content.
-Do not mix advanced technical content into beginner modules.
-Add an `isOptional: true` flag and a `skipLabel` to any optional lesson.
+---
+
+## Content structure
+
+Content is organized hierarchically:
+```
+content/
+  courses/
+    [courseSlug]/
+      content.json          # Course metadata
+      [moduleSlug]/
+        content.json        # Module metadata + lessonSlugs[]
+        [lessonSlug].json   # Lesson metadata + blocks[]
+  courses/index.ts          # Exports all courses
+  modules/index.ts          # Exports all modules
+  lessons/index.ts          # Exports all lessons
+```
+
+### Adding a course
+1. Create `content/courses/[courseSlug]/content.json`
+2. Add module folders with `content.json` and lesson JSON files
+3. Import course in `content/courses/index.ts`
+4. Add module imports to `content/modules/index.ts`
+5. Add lesson imports to `content/lessons/index.ts`
+6. Update `app/sitemap.ts` if needed
+
+### Adding a module
+1. Create `content/courses/[courseSlug]/[moduleSlug]/content.json`
+2. Create lesson JSON files in the module folder
+3. Import module in `content/modules/index.ts`
+4. Add lesson imports to `content/lessons/index.ts`
+5. Add module slug to the course's `moduleSlugs` array in `content/courses/[courseSlug]/content.json`
+
+### Adding a lesson
+1. Create `content/courses/[courseSlug]/[moduleSlug]/[lessonSlug].json`
+2. Import lesson in `content/lessons/index.ts`
+3. Add lesson slug to the module's `lessonSlugs` array in `content/courses/[courseSlug]/[moduleSlug]/content.json`
+4. Ensure `courseSlug` and `moduleSlug` match the parent directories
+
+### Lesson JSON structure
+```json
+{
+  "id": "lesson-...",
+  "slug": "...",
+  "moduleSlug": "...",
+  "courseSlug": "...",
+  "title": "...",
+  "description": "...",
+  "order": 1,
+  "difficulty": "beginner",
+  "estimatedMinutes": 10,
+  "tags": [],
+  "blocks": []
+}
+```
+
+### Available ContentBlock types
+See `types/index.ts` for the full list. Current types:
+- `paragraph`, `heading`, `bullet-list`, `numbered-list`
+- `callout`, `quote`, `key-terms`, `table`
+- `example`, `exercise`, `checklist`
+- `mermaid`, `comparison-cards`, `summary-box`, `faq-block`
+- `divider`, `image`
 
 ---
 
-## When adding content
+## Routes
 
-### Adding a lesson
-1. Add the `Lesson` object to `content/lessons/index.ts`
-2. Include `blocks: ContentBlock[]` with the full content
-3. Set accurate `estimatedMinutes`, `difficulty`, `tags`
-4. Add the slug to the owning module's `lessonSlugs` in `content/modules/index.ts`
-5. Set `relatedLessons` and `relatedGlossaryTerms` for cross-linking
-6. Run `yarn typecheck` to confirm no type errors
-
-### Adding a module
-1. Add the `Module` object to `content/modules/index.ts`
-2. Set `phaseSlug` to an existing phase slug
-3. Include `whatYouLearn` array (4–6 bullet points)
-4. Add the slug to the phase's `moduleSlug` array in `content/phases/index.ts`
-5. Set realistic `estimatedHours`
-
-### Adding a glossary term
-1. Add the `GlossaryTerm` to `content/glossary/index.ts`
-2. Include both `shortDefinition` and `fullDefinition`
-3. Set an accurate `category` from the `GlossaryCategory` type
-4. Add `examples` where possible (3 is ideal)
-5. Link to the most relevant lesson via `learnMoreSlug`
-
-### Adding a prompt template
-1. Add to `content/prompts/index.ts`
-2. Use `[BRACKETS]` for all user-replaceable placeholders
-3. Include a concrete `example` showing filled-in values
-4. Write 2–3 practical `tips`
-5. Set `isStarter: true` only for the simplest, broadest templates
+- `/` — Home page
+- `/courses` — Course listing
+- `/courses/[courseSlug]` — Course overview
+- `/courses/[courseSlug]/[moduleSlug]` — Module overview
+- `/courses/[courseSlug]/[moduleSlug]/[lessonSlug]` — Lesson page
+- `/interview-questions` — Interview question listing
+- `/interview-questions/[technology]` — Technology-specific questions
+- `/interview-questions/[technology]/[slug]` — Individual question
+- `/search` — Search page
 
 ---
 
@@ -102,7 +143,6 @@ Whenever you add a new top-level page:
 1. Add it to `NAV_LINKS` in `components/layout/Navbar.tsx`
 2. Add it to `FOOTER_LINKS` in `components/layout/Footer.tsx`
 3. Add it to `app/sitemap.ts` in the static routes array
-4. Update `app/about/page.tsx` if it's a major course section
 
 ---
 
@@ -110,7 +150,7 @@ Whenever you add a new top-level page:
 
 - All content files must be fully type-safe — no `as any` or `// @ts-ignore`
 - Use the existing types from `types/index.ts` — extend them don't bypass them
-- Run `yarn typecheck` before finalizing any change
+- Run `npm run typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
 
 ---
@@ -125,6 +165,15 @@ Whenever you add a new top-level page:
 
 ---
 
+## Code blocks and syntax highlighting
+
+- Use `prism-react-renderer` with `themes.nightOwl` for syntax highlighting
+- Code blocks are rendered in `components/content/ContentBlockRenderer.tsx` via the `CustomCodeBlock` component
+- Do NOT import `prismjs` directly — it is no longer a dependency
+- Do NOT use `react-code-block` — it has been removed
+
+---
+
 ## Mermaid diagrams
 
 - Always write readable, well-labeled Mermaid definitions
@@ -132,6 +181,7 @@ Whenever you add a new top-level page:
 - Include a `caption` for every diagram
 - Give each diagram a unique `id`
 - Keep diagrams focused — one concept per diagram
+- Mermaid is loaded dynamically (client-side only) via `dynamic()` in `MermaidRenderer.tsx`
 
 ---
 
@@ -139,9 +189,9 @@ Whenever you add a new top-level page:
 
 Run these in order:
 ```bash
-yarn typecheck
-yarn lint
-yarn build   # optional but recommended for major changes
+npm run typecheck
+npm run lint
+npm run build   # optional but recommended for major changes
 ```
 
 Fix all errors before calling the task complete. Do not suppress TypeScript errors to make them pass.
@@ -150,23 +200,18 @@ Fix all errors before calling the task complete. Do not suppress TypeScript erro
 
 ## What to watch out for
 
-- **Hydration mismatches**: Any component that reads from `localStorage` or uses `window` must have `'use client'` and handle SSR gracefully (see `useLocalStorage.ts` for the pattern)
+- **Hydration mismatches**: Any component that reads from `localStorage` or uses `window` must have `'use client'` and handle SSR gracefully (see `hooks/useLocalStorage.ts` for the pattern)
 - **Mermaid SSR**: `mermaid` package cannot be imported server-side — always use the dynamic import pattern in `MermaidRenderer.tsx`
 - **`next/link` vs `<a>`**: Use `next/link` for internal links; `<a target="_blank" rel="noopener noreferrer">` for external
-- **Image optimization**: Use `next/image` for all images (not `<img>`)
+- **Image optimization**: Use `next/image` for all images (not `<img>``)
 - **Generate static params**: When adding a new dynamic route, implement `generateStaticParams()` for build-time generation
+- **Content indexing**: When adding lessons/modules, always update the corresponding `index.ts` files in `content/`. The build will not automatically discover new content files.
 
 ---
 
-## Content philosophy reminder
+## Important notes
 
-This is not a developer course. The audience is:
-- People who want to use AI in their work and life
-- Professionals with no technical background
-- Anyone curious about AI but overwhelmed by jargon
-
-Every lesson should be readable by someone with no AI background.
-If a concept requires deep technical background to understand, it belongs in `/app/advanced/` with an `advanced` difficulty label.
-
-Progressive disclosure: start simple, offer depth for those who want it.
-Never make the user feel dumb. AI is complex — clarity is kindness.
+- This project uses **npm**, not yarn. Use `npm run <script>` not `yarn <script>`.
+- The `content/modules/index.ts` and `content/lessons/index.ts` files are auto-generated in spirit but must be manually updated when adding content. Always verify new imports are included in the `rawModules`/`rawLessons` arrays.
+- Interview questions use a `technology` field on lessons to group them. See `lib/content.ts` helpers like `getInterviewTechnologies()` and `getInterviewQuestions()`.
+- The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
