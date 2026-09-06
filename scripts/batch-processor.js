@@ -4,10 +4,8 @@ import { loadProgress, saveProgress, loadLesson, saveLesson, updateProgress } fr
 
 const BATCH_SIZE = 10;
 
-function getBatch(progress, batchIndex) {
-  const start = batchIndex * BATCH_SIZE;
-  const end = Math.min(start + BATCH_SIZE, progress.pending.length);
-  return progress.pending.slice(start, end);
+function getBatch(progress) {
+  return progress.pending.slice(0, BATCH_SIZE);
 }
 
 function generateMermaidDiagram(title, category) {
@@ -452,7 +450,7 @@ function processLesson(relativePath, progress) {
 
 function processBatch(batchIndex) {
   const progress = loadProgress();
-  const batch = getBatch(progress, batchIndex);
+  const batch = getBatch(progress);
   
   if (batch.length === 0) {
     console.log('No more lessons to process.');
