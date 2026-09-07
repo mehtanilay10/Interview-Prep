@@ -2,8 +2,9 @@
   "id": "lesson-redux-014",
   "slug": "normalizing-state",
   "moduleSlug": "redux-patterns",
+  "courseSlug": "redux",
   "title": "Normalizing State",
-  "description": "Learn how to structure state for efficient updates.",
+  "description": "Learn how to structure state for efficient updates using normalized data structures.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 20,
@@ -11,37 +12,236 @@
     "redux",
     "normalization",
     "state",
-    "structure"
+    "structure",
+    "entities"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Normalizing state** means storing entities in an object keyed by ID, like a database. This makes updates efficient and consistent."
+        "text": "When building real applications, you often deal with collections of data like users, posts, comments, or products. How you structure this data in your Redux store has a huge impact on how easy it is to update and retrieve."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Normalizing state** means storing entities in a flat object keyed by their unique ID, similar to how a database stores records. Instead of nested arrays and objects, each entity type gets its own table with IDs as keys. This approach makes updates efficient and consistent across your application."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Normalized vs Nested"
+        "text": "The Problem with Nested Data"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Imagine you have a social media app with users, posts, and comments. A common beginner mistake is to nest this data deeply, like storing comments inside posts, and posts inside users. This creates several problems."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Nested vs Normalized State",
+        "cards": [
+          {
+            "title": "Nested State",
+            "content": "Hard to update related entities\nRedundant data duplication\nSlow lookups with deep nesting\nComplex immutability updates\nDifficult to cache efficiently"
+          },
+          {
+            "title": "Normalized State",
+            "content": "Single source of truth\nEasy entity updates by ID\nFast O(1) lookups\nSimple immutability patterns\nReusable across components"
+          }
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Normalization",
-        "content": "Nested vs normalized state",
+        "title": "Nested vs Normalized State",
+        "content": "Compare how the same data looks in nested vs normalized form",
         "language": "javascript",
-        "code": "// Nested (hard to update)\n{\n  users: [\n    { id: 1, name: 'Alice', posts: [{ id: 1, title: 'Hello' }] }\n  ]\n}\n\n// Normalized (easy to update)\n{\n  users: {\n    byId: { 1: { id: 1, name: 'Alice', posts: [1] } },\n    allIds: [1]\n  },\n  posts: {\n    byId: { 1: { id: 1, title: 'Hello', author: 1 } },\n    allIds: [1]\n  }\n}"
+        "code": "// Nested structure (problematic)\nconst state = {\n  posts: [\n    {\n      id: 'post-1',\n      title: 'Hello World',\n      author: {\n        id: 'user-1',\n        name: 'Alice',\n        avatar: 'alice.jpg'\n      },\n      comments: [\n        {\n          id: 'comment-1',\n          text: 'Great post!',\n          author: { id: 'user-2', name: 'Bob', avatar: 'bob.jpg' }\n        }\n      ]\n    }\n  ]\n};\n\n// Normalized structure (recommended)\nconst state = {\n  users: {\n    byId: {\n      'user-1': { id: 'user-1', name: 'Alice', avatar: 'alice.jpg' },\n      'user-2': { id: 'user-2', name: 'Bob', avatar: 'bob.jpg' }\n    },\n    allIds: ['user-1', 'user-2']\n  },\n  posts: {\n    byId: {\n      'post-1': { id: 'post-1', title: 'Hello World', authorId: 'user-1', commentIds: ['comment-1'] }\n    },\n    allIds: ['post-1']\n  },\n  comments: {\n    byId: {\n      'comment-1': { id: 'comment-1', text: 'Great post!', authorId: 'user-2', postId: 'post-1' }\n    },\n    allIds: ['comment-1']\n  }\n};"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Entity Relationships"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In normalized state, entities reference each other by ID rather than containing each other. Think of it like a graph where each node is an entity and connections are just ID references."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "caption": "Normalized entity relationships",
+        "definition": "erDiagram\n    USERS {\n        string id PK\n        string name\n        string avatar\n    }\n    POSTS {\n        string id PK\n        string title\n        string authorId FK\n    }\n    COMMENTS {\n        string id PK\n        string text\n        string authorId FK\n        string postId FK\n    }\n    USERS ||--o{ POSTS : writes\n    USERS ||--o{ COMMENTS : writes\n    POSTS ||--o{ COMMENTS : has"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Normalization Rules"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Rule",
+          "Description",
+          "Example"
+        ],
+        "rows": [
+          [
+            "One table per entity type",
+            "Each entity type (users, posts) gets its own normalized object",
+            "users: {...}, posts: {...}"
+          ],
+          [
+            "Key by unique ID",
+            "Use entity IDs as keys for O(1) lookups",
+            "byId: { '123': entity }"
+          ],
+          [
+            "Separate allIds array",
+            "Maintain order with an array of all IDs",
+            "allIds: ['123', '456']"
+          ],
+          [
+            "Reference by ID, not object",
+            "Store references as IDs, not nested objects",
+            "authorId: 'user-123'"
+          ],
+          [
+            "Avoid data duplication",
+            "Each piece of data lives in exactly one place",
+            "User name only in users table"
+          ],
+          [
+            "Normalize nested arrays",
+            "Convert nested arrays to ID arrays",
+            "commentIds: ['c1', 'c2']"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Manual Normalization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can normalize data manually or use helper functions. The key is to transform an array of entities into an object keyed by ID plus an array of IDs for ordering."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Manual Normalization",
+        "content": "A simple normalization helper function",
+        "language": "javascript",
+        "code": "function normalizeEntities(entities, keyField = 'id') {\n  return entities.reduce(\n    (result, entity) => {\n      const key = entity[keyField];\n      result.byId[key] = entity;\n      result.allIds.push(key);\n      return result;\n    },\n    { byId: {}, allIds: [] }\n  );\n}\n\n// Usage\nconst posts = [\n  { id: 'p1', title: 'First Post' },\n  { id: 'p2', title: 'Second Post' }\n];\n\nconst normalized = normalizeEntities(posts);\n// Result:\n// {\n//   byId: { p1: {...}, p2: {...} },\n//   allIds: ['p1', 'p2']\n// }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Updating Normalized State"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "One of the biggest benefits of normalized state is how easy it becomes to update a single entity. You only need to know the entity ID; no traversing through nested objects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Updating Normalized State",
+        "content": "Simple updates with normalized state",
+        "language": "javascript",
+        "code": "// Update a single user by ID\nconst updateUser = (usersState, userId, changes) => ({\n  ...usersState,\n  byId: {\n    ...usersState.byId,\n    [userId]: { ...usersState.byId[userId], ...changes }\n  }\n});\n\n// Delete a post\nconst removePost = (postsState, postId) => {\n  const { [postId]: removed, ...remaining } = postsState.byId;\n  return {\n    byId: remaining,\n    allIds: postsState.allIds.filter(id => id !== postId)\n  };\n};\n\n// Add a new comment\nconst addComment = (commentsState, newComment) => ({\n  byId: { ...commentsState.byId, [newComment.id]: newComment },\n  allIds: [...commentsState.allIds, newComment.id]\n});"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Entity Adapter",
-        "text": "Redux Toolkit's createEntityAdapter handles normalization automatically."
+        "variant": "info",
+        "title": "Redux Toolkit Helper",
+        "text": "Redux Toolkit's `createEntityAdapter` automates all these normalization patterns and provides pre-built reducers and selectors."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Denormalization for Display"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "While you store data in normalized form, you often need to display denormalized data in your components. This is where selectors come in handy. Selectors can reconstruct the nested view you need from the flat normalized state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Denormalization Selector",
+        "content": "Building nested views from normalized state",
+        "language": "javascript",
+        "code": "// Selector to get a post with author and comments populated\nconst selectPostWithDetails = (state, postId) => {\n  const post = state.posts.byId[postId];\n  if (!post) return null;\n\n  const author = state.users.byId[post.authorId];\n  const comments = post.commentIds\n    .map(id => state.comments.byId[id])\n    .map(comment => ({\n      ...comment,\n      author: state.users.byId[comment.authorId]\n    }));\n\n  return { ...post, author, comments };\n};"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Normalization",
+            "definition": "Organizing state into flat structures keyed by entity ID, like database tables."
+          },
+          {
+            "term": "Entity",
+            "definition": "A single item of a particular type, like one user or one post."
+          },
+          {
+            "term": "Denormalization",
+            "definition": "Reconstructing nested views from normalized data for display purposes."
+          },
+          {
+            "term": "byId Map",
+            "definition": "An object mapping entity IDs to entity objects for fast lookups."
+          },
+          {
+            "term": "allIds Array",
+            "definition": "An array storing all entity IDs in order."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Normalize Nested State",
+        "description": "Convert this nested state structure into normalized form. Write the normalized state structure and create an updater function for changing a user's avatar."
       }
     },
     {
@@ -49,16 +249,26 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Store entities keyed by ID",
-          "Easier updates and lookups",
-          "Avoids data duplication",
-          "Entity adapter automates this"
+          "Normalize state by storing entities in objects keyed by ID",
+          "Avoid deeply nested structures that are hard to update",
+          "Reference entities by ID rather than embedding objects",
+          "Maintain separate allIds arrays for ordering",
+          "Use selectors to denormalize data for display",
+          "Redux Toolkit's entity adapter automates these patterns"
         ],
-        "takeaway": "Normalized state is more efficient and consistent."
+        "takeaway": "Normalized state is more efficient, easier to update, and scales better as your application grows."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "redux"
+  "furtherReading": [
+    {
+      "title": "Redux Style Guide: Normalize State Shape",
+      "url": "https://redux.js.org/style-guide/#normalize-nested-state"
+    },
+    {
+      "title": "Entity Adapter Documentation",
+      "url": "https://redux-toolkit.js.org/api/createEntityAdapter"
+    }
+  ]
 }

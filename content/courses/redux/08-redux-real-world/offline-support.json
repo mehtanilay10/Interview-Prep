@@ -1,0 +1,293 @@
+{
+  "id": "lesson-redux-031",
+  "slug": "offline-support",
+  "moduleSlug": "redux-real-world",
+  "title": "Offline Support and State Persistence",
+  "description": "Keep Redux state and user actions available offline with redux-persist, IndexedDB, and optimistic updates.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "redux",
+    "persistence",
+    "offline",
+    "redux-persist"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Users don't always have a fast connection. **Offline support** means your app remembers what they typed, queues mutations, and replays them when the network returns — without losing data or showing stale errors."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Two kinds of persistence",
+        "text": "1. **State persistence** — saving Redux state between sessions (redux-persist).\n2. **Action persistence** — queuing dispatched actions to replay later (redux-offline, RTK Query). This lesson focuses on state persistence."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Meet redux-persist"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`redux-persist` is the most popular library for persisting a Redux store. It writes your state to a storage engine (default: `localStorage`) and rehydrates it on the next page load."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic redux-persist setup",
+        "content": "Persist the entire store",
+        "language": "javascript",
+        "code": "import { configureStore, combineReducers } from '@reduxjs/toolkit';\nimport { persistStore, persistReducer } from 'redux-persist';\nimport storage from 'redux-persist/lib/storage';\n\nimport authReducer from './features/auth/authSlice';\nimport todosReducer from './features/todos/todosSlice';\n\nconst rootReducer = combineReducers({\n  auth: authReducer,\n  todos: todosReducer,\n});\n\nconst persistConfig = {\n  key: 'root',\n  version: 1,\n  storage,\n};\n\nconst persistedReducer = persistReducer(persistConfig, rootReducer);\n\nexport const store = configureStore({\n  reducer: persistedReducer,\n});\n\nexport const persistor = persistStore(store);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Wiring It Up with PersistGate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`PersistGate` blocks the app from rendering until the persisted state has been rehydrated. Without it, components may see an empty store on first paint and flicker."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PersistGate in React",
+        "content": "Wait for rehydration before rendering",
+        "language": "jsx",
+        "code": "import { Provider } from 'react-redux';\nimport { PersistGate } from 'redux-persist/integration/react';\nimport { store, persistor } from './app/store';\nimport App from './App';\n\nfunction Root() {\n  return (\n    <Provider store={store}>\n      <PersistGate loading={<div>Loading…</div>} persistor={persistor}>\n        <App />\n      </PersistGate>\n    </Provider>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "offline-rehydrate",
+        "caption": "redux-persist rehydrates the store before the UI mounts.",
+        "definition": "sequenceDiagram\n  participant App\n  participant Persistor\n  participant Storage as localStorage\n  participant Store as Redux Store\n\n  App->>Persistor: persistStore(store)\n  Persistor->>Storage: getItem('persist:root')\n  Storage-->>Persistor: serialized JSON\n  Persistor->>Store: REHYDRATE action\n  Store-->>App: ready to render\n  App->>Store: dispatch(actions)\n  Store->>Persistor: state changed\n  Persistor->>Storage: setItem(...)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Selective Persistence"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Persisting the whole store is usually a bad idea. Some slices contain ephemeral UI state (modal open, hover). Use `whitelist` and `blacklist` to control what survives a reload."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Persisting only specific slices",
+        "content": "Whitelist and blacklist",
+        "language": "javascript",
+        "code": "const persistConfig = {\n  key: 'root',\n  version: 1,\n  storage,\n  whitelist: ['auth', 'todos'],         // only persist these\n  blacklist: ['ui', 'transient'],      // never persist these\n};\n\nconst persistedReducer = persistReducer(persistConfig, rootReducer);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Nested Persists"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can also apply a different persistence config to a single slice by wrapping its reducer in `persistReducer` before combining."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Persist one slice differently",
+        "content": "Settings keep 30-day TTL; auth uses sessionStorage",
+        "language": "javascript",
+        "code": "import sessionStorage from 'redux-persist/lib/storage/session';\n\nconst settingsPersistConfig = {\n  key: 'settings',\n  storage,\n  version: 1,\n};\n\nconst authPersistConfig = {\n  key: 'auth',\n  storage: sessionStorage, // cleared when tab closes\n  version: 1,\n};\n\nconst rootReducer = combineReducers({\n  settings: persistReducer(settingsPersistConfig, settingsReducer),\n  auth: persistReducer(authPersistConfig, authReducer),\n  todos: todosReducer,\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When your state shape changes, you need **migrations** to upgrade old persisted data. Without them, rehydrating old data may crash the app or corrupt the store."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Versioned migration",
+        "content": "Transform old state shapes",
+        "language": "javascript",
+        "code": "const persistConfig = {\n  key: 'root',\n  version: 2,\n  storage,\n  migrate: createMigrate({\n    2: (state) => {\n      if (!state) return state;\n      return {\n        ...state,\n        // v1 stored todos as an array; v2 expects { ids, entities }\n        todos: { ids: state.todos.map((t) => t.id), entities: Object.fromEntries(state.todos.map((t) => [t.id, t])) },\n      };\n    },\n  }, { debug: process.env.NODE_ENV !== 'production' }),\n};"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage Engines"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Storage engines for redux-persist",
+        "headers": [
+          "Engine",
+          "Backend",
+          "Best for"
+        ],
+        "rows": [
+          [
+            "redux-persist/lib/storage",
+            "localStorage",
+            "Small persistent preferences"
+          ],
+          [
+            "redux-persist/lib/storage/session",
+            "sessionStorage",
+            "Tab-scoped data, wizards"
+          ],
+          [
+            "@react-native-async-storage/async-storage",
+            "Native AsyncStorage",
+            "React Native apps"
+          ],
+          [
+            "redux-persist-indexeddb-storage",
+            "IndexedDB",
+            "Large offline datasets"
+          ],
+          [
+            "redux-persist-fs-storage",
+            "File system (RN)",
+            "Mobile file-based caching"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Manual Persistence Without a Library"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Manual throttle",
+        "content": "Save every 500 ms",
+        "language": "javascript",
+        "code": "let saveTimer;\n\nstore.subscribe(() => {\n  clearTimeout(saveTimer);\n  saveTimer = setTimeout(() => {\n    try {\n      localStorage.setItem('app:state', JSON.stringify(store.getState()));\n    } catch (e) {\n      console.warn('Persist failed', e);\n    }\n  }, 500);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic Updates While Offline"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Persistence is only half the story. For true offline support, also **queue writes** and replay them when the network comes back. The classic pattern: update state immediately, attempt the network call, retry if it fails."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Optimistic todo with retry",
+        "content": "Update UI first, sync later",
+        "language": "javascript",
+        "code": "export const toggleTodo = createAsyncThunk(\n  'todos/toggle',\n  async (id, { dispatch, rejectWithValue }) => {\n    dispatch(todoToggledOptimistic(id)); // optimistic\n    try {\n      await fetch(`/api/todos/${id}/toggle`, { method: 'POST' });\n    } catch {\n      dispatch(todoToggledRetry(id));\n      return rejectWithValue({ id, message: 'Will retry when online' });\n    }\n  }\n);"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Hydration / Rehydration",
+            "definition": "Loading persisted state back into the store."
+          },
+          {
+            "term": "Whitelist / Blacklist",
+            "definition": "redux-persist options to include or exclude specific slices from persistence."
+          },
+          {
+            "term": "Migration",
+            "definition": "Code that transforms old persisted state into the current shape."
+          },
+          {
+            "term": "Optimistic Update",
+            "definition": "Updating the UI before the server confirms the change, with rollback if it fails."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Security",
+        "text": "Don't persist auth tokens, passwords, or PII in client-side storage. Persist user-friendly profile info only."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Persist the todos slice",
+        "description": "Add redux-persist to an existing app:\n1. Persist only the `todos` slice using localStorage.\n2. Wrap the app in `PersistGate`.\n3. Add a `version: 2` migration that renames `todo.text` to `todo.title`.\n4. Verify in DevTools that after a reload, the todos are restored.",
+        "steps": [
+          "`createMigrate(migrations, options)` lives in `redux-persist`.",
+          "Don't persist the `ui` slice — it contains modal-open flags."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "redux-persist rehydrates state across reloads automatically",
+          "Use `PersistGate` to avoid flicker on first render",
+          "Whitelist/blacklist to control which slices persist",
+          "Write migrations for every state-shape change",
+          "Pair persistence with optimistic updates for true offline support"
+        ],
+        "takeaway": "Persistence keeps users productive even when the network flakes."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "redux"
+}

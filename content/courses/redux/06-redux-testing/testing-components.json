@@ -2,44 +2,241 @@
   "id": "lesson-redux-018",
   "slug": "testing-components",
   "moduleSlug": "redux-testing",
+  "courseSlug": "redux",
   "title": "Testing Connected Components",
-  "description": "Learn how to test React components connected to Redux.",
-  "order": 2,
+  "description": "Learn how to test React components connected to Redux, including mocking the store and testing user interactions.",
+  "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 20,
   "tags": [
     "redux",
     "testing",
     "react",
-    "components"
+    "components",
+    "testing-library"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Testing connected components requires wrapping them in a Provider with a test store."
+        "text": "Components are the visible part of your application. They read data from Redux and dispatch actions in response to user interactions. Testing these components requires setting up a Redux store, providing it to your component, and verifying that the rendered output matches expectations."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers testing connected React components using React Testing Library, which encourages testing components the way users interact with them rather than testing implementation details."
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Test Setup"
+      "data": {
+        "level": 2,
+        "text": "Setting Up the Test Store"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every test that involves connected components needs a Redux store. Create a helper function that sets up a store with the slices your component needs. This ensures tests are isolated and reproducible."
+      }
     },
     {
       "type": "example",
       "data": {
-        "title": "Component Test",
-        "content": "Testing a connected Counter component",
+        "title": "Test Store Setup",
+        "content": "Creating a reusable test store configuration",
         "language": "javascript",
-        "code": "import { render, screen, fireEvent } from '@testing-library/react';\nimport { Provider } from 'react-redux';\nimport { configureStore } from '@reduxjs/toolkit';\nimport counterReducer from './counterSlice';\nimport Counter from './Counter';\n\nfunction createTestStore() {\n  return configureStore({\n    reducer: { counter: counterReducer },\n    middleware: (getDefaultMiddleware) => getDefaultMiddleware()\n  });\n}\n\ndescribe('Counter', () => {\n  it('displays count and increments on click', () => {\n    const store = createTestStore();\n    render(\n      <Provider store={store}>\n        <Counter />\n      </Provider>\n    );\n    expect(screen.getByText('0')).toBeInTheDocument();\n    fireEvent.click(screen.getByRole('button'));\n    expect(screen.getByText('1')).toBeInTheDocument();\n  });\n});"
+        "code": "import { render } from '@testing-library/react';\nimport { Provider } from 'react-redux';\nimport { configureStore } from '@reduxjs/toolkit';\nimport { MemoryRouter } from 'react-router-dom';\n\n// Import your slices\nimport usersReducer from './features/users/usersSlice';\nimport postsReducer from './features/posts/postsSlice';\n\n// Create a configured test store\nfunction createTestStore(preloadedState = {}) {\n  return configureStore({\n    reducer: {\n      users: usersReducer,\n      posts: postsReducer\n    },\n    preloadedState: {\n      users: { entities: {}, ids: [], loading: false, error: null },\n      posts: { entities: {}, ids: [], loading: false, error: null },\n      ...preloadedState\n    }\n  });\n}\n\n// Custom render function with providers\nfunction renderWithProviders(\n  ui,\n  {\n    preloadedState = {},\n    store = createTestStore(preloadedState),\n    ...renderOptions\n  } = {}\n) {\n  function Wrapper({ children }) {\n    return (\n      <Provider store={store}>\n        <MemoryRouter>{children}</MemoryRouter>\n      </Provider>\n    );\n  }\n  return { store, ...render(ui, { wrapper: Wrapper, ...renderOptions }) };\n}\n\nexport { createTestStore, renderWithProviders };"
       }
     },
     {
-      "type": "callout",
+      "type": "heading",
       "data": {
-        "variant": "info",
-        "title": "Testing Library",
-        "text": "Use React Testing Library to test components the way users interact with them."
+        "level": 2,
+        "text": "Testing a Connected Component"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With the test utilities in place, you can now render connected components and test their behavior. The key is to set up initial state, render the component, interact with it, and verify the results."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing Connected Components",
+        "content": "Comprehensive component tests with Redux",
+        "language": "javascript",
+        "code": "import { screen, waitFor } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { renderWithProviders } from './test-utils';\nimport UserList from './UserList';\nimport { userAdded, userDeleted } from './features/users/usersSlice';\n\ndescribe('UserList component', () => {\n  it('renders list of users', () => {\n    const preloadedState = {\n      users: {\n        entities: {\n          '1': { id: '1', name: 'Alice', email: 'alice@example.com' },\n          '2': { id: '2', name: 'Bob', email: 'bob@example.com' }\n        },\n        ids: ['1', '2'],\n        loading: false,\n        error: null\n      }\n    };\n\n    renderWithProviders(<UserList />, { preloadedState });\n\n    expect(screen.getByText('Alice')).toBeInTheDocument();\n    expect(screen.getByText('Bob')).toBeInTheDocument();\n    expect(screen.getAllByRole('listitem')).toHaveLength(2);\n  });\n\n  it('dispatches deleteUser when delete button is clicked', async () => {\n    const { store } = renderWithProviders(<UserList />, {\n      preloadedState: {\n        users: {\n          entities: { '1': { id: '1', name: 'Alice', email: 'alice@example.com' } },\n          ids: ['1'],\n          loading: false,\n          error: null\n        }\n      }\n    });\n\n    const deleteButton = screen.getByRole('button', { name: /delete/i });\n    await userEvent.click(deleteButton);\n\n    // Verify the action was dispatched\n    const actions = store.getState().users;\n    expect(actions.ids).not.toContain('1');\n  });\n\n  it('shows loading state', () => {\n    renderWithProviders(<UserList />, {\n      preloadedState: {\n        users: { entities: {}, ids: [], loading: true, error: null }\n      }\n    });\n\n    expect(screen.getByText(/loading/i)).toBeInTheDocument();\n  });\n\n  it('shows error message', () => {\n    renderWithProviders(<UserList />, {\n      preloadedState: {\n        users: { entities: {}, ids: [], loading: false, error: 'Failed to load' }\n      }\n    });\n\n    expect(screen.getByText(/failed to load/i)).toBeInTheDocument();\n  });\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing User Interactions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Components respond to user actions like clicks, form submissions, and keyboard input. Use `@testing-library/user-event` to simulate realistic user behavior rather than firing synthetic events."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing User Interactions",
+        "content": "Testing form submissions and button clicks",
+        "language": "javascript",
+        "code": "import { screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { renderWithProviders } from './test-utils';\nimport AddUserForm from './AddUserForm';\n\ndescribe('AddUserForm component', () => {\n  it('submits form data correctly', async () => {\n    const { store } = renderWithProviders(<AddUserForm />);\n\n    // Fill in the form fields\n    await userEvent.type(screen.getByLabelText(/name/i), 'Alice');\n    await userEvent.type(screen.getByLabelText(/email/i), 'alice@example.com');\n\n    // Submit the form\n    await userEvent.click(screen.getByRole('button', { name: /submit/i }));\n\n    // Verify dispatch or navigation happened\n    const actions = store.getActions();\n    expect(actions.some(action => \n      action.type === 'users/userAdded' || \n      action.type === 'users/addUser/pending'\n    )).toBe(true);\n  });\n\n  it('validates required fields', async () => {\n    renderWithProviders(<AddUserForm />);\n\n    // Try to submit empty form\n    await userEvent.click(screen.getByRole('button', { name: /submit/i }));\n\n    // Form should show validation error\n    expect(screen.getByText(/name is required/i)).toBeInTheDocument();\n  });\n\n  it('handles keyboard input', async () => {\n    renderWithProviders(<AddUserForm />);\n\n    const nameInput = screen.getByLabelText(/name/i);\n    await userEvent.type(nameInput, 'Alice{backspace}{backspace}Bob');\n\n    expect(nameInput).toHaveValue('Bob');\n  });\n});"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Testing Library vs Enzyme",
+        "cards": [
+          {
+            "title": "React Testing Library",
+            "content": "Tests from user perspective\nQueries by accessible name\nEncourages accessible components\nLess test brittleness\nBetter for integration testing\nRecommended approach"
+          },
+          {
+            "title": "Enzyme",
+            "content": "Tests component internals\nShallow vs full rendering\nQueries by CSS selectors\nMore implementation detail\nTighter coupling to code\nLegacy approach"
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "caption": "Component test flow",
+        "definition": "flowchart TD\n    A[Setup: Create test store] --> B[Render: Component + Provider]\n    B --> C[Act: User interaction]\n    C --> D[Assert: Check rendered output]\n    D --> E[Assert: Verify dispatched actions]\n    E --> F[Cleanup: Reset for next test]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Selectors Directly"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes you want to test selectors in isolation. While you can test them through component rendering, testing them directly gives you more precise verification of the selector logic."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing Selectors",
+        "content": "Unit testing selectors in isolation",
+        "language": "javascript",
+        "code": "import { renderHook } from '@testing-library/react';\nimport { Provider } from 'react-redux';\nimport { createTestStore } from './test-utils';\nimport { useSelector } from 'react-redux';\nimport { selectUserById, selectAllUsers } from './usersSlice';\n\ndescribe('users selectors', () => {\n  const setup = (preloadedState) => {\n    const store = createTestStore(preloadedState);\n    return renderHook(() => ({\n      store,\n      result: useSelector((state) => state)\n    }));\n  };\n\n  it('selectAllUsers returns all users', () => {\n    const { store } = setup({\n      users: {\n        entities: {\n          '1': { id: '1', name: 'Alice' },\n          '2': { id: '2', name: 'Bob' }\n        },\n        ids: ['1', '2'],\n        loading: false,\n        error: null\n      }\n    });\n\n    const allUsers = selectAllUsers(store.getState());\n    expect(allUsers).toHaveLength(2);\n    expect(allUsers[0].name).toBe('Alice');\n  });\n\n  it('selectUserById returns specific user', () => {\n    const { store } = setup({\n      users: {\n        entities: { '1': { id: '1', name: 'Alice' } },\n        ids: ['1'],\n        loading: false,\n        error: null\n      }\n    });\n\n    const user = selectUserById(store.getState(), '1');\n    expect(user?.name).toBe('Alice');\n  });\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Utilities"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Utility",
+          "Purpose",
+          "Example"
+        ],
+        "rows": [
+          [
+            "renderWithProviders",
+            "Render with Redux Provider",
+            "renderWithProviders(<Component />)"
+          ],
+          [
+            "createTestStore",
+            "Create isolated store",
+            "createTestStore({ users: {...} })"
+          ],
+          [
+            "screen",
+            "Query rendered elements",
+            "screen.getByText('Hello')"
+          ],
+          [
+            "userEvent",
+            "Simulate user interactions",
+            "userEvent.click(button)"
+          ],
+          [
+            "waitFor",
+            "Wait for async operations",
+            "await waitFor(() => expect...)"
+          ],
+          [
+            "cleanup",
+            "Reset after tests",
+            "Called automatically"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Component Test Checklist",
+        "items": [
+          "Set up test store with realistic initial state",
+          "Test default/rendered state displays correctly",
+          "Test loading state rendering",
+          "Test error state rendering",
+          "Test user interactions dispatch correct actions",
+          "Test component responds to state changes",
+          "Use semantic queries (getByRole, getByLabelText)",
+          "Prefer userEvent over fireEvent for realism"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Connected Component",
+            "definition": "A React component that connects to Redux using the useSelector and useDispatch hooks."
+          },
+          {
+            "term": "Test Store",
+            "definition": "A Redux store configured specifically for testing, often with pre-loaded state."
+          },
+          {
+            "term": "Preloaded State",
+            "definition": "Initial state passed to the store for test setup."
+          },
+          {
+            "term": "User Event",
+            "definition": "Testing Library utility for simulating realistic user interactions."
+          },
+          {
+            "term": "Semantic Query",
+            "definition": "A test query that finds elements by their accessible role or label."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Test a Shopping Cart Component",
+        "description": "Write comprehensive tests for a shopping cart component that displays items, totals, and allows quantity updates."
       }
     },
     {
@@ -47,16 +244,30 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Wrap components in Provider",
-          "Use a test store",
-          "Dispatch actions in tests",
-          "Assert on rendered output"
+          "Use renderWithProviders to wrap components with Provider",
+          "Set up realistic initial state for each test scenario",
+          "Use semantic queries like getByRole instead of class names",
+          "Prefer userEvent over fireEvent for realistic interactions",
+          "Test user interactions by verifying dispatched actions",
+          "Test all states: loading, error, empty, and populated"
         ],
-        "takeaway": "Connected components need a Provider wrapper in tests."
+        "takeaway": "Component tests with React Testing Library ensure your UI works correctly from the user's perspective while integrating properly with Redux."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "redux"
+  "furtherReading": [
+    {
+      "title": "React Testing Library",
+      "url": "https://testing-library.com/docs/react-testing-library/intro/"
+    },
+    {
+      "title": "Testing Redux Hooks",
+      "url": "https://redux.js.org/tutorials/tutorials/using-redux-with-react"
+    },
+    {
+      "title": "User Event Documentation",
+      "url": "https://testing-library.com/docs/user-event/intro/"
+    }
+  ]
 }

@@ -394,31 +394,38 @@ import tsrLesson15 from '../courses/typescript-for-react/05-generic-components/g
 import tsrLesson16 from '../courses/typescript-for-react/05-generic-components/generic-list.json';
 import tsrLesson17 from '../courses/typescript-for-react/05-generic-components/polymorphic-components.json';
 
-import reduxLesson1 from '../courses/redux/01-redux-fundamentals/devtools.json';
-import reduxLesson2 from '../courses/redux/01-redux-fundamentals/immutability.json';
+import reduxLesson1 from '../courses/redux/01-redux-fundamentals/three-principles.json';
+import reduxLesson2 from '../courses/redux/01-redux-fundamentals/what-is-redux.json';
 import reduxLesson3 from '../courses/redux/01-redux-fundamentals/store-actions-reducers.json';
-import reduxLesson4 from '../courses/redux/01-redux-fundamentals/what-is-redux.json';
-import reduxLesson5 from '../courses/redux/02-redux-toolkit/configure-store.json';
-import reduxLesson6 from '../courses/redux/02-redux-toolkit/create-async-thunk.json';
+import reduxLesson4 from '../courses/redux/01-redux-fundamentals/immutability.json';
+import reduxLesson5 from '../courses/redux/01-redux-fundamentals/devtools.json';
+import reduxLesson6 from '../courses/redux/02-redux-toolkit/configure-store.json';
 import reduxLesson7 from '../courses/redux/02-redux-toolkit/create-slice.json';
-import reduxLesson8 from '../courses/redux/03-react-redux/provider.json';
-import reduxLesson9 from '../courses/redux/03-react-redux/use-dispatch.json';
-import reduxLesson10 from '../courses/redux/03-react-redux/use-selector.json';
-import reduxLesson11 from '../courses/redux/04-redux-middleware/middleware-basics.json';
-import reduxLesson12 from '../courses/redux/04-redux-middleware/redux-saga.json';
-import reduxLesson13 from '../courses/redux/04-redux-middleware/redux-thunk.json';
-import reduxLesson14 from '../courses/redux/05-redux-patterns/entity-adapter.json';
-import reduxLesson15 from '../courses/redux/05-redux-patterns/normalizing-state.json';
-import reduxLesson16 from '../courses/redux/05-redux-patterns/rtk-query.json';
-import reduxLesson17 from '../courses/redux/06-redux-testing/testing-reducers.json';
-import reduxLesson18 from '../courses/redux/06-redux-testing/testing-components.json';
-import reduxLesson19 from '../courses/redux/07-redux-advanced-concepts/custom-hooks.json';
-import reduxLesson20 from '../courses/redux/07-redux-advanced-concepts/store-initialization.json';
-import reduxLesson21 from '../courses/redux/07-redux-advanced-concepts/performance-optimization.json';
-import reduxLesson22 from '../courses/redux/08-redux-real-world/project-structure.json';
-import reduxLesson23 from '../courses/redux/08-redux-real-world/authentication-flow.json';
-import reduxLesson24 from '../courses/redux/08-redux-real-world/error-handling.json';
-import reduxLesson25 from '../courses/redux/08-redux-real-world/deployment-setup.json';
+import reduxLesson8 from '../courses/redux/02-redux-toolkit/create-async-thunk.json';
+import reduxLesson9 from '../courses/redux/02-redux-toolkit/extra-reducers.json';
+import reduxLesson10 from '../courses/redux/03-react-redux/provider.json';
+import reduxLesson11 from '../courses/redux/03-react-redux/use-selector.json';
+import reduxLesson12 from '../courses/redux/03-react-redux/use-dispatch.json';
+import reduxLesson13 from '../courses/redux/04-redux-middleware/middleware-basics.json';
+import reduxLesson14 from '../courses/redux/04-redux-middleware/redux-thunk.json';
+import reduxLesson15 from '../courses/redux/04-redux-middleware/redux-saga.json';
+import reduxLesson16 from '../courses/redux/04-redux-middleware/middleware-composition.json';
+import reduxLesson17 from '../courses/redux/05-redux-patterns/normalizing-state.json';
+import reduxLesson18 from '../courses/redux/05-redux-patterns/entity-adapter.json';
+import reduxLesson19 from '../courses/redux/05-redux-patterns/rtk-query.json';
+import reduxLesson20 from '../courses/redux/05-redux-patterns/derived-data.json';
+import reduxLesson21 from '../courses/redux/06-redux-testing/testing-reducers.json';
+import reduxLesson22 from '../courses/redux/06-redux-testing/testing-async.json';
+import reduxLesson23 from '../courses/redux/06-redux-testing/testing-components.json';
+import reduxLesson24 from '../courses/redux/07-redux-advanced-concepts/custom-hooks.json';
+import reduxLesson25 from '../courses/redux/07-redux-advanced-concepts/store-initialization.json';
+import reduxLesson26 from '../courses/redux/07-redux-advanced-concepts/performance-optimization.json';
+import reduxLesson27 from '../courses/redux/07-redux-advanced-concepts/code-splitting.json';
+import reduxLesson28 from '../courses/redux/08-redux-real-world/project-structure.json';
+import reduxLesson29 from '../courses/redux/08-redux-real-world/authentication-flow.json';
+import reduxLesson30 from '../courses/redux/08-redux-real-world/error-handling.json';
+import reduxLesson31 from '../courses/redux/08-redux-real-world/deployment-setup.json';
+import reduxLesson32 from '../courses/redux/08-redux-real-world/offline-support.json';
 
 import rqLesson1 from '../courses/react-query/01-query-basics/first-query.json';
 import rqLesson2 from '../courses/react-query/01-query-basics/query-client.json';
@@ -829,7 +836,8 @@ const rawLessons = [
   reduxLesson1, reduxLesson2, reduxLesson3, reduxLesson4, reduxLesson5, reduxLesson6, reduxLesson7,
   reduxLesson8, reduxLesson9, reduxLesson10, reduxLesson11, reduxLesson12, reduxLesson13, reduxLesson14,
   reduxLesson15, reduxLesson16, reduxLesson17, reduxLesson18, reduxLesson19, reduxLesson20, reduxLesson21,
-  reduxLesson22, reduxLesson23, reduxLesson24, reduxLesson25,
+  reduxLesson22, reduxLesson23, reduxLesson24, reduxLesson25, reduxLesson26, reduxLesson27, reduxLesson28,
+  reduxLesson29, reduxLesson30, reduxLesson31, reduxLesson32,
   rqLesson1, rqLesson2, rqLesson3, rqLesson4, rqLesson5, rqLesson6, rqLesson7, rqLesson8, rqLesson9,
   rqLesson10, rqLesson11, rqLesson12, rqLesson13, rqLesson14, rqLesson15, rqLesson16, rqLesson17, rqLesson18,
   rqLesson19, rqLesson20, rqLesson21, rqLesson22, rqLesson23, rqLesson24, rqLesson25, rqLesson26, rqLesson27,

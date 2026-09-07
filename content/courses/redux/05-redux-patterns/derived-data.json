@@ -1,0 +1,275 @@
+{
+  "id": "lesson-redux-028",
+  "slug": "derived-data",
+  "moduleSlug": "redux-patterns",
+  "courseSlug": "redux",
+  "title": "Derived Data with Selectors",
+  "description": "Learn how to compute and cache derived data from Redux state using selectors and memoization.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": [
+    "redux",
+    "selectors",
+    "derived-data",
+    "memoization",
+    "reselect"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In Redux, you store your application's state, not every possible view of that state. **Derived data** is information you can calculate from the raw state. Instead of storing computed values, you compute them when needed using selectors."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For example, if you store an array of orders, the total price is derived data. If you store a list of users, the count of active users is derived. The key principle is: **don't duplicate data that can be computed**."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Avoid Duplicating State?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Storing computed values in state leads to synchronization problems. When the source data changes, you must remember to update all the places that duplicate it. This creates bugs where the UI shows stale data."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Stored vs Derived Data",
+        "cards": [
+          {
+            "title": "Duplicated in State",
+            "content": "Must sync manually on every update\nRisk of stale data inconsistencies\nHarder to reason about source of truth\nMore state to maintain\nPotential bugs from missed updates"
+          },
+          {
+            "title": "Derived with Selectors",
+            "content": "Always up-to-date automatically\nSingle source of truth preserved\nImpossible to get out of sync\nComputed on-demand efficiently\nMemoization prevents recalculation"
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Selectors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A selector is a function that extracts data from the Redux state. Simple selectors just return a slice of state. More complex selectors compute derived values."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Simple vs Derived Selectors",
+        "content": "Different types of selectors",
+        "language": "javascript",
+        "code": "// Simple selector - returns state slice directly\nconst selectUsers = (state) => state.users;\n\n// Selector with transformation\nconst selectUserNames = (state) => state.users.map(user => user.name);\n\n// Selector with filtering\nconst selectActiveUsers = (state) => \n  state.users.filter(user => user.isActive);\n\n// Selector with computation\nconst selectTotalPrice = (state) => \n  state.cart.items.reduce((total, item) => \n    total + item.price * item.quantity, 0\n  );\n\n// Composing selectors\nconst selectCartTotal = (state) => state.cart.total;\nconst selectTaxRate = (state) => state.config.taxRate;\n\nconst selectTaxAmount = (state) => \n  selectCartTotal(state) * selectTaxRate(state);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Memoization Problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problem with simple selectors is that they recompute on every render, even when the inputs haven't changed. For expensive computations, this wastes CPU cycles. For object or array returns, it creates new references every time, causing unnecessary re-renders."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "caption": "Selector memoization behavior",
+        "definition": "flowchart TD\n    A[Component Renders] --> B{same inputs?}\n    B -->|Yes| C[Return cached result]\n    B -->|No| D[Compute new result]\n    D --> E[Cache new result]\n    E --> F[Return computed value]\n    C --> G[No re-render needed]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using createSelector"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**`createSelector`** from Reselect (included with Redux Toolkit) creates memoized selectors. It only recomputes when one of its input selectors returns a new value. For primitive comparisons, it uses `===`. For objects and arrays, it does a shallow comparison."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Memoized Selectors",
+        "content": "Using createSelector for memoization",
+        "language": "javascript",
+        "code": "import { createSelector } from '@reduxjs/toolkit';\n\n// createSelector takes input selectors and an output function\nconst selectCartItems = (state) => state.cart.items;\nconst selectTaxRate = (state) => state.cart.taxRate;\n\n// This only recomputes when cart.items or taxRate changes\nconst selectCartSummary = createSelector(\n  [selectCartItems, selectTaxRate],\n  (items, taxRate) => {\n    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n    const tax = subtotal * taxRate;\n    const total = subtotal + tax;\n    const itemCount = items.reduce((count, item) => count + item.quantity, 0);\n    \n    return { subtotal, tax, total, itemCount };\n  }\n);\n\n// Usage in a component\nfunction CartSummary() {\n  const { subtotal, tax, total, itemCount } = useSelector(selectCartSummary);\n  // ...\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Selector Composition Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Selectors compose naturally. You can build complex derived data by combining simpler selectors. This makes your code reusable and testable."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Composing Selectors",
+        "content": "Building complex selectors from simple ones",
+        "language": "javascript",
+        "code": "import { createSelector } from '@reduxjs/toolkit';\n\n// Base selectors\nconst selectAllProducts = (state) => state.products.items;\nconst selectFilters = (state) => state.filters;\nconst selectCartItemIds = (state) => state.cart.itemIds;\n\n// Derived selectors\nconst selectVisibleProducts = createSelector(\n  [selectAllProducts, selectFilters],\n  (products, filters) => {\n    let result = products;\n    \n    if (filters.category) {\n      result = result.filter(p => p.category === filters.category);\n    }\n    if (filters.minPrice !== undefined) {\n      result = result.filter(p => p.price >= filters.minPrice);\n    }\n    if (filters.maxPrice !== undefined) {\n      result = result.filter(p => p.price <= filters.maxPrice);\n    }\n    if (filters.searchQuery) {\n      const query = filters.searchQuery.toLowerCase();\n      result = result.filter(p => p.name.toLowerCase().includes(query));\n    }\n    \n    return result;\n  }\n);\n\n// Selectors that depend on other derived selectors\nconst selectCartTotalWithDiscount = createSelector(\n  [selectVisibleProducts, selectCartItemIds],\n  (products, cartIds) => {\n    const cartProducts = products.filter(p => cartIds.includes(p.id));\n    return cartProducts.reduce((sum, p) => sum + p.price, 0);\n  }\n);"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Scenario",
+          "Selector Type",
+          "Memoization Benefit"
+        ],
+        "rows": [
+          [
+            "Simple state access",
+            "Plain function",
+            "None needed"
+          ],
+          [
+            "Array/object creation",
+            "createSelector",
+            "Avoids new references"
+          ],
+          [
+            "Expensive computation",
+            "createSelector",
+            "Skips recalculation"
+          ],
+          [
+            "Filtered lists",
+            "createSelector",
+            "Only recomputes on filter change"
+          ],
+          [
+            "Aggregated values",
+            "createSelector",
+            "Caches sum/count/etc."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding Expensive Recalculations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some computations are expensive: sorting large lists, filtering thousands of items, or processing complex data structures. Memoization helps, but you should also consider when and where these computations happen."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expensive Operations",
+        "content": "Optimizing expensive selector computations",
+        "language": "javascript",
+        "code": "// Bad: Expensive sort runs on every render\nconst selectSortedProducts = (state) => \n  [...state.products].sort((a, b) => a.name.localeCompare(b.name));\n\n// Good: Memoized sort only recomputes when products change\nconst selectSortedProducts = createSelector(\n  [(state) => state.products],\n  (products) => [...products].sort((a, b) => a.name.localeCompare(b.name))\n);\n\n// Even better: Sort once when products load, store sorted order\nconst selectProductsWithSortOrder = createSelector(\n  [(state) => state.products, (state) => state.ui.sortField],\n  (products, sortField) => {\n    const sorted = [...products];\n    if (sortField === 'name') {\n      sorted.sort((a, b) => a.name.localeCompare(b.name));\n    } else if (sortField === 'price') {\n      sorted.sort((a, b) => a.price - b.price);\n    } else if (sortField === 'date') {\n      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));\n    }\n    return sorted;\n  }\n);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Shallow Comparison Gotcha",
+        "text": "createSelector uses shallow equality for comparisons. If you return a new object every time (even with the same contents), it won't memoize. Always return the same object reference when the contents haven't changed."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Selector",
+            "definition": "A function that extracts and computes data from Redux state."
+          },
+          {
+            "term": "Derived Data",
+            "definition": "Values that can be calculated from other state, not stored separately."
+          },
+          {
+            "term": "Memoization",
+            "definition": "Caching a computation's result and returning it when inputs haven't changed."
+          },
+          {
+            "term": "createSelector",
+            "definition": "A function that creates memoized selectors from input selectors and an output function."
+          },
+          {
+            "term": "Shallow Comparison",
+            "definition": "Checking if two values are the same reference using ===."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Dashboard Selector",
+        "description": "Create memoized selectors for an analytics dashboard that computes various metrics from raw event data."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Store raw state, not computed values",
+          "Use selectors to derive data from state",
+          "createSelector memoizes expensive computations",
+          "Selectors compose naturally into complex derivations",
+          "Avoid creating new references unnecessarily",
+          "Memoization prevents wasteful recalculations"
+        ],
+        "takeaway": "Selectors with memoization keep your state minimal while providing efficient access to computed values."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Reselect Library",
+      "url": "https://redux.js.org/tutorials/fundamentals/part-7-app-state"
+    },
+    {
+      "title": "Selectors Best Practices",
+      "url": "https://redux.js.org/style-guide/#use-selectors"
+    }
+  ]
+}

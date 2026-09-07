@@ -17,7 +17,28 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Redux Thunk** is middleware that allows you to write action creators that return functions instead of actions. It's the standard way to handle async logic in Redux."
+        "text": "**Redux Thunk** is middleware that allows you to write action creators that return **functions** instead of plain action objects. This enables asynchronous logic like API calls, waiting for timers, or accessing state before dispatching."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is a Thunk?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **thunk** is a function that wraps an expression to delay its evaluation. In Redux terms, a thunk allows you to dispatch a function that can execute async code and dispatch other actions. The thunk receives `dispatch` and `getState` as arguments."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "thunk-flow-diagram",
+        "caption": "Thunk Middleware Action Flow",
+        "definition": "flowchart TD\n    A[dispatch\n    fetchUser(123)] --> B{Is it a\n    function?}\n    B -->|Yes| C[Thunk: Call\n    function(dispatch, getState)]\n    B -->|No| F[Pass to next\n    middleware]\n    C --> D[Dispatch\n    FETCH_START]\n    D --> E[Wait for\n    async operation]\n    E -->|Success| G[Dispatch\n    FETCH_SUCCESS]\n    E -->|Error| H[Dispatch\n    FETCH_ERROR]\n    F --> I[Reducer]\n    G --> I\n    H --> I\n    style C fill:#e1eff6\n    style D fill:#fff3cd\n    style G fill:#d4edda\n    style H fill:#f8d7da"
       }
     },
     {
@@ -30,18 +51,169 @@
     {
       "type": "example",
       "data": {
-        "title": "Thunk",
+        "title": "Basic Thunk",
         "content": "Creating a thunk action creator",
         "language": "javascript",
-        "code": "// Thunk - action creator that returns a function\nconst fetchUser = (userId) => {\n  return async (dispatch, getState) => {\n    dispatch({ type: 'FETCH_USER_START' });\n    \n    try {\n      const response = await fetch(`/api/users/${userId}`);\n      const user = await response.json();\n      dispatch({ type: 'FETCH_USER_SUCCESS', payload: user });\n    } catch (error) {\n      dispatch({ type: 'FETCH_USER_ERROR', payload: error.message });\n    }\n  };\n};\n\n// Usage\ndispatch(fetchUser(123));"
+        "code": "// A thunk action creator returns a function\nconst fetchUser = (userId) => {\n  // This function is the thunk\n  return async (dispatch, getState) => {\n    // 1. Dispatch loading state\n    dispatch({ type: 'FETCH_USER_START' });\n\n    try {\n      // 2. Perform async operation\n      const response = await fetch(`/api/users/${userId}`);\n      \n      if (!response.ok) {\n        throw new Error('User not found');\n      }\n      \n      const user = await response.json();\n\n      // 3. Dispatch success with data\n      dispatch({ type: 'FETCH_USER_SUCCESS', payload: user });\n    } catch (error) {\n      // 4. Dispatch error\n      dispatch({ type: 'FETCH_USER_ERROR', payload: error.message });\n    }\n  };\n};\n\n// Usage - dispatch the thunk like any action\nstore.dispatch(fetchUser(123));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thunk Action Types"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Type",
+          "Pattern",
+          "Use Case"
+        ],
+        "rows": [
+          [
+            "Promise Thunk",
+            "dispatch(action()).then(...)",
+            "When you need to chain operations"
+          ],
+          [
+            "Async/Await Thunk",
+            "dispatch(async (...) => {...})",
+            "Cleaner syntax for async code"
+          ],
+          [
+            "Conditional Thunk",
+            "if (getState().auth.token) dispatch(...)",
+            "Access state before action"
+          ],
+          [
+            "Batch Thunk",
+            "dispatch([action1, action2])",
+            "Dispatch multiple actions"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Terms"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Thunk",
+            "definition": "A function that delays an operation by wrapping it in another function."
+          },
+          {
+            "term": "Side Effect",
+            "definition": "Operations that affect the outside world: API calls, timers, DOM changes."
+          },
+          {
+            "term": "getState",
+            "definition": "A function provided to thunks to read the current Redux state."
+          },
+          {
+            "term": "Promise-based Actions",
+            "definition": "Actions that return promises, allowing chaining and handling async completion."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thunk with Redux Toolkit"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redux Toolkit createAsyncThunk",
+        "content": "The modern way to handle async with thunks",
+        "language": "javascript",
+        "code": "import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';\n\n// createAsyncThunk handles the action lifecycle\n// automatically dispatches: pending, fulfilled, rejected\nexport const fetchUserById = createAsyncThunk(\n  'users/fetchById',\n  async (userId, { rejectWithValue }) => {\n    try {\n      const response = await fetch(`/api/users/${userId}`);\n      if (!response.ok) {\n        throw new Error('Failed to fetch');\n      }\n      return await response.json();\n    } catch (error) {\n      return rejectWithValue(error.message);\n    }\n  }\n);\n\nconst usersSlice = createSlice({\n  name: 'users',\n  initialState: { entities: {}, loading: 'idle', error: null },\n  reducers: {},\n  extraReducers: (builder) => {\n    builder\n      .addCase(fetchUserById.pending, (state) => {\n        state.loading = 'pending';\n      })\n      .addCase(fetchUserById.fulfilled, (state, action) => {\n        state.loading = 'succeeded';\n        state.entities[action.payload.id] = action.payload;\n      })\n      .addCase(fetchUserById.rejected, (state, action) => {\n        state.loading = 'failed';\n        state.error = action.payload;\n      });\n  },\n});\n\n// Usage in component\nfunction UserProfile({ userId }) {\n  const dispatch = useDispatch();\n  const user = useSelector((state) => state.users.entities[userId]);\n  const loading = useSelector((state) => state.users.loading);\n\n  useEffect(() => {\n    dispatch(fetchUserById(userId));\n  }, [dispatch, userId]);\n\n  if (loading === 'pending') return <Spinner />;\n  if (loading === 'failed') return <Error />;\n  return <div>{user?.name}</div>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thunk vs Saga"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "cards": [
+          {
+            "title": "Redux Thunk",
+            "content": "Simple concept: return functions from action creators. Good for basic async: single API calls, simple chains. Easier to learn.",
+            "highlight": true
+          },
+          {
+            "title": "Redux Saga",
+            "content": "Uses generator functions and declarative effects. Better for complex flows: parallel operations, cancellation, polling. Steeper learning curve.",
+            "highlight": false
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "Modern Alternative",
-        "text": "createAsyncThunk from Redux Toolkit is the modern replacement for hand-written thunks."
+        "variant": "tip",
+        "title": "Modern Recommendation",
+        "text": "For most applications, use createAsyncThunk from Redux Toolkit. It handles loading states, errors, and the action lifecycle automatically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Advanced Thunk Patterns"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Conditional Thunk",
+        "content": "Using getState to make decisions",
+        "language": "javascript",
+        "code": "// Only fetch if data is stale (conditional dispatch)\nconst fetchUsersIfNeeded = () => {\n  return (dispatch, getState) => {\n    const { users } = getState();\n    \n    // Check if we should skip the fetch\n    if (users.lastFetched && \n        Date.now() - users.lastFetched < 5 * 60 * 1000) {\n      console.log('Data is fresh, skipping fetch');\n      return;\n    }\n    \n    // Check if already loading\n    if (users.loading === 'pending') {\n      console.log('Already fetching...');\n      return;\n    }\n    \n    // Proceed with fetch\n    dispatch(fetchUsers());\n  };\n};\n\n// Sequential operations with thunks\nconst processOrder = (orderId) => {\n  return async (dispatch, getState) => {\n    dispatch({ type: 'ORDER_PROCESSING', payload: orderId });\n    \n    // Wait for payment\n    await dispatch(processPayment(orderId));\n    \n    // Check payment succeeded\n    const { order } = getState();\n    if (order.paymentStatus !== 'paid') {\n      return dispatch({ type: 'ORDER_FAILED', payload: 'Payment failed' });\n    }\n    \n    // Continue with fulfillment\n    await dispatch(fulfillOrder(orderId));\n    dispatch({ type: 'ORDER_COMPLETE', payload: orderId });\n  };\n};"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build an Async Data Manager",
+        "description": "Create a slice with async CRUD operations using createAsyncThunk. Handle loading states, errors, and implement optimistic updates."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Forgetting to return the promise from thunks",
+          "Not handling errors in async operations",
+          "Creating infinite loops by dispatching in useEffect without dependency control",
+          "Not checking loading state before dispatching",
+          "Mixing manual thunk writing with createAsyncThunk unnecessarily"
+        ]
       }
     },
     {
@@ -49,16 +221,26 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Thunks return functions instead of actions",
-          "Can dispatch multiple actions",
-          "Access state via getState",
-          "createAsyncThunk is modern alternative"
+          "Thunks allow action creators to return functions for async logic",
+          "Thunks receive dispatch and getState as arguments",
+          "createAsyncThunk is the modern Redux Toolkit approach",
+          "Automatically handles pending/fulfilled/rejected states",
+          "Best for simple to moderate async flows; use Saga for complex flows"
         ],
-        "takeaway": "Thunks handle async logic in Redux."
+        "takeaway": "Redux Thunk is the standard middleware for handling asynchronous operations in Redux, with createAsyncThunk being the recommended modern approach."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
+  "furtherReading": [
+    {
+      "title": "Redux Thunk Documentation",
+      "url": "https://redux.js.org/tutorials/fundamentals/part-6-async-logic"
+    },
+    {
+      "title": "createAsyncThunk API Reference",
+      "url": "https://redux-toolkit.js.org/api/createAsyncThunk"
+    }
+  ],
   "courseSlug": "redux"
 }

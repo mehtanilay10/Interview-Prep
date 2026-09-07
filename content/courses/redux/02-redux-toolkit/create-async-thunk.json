@@ -2,8 +2,9 @@
   "id": "lesson-redux-007",
   "slug": "create-async-thunk",
   "moduleSlug": "redux-toolkit",
+  "courseSlug": "redux",
   "title": "createAsyncThunk",
-  "description": "Learn how to handle async logic with createAsyncThunk.",
+  "description": "Learn how to handle async logic with createAsyncThunk and manage loading states.",
   "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 22,
@@ -17,47 +18,276 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**createAsyncThunk** handles async operations in Redux. It dispatches pending, fulfilled, and rejected actions automatically."
+        "text": "**createAsyncThunk** simplifies async operations in Redux by generating three lifecycle actions: `pending`, `fulfilled`, and `rejected`. You write the async logic once, and Redux Toolkit handles the action dispatching automatically."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Creating a Thunk"
+        "text": "How createAsyncThunk Works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A thunk is a function that delays an action until later. `createAsyncThunk` wraps your async logic (like a `fetch` call) and automatically dispatches lifecycle actions so your UI can respond to loading, success, and error states without you managing the boilerplate."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating an Async Thunk"
       }
     },
     {
       "type": "example",
       "data": {
         "title": "createAsyncThunk",
-        "content": "Creating an async thunk",
+        "content": "Creating an async thunk for fetching users",
         "language": "javascript",
-        "code": "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n\n// Create async thunk\nexport const fetchUsers = createAsyncThunk(\n  'users/fetchUsers',\n  async (_, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/users');\n      if (!response.ok) throw new Error('Failed');\n      return await response.json();\n    } catch (error) {\n      return rejectWithValue(error.message);\n    }\n  }\n);"
+        "code": "import { createAsyncThunk } from '@reduxjs/toolkit';\n\nexport const fetchUsers = createAsyncThunk(\n  'users/fetchUsers',\n  async (_, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/users');\n      if (!response.ok) {\n        throw new Error('Server error');\n      }\n      const data = await response.json();\n      return data;\n    } catch (err) {\n      return rejectWithValue(err.message);\n    }\n  }\n);"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Handling in Slice"
+        "text": "Handling Lifecycle Actions in a Slice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The lifecycle actions are `fetchUsers/pending`, `fetchUsers/fulfilled`, and `fetchUsers/rejected`. You handle them in `extraReducers` using the `builder` pattern. This keeps your async state management predictable and organized."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "ExtraReducers",
-        "content": "Handling thunk states in slice",
+        "title": "Slice with Thunk",
+        "content": "Handling thunk states in a slice",
         "language": "javascript",
-        "code": "const usersSlice = createSlice({\n  name: 'users',\n  initialState: { items: [], status: 'idle', error: null },\n  reducers: {},\n  extraReducers: (builder) => {\n    builder\n      .addCase(fetchUsers.pending, (state) => {\n        state.status = 'loading';\n      })\n      .addCase(fetchUsers.fulfilled, (state, action) => {\n        state.status = 'succeeded';\n        state.items = action.payload;\n      })\n      .addCase(fetchUsers.rejected, (state, action) => {\n        state.status = 'failed';\n        state.error = action.payload;\n      });\n  }\n});"
+        "code": "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n\nexport const fetchUsers = createAsyncThunk(\n  'users/fetchUsers',\n  async (_, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/users');\n      if (!response.ok) throw new Error('Server error');\n      return await response.json();\n    } catch (err) {\n      return rejectWithValue(err.message);\n    }\n  }\n);\n\nconst usersSlice = createSlice({\n  name: 'users',\n  initialState: {\n    items: [],\n    status: 'idle',\n    error: null\n  },\n  reducers: {},\n  extraReducers: (builder) => {\n    builder\n      .addCase(fetchUsers.pending, (state) => {\n        state.status = 'loading';\n      })\n      .addCase(fetchUsers.fulfilled, (state, action) => {\n        state.status = 'succeeded';\n        state.items = action.payload;\n      })\n      .addCase(fetchUsers.rejected, (state, action) => {\n        state.status = 'failed';\n        state.error = action.payload;\n      });\n  }\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thunk Lifecycle Actions"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Lifecycle Action",
+          "When Dispatched",
+          "Payload",
+          "Common Use"
+        ],
+        "rows": [
+          [
+            "thunk.pending",
+            "Immediately when thunk starts",
+            "undefined",
+            "Set loading = true, show spinner"
+          ],
+          [
+            "thunk.fulfilled",
+            "When promise resolves",
+            "Return value of thunk",
+            "Update state with data, set loading = false"
+          ],
+          [
+            "thunk.rejected",
+            "When promise rejects",
+            "rejectWithValue() return",
+            "Set error message, set loading = false"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Async Flow Diagram"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-async-flow-diagram",
+        "definition": "sequenceDiagram\n    participant UI as UI Component\n    participant Store as Redux Store\n    participant Thunk as createAsyncThunk\n    participant API as API Server\n    UI->>Store: dispatch(fetchUsers())\n    Store->>Thunk: execute thunk\n    Thunk->>Store: dispatch pending\n    Store->>UI: state updated (loading)\n    Thunk->>API: fetch request\n    API-->>Thunk: response data\n    Thunk->>Store: dispatch fulfilled\n    Store->>UI: state updated (data)\n    Note over Thunk,API: On error: dispatch rejected",
+        "caption": "Sequence diagram of createAsyncThunk lifecycle"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling with rejectWithValue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`rejectWithValue` lets you pass a custom payload to the `rejected` action. Without it, the rejected action's payload would be `undefined`. This is critical for displaying meaningful error messages in your UI."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Error Handling",
+        "content": "Using rejectWithValue for error messages",
+        "language": "javascript",
+        "code": "export const fetchPosts = createAsyncThunk(\n  'posts/fetchPosts',\n  async (userId, { rejectWithValue }) => {\n    try {\n      const res = await fetch(`/api/users/${userId}/posts`);\n      if (!res.ok) {\n        return rejectWithValue('Failed to load posts');\n      }\n      return await res.json();\n    } catch {\n      return rejectWithValue('Network error');\n    }\n  }\n);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Error States in Components"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Error UI",
+        "content": "Displaying loading, error, and success states",
+        "language": "jsx",
+        "code": "import { useDispatch, useSelector } from 'react-redux';\nimport { fetchUsers } from './usersSlice';\n\nfunction UsersList() {\n  const { items, status, error } = useSelector((state) => state.users);\n  const dispatch = useDispatch();\n\n  if (status === 'loading') return <p>Loading...</p>;\n  if (status === 'failed') return <p className='error'>{error}</p>;\n\n  return (\n    <ul>\n      {items.map((user) => (\n        <li key={user.id}>{user.name}</li>\n      ))}\n    </ul>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
+        "variant": "warning",
         "title": "Status Pattern",
-        "text": "Track loading status with 'idle' | 'loading' | 'succeeded' | 'failed' for better UX handling."
+        "text": "Use the status string pattern 'idle' | 'loading' | 'succeeded' | 'failed' consistently across slices. It makes your UI logic predictable and your components easy to read."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thunk Arguments and Extra Arguments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The second argument to the thunk creator is a 'thunk API' object. It contains `dispatch`, `getState`, `extra`, and `rejectWithValue`. You can also pass extra arguments to all thunks by configuring the store."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Extra Arguments",
+        "content": "Accessing extra API client in thunks",
+        "language": "javascript",
+        "code": "const store = configureStore({\n  reducer: { users: usersReducer },\n  middleware: (getDefaultMiddleware) =>\n    getDefaultMiddleware({\n      thunk: {\n        extraArgument: { client: apiClient }\n      }\n    })\n});\n\nconst fetchUser = createAsyncThunk(\n  'users/fetchUser',\n  async (userId, { extra, rejectWithValue }) => {\n    try {\n      const response = await extra.client.get(`/users/${userId}`);\n      return response.data;\n    } catch (err) {\n      return rejectWithValue(err.message);\n    }\n  }\n);"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "createAsyncThunk",
+            "definition": "Redux Toolkit function that wraps async logic and auto-dispatches pending/fulfilled/rejected actions."
+          },
+          {
+            "term": "thunk API",
+            "definition": "Object passed as the second argument containing dispatch, getState, extra, and rejectWithValue."
+          },
+          {
+            "term": "rejectWithValue",
+            "definition": "Function to return a custom payload when the thunk is rejected, useful for error messages."
+          },
+          {
+            "term": "lifecycle actions",
+            "definition": "The three actions dispatched by createAsyncThunk: pending, fulfilled, and rejected."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cancelling Thunks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can abort a thunk using `AbortSignal`. Pass a signal to the fetch call and dispatch an action when the component unmounts or the user navigates away. This prevents state updates on unmounted components."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cancellable Thunk",
+        "content": "Using AbortSignal with createAsyncThunk",
+        "language": "javascript",
+        "code": "const fetchUsers = createAsyncThunk(\n  'users/fetch',\n  async (_, { signal, rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/users', { signal });\n      if (!response.ok) throw new Error('Failed');\n      return await response.json();\n    } catch (err) {\n      if (err.name === 'AbortError') {\n        return rejectWithValue('Request cancelled');\n      }\n      return rejectWithValue(err.message);\n    }\n  }\n);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dispatching from Components"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Thunks are dispatched just like regular actions. The only difference is that they return a promise, so you can `await` them or chain `.then()` / `.catch()` for imperative logic like showing a toast notification."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dispatching and Awaiting",
+        "content": "Awaiting thunk results in a component",
+        "language": "jsx",
+        "code": "import { useDispatch, useSelector } from 'react-redux';\nimport { fetchUser } from './usersSlice';\n\nfunction UserProfile({ userId }) {\n  const dispatch = useDispatch();\n  const [toast, setToast] = useState(null);\n\n  useEffect(() => {\n    async function load() {\n      const result = await dispatch(fetchUser(userId));\n      if (fetchUser.rejected.match(result)) {\n        setToast('Failed to load user');\n      }\n    }\n    load();\n  }, [dispatch, userId]);\n\n  return (\n    <div>\n      {toast && <div className='toast'>{toast}</div>}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Forgetting to handle the rejected case in extraReducers",
+          "Not using rejectWithValue and losing error details",
+          "Mutating state in the thunk body instead of the reducer",
+          "Returning values from thunks but not handling them in the reducer"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Fetch Thunk",
+        "description": "Create a `fetchTodos` async thunk that fetches from `/api/todos`. Handle pending, fulfilled, and rejected in a `todosSlice` extraReducers block. Use `rejectWithValue` for errors.",
+        "steps": [
+          "Use createAsyncThunk with the URL '/api/todos'",
+          "Status values: 'idle', 'loading', 'succeeded', 'failed'",
+          "Call rejectWithValue in the catch block"
+        ]
       }
     },
     {
@@ -65,16 +295,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "createAsyncThunk handles async logic",
-          "Auto-dispatches pending/fulfilled/rejected",
-          "Handle states in extraReducers",
-          "Track loading status for UX"
+          "createAsyncThunk wraps async logic and dispatches lifecycle actions",
+          "Handle pending, fulfilled, and rejected in extraReducers",
+          "Use rejectWithValue to pass error details",
+          "Track loading status with idle, loading, succeeded, failed"
         ],
-        "takeaway": "createAsyncThunk simplifies async Redux logic."
+        "takeaway": "createAsyncThunk eliminates async Redux boilerplate by auto-dispatching lifecycle actions you handle in your slice."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "redux"
+  "furtherReading": []
 }

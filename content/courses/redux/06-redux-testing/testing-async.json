@@ -1,0 +1,246 @@
+{
+  "id": "lesson-redux-029",
+  "slug": "testing-async",
+  "moduleSlug": "redux-testing",
+  "courseSlug": "redux",
+  "title": "Testing Async Thunks",
+  "description": "Learn how to write tests for Redux async thunks including mocking API calls and testing pending/fulfilled/rejected states.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "redux",
+    "testing",
+    "async",
+    "thunks",
+    "api",
+    "mocking"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real applications don't exist in isolation. They communicate with APIs, databases, and external services. Testing this async behavior requires different techniques than testing synchronous reducers. You need to mock API calls, control timing, and verify that your async thunks handle success and failure correctly."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers testing async thunks using Jest's mocking capabilities and testing library utilities to ensure your async logic works correctly under various conditions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Async Thunk Structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before testing, let's review how async thunks work. An async thunk dispatches three actions: **pending** (when started), **fulfilled** (on success), and **rejected** (on error). Your tests should verify each of these state transitions."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "caption": "Async thunk lifecycle",
+        "definition": "stateDiagram-v2\n    [*] --> Pending: async thunk dispatched\n    Pending --> Fulfilled: API returns success\n    Pending --> Rejected: API throws error\n    Fulfilled --> [*]\n    Rejected --> [*]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Async Thunk",
+        "content": "An async thunk for fetching user data",
+        "language": "javascript",
+        "code": "import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';\nimport { userAPI } from './api';\n\nexport const fetchUserById = createAsyncThunk(\n  'users/fetchById',\n  async (userId, { rejectWithValue }) => {\n    try {\n      const response = await userAPI.getUser(userId);\n      return response.data;\n    } catch (error) {\n      return rejectWithValue(error.message);\n    }\n  }\n);\n\nconst usersSlice = createSlice({\n  name: 'users',\n  initialState: {\n    entities: {},\n    loading: false,\n    error: null\n  },\n  reducers: {},\n  extraReducers: (builder) => {\n    builder\n      .addCase(fetchUserById.pending, (state) => {\n        state.loading = true;\n        state.error = null;\n      })\n      .addCase(fetchUserById.fulfilled, (state, action) => {\n        state.loading = false;\n        state.entities[action.payload.id] = action.payload;\n      })\n      .addCase(fetchUserById.rejected, (state, action) => {\n        state.loading = false;\n        state.error = action.payload || 'Unknown error';\n      });\n  }\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Mocking with jest.fn()"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest way to mock API calls is using `jest.fn()`. You can mock entire modules with `jest.mock()` or create mock functions for specific API calls."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "caption": "Testing async thunks flow",
+        "definition": "flowchart TD\n    A[Create mock API] --> B[Dispatch thunk]\n    B --> C[Mock returns data]\n    C --> D[Wait for completion]\n    D --> E[Assert on store state]\n    D --> F[Assert on dispatched actions]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic Async Thunk Test",
+        "content": "Testing an async thunk with mocked API",
+        "language": "javascript",
+        "code": "import { fetchUserById, usersSlice } from './usersSlice';\n\n// Mock the API module\njest.mock('./api', () => ({\n  userAPI: {\n    getUser: jest.fn()\n  }\n}));\n\nimport { userAPI } from './api';\n\ndescribe('fetchUserById thunk', () => {\n  let store;\n\n  beforeEach(() => {\n    // Reset all mocks before each test\n    jest.clearAllMocks();\n    // Create a test store\n    store = createTestStore();\n  });\n\n  it('should fetch user successfully', async () => {\n    const mockUser = { id: 'user-1', name: 'Alice', email: 'alice@example.com' };\n    userAPI.getUser.mockResolvedValue({ data: mockUser });\n\n    await store.dispatch(fetchUserById('user-1'));\n\n    const state = store.getState();\n    expect(state.users.entities['user-1']).toEqual(mockUser);\n    expect(state.users.loading).toBe(false);\n    expect(state.users.error).toBeNull();\n  });\n\n  it('should handle fetch error', async () => {\n    userAPI.getUser.mockRejectedValue(new Error('User not found'));\n\n    await store.dispatch(fetchUserById('invalid-id'));\n\n    const state = store.getState();\n    expect(state.users.loading).toBe(false);\n    expect(state.users.error).toBe('User not found');\n  });\n\n  it('should set loading state while fetching', async () => {\n    userAPI.getUser.mockImplementation(() => \n      new Promise(resolve => setTimeout(() => resolve({ data: {} }), 100))\n    );\n\n    const pendingAction = store.dispatch(fetchUserById('user-1'));\n    \n    // Check loading is true immediately after dispatch\n    expect(store.getState().users.loading).toBe(true);\n    \n    await pendingAction;\n    expect(store.getState().users.loading).toBe(false);\n  });\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using waitFor"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When testing async operations, you need to wait for them to complete before making assertions. `@testing-library/react` provides `waitFor` which polls until the expectation passes or times out."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using waitFor",
+        "content": "Waiting for async operations in component tests",
+        "language": "javascript",
+        "code": "import { render, screen, waitFor } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { Provider } from 'react-redux';\nimport { configureStore } from '@reduxjs/toolkit';\nimport { fetchUserById } from './usersSlice';\nimport UserProfile from './UserProfile';\n\njest.mock('./api', () => ({\n  userAPI: {\n    getUser: jest.fn()\n  }\n}));\n\nimport { userAPI } from './api';\n\ndescribe('UserProfile component', () => {\n  it('displays user data after loading', async () => {\n    const mockUser = { id: '1', name: 'Alice', email: 'alice@example.com' };\n    userAPI.getUser.mockResolvedValue({ data: mockUser });\n\n    render(\n      <Provider store={store}>\n        <UserProfile userId=\"1\" />\n      </Provider>\n    );\n\n    // Initially shows loading\n    expect(screen.getByText(/loading/i)).toBeInTheDocument();\n\n    // Wait for user data to appear\n    await waitFor(() => {\n      expect(screen.getByText('Alice')).toBeInTheDocument();\n    });\n\n    // Error state should not be visible\n    expect(screen.queryByText(/error/i)).not.toBeInTheDocument();\n  });\n\n  it('displays error message on failure', async () => {\n    userAPI.getUser.mockRejectedValue(new Error('Network error'));\n\n    render(\n      <Provider store={store}>\n        <UserProfile userId=\"invalid\" />\n      </Provider>\n    );\n\n    await waitFor(() => {\n      expect(screen.getByText(/error/i)).toBeInTheDocument();\n    });\n  });\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Pending/Fulfilled/Rejected Actions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redux Toolkit generates action creators for each phase of an async thunk. You can test that the correct actions are dispatched by capturing actions using `configureStore` with a custom middleware."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing Dispatched Actions",
+        "content": "Verifying all three thunk phases dispatch correctly",
+        "language": "javascript",
+        "code": "import { fetchUserById } from './usersSlice';\n\ndescribe('fetchUserById thunk actions', () => {\n  it('should dispatch pending, fulfilled, and rejected in correct order', async () => {\n    const store = createTestStore();\n    const dispatchedActions = [];\n\n    store.dispatch(fetchUserById('user-1'));\n\n    // Check pending action was dispatched\n    const pendingAction = store.getState().users.loading;\n    expect(pendingAction).toBe(true);\n\n    // Wait for completion\n    await store.dispatch(fetchUserById('user-1'));\n\n    // Redux Toolkit handles action dispatch internally\n    // The fulfilled/rejected cases update state accordingly\n    const finalState = store.getState();\n    expect(finalState.users.loading).toBe(false);\n  });\n});\n\n// Alternative: Using a spy middleware to capture all actions\nfunction createTestStore() {\n  let capturedActions = [];\n  const spyMiddleware = (storeAPI) => (next) => (action) => {\n    capturedActions.push(action);\n    return next(action);\n  };\n\n  return {\n    store: configureStore({\n      reducer: usersReducer,\n      middleware: (getDefaultMiddleware) => \n        getDefaultMiddleware().concat(spyMiddleware)\n    }),\n    getActions: () => capturedActions,\n    clearActions: () => { capturedActions = []; }\n  };\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Multiple Concurrent Requests"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real apps often make multiple requests simultaneously. You should test that your reducers handle race conditions correctly, such as when an earlier request completes after a later one."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing Race Conditions",
+        "content": "Handling multiple concurrent requests",
+        "language": "javascript",
+        "code": "describe('concurrent requests', () => {\n  it('should handle race condition - first request wins', async () => {\n    // Make request for user-2 first, then user-1\n    // But user-1 responds faster\n    userAPI.getUser\n      .mockResolvedValueOnce({ data: { id: 'user-1', name: 'Alice' } })\n      .mockResolvedValueOnce({ data: { id: 'user-2', name: 'Bob' } });\n\n    // Dispatch both requests simultaneously\n    await Promise.all([\n      store.dispatch(fetchUserById('user-1')),\n      store.dispatch(fetchUserById('user-2'))\n    ]);\n\n    // Both users should be in state\n    const state = store.getState();\n    expect(state.users.entities['user-1']).toBeDefined();\n    expect(state.users.entities['user-2']).toBeDefined();\n  });\n\n  it('should cancel previous request when new one starts', async () => {\n    // This is a more advanced scenario\n    // Requires abort controller support in your thunk\n    // See RTK Query's automatic request cancellation\n  });\n});"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Mocking Strategies",
+        "cards": [
+          {
+            "title": "jest.fn() for Functions",
+            "content": "Mock specific functions\nControl return values\nTrack call count and arguments\nSimple and direct\nBest for isolated testing"
+          },
+          {
+            "title": "jest.mock() for Modules",
+            "content": "Mock entire modules\nReplace dependencies completely\nGood for API modules\nRequires module path matching\nCan be hoisted automatically"
+          },
+          {
+            "title": "MSW (Mock Service Worker)",
+            "content": "Mocks at network level\nTests realistic HTTP behavior\nNo code changes needed\nGreat for integration tests\nMore setup but more realistic"
+          }
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Async Thunk",
+            "definition": "A Redux thunk that handles asynchronous operations like API calls."
+          },
+          {
+            "term": "Pending Action",
+            "definition": "The action dispatched when an async operation starts."
+          },
+          {
+            "term": "Fulfilled Action",
+            "definition": "The action dispatched when an async operation succeeds."
+          },
+          {
+            "term": "Rejected Action",
+            "definition": "The action dispatched when an async operation fails."
+          },
+          {
+            "term": "Mock Function",
+            "definition": "A fake function that simulates behavior and tracks calls."
+          },
+          {
+            "term": "waitFor",
+            "definition": "A testing library utility that waits for an assertion to pass."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Test an Async CRUD Thunk",
+        "description": "Write tests for a complete CRUD async thunk setup with create, read, update, and delete operations."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Async thunks dispatch pending/fulfilled/rejected actions",
+          "Use jest.fn() and jest.mock() to mock API calls",
+          "Always call jest.clearAllMocks() in beforeEach",
+          "Use waitFor to wait for async operations in components",
+          "Test both success and error paths",
+          "Consider race conditions with concurrent requests"
+        ],
+        "takeaway": "Testing async thunks requires mocking external dependencies and verifying state transitions at each phase of the async operation."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Testing Redux Async Logic",
+      "url": "https://redux.js.org/tutorials/tutorials/dispatching-async-actions"
+    },
+    {
+      "title": "Jest Mock Functions",
+      "url": "https://jestjs.io/docs/mock-functions"
+    },
+    {
+      "title": "MSW for API Mocking",
+      "url": "https://mswjs.io/"
+    }
+  ]
+}

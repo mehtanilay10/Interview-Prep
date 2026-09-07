@@ -3,7 +3,7 @@
   "slug": "authentication-flow",
   "moduleSlug": "redux-real-world",
   "title": "Authentication Flow",
-  "description": "Implement a complete authentication flow using Redux Toolkit.",
+  "description": "Build a complete authentication flow with Redux Toolkit, including login, logout, refresh tokens, and protected routes.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 24,
@@ -17,29 +17,201 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Authentication is a common real-world use case. Redux Toolkit makes managing auth state straightforward."
-      }
-    },
-    {
-      "type": "heading",
-      "level": 2,
-      "text": "Auth Slice"
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Auth Slice",
-        "content": "Authentication state management",
-        "language": "javascript",
-        "code": "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n\nexport const login = createAsyncThunk(\n  'auth/login',\n  async (credentials, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/login', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(credentials)\n      });\n      const data = await response.json();\n      if (!response.ok) throw data;\n      return data;\n    } catch (err) {\n      return rejectWithValue(err);\n    }\n  }\n);\n\nconst authSlice = createSlice({\n  name: 'auth',\n  initialState: { user: null, token: null, loading: false, error: null },\n  reducers: {\n    logout: (state) => {\n      state.user = null;\n      state.token = null;\n    }\n  },\n  extraReducers: (builder) => {\n    builder\n      .addCase(login.pending, (state) => {\n        state.loading = true;\n        state.error = null;\n      })\n      .addCase(login.fulfilled, (state, action) => {\n        state.loading = false;\n        state.user = action.payload.user;\n        state.token = action.payload.token;\n      })\n      .addCase(login.rejected, (state, action) => {\n        state.loading = false;\n        state.error = action.payload;\n      });\n  }\n});\n\nexport const { logout } = authSlice.actions;\nexport default authSlice.reducer;"
+        "text": "Authentication is the most common real-world feature built on Redux. With Redux Toolkit's `createAsyncThunk` you can model the entire login/logout/refresh flow, track loading and error states, and guard routes based on auth status."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "Token Storage",
-        "text": "Store tokens in memory or httpOnly cookies. Avoid localStorage for sensitive tokens."
+        "title": "Never trust the client",
+        "text": "Auth state in Redux is for UX. Always re-validate critical actions on the server. Sensitive tokens should live in httpOnly cookies, not Redux."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Auth Lifecycle"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "auth-flow",
+        "caption": "The auth state machine drives UI feedback and route guards.",
+        "definition": "stateDiagram-v2\n  [*] --> Anonymous\n  Anonymous --> Authenticating: login(creds)\n  Authenticating --> Authenticated: success\n  Authenticating --> Anonymous: failure\n  Authenticated --> Refreshing: token expired\n  Refreshing --> Authenticated: refresh ok\n  Refreshing --> Anonymous: refresh failed\n  Authenticated --> Anonymous: logout()"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Building the Auth Slice"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auth slice with thunks",
+        "content": "Login, refresh, and logout",
+        "language": "javascript",
+        "code": "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n\nexport const login = createAsyncThunk(\n  'auth/login',\n  async (credentials, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/login', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(credentials),\n      });\n      const data = await response.json();\n      if (!response.ok) return rejectWithValue(data);\n      return data;\n    } catch (err) {\n      return rejectWithValue({ message: 'Network error' });\n    }\n  }\n);\n\nexport const refreshToken = createAsyncThunk(\n  'auth/refresh',\n  async (_, { rejectWithValue }) => {\n    const response = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });\n    if (!response.ok) return rejectWithValue({ message: 'Session expired' });\n    return response.json();\n  }\n);\n\nconst authSlice = createSlice({\n  name: 'auth',\n  initialState: {\n    user: null,\n    accessToken: null,\n    status: 'idle', // 'idle' | 'loading' | 'authenticated' | 'error'\n    error: null,\n  },\n  reducers: {\n    logout: (state) => {\n      state.user = null;\n      state.accessToken = null;\n      state.status = 'idle';\n      state.error = null;\n    },\n  },\n  extraReducers: (builder) => {\n    builder\n      .addCase(login.pending, (state) => {\n        state.status = 'loading';\n        state.error = null;\n      })\n      .addCase(login.fulfilled, (state, action) => {\n        state.status = 'authenticated';\n        state.user = action.payload.user;\n        state.accessToken = action.payload.accessToken;\n      })\n      .addCase(login.rejected, (state, action) => {\n        state.status = 'error';\n        state.error = action.payload?.message ?? 'Login failed';\n      })\n      .addCase(refreshToken.fulfilled, (state, action) => {\n        state.accessToken = action.payload.accessToken;\n      })\n      .addCase(refreshToken.rejected, (state) => {\n        state.user = null;\n        state.accessToken = null;\n        state.status = 'idle';\n      });\n  },\n});\n\nexport const { logout } = authSlice.actions;\nexport default authSlice.reducer;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Auth States at a Glance"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Auth state values",
+        "headers": [
+          "Status",
+          "Meaning",
+          "UI"
+        ],
+        "rows": [
+          [
+            "idle",
+            "No attempt made yet",
+            "Show login form"
+          ],
+          [
+            "loading",
+            "Request in flight",
+            "Disable submit, show spinner"
+          ],
+          [
+            "authenticated",
+            "Tokens and user present",
+            "Show app, render protected routes"
+          ],
+          [
+            "error",
+            "Login failed",
+            "Show error message, allow retry"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JWT vs Session Cookies"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Two main token strategies",
+        "cards": [
+          {
+            "title": "JWT (in memory)",
+            "description": "Short-lived access token kept in Redux memory, refresh token in httpOnly cookie.",
+            "pros": [
+              "XSS can't read the access token",
+              "Easy to revoke by clearing memory",
+              "Stateless server validation"
+            ],
+            "cons": [
+              "Refresh flow adds complexity",
+              "Need silent refresh on tab focus"
+            ]
+          },
+          {
+            "title": "Server sessions",
+            "description": "Server stores session in DB/Redis, sends Set-Cookie header.",
+            "pros": [
+              "Easy revocation",
+              "Server has full control"
+            ],
+            "cons": [
+              "CSRF protection required",
+              "Stateful — harder to scale horizontally"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Protected Routes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Route guard",
+        "content": "Redirect unauthenticated users to /login",
+        "language": "jsx",
+        "code": "import { Navigate, useLocation } from 'react-router-dom';\nimport { useSelector } from 'react-redux';\nimport { selectIsAuthenticated } from './authSelectors';\n\nexport function RequireAuth({ children }) {\n  const isAuthed = useSelector(selectIsAuthenticated);\n  const location = useLocation();\n\n  if (!isAuthed) {\n    return <Navigate to=\"/login\" state={{ from: location }} replace />;\n  }\n  return children;\n}\n\n// Usage\n<Route path=\"/dashboard\" element={\n  <RequireAuth><Dashboard /></RequireAuth>\n} />"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Attaching Tokens to Requests"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auth-aware fetch wrapper",
+        "content": "Centralizes token injection",
+        "language": "javascript",
+        "code": "import { store } from '../app/store';\n\nexport async function authedFetch(url, options = {}) {\n  const token = store.getState().auth.accessToken;\n\n  const headers = {\n    'Content-Type': 'application/json',\n    ...(token ? { Authorization: `Bearer ${token}` } : {}),\n    ...options.headers,\n  };\n\n  const response = await fetch(url, { ...options, headers, credentials: 'include' });\n\n  if (response.status === 401) {\n    store.dispatch(logout());\n    throw new Error('Unauthorized');\n  }\n\n  return response;\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Access Token",
+            "definition": "Short-lived credential sent with every API request (5–15 min)."
+          },
+          {
+            "term": "Refresh Token",
+            "definition": "Long-lived credential used to mint new access tokens; should be in an httpOnly cookie."
+          },
+          {
+            "term": "httpOnly Cookie",
+            "definition": "Cookie inaccessible to JavaScript, mitigating XSS token theft."
+          },
+          {
+            "term": "Route Guard",
+            "definition": "A wrapper component that redirects unauthenticated users away from protected pages."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Silent refresh",
+        "text": "Most apps refresh the access token on app boot and on tab focus using `visibilitychange` so users don't see login screens mid-session."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a full auth flow",
+        "description": "Wire up:\n1. A `/login` page with email/password fields.\n2. A `RequireAuth` route guard.\n3. A `useAuth()` hook that returns `{ user, login, logout, isAuthenticated }`.\n4. A 401 handler in your fetch wrapper that auto-logs out.",
+        "steps": [
+          "Use `createAsyncThunk` for the login request.",
+          "Store the refresh token in an httpOnly cookie on the server."
+        ]
       }
     },
     {
@@ -47,12 +219,13 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use createAsyncThunk for auth requests",
-          "Track loading and error states",
-          "Clear state on logout",
-          "Protect routes based on auth state"
+          "Model the full auth lifecycle: idle → loading → authenticated → error",
+          "Keep access tokens in memory and refresh tokens in httpOnly cookies",
+          "Use route guards to redirect unauthenticated users",
+          "Centralize token injection in an auth-aware fetch wrapper",
+          "Listen for 401s and dispatch `logout` automatically"
         ],
-        "takeaway": "Redux Toolkit simplifies auth state management."
+        "takeaway": "Redux Toolkit makes complex auth flows manageable and testable."
       }
     }
   ],

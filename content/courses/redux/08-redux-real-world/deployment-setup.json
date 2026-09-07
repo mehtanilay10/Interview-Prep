@@ -3,7 +3,7 @@
   "slug": "deployment-setup",
   "moduleSlug": "redux-real-world",
   "title": "Deployment and Production Setup",
-  "description": "Prepare your Redux application for production deployment.",
+  "description": "Configure Redux for production: turn off dev tooling, optimize bundles, monitor errors, and run safely in CI/CD.",
   "order": 4,
   "difficulty": "intermediate",
   "estimatedMinutes": 16,
@@ -17,47 +17,213 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Production-ready Redux apps need specific configurations for performance and reliability."
-      }
-    },
-    {
-      "type": "heading",
-      "level": 2,
-      "text": "Production Checklist"
-    },
-    {
-      "type": "checklist",
-      "data": {
-        "items": [
-          "Enable Redux DevTools only in development",
-          "Strip console logs in production build",
-          "Use Redux Toolkit dev checks only in development",
-          "Implement error boundaries in React",
-          "Set up monitoring and logging",
-          "Optimize bundle size with code splitting"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "level": 2,
-      "text": "Environment Configuration"
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Dev vs Prod",
-        "content": "Conditional store setup",
-        "language": "javascript",
-        "code": "import { configureStore } from '@reduxjs/toolkit';\nimport rootReducer from './rootReducer';\n\nconst store = configureStore({\n  reducer: rootReducer,\n  devTools: process.env.NODE_ENV !== 'production',\n  middleware: (getDefaultMiddleware) =>\n    process.env.NODE_ENV === 'production'\n      ? getDefaultMiddleware({ serializableCheck: false })\n      : getDefaultMiddleware()\n});\n\nexport default store;"
+        "text": "What works in development can **hurt** you in production. Redux dev checks, verbose logs, and unminified bundles all add overhead. A clean production setup disables them, monitors the rest, and ships fast."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "info",
-        "title": "Monitoring",
-        "text": "Use tools like Sentry or LogRocket to monitor Redux state changes in production."
+        "title": "The big rule",
+        "text": "Anything that helps you debug should be **off or no-op** in production. Anything that helps you understand users should be **on and silent** to them."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Production-Only Store Configuration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Env-aware store",
+        "content": "Disable dev checks in production",
+        "language": "javascript",
+        "code": "import { configureStore } from '@reduxjs/toolkit';\nimport rootReducer from './rootReducer';\n\nconst isProd = process.env.NODE_ENV === 'production';\n\nexport const store = configureStore({\n  reducer: rootReducer,\n  devTools: !isProd,\n  middleware: (getDefault) =>\n    getDefault({\n      serializableCheck: !isProd,\n      immutableCheck: !isProd,\n    }),\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Build Optimizations"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Tune your build for production",
+        "headers": [
+          "Optimization",
+          "Tool",
+          "Impact"
+        ],
+        "rows": [
+          [
+            "Minify JS",
+            "Terser (Webpack/Vite)",
+            "40–60% smaller bundle"
+          ],
+          [
+            "Compress assets",
+            "gzip / Brotli",
+            "60–80% smaller transfer"
+          ],
+          [
+            "Tree-shake unused exports",
+            "ES modules + bundler",
+            "Removes dead code"
+          ],
+          [
+            "Code-split routes",
+            "React.lazy / Loadable",
+            "Faster initial load"
+          ],
+          [
+            "Cache with hashing",
+            "Webpack content-hash / Vite",
+            "Long browser cache"
+          ],
+          [
+            "Disable Redux DevTools",
+            "configureStore({ devTools: false })",
+            "Smaller, no overhead"
+          ],
+          [
+            "Disable serializable check",
+            "configureStore middleware option",
+            "Avoids per-action overhead"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Continuous Deployment Pipeline"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cicd-flow",
+        "caption": "A typical pipeline: test, build, smoke test, deploy, monitor.",
+        "definition": "flowchart LR\n  A[git push] --> B[CI: lint + typecheck + tests]\n  B --> C[Build: bundle + split]\n  C --> D[Smoke test against staging]\n  D --> E[Deploy to CDN]\n  E --> F[Monitor Sentry / Datadog]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Production Checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Pre-flight checks",
+        "items": [
+          "DevTools disabled in production",
+          "Serializable check disabled in production",
+          "Immutable check disabled in production",
+          "Console logs stripped or gated by env",
+          "Error tracking (Sentry/Datadog) initialized before store",
+          "Bundle analyzed with `webpack-bundle-analyzer` or `rollup-plugin-visualizer`",
+          "Long-term caching enabled via content-hashed filenames",
+          "Sensitive values injected via runtime config, not bundled",
+          "Smoke tests run against the deployed app",
+          "Redux state changes are scrubbed before logging"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Monitoring and Logging"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In production you should still see **what the store is doing** — but only through a tool like Sentry or Datadog. Forward every `/rejected` action and any custom error action."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Production error middleware",
+        "content": "Forward errors to monitoring",
+        "language": "javascript",
+        "code": "const sentryMiddleware = (store) => (next) => (action) => {\n  if (action.type.endsWith('/rejected') && window.Sentry) {\n    window.Sentry.withScope((scope) => {\n      scope.setExtra('action', action);\n      scope.setExtra('state', store.getState());\n      window.Sentry.captureException(action.payload ?? action.error);\n    });\n  }\n  return next(action);\n};"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't log sensitive state",
+        "text": "Never send passwords, tokens, or PII to Sentry. Scrub your state before forwarding it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Runtime Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Don't bake environment URLs into your bundle. Inject them at runtime via a `/config.json` or environment variables so the same build can run in staging and production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Runtime config",
+        "content": "Fetch environment at boot",
+        "language": "javascript",
+        "code": "const response = await fetch('/config.json');\nconst config = await response.json();\n\nexport const store = configureStore({\n  reducer: rootReducer,\n  middleware: (getDefault) =>\n    getDefault({ thunk: { extraArgument: config } }),\n});"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "DevTools",
+            "definition": "Browser extension that visualizes Redux state and actions. Disabled in production."
+          },
+          {
+            "term": "Serializable Check",
+            "definition": "Toolkit middleware that warns when state contains non-serializable values. Slow, so disabled in production."
+          },
+          {
+            "term": "Tree Shaking",
+            "definition": "Bundler removes unused exports from the final bundle."
+          },
+          {
+            "term": "Content Hash",
+            "definition": "Filename suffix derived from file contents, enabling long-term browser caching."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Configure a production store",
+        "description": "Build a `configureAppStore(env)` function that:\n1. Disables devTools when `env === 'production'`.\n2. Disables serializable/immutable checks in production.\n3. Adds a monitoring middleware that forwards `/rejected` actions.\n4. Loads runtime config and exposes it as the thunk extra argument.",
+        "steps": [
+          "`getDefaultMiddleware({ thunk: { extraArgument: config } })` lets thunks read it via the third argument.",
+          "Always guard `window.Sentry` so SSR doesn't crash."
+        ]
       }
     },
     {
@@ -65,12 +231,13 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Disable DevTools in production",
-          "Configure middleware per environment",
-          "Monitor errors in production",
-          "Optimize bundle size"
+          "Disable Redux DevTools and dev checks in production",
+          "Analyze and code-split your bundle for fast first paint",
+          "Forward errors to monitoring without leaking sensitive state",
+          "Inject runtime config so the same build serves many environments",
+          "Run a CI pipeline that tests, builds, and smoke-tests before deploying"
         ],
-        "takeaway": "Production setup ensures performance and reliability."
+        "takeaway": "Production setup turns Redux into a lean, observable state engine."
       }
     }
   ],

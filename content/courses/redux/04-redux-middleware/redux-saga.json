@@ -17,37 +17,240 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Redux Saga** is a middleware for handling complex side effects using generator functions. It's powerful for complex async flows."
+        "text": "**Redux Saga** is a middleware library that handles complex asynchronous operations using **generator functions** and declarative **effects**. It's more powerful than thunks for handling intricate async flows like parallel execution, task cancellation, and complex event coordination."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "How Sagas Work"
+        "text": "Why Use Sagas?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Sagas use generator functions and effects (call, put, take, etc.) to orchestrate async operations."
+        "text": "While thunks work well for simple async, sagas excel at complex scenarios: waiting for multiple actions, canceling ongoing tasks, handling polling, orchestrating parallel API calls, and testing. Sagas are also easier to test because effects are plain objects."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "saga-flow-diagram",
+        "caption": "Redux Saga Architecture",
+        "definition": "flowchart TD\n    A[Action\n    dispatched] --> B{Saga\n    Middleware}\n    B --> C{Watcher\n    Saga}\n    C -->|action type matches| D[Worker\n    Saga]\n    D --> E{Effects}\n    E -->|yield call| F[API Call]\n    E -->|yield put| G[Dispatch\n    Action]\n    E -->|yield select| H[Read\n    State]\n    E -->|yield take| I[Wait for\n    Action]\n    F --> J[Promise\n    Resolved]\n    J --> G\n    style C fill:#e1eff6\n    style D fill:#d4edda\n    style E fill:#fff3cd"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Generator Functions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sagas use **generator functions** (functions with `*` and `yield`). Generators can pause execution and resume, making async code look synchronous. Each `yield` produces an effect that the saga middleware executes."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Saga",
-        "content": "Creating a saga",
+        "title": "Basic Generator",
+        "content": "Understanding generator functions",
         "language": "javascript",
-        "code": "import { call, put, takeEvery } from 'redux-saga/effects';\n\n// Worker saga\nfunction* fetchUserSaga(action) {\n  try {\n    const user = yield call(api.fetchUser, action.payload.userId);\n    yield put({ type: 'FETCH_USER_SUCCESS', payload: user });\n  } catch (error) {\n    yield put({ type: 'FETCH_USER_ERROR', payload: error.message });\n  }\n}\n\n// Watcher saga\nfunction* watchFetchUser() {\n  yield takeEvery('FETCH_USER_REQUEST', fetchUserSaga);\n}"
+        "code": "// A simple generator function\nfunction* myGenerator() {\n  console.log('Starting');\n  yield 1;           // Pause, return 1\n  console.log('Resumed');\n  yield 2;           // Pause, return 2\n  return 3;          // Finish, return 3\n}\n\nconst gen = myGenerator();\nconsole.log(gen.next()); // { value: 1, done: false }\nconsole.log(gen.next()); // { value: 2, done: false }\nconsole.log(gen.next()); // { value: 3, done: true }\n\n// Async generator - looks like sync code!\nfunction* fetchUserSaga(userId) {\n  const user = yield call(api.fetchUser, userId);  // Waits for API\n  yield put({ type: 'USER_FETCHED', payload: user });\n  return user;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Saga Effects"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Effect",
+          "Purpose",
+          "Example"
+        ],
+        "rows": [
+          [
+            "call",
+            "Invoke a function",
+            "yield call(api.fetchUser, id)"
+          ],
+          [
+            "put",
+            "Dispatch an action",
+            "yield put({ type: 'FETCHED', payload })"
+          ],
+          [
+            "select",
+            "Read from state",
+            "yield select(state => state.users)"
+          ],
+          [
+            "take",
+            "Wait for an action",
+            "yield take('FETCH_USER')"
+          ],
+          [
+            "takeEvery",
+            "Run on every action",
+            "yield takeEvery('*', handler)"
+          ],
+          [
+            "takeLatest",
+            "Cancel previous",
+            "yield takeLatest('*', handler)"
+          ],
+          [
+            "fork",
+            "Start non-blocking",
+            "yield fork(task)"
+          ],
+          [
+            "cancel",
+            "Cancel a task",
+            "yield cancel(task)"
+          ],
+          [
+            "all",
+            "Run in parallel",
+            "yield all([call1, call2])"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Terms"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Effect",
+            "definition": "A plain object describing an operation. Sagas don't execute effects directly; the middleware does."
+          },
+          {
+            "term": "Worker Saga",
+            "definition": "A generator function that performs the actual work (API calls, state updates)."
+          },
+          {
+            "term": "Watcher Saga",
+            "definition": "A generator that watches for specific actions and spawns worker sagas."
+          },
+          {
+            "term": "Task",
+            "definition": "An object representing a running saga, used for cancellation and monitoring."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Saga Setup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Watcher and Worker Sagas",
+        "content": "Setting up sagas for user fetching",
+        "language": "javascript",
+        "code": "import { call, put, takeEvery } from 'redux-saga/effects';\nimport { createSagaMiddleware } from '@redux-saga/core';\nimport { configureStore } from '@reduxjs/toolkit';\n\n// API function\nconst api = {\n  fetchUser: (userId) => \n    fetch(`/api/users/${userId}`).then(r => r.json())\n};\n\n// Worker saga - does the actual work\nfunction* fetchUserSaga(action) {\n  try {\n    // call effect: call the API function\n    const user = yield call(api.fetchUser, action.payload.userId);\n    \n    // put effect: dispatch action to store\n    yield put({ type: 'FETCH_USER_SUCCESS', payload: user });\n  } catch (error) {\n    yield put({ type: 'FETCH_USER_ERROR', payload: error.message });\n  }\n}\n\n// Watcher saga - watches for actions\nfunction* watchFetchUser() {\n  // takeEvery: run fetchUserSaga for every FETCH_USER_REQUEST\n  yield takeEvery('FETCH_USER_REQUEST', fetchUserSaga);\n}\n\n// Create saga middleware\nconst sagaMiddleware = createSagaMiddleware();\n\n// Add to store\nconst store = configureStore({\n  reducer: rootReducer,\n  middleware: (getDefaultMiddleware) =>\n    getDefaultMiddleware().concat(sagaMiddleware),\n});\n\n// Run the root saga\nsagaMiddleware.run(watchFetchUser);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Saga vs Thunk"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "cards": [
+          {
+            "title": "Redux Thunk",
+            "content": "Simple: return functions. Good for basic async. Testing requires mocking. Direct access to dispatch and getState.",
+            "highlight": false
+          },
+          {
+            "title": "Redux Saga",
+            "content": "Declarative effects. Powerful for complex flows. Easier to test (effects are plain objects). Steeper learning curve.",
+            "highlight": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Complex Saga Patterns",
+        "content": "Parallel execution and cancellation",
+        "language": "javascript",
+        "code": "import { call, put, takeLatest, fork, cancel, all } from 'redux-saga/effects';\n\n// Example: Load user and their posts in parallel\nfunction* loadUserData(userId) {\n  const [user, posts] = yield all([\n    call(api.fetchUser, userId),\n    call(api.fetchPosts, userId),\n  ]);\n  yield put({ type: 'USER_DATA_LOADED', payload: { user, posts } });\n}\n\n// Example: takeLatest - only process the latest request\nfunction* watchFetchUser() {\n  // Cancel any previous saga if new action comes in\n  yield takeLatest('FETCH_USER_REQUEST', fetchUserSaga);\n}\n\n// Example: Task cancellation\nfunction* workflowSaga() {\n  const task = yield fork(backgroundTask);\n  \n  // Wait for cancel action\n  yield take('CANCEL_WORKFLOW');\n  \n  // Cancel the background task\n  yield cancel(task);\n}\n\n// Example: Debouncing\nfunction* handleSearch() {\n  // debounce effect using select and delay\n  const { query } = yield select(state => state.search);\n  if (query) {\n    yield call(delay, 500);  // Wait 500ms\n    yield put({ type: 'SEARCH', payload: query });\n  }\n}\n\n// takeEvery with debounce pattern\nfunction* watchSearch() {\n  yield takeLatest('SEARCH_INPUT', handleSearch);\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "When to Use Sagas",
-        "text": "Sagas are great for complex async flows: debouncing, chaining, cancellation. For simple async, thunks or createAsyncThunk are simpler."
+        "variant": "warning",
+        "title": "Performance Consideration",
+        "text": "takeEvery runs a saga for every matching action. For scenarios where you only want the latest (like search), use takeLatest to avoid processing stale results."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Accessing State in Sagas"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using select Effect",
+        "content": "Reading state within sagas",
+        "language": "javascript",
+        "code": "import { select, call, put } from 'redux-saga/effects';\n\n// Check auth state before making API call\nfunction* fetchProtectedData(resourceId) {\n  // Select auth token from state\n  const token = yield select(state => state.auth.token);\n  \n  if (!token) {\n    yield put({ type: 'AUTH_ERROR', payload: 'Not authenticated' });\n    return;\n  }\n  \n  // Pass token to API\n  const data = yield call(\n    api.fetchProtected, \n    resourceId, \n    token\n  );\n  \n  yield put({ type: 'DATA_FETCHED', payload: data });\n}\n\n// Complex state selection\nfunction* processOrder(orderId) {\n  const { user, cart, settings } = yield select(state => ({\n    user: state.user,\n    cart: state.cart,\n    settings: state.settings,\n  }));\n  \n  if (cart.items.length === 0) {\n    yield put({ type: 'ORDER_ERROR', payload: 'Cart is empty' });\n    return;\n  }\n  \n  const shippingAddress = user.addresses[settings.defaultAddress];\n  yield call(api.submitOrder, { orderId, cart, shippingAddress });\n}"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Real-Time Polling System",
+        "description": "Create a saga-based polling system that fetches data at regular intervals, handles errors gracefully, and can be started/stopped dynamically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Sagas"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Saga Testing",
+        "content": "Testing sagas with redux-saga-test-plan",
+        "language": "javascript",
+        "code": "import { runSaga } from 'redux-saga';\nimport { call, put } from 'redux-saga/effects';\nimport { fetchUserSaga, watchFetchUser } from './sagas';\nimport api from './api';\n\n// Test a single saga\ntest('fetchUserSaga should fetch and dispatch success', async () => {\n  const dispatchedActions = [];\n  const fakeUser = { id: 1, name: 'Test User' };\n  \n  // Mock the API\n  api.fetchUser = jest.fn().mockResolvedValue(fakeUser);\n  \n  // Run the saga\n  const gen = fetchUserSaga({ payload: { userId: 1 } });\n  \n  // Step through generator\n  const callEffect = gen.next();\n  expect(callEffect.value).toEqual(call(api.fetchUser, 1));\n  \n  // Resume with the API result\n  const putEffect = gen.next(fakeUser);\n  expect(putEffect.value).toEqual(\n    put({ type: 'FETCH_USER_SUCCESS', payload: fakeUser })\n  );\n  \n  // Should be done\n  expect(gen.next().done).toBe(true);\n});\n\n// Test with runSaga helper\ntest('fetchUserSaga integration', async () => {\n  const dispatchedActions = [];\n  const fakeUser = { id: 1, name: 'Test' };\n  \n  const result = await runSaga(\n    {\n      dispatch: (action) => dispatchedActions.push(action),\n      getState: () => ({ user: {} }),\n    },\n    fetchUserSaga,\n    { payload: { userId: 1 } }\n  ).toPromise();\n  \n  expect(dispatchedActions).toContainEqual(\n    { type: 'FETCH_USER_SUCCESS', payload: fakeUser }\n  );\n});"
       }
     },
     {
@@ -55,16 +258,30 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Sagas use generator functions",
-          "Effects: call, put, take, etc.",
-          "Great for complex async flows",
-          "Thunks are simpler for basic async"
+          "Sagas use generator functions and declarative effects for async operations",
+          "Watcher sagas detect actions, worker sagas perform work",
+          "Effects (call, put, select) are plain objects, making testing easier",
+          "takeEvery runs for every action, takeLatest cancels previous",
+          "Choose Saga for complex flows; thunks are simpler for basic async"
         ],
-        "takeaway": "Sagas handle complex async patterns in Redux."
+        "takeaway": "Redux Saga provides a powerful model for handling complex async workflows through declarative generator-based effects."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
+  "furtherReading": [
+    {
+      "title": "Redux Saga Official Documentation",
+      "url": "https://redux-saga.js.org/"
+    },
+    {
+      "title": "Saga Effects Reference",
+      "url": "https://redux-saga.js.org/docs/api/"
+    },
+    {
+      "title": "Saga vs Thunk Comparison",
+      "url": "https://decembersoft.com/posts/what-is-the-best-way-to-handle-async-in-redux/"
+    }
+  ],
   "courseSlug": "redux"
 }

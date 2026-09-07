@@ -1,0 +1,249 @@
+{
+  "id": "lesson-redux-030",
+  "slug": "code-splitting",
+  "moduleSlug": "redux-advanced-concepts",
+  "title": "Code Splitting and Dynamic Reducers",
+  "description": "Reduce initial bundle size and load reducers on demand with dynamic imports and store injection.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 22,
+  "tags": [
+    "redux",
+    "code-splitting",
+    "dynamic-imports",
+    "performance"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Large apps ship a single Redux store with **every reducer** loaded up front. That means a `settings` reducer and its dependencies load even if the user never opens the settings page. **Code splitting** fixes this by loading reducers only when their feature is needed."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "What we are splitting",
+        "text": "We split two things: the React code for a feature (with `React.lazy`), and the Redux slice/reducer for that feature (with dynamic `injectReducer`)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Static vs Dynamic Reducers"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Static reducer (the old way)",
+        "content": "Every reducer is in the initial bundle",
+        "language": "javascript",
+        "code": "import { configureStore, combineReducers } from '@reduxjs/toolkit';\nimport authReducer from './features/auth/authSlice';\nimport todosReducer from './features/todos/todosSlice';\nimport settingsReducer from './features/settings/settingsSlice';\n\nconst rootReducer = combineReducers({\n  auth: authReducer,\n  todos: todosReducer,\n  settings: settingsReducer,\n});\n\nconst store = configureStore({ reducer: rootReducer });"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Above, the user pays the cost of all three reducers on the very first page load — even if they only ever visit `/login`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dynamic Reducer Injection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The idea: build a `combineReducers` that supports being mutated at runtime. When a feature route mounts, it asks the store to **inject** its reducer under a chosen key. From that point on, the reducer is part of the store."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Injectable store factory",
+        "content": "Store with a reducer registry",
+        "language": "javascript",
+        "code": "import { configureStore, combineReducers } from '@reduxjs/toolkit';\n\nexport function createInjectableStore() {\n  const reducerMap = {};\n\n  const rootReducer = combineReducers(reducerMap);\n  const store = configureStore({ reducer: rootReducer });\n\n  // Replace the root reducer so newly-injected keys are picked up\n  store.injectReducer = (key, reducer) => {\n    if (reducerMap[key]) return; // already injected\n    reducerMap[key] = reducer;\n    store.replaceReducer(combineReducers(reducerMap));\n  };\n\n  return store;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Loading a Slice Lazily"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "useInjectReducer hook",
+        "content": "Inject a reducer once when a component mounts",
+        "language": "javascript",
+        "code": "import { useEffect } from 'react';\nimport { useStore } from 'react-redux';\n\nexport function useInjectReducer(key, reducer) {\n  const store = useStore();\n  useEffect(() => {\n    store.injectReducer(key, reducer);\n  }, [store, key, reducer]);\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Lazy feature entry",
+        "content": "Combine React.lazy with reducer injection",
+        "language": "jsx",
+        "code": "import React, { useEffect, lazy } from 'react';\nimport { useInjectReducer } from './useInjectReducer';\n\nconst SettingsPage = lazy(() => import('./SettingsPage'));\nconst settingsReducer = await import('./settingsSlice').then((m) => m.default);\n\nexport function SettingsRoute() {\n  useInjectReducer('settings', settingsReducer);\n  return (\n    <React.Suspense fallback={<div>Loading settings…</div>}>\n      <SettingsPage />\n    </React.Suspense>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "code-splitting-flow",
+        "caption": "Reducers and components are downloaded only when their route is visited.",
+        "definition": "sequenceDiagram\n  participant App\n  participant Store\n  participant Net as Network\n\n  App->>Store: createInjectableStore()\n  Store-->>App: empty store\n  App->>App: Render Home route\n  App->>Net: import('/settings/SettingsPage.jsx')\n  Net-->>App: settings chunk\n  App->>Store: injectReducer('settings', settingsReducer)\n  Store-->>App: settings state available\n  App->>App: Render SettingsPage"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performance Benefits"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Bundle size before vs after splitting",
+        "headers": [
+          "Metric",
+          "Monolithic",
+          "Code-Split"
+        ],
+        "rows": [
+          [
+            "Initial JS bundle",
+            "1.2 MB",
+            "320 KB"
+          ],
+          [
+            "Time to interactive (cold)",
+            "4.1 s",
+            "1.4 s"
+          ],
+          [
+            "Reducers in memory on load",
+            "All",
+            "Only home + auth"
+          ],
+          [
+            "Routes that load extra JS",
+            "None",
+            "Each route on demand"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Alternative: react-loadable / Loadable Components"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before `React.lazy`, libraries like `react-loadable` and `@loadable/component` handled the same job. They still work and add features like SSR-friendly placeholders."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Loadable Components",
+        "content": "Declarative lazy loading",
+        "language": "jsx",
+        "code": "import loadable from '@loadable/component';\n\nconst SettingsPage = loadable(() => import('./SettingsPage'), {\n  fallback: <div>Loading…</div>,\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't double-register",
+        "text": "Always check whether the reducer key already exists before injecting. Calling `injectReducer` twice with the same key resets state and re-runs initial effects."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Code Splitting",
+            "definition": "Breaking your bundle into smaller chunks that load on demand."
+          },
+          {
+            "term": "Dynamic Import",
+            "definition": "`import('./module.js')` returns a promise and creates a separate chunk in the bundle."
+          },
+          {
+            "term": "React.lazy",
+            "definition": "React API for lazy-loading components via dynamic imports."
+          },
+          {
+            "term": "replaceReducer",
+            "definition": "Store method that swaps in a new root reducer at runtime."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Things to Watch For"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Server-side rendering: defer injection until after hydration",
+          "Tests: reset the store between tests so injected reducers don't leak",
+          "Selectors: ensure they're defined **after** the reducer is injected",
+          "Don't inject in render — wrap in `useEffect` or route guards"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Split the dashboard feature",
+        "description": "Take a monolithic store with `auth`, `todos`, `dashboard`. Move `dashboard` into its own lazy chunk.\n1. Create a `useInjectReducer` hook.\n2. Wrap the `/dashboard` route with `React.lazy` and `Suspense`.\n3. Verify in the Network tab that `dashboard.js` only loads when you visit `/dashboard`.",
+        "steps": [
+          "Use `React.lazy` for the component AND `import('./dashboardSlice')` for the reducer.",
+          "Test that navigating away and back does **not** re-inject the reducer."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Dynamic reducers let you load slices on demand instead of up front",
+          "`React.lazy` handles UI; a custom `injectReducer` handles state",
+          "`replaceReducer` is the API that swaps in new reducers at runtime",
+          "Watch for double-injection and SSR pitfalls",
+          "Measure bundle size before and after with `webpack-bundle-analyzer`"
+        ],
+        "takeaway": "Code splitting shrinks initial bundles and speeds up large apps."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "redux"
+}

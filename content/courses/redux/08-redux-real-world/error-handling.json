@@ -3,7 +3,7 @@
   "slug": "error-handling",
   "moduleSlug": "redux-real-world",
   "title": "Error Handling in Redux",
-  "description": "Learn strategies for handling errors gracefully in Redux applications.",
+  "description": "Strategies for tracking, surfacing, and recovering from failures in Redux applications.",
   "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 18,
@@ -17,46 +17,220 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Robust error handling keeps your app stable and provides good user feedback."
+        "text": "Every async action can fail. A robust Redux app surfaces those failures as **first-class state**, shows helpful UI, and lets the user retry — without crashing the page."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Three layers of error handling",
+        "text": "1. **Slice state** — per-feature errors (`state.auth.error`).\n2. **Middleware** — global error logging and toasts.\n3. **Error boundaries** — last-resort React catch-all."
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Error Patterns"
+      "data": {
+        "level": 2,
+        "text": "Errors in Slices"
+      }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Track error state in the slice",
-          "Use rejected action types from createAsyncThunk",
-          "Show toast notifications for failures",
-          "Retry failed requests with exponential backoff",
-          "Log errors to monitoring service"
+        "text": "Each feature slice should track its own loading and error state. With `createAsyncThunk`, the `pending`, `fulfilled`, and `rejected` actions do this for free."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Slice-level error state",
+        "content": "Capture errors per feature",
+        "language": "javascript",
+        "code": "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n\nexport const fetchTodos = createAsyncThunk(\n  'todos/fetch',\n  async (_, { rejectWithValue }) => {\n    try {\n      const response = await fetch('/api/todos');\n      if (!response.ok) {\n        return rejectWithValue({ code: response.status, message: response.statusText });\n      }\n      return response.json();\n    } catch (err) {\n      return rejectWithValue({ code: 'NETWORK', message: err.message });\n    }\n  }\n);\n\nconst todosSlice = createSlice({\n  name: 'todos',\n  initialState: { items: [], status: 'idle', error: null },\n  reducers: {},\n  extraReducers: (builder) => {\n    builder\n      .addCase(fetchTodos.pending, (state) => {\n        state.status = 'loading';\n        state.error = null;\n      })\n      .addCase(fetchTodos.fulfilled, (state, action) => {\n        state.status = 'succeeded';\n        state.items = action.payload;\n      })\n      .addCase(fetchTodos.rejected, (state, action) => {\n        state.status = 'failed';\n        state.error = action.payload ?? { message: 'Unknown error' };\n      });\n  },\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Global Error Middleware"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "error-middleware",
+        "caption": "Middleware inspects every action and reacts to failures globally.",
+        "definition": "flowchart LR\n  A[Component dispatches thunk] --> B[Middleware intercepts]\n  B -->|action is rejected| C[Log to Sentry]\n  B -->|action is rejected| D[Show toast toast]\n  B -->|any action| E[next action]\n  E --> F[Reducer]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global error middleware",
+        "content": "Logs and toasts every rejected action",
+        "language": "javascript",
+        "code": "const errorLogger = (store) => (next) => (action) => {\n  if (action.type.endsWith('/rejected')) {\n    const error = action.payload ?? action.error?.message ?? 'Unknown error';\n\n    console.error('[Redux] ', action.type, error);\n\n    if (typeof window !== 'undefined' && window.Sentry) {\n      window.Sentry.captureException(error);\n    }\n\n    store.dispatch(showToast({ kind: 'error', message: String(error) }));\n  }\n  return next(action);\n};\n\nconst store = configureStore({\n  reducer: rootReducer,\n  middleware: (getDefault) => getDefault().concat(errorLogger),\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling Patterns Compared"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Where to handle each failure",
+        "cards": [
+          {
+            "title": "try/catch in thunk",
+            "description": "Wrap your `fetch` in `try/catch` and return `rejectWithValue`.",
+            "pros": [
+              "Full control over per-request logic",
+              "Easily attaches context"
+            ],
+            "cons": [
+              "Easy to forget",
+              "Duplicated across thunks"
+            ]
+          },
+          {
+            "title": "Rejected action types",
+            "description": "Use `builder.addCase(thunk.rejected)` in the slice.",
+            "pros": [
+              "First-class state for UI",
+              "Predictable and testable"
+            ],
+            "cons": [
+              "Doesn't run if the thunk never dispatched"
+            ]
+          },
+          {
+            "title": "Global middleware",
+            "description": "A single middleware inspects every action for `/rejected`.",
+            "pros": [
+              "One place to log or alert",
+              "Catches things slices miss"
+            ],
+            "cons": [
+              "No UI-specific error state",
+              "Hard to attach context"
+            ]
+          }
         ]
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Global Error Middleware"
+      "data": {
+        "level": 2,
+        "text": "Error Handling Matrix"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Patterns by failure type",
+        "headers": [
+          "Failure",
+          "Pattern",
+          "Where it lives"
+        ],
+        "rows": [
+          [
+            "Network error",
+            "try/catch → rejectWithValue",
+            "Inside createAsyncThunk"
+          ],
+          [
+            "Validation error",
+            "Rejected action → state.error",
+            "Slice extraReducers"
+          ],
+          [
+            "Crash in component",
+            "React error boundary",
+            "React tree"
+          ],
+          [
+            "Repeated failures",
+            "Exponential backoff retry",
+            "Thunk or RTK Query"
+          ],
+          [
+            "Server 500",
+            "Global middleware + logging",
+            "Middleware"
+          ],
+          [
+            "Permission denied (401/403)",
+            "Auth middleware → redirect",
+            "Auth slice/middleware"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retrying Failed Requests"
+      }
     },
     {
       "type": "example",
       "data": {
-        "title": "Error Middleware",
-        "content": "Catching unhandled errors",
+        "title": "Exponential backoff",
+        "content": "Retry transient network errors",
         "language": "javascript",
-        "code": "const errorHandler = (storeApi) => (next) => (action) => {\n  if (action.type.endsWith('/rejected')) {\n    const error = action.payload || action.error.message;\n    console.error('Action failed:', action.type, error);\n    // Optionally dispatch a global error action\n    storeApi.dispatch(showErrorToast(error));\n  }\n  return next(action);\n};\n\nconst store = configureStore({\n  reducer: rootReducer,\n  middleware: (getDefaultMiddleware) =>\n    getDefaultMiddleware().concat(errorHandler)\n});"
+        "code": "async function withRetry(fn, maxAttempts = 3) {\n  let attempt = 0;\n  while (attempt < maxAttempts) {\n    try {\n      return await fn();\n    } catch (err) {\n      attempt += 1;\n      if (attempt === maxAttempts) throw err;\n      await new Promise((r) => setTimeout(r, 2 ** attempt * 250));\n    }\n  }\n}\n\nexport const fetchTodos = createAsyncThunk('todos/fetch', async () => {\n  const response = await withRetry(() => fetch('/api/todos'));\n  return response.json();\n});"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "rejectWithValue",
+            "definition": "Toolkit helper that lets a thunk return a custom error payload."
+          },
+          {
+            "term": "Error Boundary",
+            "definition": "React component that catches render errors and shows a fallback UI."
+          },
+          {
+            "term": "Exponential Backoff",
+            "definition": "Increasing delay between retries to avoid hammering a failing server."
+          },
+          {
+            "term": "Sentry",
+            "definition": "Popular service for capturing and reporting JavaScript errors in production."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "User Experience",
-        "text": "Always provide clear error messages and recovery options to users."
+        "title": "User experience",
+        "text": "Always tell the user **what** failed and **what they can do next**. Silent retries are the worst UX."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add a global error toaster",
+        "description": "Add a global error middleware that:\n1. Detects every `/rejected` action.\n2. Extracts a human-readable message.\n3. Dispatches a `showToast` action that any component can render.\n4. Logs the error to `console.error`.",
+        "steps": [
+          "Action types from `createAsyncThunk` always end in `/pending`, `/fulfilled`, or `/rejected`.",
+          "Avoid double-toasting when slices already handle the same error."
+        ]
       }
     },
     {
@@ -64,12 +238,13 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Store errors in Redux state",
-          "Handle rejected async actions",
-          "Use middleware for global errors",
-          "Provide user-friendly messages"
+          "Track per-feature error state in slices",
+          "Use `rejectWithValue` from `createAsyncThunk` to keep error data structured",
+          "Add global middleware for cross-cutting error handling",
+          "Combine error boundaries, slices, and middleware for full coverage",
+          "Always show clear, recoverable messages to users"
         ],
-        "takeaway": "Graceful error handling improves reliability."
+        "takeaway": "Layered error handling keeps Redux apps resilient and user-friendly."
       }
     }
   ],

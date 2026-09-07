@@ -3,7 +3,7 @@
   "slug": "performance-optimization",
   "moduleSlug": "redux-advanced-concepts",
   "title": "Performance Optimization",
-  "description": "Learn techniques to optimize Redux performance in large applications.",
+  "description": "Learn to profile, memoize, and tune Redux applications to avoid unnecessary re-renders and expensive computations.",
   "order": 3,
   "difficulty": "advanced",
   "estimatedMinutes": 22,
@@ -17,46 +17,248 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Redux performance issues often stem from unnecessary re-renders. Use selectors and memoization to keep your app fast."
+        "text": "Redux itself is fast, but **referential equality** issues in selectors and components are the #1 cause of slow Redux apps. Optimizing Redux means making sure components only re-render when their slice of state actually changes."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Profile first",
+        "text": "Don't optimize blindly. Use the React DevTools Profiler to record a slow interaction and see which components re-render and why."
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Memoized Selectors"
+      "data": {
+        "level": 2,
+        "text": "Why Components Re-render Unnecessarily"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`useSelector` uses `===` by default. If your selector returns a **new array or object every time** — even with the same contents — every component subscribed to it will re-render on every dispatch."
+      }
     },
     {
       "type": "example",
       "data": {
-        "title": "createSelector",
-        "content": "Memoized selector for filtering",
+        "title": "Bad selector",
+        "content": "Returns a fresh array on every call",
         "language": "javascript",
-        "code": "import { createSelector } from '@reduxjs/toolkit';\nimport { selectTodos, selectFilter } from './todoSlice';\n\nconst selectFilteredTodos = createSelector(\n  [selectTodos, selectFilter],\n  (todos, filter) => {\n    switch (filter) {\n      case 'completed':\n        return todos.filter(t => t.completed);\n      case 'active':\n        return todos.filter(t => !t.completed);\n      default:\n        return todos;\n    }\n  }\n);"
+        "code": "export const selectActiveUsers = (state) =>\n  state.users.filter((u) => u.active); // new array each time!"
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Rendering Optimization"
+      "data": {
+        "level": 2,
+        "text": "Memoized Selectors with createSelector"
+      }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Use shallowEqual for primitive values",
-          "Split selectors to limit re-renders",
-          "Avoid inline object creation in selectors",
-          "Use React.memo for presentational components",
-          "Batch dispatches with unstable_batchedUpdates"
+        "text": "`createSelector` (from Redux Toolkit / Reselect) **caches** its result. It only recomputes when its input selectors return new values."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Memoized selector",
+        "content": "Recomputes only when todos or filter change",
+        "language": "javascript",
+        "code": "import { createSelector } from '@reduxjs/toolkit';\nimport { selectTodos, selectFilter } from './todoSlice';\n\nconst selectFilteredTodos = createSelector(\n  [selectTodos, selectFilter],\n  (todos, filter) => {\n    switch (filter) {\n      case 'completed':\n        return todos.filter((t) => t.completed);\n      case 'active':\n        return todos.filter((t) => !t.completed);\n      default:\n        return todos;\n    }\n  }\n);\n\n// Usage\nexport const selectVisibleTodoCount = createSelector(\n  [selectFilteredTodos],\n  (todos) => todos.length\n);"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "memoization-flow",
+        "caption": "Memoized selectors only recompute when their inputs actually change.",
+        "definition": "flowchart TD\n  A[dispatch action] --> B[Todos reducer]\n  B --> C[New state tree]\n  C --> D[Input selector: selectTodos]\n  D -->|same value| E[Skip recompute]\n  D -->|new value| F[createSelector recompute]\n  F --> G[Cached result]\n  G --> H[Components subscribed\nonly re-render on change]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimization Techniques"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Common Redux optimizations",
+        "headers": [
+          "Technique",
+          "What it solves",
+          "When to use"
+        ],
+        "rows": [
+          [
+            "createSelector",
+            "Recomputes on every call",
+            "Derived data, filtered lists, totals"
+          ],
+          [
+            "shallowEqual",
+            "useSelector deep comparison overhead",
+            "Selecting arrays/objects of primitives"
+          ],
+          [
+            "React.memo",
+            "Re-renders with same props",
+            "Pure presentational components"
+          ],
+          [
+            "useCallback",
+            "New function references on each render",
+            "Callbacks passed to memoized children"
+          ],
+          [
+            "Entity Adapter",
+            "Manual normalization of lists",
+            "Large collections with frequent updates"
+          ],
+          [
+            "Split slices",
+            "Single huge store re-renders everyone",
+            "Distinct domains with separate update rates"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Memoization helpers",
+        "cards": [
+          {
+            "title": "React.memo",
+            "description": "HOC that skips re-render if props are shallow-equal.",
+            "pros": [
+              "One-line drop-in",
+              "Works for any component"
+            ],
+            "cons": [
+              "Doesn't help with internal state or hooks",
+              "Useless if you pass new object/function props"
+            ]
+          },
+          {
+            "title": "useMemo",
+            "description": "Hook that returns a cached value across renders.",
+            "pros": [
+              "Cache expensive JSX or computations",
+              "Per-render scoped"
+            ],
+            "cons": [
+              "Not a state library",
+              "Cache invalidates on every dep change"
+            ]
+          },
+          {
+            "title": "createSelector",
+            "description": "Memoized selector from Reselect/RTK.",
+            "pros": [
+              "Cache survives across components",
+              "Composes with other selectors"
+            ],
+            "cons": [
+              "Must be called outside render (module scope)",
+              "Memory grows with selector instances"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Equality in useSelector"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a selector returns a primitive array you mutate elsewhere, pass a custom equality function to `useSelector`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom equality",
+        "content": "Avoid re-render when array contents are the same",
+        "language": "jsx",
+        "code": "import { useSelector, shallowEqual } from 'react-redux';\n\nfunction TodoList() {\n  const todos = useSelector(selectAllTodos, shallowEqual);\n  // shallowEqual compares each element with ===\n  // Only re-renders when one of the array entries changes reference\n  return <List items={todos} />;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Normalize Large Collections"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Storing lists of objects as arrays causes expensive re-renders when any item updates. **Normalize** them into `{ ids: [], entities: {} }` so updates to one item don't change references for the whole list."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "createEntityAdapter",
+        "content": "Auto-normalized list of users",
+        "language": "javascript",
+        "code": "import { createSlice, createEntityAdapter } from '@reduxjs/toolkit';\n\nconst usersAdapter = createEntityAdapter();\n\nconst usersSlice = createSlice({\n  name: 'users',\n  initialState: usersAdapter.getInitialState(),\n  reducers: {\n    userAdded: usersAdapter.addOne,\n    userUpdated: usersAdapter.updateOne,\n    userRemoved: usersAdapter.removeOne,\n  },\n});\n\nexport const usersSelectors = usersAdapter.getSelectors(\n  (state) => state.users\n);\nexport const { userAdded, userUpdated, userRemoved } = usersSlice.actions;\nexport default usersSlice.reducer;"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "Memoization",
+            "definition": "Caching the result of a function based on its inputs."
+          },
+          {
+            "term": "Referential Equality",
+            "definition": "Two values are equal because they are the same object reference (`===`)."
+          },
+          {
+            "term": "Shallow Equality",
+            "definition": "Comparing the top-level keys of an object or items of an array with `===`."
+          },
+          {
+            "term": "Normalization",
+            "definition": "Storing entities in an `entities` lookup keyed by id so individual updates don't ripple."
+          }
         ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Reselect",
-        "text": "createSelector memoizes results. It only recomputes when inputs change, preventing unnecessary re-renders."
+        "variant": "warning",
+        "title": "Watch for over-memoization",
+        "text": "Memoization is not free. Each `createSelector` keeps its previous inputs in memory. Only memoize expensive or unstable derivations."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Profile and fix a slow TodoList",
+        "description": "1. Open React DevTools Profiler and record a click on a single todo checkbox.\n2. Notice that every TodoItem re-renders even though only one changed.\n3. Add `createSelector` for `selectFilteredTodos`.\n4. Wrap `TodoItem` in `React.memo`.\n5. Verify with Profiler that only the changed item re-renders.",
+        "steps": [
+          "Pass primitive props to memoized children, not freshly-built objects.",
+          "Entity adapters can replace `todos` arrays with `entities` lookup for big wins."
+        ]
       }
     },
     {
@@ -64,12 +266,13 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Memoize expensive selectors",
-          "Split large selectors",
-          "Use shallowEqual in useSelector",
-          "Profile before optimizing"
+          "Profile before optimizing — use React DevTools Profiler",
+          "Memoize expensive selectors with `createSelector`",
+          "Use `shallowEqual` or `React.memo` for components subscribed to unstable shapes",
+          "Normalize large lists with `createEntityAdapter`",
+          "Memoization costs memory — only use it where it pays off"
         ],
-        "takeaway": "Memoization prevents unnecessary re-renders."
+        "takeaway": "Memoization and normalization prevent unnecessary re-renders."
       }
     }
   ],

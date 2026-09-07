@@ -3,7 +3,7 @@
   "slug": "store-initialization",
   "moduleSlug": "redux-advanced-concepts",
   "title": "Store Initialization and Hydration",
-  "description": "Learn how to initialize and hydrate the Redux store from persisted state.",
+  "description": "Learn how to initialize the Redux store with persisted state, hydrate from localStorage, and handle versioning safely.",
   "order": 2,
   "difficulty": "intermediate",
   "estimatedMinutes": 20,
@@ -17,21 +17,216 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Store initialization with persisted state lets you preserve Redux state across page reloads and browser sessions."
+        "text": "By default, Redux state **disappears on page reload**. Hydration lets you rebuild the store from saved data so users return to exactly where they left off — open tabs, theme choice, drafts, and more."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "What is hydration?",
+        "text": "**Hydration** = loading persisted state into a fresh store before the app mounts. **Persistence** = saving state changes back to storage as the user works."
       }
     },
     {
       "type": "heading",
-      "level": 2,
-      "text": "Hydration Pattern"
+      "data": {
+        "level": 2,
+        "text": "The Hydration Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The classic pattern is: load saved state, pass it to `configureStore` as `preloadedState`, and then subscribe to the store to keep saving changes."
+      }
     },
     {
       "type": "example",
       "data": {
-        "title": "Store Hydration",
-        "content": "Initializing store with persisted state",
+        "title": "Manual hydration",
+        "content": "Hydrate from localStorage at startup",
         "language": "javascript",
-        "code": "import { configureStore } from '@reduxjs/toolkit';\nimport rootReducer from './rootReducer';\n\nconst loadState = () => {\n  try {\n    const serialized = localStorage.getItem('state');\n    if (serialized === null) return undefined;\n    return JSON.parse(serialized);\n  } catch (e) {\n    return undefined;\n  }\n};\n\nconst preloadedState = loadState();\n\nconst store = configureStore({\n  reducer: rootReducer,\n  preloadedState\n});\n\nstore.subscribe(() => {\n  const state = store.getState();\n  localStorage.setItem('state', JSON.stringify(state));\n});\n\nexport default store;"
+        "code": "import { configureStore } from '@reduxjs/toolkit';\nimport rootReducer from './rootReducer';\n\nconst STORAGE_KEY = 'app:state:v1';\n\nconst loadState = () => {\n  try {\n    const serialized = localStorage.getItem(STORAGE_KEY);\n    if (serialized === null) return undefined;\n    return JSON.parse(serialized);\n  } catch (e) {\n    console.warn('Failed to load state', e);\n    return undefined;\n  }\n};\n\nconst saveState = (state) => {\n  try {\n    const serialized = JSON.stringify(state);\n    localStorage.setItem(STORAGE_KEY, serialized);\n  } catch (e) {\n    console.warn('Failed to save state', e);\n  }\n};\n\nconst preloadedState = loadState();\n\nconst store = configureStore({\n  reducer: rootReducer,\n  preloadedState,\n});\n\nstore.subscribe(() => {\n  saveState(store.getState());\n});\n\nexport default store;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hydration Flow Visualized"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hydration-flow",
+        "caption": "Hydration loads saved state once; persistence saves it on every change.",
+        "definition": "sequenceDiagram\n  participant Browser\n  participant Storage as localStorage\n  participant Store as Redux Store\n  participant App as React App\n\n  Browser->>Storage: getItem('app:state:v1')\n  Storage-->>Browser: serialized JSON\n  Browser->>Store: configureStore({ preloadedState })\n  Store-->>App: <Provider store={...}>\n  App->>App: Render with hydrated state\n  App->>Store: dispatch(action)\n  Store->>Storage: setItem('app:state:v1', newJSON)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing a Persistence Strategy"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Storage options compared",
+        "headers": [
+          "Storage",
+          "Capacity",
+          "Persistence",
+          "Use Case"
+        ],
+        "rows": [
+          [
+            "localStorage",
+            "~5 MB",
+            "Until explicitly cleared",
+            "User preferences, drafts, non-sensitive UI state"
+          ],
+          [
+            "sessionStorage",
+            "~5 MB",
+            "Cleared on tab close",
+            "Wizard flows, temporary filters"
+          ],
+          [
+            "IndexedDB",
+            "Hundreds of MB",
+            "Until explicitly cleared",
+            "Large offline caches, queued writes"
+          ],
+          [
+            "Cookie",
+            "~4 KB",
+            "Configurable expiry",
+            "Auth tokens (with httpOnly flag)"
+          ],
+          [
+            "Server API",
+            "Unlimited",
+            "As long as account exists",
+            "Cross-device sync, sensitive data"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Client-side storage showdown",
+        "cards": [
+          {
+            "title": "localStorage",
+            "description": "Simple key/value store that survives reloads and tab closures.",
+            "pros": [
+              "Synchronous API, easy to use",
+              "Widely supported"
+            ],
+            "cons": [
+              "String-only, must JSON.parse",
+              "Limited to ~5 MB",
+              "Accessible to any script on the page (XSS risk)"
+            ]
+          },
+          {
+            "title": "sessionStorage",
+            "description": "Same as localStorage but scoped to the current browser tab.",
+            "pros": [
+              "Automatically cleared on tab close",
+              "Good for short-lived flows"
+            ],
+            "cons": [
+              "Lost on tab close — bad for preferences",
+              "Same XSS exposure as localStorage"
+            ]
+          },
+          {
+            "title": "Cookies",
+            "description": "Sent on every HTTP request. Marked httpOnly + secure when set by the server.",
+            "pros": [
+              "Server-readable",
+              "Can be flagged httpOnly to block JS access"
+            ],
+            "cons": [
+              "Tiny size (~4 KB)",
+              "CSRF risk if misused"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Versioning and Migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you change your state shape, old saved data can break your app. Use a **version key** in the persisted blob and run migrations when the versions don't match."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Versioned persistence",
+        "content": "Skip or migrate stale state",
+        "language": "javascript",
+        "code": "const CURRENT_VERSION = 2;\n\nconst loadState = () => {\n  try {\n    const raw = localStorage.getItem('app:state');\n    if (!raw) return undefined;\n\n    const { version, state } = JSON.parse(raw);\n    if (version !== CURRENT_VERSION) {\n      console.warn('Discarding stale state');\n      return undefined;\n    }\n    return state;\n  } catch {\n    return undefined;\n  }\n};\n\nstore.subscribe(() => {\n  const payload = { version: CURRENT_VERSION, state: store.getState() };\n  localStorage.setItem('app:state', JSON.stringify(payload));\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Debouncing Writes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Saving on every dispatch is expensive — especially for large state trees. **Debounce** the save so it only fires after the user pauses."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Debounced persistence",
+        "content": "Save state every 500 ms instead of every action",
+        "language": "javascript",
+        "code": "let timeoutId;\n\nstore.subscribe(() => {\n  clearTimeout(timeoutId);\n  timeoutId = setTimeout(() => {\n    saveState(store.getState());\n  }, 500);\n});"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "title": "Key Terms",
+        "terms": [
+          {
+            "term": "preloadedState",
+            "definition": "Initial state passed to `configureStore`. Used to inject hydrated data."
+          },
+          {
+            "term": "Rehydration",
+            "definition": "The act of loading persisted state into a fresh Redux store before mounting React."
+          },
+          {
+            "term": "Migration",
+            "definition": "Code that transforms old persisted state into the shape your current reducers expect."
+          },
+          {
+            "term": "Debouncing",
+            "definition": "Delaying repeated writes so they only happen after activity stops."
+          }
+        ]
       }
     },
     {
@@ -39,7 +234,18 @@
       "data": {
         "variant": "warning",
         "title": "Security",
-        "text": "Never persist sensitive data like auth tokens in Redux state or localStorage."
+        "text": "Never persist sensitive data — passwords, refresh tokens, PII — in Redux or localStorage. Use httpOnly cookies or a server session instead."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement versioned hydration",
+        "description": "Write a `createPersistedStore(rootReducer, options)` helper that:\n1. Reads state from localStorage under a key you pass in.\n2. Checks a `version` field; if it doesn't match `options.version`, return `undefined`.\n3. Subscribes to the store and saves the state with the version field.\n4. Wraps the save in a `try/catch` so quota errors don't crash the app.",
+        "steps": [
+          "`JSON.stringify` will throw if your state contains a circular reference.",
+          "Throttle the subscribe handler if the reducer fires often."
+        ]
       }
     },
     {
@@ -47,12 +253,13 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Hydration restores persisted state",
-          "Use preloadedState in configureStore",
-          "Subscribe to state changes for persistence",
-          "Avoid persisting sensitive data"
+          "Use `preloadedState` to hydrate from saved data",
+          "Persist with `store.subscribe`, debounced to avoid wasted writes",
+          "Version your persisted state and migrate or discard when shapes change",
+          "Pick storage based on size, lifetime, and sensitivity",
+          "Never persist auth tokens or PII in client storage"
         ],
-        "takeaway": "Hydration preserves state across sessions."
+        "takeaway": "Hydration preserves state across sessions and keeps users in flow."
       }
     }
   ],
