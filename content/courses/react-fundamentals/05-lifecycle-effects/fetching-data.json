@@ -2,6 +2,7 @@
   "id": "lesson-react-019",
   "slug": "fetching-data",
   "moduleSlug": "lifecycle-effects",
+  "courseSlug": "react-fundamentals",
   "title": "Fetching Data",
   "description": "Learn patterns for fetching data from APIs in React.",
   "order": 3,
@@ -18,69 +19,171 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Data fetching is one of the most common side effects in React. Let's explore patterns for loading, caching, and displaying data from APIs."
+        "text": "Data fetching is one of the most common side effects in React. The pattern is consistent: trigger a fetch in useEffect, track loading and error state, and render the result when it arrives."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Data Fetching"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Fetch on Mount",
-        "content": "Fetching data when component mounts",
-        "language": "jsx",
-        "code": "function UserList() {\n  const [users, setUsers] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    const fetchUsers = async () => {\n      try {\n        setLoading(true);\n        const response = await fetch('/api/users');\n        const data = await response.json();\n        setUsers(data);\n      } catch (err) {\n        setError(err.message);\n      } finally {\n        setLoading(false);\n      }\n    };\n\n    fetchUsers();\n  }, []);\n\n  if (loading) return <p>Loading...</p>;\n  if (error) return <p>Error: {error}</p>;\n\n  return (\n    <ul>\n      {users.map(user => <li key={user.id}>{user.name}</li>)}\n    </ul>\n  );\n}"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Abort Controller"
+        "text": "The Fetch Pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Use AbortController to cancel fetch requests when the component unmounts to prevent state updates on unmounted components."
+        "text": "Every data-fetching component needs three pieces of state: the data itself, a loading flag, and an error message. Initialize them, fetch on mount, and render conditionally."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic Fetch",
+        "content": "Loading data on mount with useEffect",
+        "language": "jsx",
+        "code": "function UserList() {\n  const [users, setUsers] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    let isMounted = true;\n\n    const fetchUsers = async () => {\n      try {\n        setLoading(true);\n        const response = await fetch('/api/users');\n        if (!response.ok) throw new Error('Failed to load');\n        const data = await response.json();\n        if (isMounted) setUsers(data);\n      } catch (err) {\n        if (isMounted) setError(err.message);\n      } finally {\n        if (isMounted) setLoading(false);\n      }\n    };\n\n    fetchUsers();\n\n    return () => { isMounted = false; };\n  }, []);\n\n  if (loading) return <p>Loading...</p>;\n  if (error) return <p className=\"error\">{error}</p>;\n\n  return (\n    <ul>\n      {users.map((u) => <li key={u.id}>{u.name}</li>)}\n    </ul>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Aborting Fetch on Unmount"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use AbortController to cancel the request when the component unmounts. This is cleaner than the isMounted flag and is the modern standard."
       }
     },
     {
       "type": "example",
       "data": {
         "title": "Abort Controller",
-        "content": "Cancelling fetch on unmount",
+        "content": "Canceling fetch with AbortController",
         "language": "jsx",
-        "code": "useEffect(() => {\n  const controller = new AbortController();\n\n  const fetchData = async () => {\n    try {\n      const response = await fetch('/api/data', {\n        signal: controller.signal\n      });\n      const data = await response.json();\n      setData(data);\n    } catch (err) {\n      if (err.name !== 'AbortError') {\n        setError(err.message);\n      }\n    }\n  };\n\n  fetchData();\n\n  // Cleanup: abort fetch on unmount\n  return () => controller.abort();\n}, []);"
+        "code": "useEffect(() => {\n  const controller = new AbortController();\n\n  const fetchData = async () => {\n    try {\n      const response = await fetch('/api/data', {\n        signal: controller.signal\n      });\n      const data = await response.json();\n      setData(data);\n    } catch (err) {\n      if (err.name !== 'AbortError') {\n        setError(err.message);\n      }\n    }\n  };\n\n  fetchData();\n\n  return () => controller.abort();\n}, []);"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Fetching on Dependency Change"
+        "text": "Refetching When Dependencies Change"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a dependency like a user ID changes, include it in the dependency array so React re-runs the effect and fetches fresh data."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Fetch on Change",
-        "content": "Refetching when a dependency changes",
+        "title": "Fetch on Dependency Change",
+        "content": "Refetching when userId changes",
         "language": "jsx",
-        "code": "function UserProfile({ userId }) {\n  const [user, setUser] = useState(null);\n\n  useEffect(() => {\n    const controller = new AbortController();\n\n    fetch(`/api/users/${userId}`, { signal: controller.signal })\n      .then(res => res.json())\n      .then(data => setUser(data))\n      .catch(err => {\n        if (err.name !== 'AbortError') console.error(err);\n      });\n\n    return () => controller.abort();\n  }, [userId]); // Refetch when userId changes\n\n  if (!user) return <p>Loading...</p>;\n  return <h1>{user.name}</h1>;\n}"
+        "code": "function UserProfile({ userId }) {\n  const [user, setUser] = useState(null);\n\n  useEffect(() => {\n    const controller = new AbortController();\n\n    fetch(`/api/users/${userId}`, { signal: controller.signal })\n      .then((res) => res.json())\n      .then((data) => setUser(data))\n      .catch((err) => {\n        if (err.name !== 'AbortError') console.error(err);\n      });\n\n    return () => controller.abort();\n  }, [userId]); // Re-fetch when userId changes\n\n  if (!user) return <p>Loading...</p>;\n  return <h1>{user.name}</h1>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Empty and Error States"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always handle three states: loading, error, and success. Users should never see a broken UI or a blank screen while data loads."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Complete State Handling",
+        "content": "Loading, error, and success UI",
+        "language": "jsx",
+        "code": "function Posts() {\n  const [posts, setPosts] = useState([]);\n  const [status, setStatus] = useState('idle');\n\n  useEffect(() => {\n    setStatus('loading');\n    fetch('/api/posts')\n      .then((r) => r.json())\n      .then((data) => { setPosts(data); setStatus('success'); })\n      .catch(() => setStatus('error'));\n  }, []);\n\n  if (status === 'loading') return <Spinner />;\n  if (status === 'error') return <ErrorBox message=\"Failed to load posts\" />;\n\n  return (\n    <ul>\n      {posts.map((p) => <li key={p.id}>{p.title}</li>)}\n    </ul>\n  );\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "AbortController",
+            "definition": "A browser API that aborts one or more DOM requests, such as fetch."
+          },
+          {
+            "term": "Loading State",
+            "definition": "A boolean flag indicating an async request is in progress."
+          },
+          {
+            "term": "Race Condition",
+            "definition": "When an earlier request resolves after a later one, overwriting newer data."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Consider Data Fetching Libraries",
-        "text": "For production apps, consider React Query or SWR. They handle caching, refetching, and error handling automatically."
+        "title": "Use a Data Library in Production",
+        "text": "For real apps, consider React Query (TanStack Query) or SWR. They handle caching, refetching, deduplication, and stale-while-revalidate automatically."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-fetching",
+        "caption": "The lifecycle of a fetch in useEffect.",
+        "definition": "flowchart LR\n    A[Component mounts] --> B[Set loading true]\n    B --> C[Fetch data]\n    C -->|success| D[Set data + loading false]\n    C -->|error| E[Set error]\n    D --> F[Render data]\n    E --> G[Render error message]"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Fetch and Display Posts",
+        "description": "Fetch posts from a public API and display them with loading and error handling.",
+        "steps": [
+          "Create a Posts component.",
+          "Use useEffect to fetch from https://jsonplaceholder.typicode.com/posts.",
+          "Track loading, error, and success states.",
+          "Render a loading message, an error message, or a list of post titles."
+        ],
+        "expectedOutcome": "A posts list that loads asynchronously with proper feedback for all states."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Why does my app crash with 'Can't perform a React state update on an unmounted component'?",
+            "answer": "The fetch resolved after the component unmounted. Use AbortController or an isMounted flag to prevent setting state on unmounted components."
+          },
+          {
+            "question": "Should I put fetch in useEffect or use a library?",
+            "answer": "For learning, useEffect teaches fundamentals. For production, React Query or SWR reduce boilerplate and add caching, retries, and background refetching."
+          },
+          {
+            "question": "How do I avoid race conditions?",
+            "answer": "Use an AbortController or track the latest request ID in a ref. Ignore responses from earlier requests."
+          },
+          {
+            "question": "Can I fetch inside an event handler instead?",
+            "answer": "Yes. Fetching in response to a user action (like clicking 'Load More') is also common and does not require useEffect."
+          }
+        ]
       }
     },
     {
@@ -88,27 +191,14 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Fetch data in useEffect with empty dependency array",
-          "Track loading and error states",
-          "Use AbortController to cancel on unmount",
-          "Refetch when dependencies change"
+          "Fetch data in useEffect with the proper dependency array.",
+          "Track loading, error, and data state.",
+          "Use AbortController to cancel requests on unmount.",
+          "Refetch when dependencies change.",
+          "Consider React Query or SWR for production data fetching."
         ],
-        "takeaway": "Data fetching patterns are fundamental to React apps. Let's create custom hooks."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Add State to a Counter",
-        "description": "Create a counter component with increment, decrement, and reset buttons.",
-        "steps": [
-          "Import useState",
-          "Initialize count state to 0",
-          "Add three buttons with handlers"
-        ],
-        "expectedOutcome": "Working counter with three buttons."
+        "takeaway": "Data fetching is a core React skill. Next, you will extract this logic into reusable custom hooks."
       }
     }
-  ],
-  "courseSlug": "react-fundamentals"
+  ]
 }

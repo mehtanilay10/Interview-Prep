@@ -334,6 +334,11 @@ import reactFundLesson29 from '../courses/react-fundamentals/08-styling/css-modu
 import reactFundLesson30 from '../courses/react-fundamentals/08-styling/inline-styles.json';
 import reactFundLesson31 from '../courses/react-fundamentals/08-styling/styled-components.json';
 import reactFundLesson32 from '../courses/react-fundamentals/08-styling/tailwind-css.json';
+import reactFundLesson33 from '../courses/react-fundamentals/02-components-props/conditional-rendering.json';
+import reactFundLesson34 from '../courses/react-fundamentals/02-components-props/lists-and-keys.json';
+import reactFundLesson35 from '../courses/react-fundamentals/05-lifecycle-effects/error-boundaries.json';
+import reactFundLesson36 from '../courses/react-fundamentals/09-performance-optimization/performance-optimization.json';
+import reactFundLesson37 from '../courses/react-fundamentals/09-performance-optimization/react-19-features.json';
 
 import reactAdvLesson1 from '../courses/react-advanced-patterns/01-render-props/render-props-basics.json';
 import reactAdvLesson2 from '../courses/react-advanced-patterns/01-render-props/render-props-examples.json';
@@ -808,7 +813,8 @@ const rawLessons = [
   reactFundLesson12, reactFundLesson13, reactFundLesson14, reactFundLesson15, reactFundLesson16, reactFundLesson17,
   reactFundLesson18, reactFundLesson19, reactFundLesson20, reactFundLesson21, reactFundLesson22, reactFundLesson23,
   reactFundLesson24, reactFundLesson25, reactFundLesson26, reactFundLesson27, reactFundLesson28, reactFundLesson29,
-  reactFundLesson30, reactFundLesson31, reactFundLesson32,
+  reactFundLesson30, reactFundLesson31, reactFundLesson32, reactFundLesson33, reactFundLesson34,
+  reactFundLesson35, reactFundLesson36, reactFundLesson37,
   reactAdvLesson1, reactAdvLesson2, reactAdvLesson3, reactAdvLesson4, reactAdvLesson5, reactAdvLesson6,
   reactAdvLesson7, reactAdvLesson8, reactAdvLesson9, reactAdvLesson10, reactAdvLesson11, reactAdvLesson12,
   reactAdvLesson13, reactAdvLesson14, reactAdvLesson15, reactAdvLesson16, reactAdvLesson17, reactAdvLesson18,
