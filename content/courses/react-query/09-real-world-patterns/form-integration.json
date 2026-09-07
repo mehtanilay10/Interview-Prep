@@ -9,11 +9,12 @@
   "difficulty": "advanced",
   "estimatedMinutes": 25,
   "tags": ["forms", "react-hook-form", "integration", "validation"],
+  "prerequisites": ["mutations"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Forms are one of the most common places where server state and client state collide. React Query excels at managing the server-side aspects of forms—fetching initial data, submitting mutations, and updating the cache—while libraries like React Hook Form handle the client-side form state and validation."
+        "text": "Forms are one of the most common places where server state and client state collide. React Query excels at managing the server-side aspects of formsâ€”fetching initial data, submitting mutations, and updating the cacheâ€”while libraries like React Hook Form handle the client-side form state and validation."
       }
     },
     {
@@ -32,12 +33,29 @@
       }
     },
     {
+      "type": "bullet-list",
+      "data": {
+        "title": "React Query Responsibilities",
+        "items": [
+          "Fetching initial form data from the server",
+          "Submitting form data via mutations",
+          "Updating the cache after successful submission",
+          "Invalidating related queries after mutations",
+          "Managing loading and error states for data operations"
+        ]
+      }
+    },
+    {
       "type": "mermaid",
       "data": {
-        "id": "form-data-flow",
+        "id": "form-data-flow-033",
         "caption": "Data flow between React Query and React Hook Form",
         "definition": "graph LR\n    A[API] -->|fetch| B[React Query Cache]\n    B -->|query data| C[React Hook Form defaultValues]\n    C -->|user input| D[Form State]\n    D -->|onSubmit| E[Mutation]\n    E -->|success| F[Invalidate + Reset]\n    F -->|updated data| B\n    style B fill:#4f46e5\n    style E fill:#059669"
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -47,12 +65,18 @@
       }
     },
     {
+      "type": "paragraph",
+      "data": {
+        "text": "The first step in form integration is loading existing data. Use `useQuery` to fetch the record, then pass the data to React Hook Form's `reset` function. This keeps the form state in sync with the server without manual state management."
+      }
+    },
+    {
       "type": "example",
       "data": {
         "title": "useQuery + React Hook Form",
-        "content": "Use useQuery to fetch data and populate React Hook Form default values.",
+        "content": "Use useQuery to fetch data and populate React Hook Form default values",
         "language": "tsx",
-        "code": "import { useForm } from 'react-hook-form';\nimport { useQuery } from '@tanstack/react-query';\n\nconst EditUserForm = ({ userId }: { userId: string }) => {\n  const { data, isLoading, isError } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId)\n  });\n\n  const { register, handleSubmit, reset, formState: { errors } } = useForm<{\n    name: string;\n    email: string;\n  }>({\n    defaultValues: async () => ({\n      name: data?.name ?? '',\n      email: data?.email ?? ''\n    })\n  });\n\n  useEffect(() => {\n    if (data) {\n      reset({ name: data.name, email: data.email });\n    }\n  }, [data, reset]);\n\n  if (isLoading) return <p>Loading...</p>;\n  if (isError) return <p>Error loading user</p>;\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('name', { required: true })} />\n      <input {...register('email', { required: true })} />\n      <button type=\"submit\">Save</button>\n    </form>\n  );\n};"
+        "code": "import { useForm } from 'react-hook-form';\nimport { useQuery } from '@tanstack/react-query';\nimport { useEffect } from 'react';\n\ntype FormData = {\n  name: string;\n  email: string;\n};\n\nconst EditUserForm = ({ userId }: { userId: string }) => {\n  const { data, isLoading, isError } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId)\n  });\n\n  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({\n    defaultValues: {\n      name: data?.name ?? '',\n      email: data?.email ?? ''\n    }\n  });\n\n  useEffect(() => {\n    if (data) {\n      reset({ name: data.name, email: data.email });\n    }\n  }, [data, reset]);\n\n  if (isLoading) return <p>Loading...</p>;\n  if (isError) return <p>Error loading user</p>;\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('name', { required: true })} />\n      <input {...register('email', { required: true })} />\n      <button type=\"submit\">Save</button>\n    </form>\n  );\n};"
       }
     },
     {
@@ -71,13 +95,23 @@
       }
     },
     {
+      "type": "paragraph",
+      "data": {
+        "text": "When the user submits the form, use `useMutation` to send the data to the server. On success, update the React Query cache so any other components displaying this user data also update automatically."
+      }
+    },
+    {
       "type": "example",
       "data": {
         "title": "Form Submission Mutation",
-        "content": "Handle form submission with useMutation and update the React Query cache on success.",
+        "content": "Handle form submission with useMutation and update the cache",
         "language": "tsx",
-        "code": "const EditUserForm = ({ userId }: { userId: string }) => {\n  const queryClient = useQueryClient();\n\n  const updateMutation = useMutation({\n    mutationFn: (updatedUser) =>\n      fetch(`/api/users/${userId}`, {\n        method: 'PUT',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(updatedUser)\n      }).then(res => res.json()),\n    onSuccess: (updatedUser) => {\n      queryClient.setQueryData(['user', userId], updatedUser);\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n    }\n  });\n\n  const onSubmit = handleSubmit((data) => {\n    updateMutation.mutate(data);\n  });\n\n  return (\n    <form onSubmit={onSubmit}>\n      <input {...register('name')} />\n      <input {...register('email')} />\n      <button type=\"submit\" disabled={updateMutation.isPending}>\n        {updateMutation.isPending ? 'Saving...' : 'Save'}\n      </button>\n      {updateMutation.isError && (\n        <p>Failed to save: {updateMutation.error.message}</p>\n      )}\n    </form>\n  );\n};"
+        "code": "import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';\n\nconst EditUserForm = ({ userId }: { userId: string }) => {\n  const queryClient = useQueryClient();\n  const { data } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId)\n  });\n\n  const updateMutation = useMutation({\n    mutationFn: (updatedUser: FormData) =>\n      fetch(`/api/users/${userId}`, {\n        method: 'PUT',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(updatedUser)\n      }).then(res => res.json()),\n    onSuccess: (updatedUser) => {\n      queryClient.setQueryData(['user', userId], updatedUser);\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n    }\n  });\n\n  const onSubmit = handleSubmit((formData) => {\n    updateMutation.mutate(formData);\n  });\n\n  return (\n    <form onSubmit={onSubmit}>\n      <input {...register('name')} />\n      <input {...register('email')} />\n      <button type=\"submit\" disabled={updateMutation.isPending}>\n        {updateMutation.isPending ? 'Saving...' : 'Save'}\n      </button>\n      {updateMutation.isError && (\n        <p>Failed to save: {updateMutation.error.message}</p>\n      )}\n    </form>\n  );\n};"
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -87,20 +121,18 @@
       }
     },
     {
-      "type": "example",
+      "type": "paragraph",
       "data": {
-        "title": "Optimistic Form Updates",
-        "content": "Use optimistic updates to make forms feel instant, rolling back if the API call fails.",
-        "language": "tsx",
-        "code": "const updateMutation = useMutation({\n  mutationFn: updateUser,\n  onMutate: async (newUser) => {\n    await queryClient.cancelQueries({ queryKey: ['user', userId] });\n\n    const previousUser = queryClient.getQueryData(['user', userId]);\n\n    queryClient.setQueryData(['user', userId], newUser);\n\n    return { previousUser };\n  },\n  onError: (err, newUser, context) => {\n    queryClient.setQueryData(['user', userId], context?.previousUser);\n  },\n  onSettled: () => {\n    queryClient.invalidateQueries({ queryKey: ['user', userId] });\n  }\n});"
+        "text": "Optimistic updates make forms feel instant by updating the cache before the API call completes. If the call fails, roll back to the previous state. This pattern is especially effective for small, frequent updates like toggling a setting."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "warning",
-        "title": "Optimistic Update Caveats",
-        "text": "Always roll back optimistic updates on error. Users should never see incorrect data persist after a failed mutation. Use onError to restore the previous state."
+        "title": "Optimistic Form Updates",
+        "content": "Use optimistic updates to make forms feel instant with rollback on failure",
+        "language": "tsx",
+        "code": "const updateMutation = useMutation({\n  mutationFn: updateUser,\n  onMutate: async (newUser) => {\n    await queryClient.cancelQueries({ queryKey: ['user', userId] });\n\n    const previousUser = queryClient.getQueryData(['user', userId]);\n\n    queryClient.setQueryData(['user', userId], newUser);\n\n    return { previousUser };\n  },\n  onError: (err, newUser, context) => {\n    queryClient.setQueryData(['user', userId], context?.previousUser);\n  },\n  onSettled: () => {\n    queryClient.invalidateQueries({ queryKey: ['user', userId] });\n  }\n});"
       }
     },
     {
@@ -114,7 +146,7 @@
       "type": "example",
       "data": {
         "title": "Server-Side Validation Errors",
-        "content": "Map API validation errors back to React Hook Form errors object.",
+        "content": "Map API validation errors back to React Hook Form errors object",
         "language": "tsx",
         "code": "const onSubmit = handleSubmit(async (data) => {\n  try {\n    await updateMutation.mutateAsync(data);\n  } catch (error) {\n    if (error instanceof ApiError && error.errors) {\n      Object.entries(error.errors).forEach(([field, message]) => {\n        setError(field as keyof FormData, {\n          type: 'server',\n          message: message as string\n        });\n      });\n    }\n  }\n});"
       }
@@ -148,6 +180,5 @@
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "prerequisites": ["use-mutation"]
+  "furtherReading": []
 }

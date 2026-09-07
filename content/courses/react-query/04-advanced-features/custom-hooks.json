@@ -2,8 +2,9 @@
   "id": "lesson-rq-014",
   "slug": "custom-hooks-react-query",
   "moduleSlug": "advanced-features",
+  "courseSlug": "react-query",
   "title": "Custom Query Hooks",
-  "description": "Learn how to create reusable custom query hooks.",
+  "description": "Build reusable, typed custom hooks that encapsulate React Query logic for your domain.",
   "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 20,
@@ -11,54 +12,249 @@
     "react-query",
     "custom-hooks",
     "reusable",
-    "patterns"
+    "patterns",
+    "composition"
   ],
+  "prerequisites": ["query-hooks"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Build Custom Hooks?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "Creating **custom query hooks** is a best practice for React Query. It encapsulates query logic and makes it reusable across components."
+        "text": "Raw `useQuery` and `useMutation` calls scattered across components work, but they create problems: query keys are duplicated, invalidation logic is repeated, and every change to the API requires editing many components. **Custom hooks** encapsulate all of this in one place, making your data layer consistent, reusable, and easy to change."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "custom hook",
+            "definition": "A JavaScript function starting with 'use' that calls React hooks internally and returns reusable logic."
+          },
+          {
+            "term": "encapsulation",
+            "definition": "Hiding implementation details behind a clean interface so callers don't need to know how queries are structured."
+          },
+          {
+            "term": "queryKey factory",
+            "definition": "A function that generates a query key from parameters, ensuring consistency across hooks and invalidation calls."
+          },
+          {
+            "term": "composition",
+            "definition": "Building complex hooks by combining simpler ones, such as wrapping a data query hook inside a mutation hook."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Custom Hook Pattern"
+        "text": "The Basic Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A custom query hook is simply a function that calls `useQuery` and returns its result. The magic comes from consistency: every component that uses the same hook shares the same query key shape, the same query function, and the same default options. When the API changes, you fix it once in the hook file."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Custom Hook",
-        "content": "Creating reusable query hooks",
-        "language": "jsx",
-        "code": "export function useUsers() {\n  return useQuery({\n    queryKey: ['users'],\n    queryFn: async () => {\n      const response = await fetch('/api/users');\n      return response.json();\n    }\n  });\n}\n\nexport function useUser(userId: number) {\n  return useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    enabled: !!userId\n  });\n}\n\nexport function useAddUser() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: addUser,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n    }\n  });\n}\n\n// Usage in component\nfunction UserList() {\n  const { data: users, isLoading } = useUsers();\n  const addUser = useAddUser();\n  // ...\n}"
+        "title": "Custom Query Hook with TypeScript",
+        "content": "A typed custom hook for fetching a list of products.",
+        "language": "tsx",
+        "code": "import { useQuery, useQueryClient } from '@tanstack/react-query';\n\ninterface Product {\n  id: string;\n  name: string;\n  price: number;\n}\n\nconst PRODUCTS_KEY = ['products'];\n\nasync function fetchProducts(): Promise<Product[]> {\n  const res = await fetch('/api/products');\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\n/** Reusable hook â€” import this anywhere products are needed */\nexport function useProducts() {\n  return useQuery({\n    queryKey: PRODUCTS_KEY,\n    queryFn: fetchProducts,\n    staleTime: 30_000,\n  });\n}\n\n/** Single-product hook for detail pages */\nexport function useProduct(id: string) {\n  return useQuery({\n    queryKey: ['product', id],\n    queryFn: () => fetch(`/api/products/${id}`).then((r) => r.json()),\n    enabled: !!id,\n  });\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Organization",
-        "text": "Organize custom hooks in a hooks/ directory, with one file per domain (useUsers.ts, usePosts.ts)."
+        "title": "Export Keys for Easy Invalidation",
+        "text": "Export query key constants (like PRODUCTS_KEY) so mutation hooks can invalidate them without duplicating the key array literal."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Mutation Hooks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Custom mutation hooks follow the same principle: wrap `useMutation` and return the mutation object along with any helper values. This is the ideal place to wire up cache invalidation so components never need to know which queries to refresh."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Mutation Hook with Invalidation",
+        "content": "A mutation hook that creates a product and invalidates the products list on success.",
+        "language": "tsx",
+        "code": "import { useMutation, useQueryClient } from '@tanstack/react-query';\nimport type { Product } from './useProducts';\n\nasync function createProduct(data: {\n  name: string;\n  price: number;\n}): Promise<Product> {\n  const res = await fetch('/api/products', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(data),\n  });\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\ninterface UseCreateProductResult {\n  mutate: (data: { name: string; price: number }) => void;\n  isPending: boolean;\n  isError: boolean;\n  error: Error | null;\n}\n\nexport function useCreateProduct(): UseCreateProductResult {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: createProduct,\n    onSuccess: () => {\n      // Invalidate the list so it refetches\n      queryClient.invalidateQueries({ queryKey: ['products'] });\n    },\n  });\n\n  return {\n    mutate: mutation.mutate,\n    isPending: mutation.isPending,\n    isError: mutation.isError,\n    error: mutation.error ?? null,\n  };\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hook File Organization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Organise custom hooks by domain rather than by type. A `hooks/products.ts` file contains all product-related queries and mutations together. This colocation makes it easy to find and update everything related to a domain when the API changes."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Approach",
+          "Example",
+          "Best For"
+        ],
+        "rows": [
+          [
+            "By domain",
+            "hooks/products.ts, hooks/users.ts",
+            "Most apps â€” related logic stays together"
+          ],
+          [
+            "By type",
+            "hooks/queries/products.ts, hooks/mutations/products.ts",
+            "Larger teams wanting strict separation"
+          ],
+          [
+            "Mixed",
+            "hooks/useProducts.ts, hooks/useAddProduct.ts",
+            "Individual hooks exported for tree-shaking"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Composing Hooks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Custom hooks can call other custom hooks. A `useProductDetails` hook might use `useQuery` internally and expose both the data and the loading state, while a parent component remains unaware of the query structure."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Composing Custom Hooks",
+        "content": "A hook that combines a product fetch and an add-to-cart mutation.",
+        "language": "tsx",
+        "code": "import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';\nimport { useProduct, PRODUCT_KEY } from './useProducts';\n\ninterface CartItem {\n  productId: string;\n  quantity: number;\n}\n\nasync function addToCart(item: CartItem): Promise<CartItem> {\n  const res = await fetch('/api/cart', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(item),\n  });\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\ninterface UseProductPageResult {\n  product: ReturnType<typeof useProduct>['data'];\n  productLoading: boolean;\n  productError: Error | null;\n  addToCart: (quantity: number) => void;\n  cartPending: boolean;\n}\n\nexport function useProductPage(productId: string): UseProductPageResult {\n  const queryClient = useQueryClient();\n\n  const productQuery = useProduct(productId);\n\n  const cartMutation = useMutation({\n    mutationFn: (quantity: number) => addToCart({ productId, quantity }),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['cart'] });\n    },\n  });\n\n  return {\n    product: productQuery.data,\n    productLoading: productQuery.isLoading,\n    productError: productQuery.error ?? null,\n    addToCart: (q: number) => cartMutation.mutate(q),\n    cartPending: cartMutation.isPending,\n  };\n}\n\n// Usage in component â€” clean and domain-focused\nfunction ProductPage({ id }: { id: string }) {\n  const { product, productLoading, productError, addToCart, cartPending } = useProductPage(id);\n\n  if (productLoading) return <p>Loading productâ€¦</p>;\n  if (productError) return <p role=\"alert\">Error: {productError.message}</p>;\n\n  return (\n    <div>\n      <h1>{product.name}</h1>\n      <p>${product.price}</p>\n      <button onClick={() => addToCart(1)} disabled={cartPending}>\n        {cartPending ? 'Addingâ€¦' : 'Add to Cart'}\n      </button>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Custom Hooks FAQ",
+        "items": [
+          {
+            "question": "Should every useQuery call be wrapped in a custom hook?",
+            "answer": "Not necessarily. For one-off queries in a specific page, a direct useQuery call is fine. Custom hooks pay off when the same query or mutation is reused across components or when the invalidation logic is complex."
+          },
+          {
+            "question": "Can I pass a queryFn as a parameter instead of hardcoding it?",
+            "answer": "Yes, but be careful with queryKey consistency. If the queryFn changes per component, the queryKey should reflect that to avoid cache collisions."
+          },
+          {
+            "question": "How do I type the return value of a custom hook?",
+            "answer": "Use a TypeScript interface for the return type and cast or type the useQuery result accordingly. React Query v5 types are generally inferred automatically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Extract a Custom Hook",
+        "description": "Take an inline useQuery call from a component and extract it into a typed custom hook.",
+        "steps": [
+          "Find a component in your app that calls useQuery inline.",
+          "Create a hooks/posts.ts file.",
+          "Export a POSTS_KEY constant with value ['posts'].",
+          "Create fetchPosts with proper TypeScript typing.",
+          "Build usePosts as a custom hook wrapping useQuery with the correct queryKey and queryFn.",
+          "Import usePosts into your component and replace the inline useQuery call.",
+          "Add a useCreatePost mutation hook to the same file that invalidates POSTS_KEY.",
+          "Verify the app still works and the list refreshes after adding a post."
+        ],
+        "expectedOutcome": "The component's data logic is fully extracted into reusable hooks. The component only imports and calls the hooks. Invalidation logic lives in the hook, not the component."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Custom hooks encapsulate query logic",
-          "Make queries reusable across components",
-          "Organize by domain",
-          "Combine queries and mutations"
+          "Custom hooks encapsulate query logic and keep query keys consistent",
+          "Export query key constants so mutation hooks can invalidate without duplication",
+          "Wire up cache invalidation inside mutation hooks, not in components",
+          "Organise hooks by domain â€” one file per resource type",
+          "Compose hooks for complex pages that need multiple data sources"
         ],
-        "takeaway": "Custom hooks are the best practice for React Query."
+        "takeaway": "Custom hooks turn scattered useQuery calls into a maintainable data layer. One file per domain, one hook per resource, and your components stay clean."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

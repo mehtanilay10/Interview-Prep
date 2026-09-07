@@ -9,6 +9,7 @@
   "difficulty": "advanced",
   "estimatedMinutes": 25,
   "tags": ["prefetching", "hover-prefetch", "route-prefetch", "ux"],
+  "prerequisites": ["query-options"],
   "blocks": [
     {
       "type": "paragraph",
@@ -38,6 +39,19 @@
       }
     },
     {
+      "type": "bullet-list",
+      "data": {
+        "title": "Benefits of Prefetching",
+        "items": [
+          "Eliminates loading spinners during navigation",
+          "Reduces perceived Time to Interactive (TTI)",
+          "Makes the app feel telepathic to the user",
+          "Leverages idle time between user actions",
+          "Works seamlessly with React Query's cache layer"
+        ]
+      }
+    },
+    {
       "type": "heading",
       "data": {
         "level": 2,
@@ -51,13 +65,48 @@
       }
     },
     {
+      "type": "comparison-cards",
+      "data": {
+        "title": "prefetchQuery vs fetchQuery",
+        "cards": [
+          {
+            "title": "prefetchQuery",
+            "description": "Populates the cache silently without subscribing. Ideal for pre-loading data the user will need soon.",
+            "pros": ["No component subscription needed", "Does not trigger re-renders", "Cache is populated for future use"],
+            "cons": ["Returns void, not data", "Cannot observe loading state"],
+            "tags": ["prefetch", "cache-only"]
+          },
+          {
+            "title": "fetchQuery",
+            "description": "Returns a Promise that resolves with the data. Useful in event handlers or non-React contexts.",
+            "pros": ["Returns data directly", "Useful outside components", "Throws on error for try/catch"],
+            "cons": ["Still populates cache as a side effect", "Requires async/await handling"],
+            "tags": ["promise", " imperative"]
+          }
+        ]
+      }
+    },
+    {
       "type": "example",
       "data": {
         "title": "Basic prefetchQuery",
-        "content": "Prefetching data for a user profile",
+        "content": "Prefetching data for a user profile on hover",
         "language": "tsx",
         "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction UserLink({ userId }: { userId: number }) {\n  const queryClient = useQueryClient();\n\n  const prefetchUser = async () => {\n    await queryClient.prefetchQuery({\n      queryKey: ['user', userId],\n      queryFn: () => fetchUser(userId),\n      staleTime: 1000 * 60 * 5\n    });\n  };\n\n  return (\n    <div onMouseEnter={prefetchUser}>\n      <a href={`/users/${userId}`}>View Profile</a>\n    </div>\n  );\n}"
       }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "fetchQuery Outside a Component",
+        "content": "Using fetchQuery in a route guard or event handler",
+        "language": "tsx",
+        "code": "const queryClient = new QueryClient();\n\nasync function prefetchOnRouteEnter(userId: number) {\n  try {\n    const user = await queryClient.fetchQuery({\n      queryKey: ['user', userId],\n      queryFn: () => fetchUser(userId),\n      staleTime: 1000 * 60 * 5\n    });\n    console.log('Prefetched user:', user.name);\n  } catch (error) {\n    console.error('Prefetch failed:', error);\n  }\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -73,21 +122,25 @@
       }
     },
     {
-      "type": "example",
-      "data": {
-        "title": "Hover Prefetch with Links",
-        "content": "Prefetching on link hover",
-        "language": "tsx",
-        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction UserCard({ user }: { user: User }) {\n  const queryClient = useQueryClient();\n\n  return (\n    <a\n      href={`/users/${user.id}`}\n      onMouseEnter={() => {\n        queryClient.prefetchQuery({\n          queryKey: ['user', user.id],\n          queryFn: () => fetchUser(user.id),\n          staleTime: 1000 * 60 * 5\n        });\n      }}\n    >\n      {user.name}\n    </a>\n  );\n}"
-      }
-    },
-    {
       "type": "callout",
       "data": {
         "variant": "tip",
         "title": "Debounce Hover Prefetching",
         "text": "Avoid prefetching on every mouseEnter event. Use a short debounce (50-100ms) to ensure the user is actually hovering intentionally, not just passing the cursor across the screen."
       }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hover Prefetch with Links",
+        "content": "Prefetching on link hover with debouncing",
+        "language": "tsx",
+        "code": "'use client';\n\nimport { useQueryClient } from '@tanstack/react-query';\nimport { useCallback } from 'react';\n\nfunction UserCard({ user }: { user: User }) {\n  const queryClient = useQueryClient();\n\n  const prefetchUser = useCallback(() => {\n    queryClient.prefetchQuery({\n      queryKey: ['user', user.id],\n      queryFn: () => fetchUser(user.id),\n      staleTime: 1000 * 60 * 5\n    });\n  }, [queryClient, user.id]);\n\n  return (\n    <a\n      href={`/users/${user.id}`}\n      onMouseEnter={prefetchUser}\n    >\n      {user.name}\n    </a>\n  );\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -105,7 +158,7 @@
     {
       "type": "mermaid",
       "data": {
-        "id": "prefetch-flow",
+        "id": "prefetch-flow-024",
         "caption": "Prefetch data flow from hover to navigation",
         "definition": "sequenceDiagram\n    participant U as User\n    participant L as Link\n    participant Q as QueryClient\n    participant A as API\n\n    U->>L: Hovers over link\n    L->>Q: prefetchQuery(queryKey, queryFn)\n    Q->>A: Fetch data\n    A-->>Q: Return data\n    Q->>Q: Store in cache\n    U->>L: Clicks link\n    L->>Q: useQuery(queryKey)\n    Q-->>L: Return cached data instantly"
       }
@@ -129,7 +182,7 @@
         "title": "Prefetching Multiple Queries",
         "content": "Prefetching a dashboard's data in parallel",
         "language": "tsx",
-        "code": "const prefetchDashboard = async () => {\n  await Promise.all([\n    queryClient.prefetchQuery({\n      queryKey: ['stats'],\n      queryFn: fetchStats\n    }),\n    queryClient.prefetchQuery({\n      queryKey: ['recent-activity'],\n      queryFn: fetchRecentActivity\n    }),\n    queryClient.prefetchQuery({\n      queryKey: ['notifications'],\n      queryFn: fetchNotifications\n    })\n  ]);\n};\n\n// Call this on route hover or mount\nprefetchDashboard();"
+        "code": "const prefetchDashboard = async (queryClient: QueryClient) => {\n  await Promise.all([\n    queryClient.prefetchQuery({\n      queryKey: ['stats'],\n      queryFn: fetchStats\n    }),\n    queryClient.prefetchQuery({\n      queryKey: ['recent-activity'],\n      queryFn: fetchRecentActivity\n    }),\n    queryClient.prefetchQuery({\n      queryKey: ['notifications'],\n      queryFn: fetchNotifications\n    })\n  ]);\n};\n\n// Call this on route hover or page mount\nprefetchDashboard(queryClient);"
       }
     },
     {
@@ -138,6 +191,21 @@
         "variant": "warning",
         "title": "Avoid Over-Prefetching",
         "text": "Prefetching every link on a page can saturate the user's network and waste bandwidth. Focus on high-intent elements like primary navigation, product cards, and pagination links."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement Hover Prefetching on a Product List",
+        "description": "You have a product listing page with links to individual product detail pages. Add hover prefetching so that when a user hovers over a product card, the product detail query is prefetched.",
+        "steps": [
+          "Create a ProductCard component that receives a product object",
+          "Use useQueryClient to get the QueryClient instance",
+          "Add an onMouseEnter handler that calls prefetchQuery with the product query key",
+          "Set staleTime to 5 minutes so prefetched data stays fresh",
+          "Verify in React Query DevTools that the prefetch populates the cache on hover"
+        ],
+        "expectedOutcome": "Hovering over a product card triggers a background fetch. Clicking the link navigates instantly with cached data."
       }
     },
     {
@@ -157,6 +225,5 @@
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "prerequisites": ["query-options"]
+  "furtherReading": []
 }

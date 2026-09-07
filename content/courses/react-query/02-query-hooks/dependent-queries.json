@@ -2,46 +2,187 @@
   "id": "lesson-rq-008",
   "slug": "dependent-queries",
   "moduleSlug": "query-hooks",
+  "courseSlug": "react-query",
   "title": "Dependent Queries",
-  "description": "Learn how to chain queries that depend on each other.",
-  "order": 4,
+  "description": "Chain queries that depend on each other using the enabled option for sequential data fetching.",
+  "order": 5,
   "difficulty": "intermediate",
   "estimatedMinutes": 18,
   "tags": [
     "react-query",
-    "dependent",
+    "dependent-queries",
     "chaining",
-    "queries"
+    "enabled",
+    "sequential",
+    "useQuery"
   ],
+  "prerequisites": ["query-options-react-query"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Dependent queries** (or sequential queries) are queries that depend on data from a previous query. Use the enabled option to control when they run."
+        "text": "**Dependent queries** (also called sequential queries) are queries that require data from a previous query before they can run. The key mechanism is the **enabled** option â€” set it to false until the prerequisite data is available, then set it to true to start the dependent query."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Chaining Queries"
+        "text": "The enabled Option"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The enabled option is a boolean that controls whether useQuery executes its queryFn. When false, the hook does nothing â€” it does not fetch, not error, not show loading. When it becomes true (either from the start or via a reactive dependency), the query runs normally."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Dependent Query",
-        "content": "Query that depends on another query",
-        "language": "jsx",
-        "code": "function UserProfile({ userId }) {\n  // First query: fetch user\n  const { data: user } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId)\n  });\n\n  // Second query: fetch user's posts (depends on user)\n  const { data: posts } = useQuery({\n    queryKey: ['posts', user?.id],\n    queryFn: () => fetchPosts(user.id),\n    enabled: !!user // Only run when user is loaded\n  });\n\n  return (\n    <div>\n      <h1>{user?.name}</h1>\n      <ul>{posts?.map(post => <li key={post.id}>{post.title}</li>)}</ul>\n    </div>\n  );\n}"
+        "title": "enabled with a Prop Dependency",
+        "content": "Using enabled to control when a query starts based on component props",
+        "language": "tsx",
+        "code": "function UserPosts({ userId }: { userId: string | null }) {\n  const { data: user, isLoading: userLoading } = useQuery({\n    queryKey: ['user', userId ?? 'none'],\n    queryFn: () => fetchUser(userId!),\n    enabled: userId !== null,\n  });\n\n  const { data: posts, isLoading: postsLoading } = useQuery({\n    queryKey: ['posts', 'by-user', user?.id ?? 'none'],\n    queryFn: () => fetchPostsByUser(user!.id),\n    // Only fetch posts once user data is available\n    enabled: !!user,\n  });\n\n  if (!userId) return <p>Select a user to view their posts.</p>;\n  if (userLoading) return <p>Loading user...</p>;\n  if (postsLoading) return <p>Loading posts...</p>;\n\n  return (\n    <section>\n      <h1>{user.name}'s Posts</h1>\n      <ul>\n        {posts?.map((post) => (\n          <li key={post.id}>{post.title}</li>\n        ))}\n      </ul>\n    </section>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-dependent-queries-flow",
+        "caption": "How two dependent queries execute sequentially using the enabled flag",
+        "definition": "flowchart TD\n    A[Component mounts\n    userId = '42'] --> B[Query 1 enabled: true\n    queryKey: ['user', '42']]\n    B --> C[Fetch user from server]\n    C --> D[User data in cache\n    user.id = '42']\n    D --> E[Query 2 enabled becomes true\n    queryKey: ['posts', '42']]\n    E --> F[Fetch posts for user 42]\n    F --> G[Posts data in cache]\n    G --> H[Render user + posts UI]\n\n    I[userId = null] --> J[Both queries disabled\n    enabled: false]\n    J --> K[Show 'Select a user' prompt]\n\n    L[userId changes to '99'] --> M[Query 1 refetches\n    for new user]\n    M --> N[Query 2 refetches\n    for new user's posts]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Dependent Query Patterns"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "When to Use Dependent Queries",
+        "items": [
+          "**Nested resources**: Fetch a user, then fetch their posts â€” posts depend on user.id",
+          "**Auth-dependent data**: Fetch the current user, then fetch their private settings",
+          " **Search then detail**: Fetch search results, then fetch details for the selected item",
+          " **Form with options**: Fetch a list of categories, then fetch products filtered by the selected category",
+          "**Multi-step wizards**: Step 2 data depends on the selection made in Step 1"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Query within a Query"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can also use data from one query inside another query's queryFn. React Query's cache ensures the prerequisite data is available. This pattern is useful when the second query's parameters depend on the first query's result."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using First Query's Data in the Second QueryFn",
+        "content": "Accessing cached data inside a dependent query's queryFn",
+        "language": "tsx",
+        "code": "import { useQuery, useQueryClient } from '@tanstack/react-query';\n\nfunction OrderDetails({ orderId }: { orderId: string }) {\n  const queryClient = useQueryClient();\n\n  const { data: order } = useQuery({\n    queryKey: ['orders', orderId],\n    queryFn: () => fetchOrder(orderId),\n  });\n\n  // Second query depends on the first â€” reads customerId from cache\n  const { data: customer } = useQuery({\n    queryKey: ['customers', order?.customerId],\n    queryFn: async () => {\n      // order is available from the cache once query 1 succeeds\n      const customerId = order!.customerId;\n      const res = await fetch(`/api/customers/${customerId}`);\n      return res.json();\n    },\n    enabled: !!order?.customerId,\n  });\n\n  return (\n    <div>\n      <h2>Order #{orderId}</h2>\n      <p>Customer: {customer?.name}</p>\n    </div>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "enabled Option",
-        "text": "The enabled option is key for dependent queries. Set it to false until the prerequisite data is available."
+        "variant": "warning",
+        "title": "Avoid Query Key Dependencies on Data",
+        "text": "Never use data values (not just IDs) directly in a queryKey â€” only use stable identifiers like IDs. If the data object reference changes on every render, the query will refetch infinitely."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Dependent Query Errors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each dependent query handles its own errors independently. If the first query fails, the second query never runs (enabled remains false). If the first query succeeds but the second fails, the first query's data remains in the UI while you show the second query's error."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Error Handling in Dependent Queries",
+        "content": "Displaying partial data when one query in a chain fails",
+        "language": "tsx",
+        "code": "function OrderWithItems({ orderId }: { orderId: string }) {\n  const { data: order, isError: orderError } = useQuery({\n    queryKey: ['orders', orderId],\n    queryFn: () => fetchOrder(orderId),\n  });\n\n  const { data: items, isError: itemsError } = useQuery({\n    queryKey: ['orders', orderId, 'items'],\n    queryFn: () => fetchOrderItems(orderId),\n    enabled: !!order,\n  });\n\n  if (orderError) return <p className=\"error\">Failed to load order.</p>;\n\n  return (\n    <div>\n      <h1>Order #{order?.id}</h1>\n      <p>Status: {order?.status}</p>\n\n      {itemsError && (\n        <p className=\"error\">Could not load items, but order details are shown.</p>\n      )}\n\n      {items?.map((item) => (\n        <div key={item.id}>{item.productName} x {item.quantity}</div>\n      ))}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "enabled",
+            "definition": "A boolean option on useQuery that controls whether the queryFn runs. When false, the query does not execute, does not error, and shows no loading state."
+          },
+          {
+            "term": "Dependent Query",
+            "definition": "A query that relies on the result of another query before it can run. Implemented using the enabled option to delay execution until prerequisite data is cached."
+          },
+          {
+            "term": "Sequential Fetching",
+            "definition": "Fetching data in a specific order where each step depends on the previous step's result. Contrasts with parallel fetching where all queries run simultaneously."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Project Detail View",
+        "description": "Create a ProjectDetail page that loads a project, then loads its team members and recent activity â€” each depending on the previous query's result.",
+        "steps": [
+          "Create mock API functions: fetchProject(id), fetchTeamMembers(projectId), fetchRecentActivity(projectId)",
+          "Create ProjectDetail component accepting a projectId prop",
+          "Query 1: Fetch project with queryKey ['projects', projectId]",
+          "Query 2: Fetch team members with queryKey ['projects', projectId, 'team'], enabled: !!project",
+          "Query 3: Fetch recent activity with queryKey ['projects', projectId, 'activity'], enabled: !!project",
+          "Show loading state only for each query independently â€” project name appears as soon as Query 1 resolves",
+          "Handle errors for each query separately with distinct error messages",
+          "Style with Tailwind: project name as heading, team as avatar list, activity as a timeline"
+        ],
+        "expectedOutcome": "A project detail page where the header appears first, followed by team members and activity. Each section loads independently, and errors in one section do not block the others."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
       }
     },
     {
@@ -49,16 +190,17 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Dependent queries chain data fetching",
-          "Use enabled to control execution",
-          "Second query waits for first to complete",
-          "Great for sequential data requirements"
+          "Dependent queries use the enabled option to control execution order",
+          "Set enabled: false until prerequisite data is available in the cache",
+          "The second query reads the first query's result from the cache via its queryKey",
+          "Each query handles its own errors independently",
+          "Use case IDs (not full objects) in dependent query keys for stability",
+          "Dependent queries are perfect for nested resources and multi-step workflows"
         ],
-        "takeaway": "Dependent queries handle sequential data needs."
+        "takeaway": "The enabled option is the simplest and most powerful tool for chaining queries â€” it turns independent hooks into a coordinated data-fetching pipeline."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

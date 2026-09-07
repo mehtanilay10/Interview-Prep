@@ -19,70 +19,152 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Stale Time Deep Dive"
+        "text": "What Is Stale Time?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Stale time determines how long React Query considers data fresh. While data is fresh, React Query will not refetch it in the background. Once stale, the next consumer triggers a background refetch. Setting staleTime to Infinity makes data never stale, turning React Query into a client-side cache with no automatic updates."
+        "text": "Stale time is the window during which React Query considers cached data fresh. While data is fresh, any component that uses the same query key receives the cached data instantly without triggering a network request. Once the stale time window expires, the next consumer triggers a background refetch. Setting staleTime to Infinity makes data perpetually fresh, turning React Query into a read-only client-side cache."
       }
     },
     {
-      "type": "example",
+      "type": "callout",
       "data": {
-        "title": "Infinite stale time example",
-        "code": "const { data } = useQuery({\n  queryKey: ['static-data'],\n  queryFn: () => fetch('/api/static').then(res => res.json()),\n  staleTime: Infinity,\n});",
-        "language": "tsx",
-        "content": "Use Infinity for truly static reference data."
+        "variant": "tip",
+        "title": "Freshness Is Not Accuracy",
+        "text": "A query can be stale yet still accurate. staleTime is about your confidence in how quickly data might change â€” not about correctness. A country list is accurate for years, so staleTime: Infinity is safe. A live score needs staleTime: 0."
       }
+    },
+    {
+      "type": "divider"
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Garbage Collection"
+        "text": "The Garbage Collection Lifecycle"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "When a query is no longer observed by any component, it enters the garbage collection timer. If no component subscribes before `cacheTime` expires, the query is removed from cache. This frees memory but means the next mount will show a loading state."
+        "text": "When every component that subscribes to a query unmounts, React Query starts the garbage collection timer. If no component re-subscribes before cacheTime expires, the query is removed from cache entirely. On the next mount, the component sees a loading state and triggers a fresh fetch."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "rq-gc",
-        "definition": "graph TD\n    A[Query Active] --> B[All Components Unmount]\n    B --> C[GC Timer Starts]\n    C --> D{ cacheTime Expired? }\n    D -->|No| E[Query Remains in Cache]\n    D -->|Yes| F[Query Removed]\n    E --> G[Component Remounts]\n    G --> H[Instant Data from Cache]\n    F --> I[Component Remounts]\n    I --> J[Loading State + Refetch]",
-        "caption": "Garbage collection flow"
+        "id": "rq-gc-lifecycle",
+        "definition": "graph TD\n    A[Component Mounts] --> B[Query Created or Fetched]\n    B --> C[Data in Cache]\n    C --> D{All Components Unmount?}\n    D -->|No| C\n    D -->|Yes| E[GC Timer Starts: cacheTime]\n    E --> F{cacheTime Expired?}\n    F -->|No| G[Query Stays in Cache]\n    F -->|Yes| H[Query Removed from Cache]\n    G --> I[Component Remounts]\n    I --> J[Instant Data â€” No Loading]\n    H --> K[Component Remounts]\n    K --> L[Loading State + Background Refetch]",
+        "caption": "Garbage collection lifecycle: how queries enter, stay in, and leave the cache."
       }
     },
     {
       "type": "heading",
       "data": {
-        "level": 2,
-        "text": "Practical Guidelines"
+        "level": 3,
+        "text": "Practical Guidelines for staleTime"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "staleTime Recommendations",
         "items": [
-          "Use staleTime: 0 for real-time or frequently changing data.",
-          "Use staleTime: Infinity for static reference data.",
-          "Set cacheTime between 5-30 minutes for most applications.",
-          "Increase cacheTime for expensive queries that users revisit often."
-        ],
-        "title": "Guidelines"
+          "Use staleTime: 0 for real-time dashboards, live scores, or frequently changing data.",
+          "Use staleTime: 1000 * 60 * 5 (5 min) as a reasonable default for most REST APIs.",
+          "Use staleTime: Infinity for static reference data: countries, categories, feature flags.",
+          "Avoid setting cacheTime below 1 minute â€” it causes excessive refetching for active queries."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Different staleTime values for different data types",
+        "code": "// Static reference data â€” never refetch\nconst { data: countries } = useQuery({\n  queryKey: ['countries'],\n  queryFn: fetchCountries,\n  staleTime: Infinity,\n});\n\n// User dashboard â€” moderate freshness\nconst { data: stats } = useQuery({\n  queryKey: ['dashboard-stats'],\n  queryFn: fetchStats,\n  staleTime: 1000 * 60 * 5, // 5 minutes\n});\n\n// Live notifications â€” always refetch\nconst { data: notifications } = useQuery({\n  queryKey: ['notifications'],\n  queryFn: fetchNotifications,\n  staleTime: 0,\n  refetchInterval: 10000,\n});",
+        "language": "tsx",
+        "content": "Tailor staleTime to the nature of each data source."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Garbage Collection Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Garbage collection only runs for queries that have zero active observers. If even one component is subscribed, the query is considered active and will not be collected. This means you can safely set long cacheTimes for frequently accessed queries without memory concerns."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Active Query",
+            "definition": "A query with at least one subscribed observer component. Active queries are never garbage collected."
+          },
+          {
+            "term": "Inactive Query",
+            "definition": "A query with zero observers, sitting in cache waiting for the GC timer. It will be removed after cacheTime expires."
+          },
+          {
+            "term": "cacheTime (gcTime)",
+            "definition": "The duration an inactive query remains in cache before garbage collection. In React Query v5 this was renamed to gcTime."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "important",
-        "text": "Garbage collection only runs for unused queries. Active queries are never collected. This means you can safely use long cacheTimes for queries that are frequently accessed.",
-        "title": "GC Safety"
+        "title": "GC Safety Guarantee",
+        "text": "Garbage collection only runs for unused queries. Active queries â€” those with at least one mounted subscriber â€” are never collected. This means you can safely use long cacheTimes for queries that are frequently accessed without worrying about memory leaks."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Tune staleTime and cacheTime",
+        "description": "Given a blog app with posts (rarely change), comments (update occasionally), and live analytics (real-time), assign appropriate staleTime and cacheTime values for each query.",
+        "steps": [
+          "Assign staleTime: Infinity and cacheTime: 30 minutes for the posts query.",
+          "Assign staleTime: 1000 * 60 * 2 and cacheTime: 10 minutes for comments.",
+          "Assign staleTime: 0 and refetchInterval: 5000 for live analytics."
+        ],
+        "expectedOutcome": "Posts load instantly from cache on navigation, comments refresh after 2 minutes, and analytics updates every 5 seconds."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Stale Time & GC FAQ",
+        "items": [
+          {
+            "question": "Why was gcTime renamed to cacheTime?",
+            "answer": "In React Query v5, gcTime was renamed to cacheTime for clarity. They refer to the same concept: how long an unused query stays in cache. The rename was purely cosmetic."
+          },
+          {
+            "question": "Can I prevent garbage collection entirely?",
+            "answer": "No, but you can set cacheTime to Infinity to keep unused queries indefinitely. Be cautious â€” this can cause memory issues in long-running applications with many unique query keys."
+          },
+          {
+            "question": "Does background refetching reset the GC timer?",
+            "answer": "No. The GC timer only counts down while a query has zero observers. If a component is mounted and subscribed, the query is active and not subject to GC."
+          }
+        ]
       }
     },
     {
@@ -90,10 +172,10 @@
       "data": {
         "title": "Stale Time & GC Key Points",
         "points": [
-          "staleTime controls when data is considered outdated.",
-          "Garbage collection removes unused queries after cacheTime.",
+          "staleTime controls when data is considered outdated and eligible for background refetching.",
+          "Garbage collection removes unused queries after cacheTime expires.",
           "Active queries are never garbage collected.",
-          "Balance cacheTime with memory constraints."
+          "Balance cacheTime with memory constraints in long-running apps."
         ],
         "takeaway": "Understanding stale time and garbage collection lets you tune React Query for both performance and memory efficiency."
       }

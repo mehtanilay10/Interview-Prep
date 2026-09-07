@@ -19,21 +19,32 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Understanding Cache Configuration"
+        "text": "The Two-Layer Cache Model"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "React Query uses a two-layer cache model: the query cache stores query results, while the garbage collector removes unused queries after a configurable period. The two most important settings are `cacheTime` (how long unused queries stay in cache) and `staleTime` (how long data is considered fresh before background refetching)."
+        "text": "React Query maintains a query cache in memory that stores the results of every unique query key. This cache has two distinct timers that control its behavior: `staleTime` governs how long data is considered fresh, while `cacheTime` controls how long unused queries stay in memory before garbage collection removes them. Understanding both is essential for building performant React Query applications."
       }
     },
     {
-      "type": "callout",
+      "type": "key-terms",
       "data": {
-        "variant": "tip",
-        "text": "`staleTime` is the freshness window. Set it higher for data that rarely changes, like a list of countries. Set it lower for frequently updating data, like a dashboard count.",
-        "title": "Freshness vs Cache Duration"
+        "terms": [
+          {
+            "term": "staleTime",
+            "definition": "The duration in milliseconds that data is considered fresh. While fresh, React Query will not refetch the data in the background."
+          },
+          {
+            "term": "cacheTime",
+            "definition": "The duration in milliseconds that unused queries remain in the cache before being garbage collected. Formerly called gcTime in React Query v4."
+          },
+          {
+            "term": "Query Cache",
+            "definition": "The in-memory store that holds all query results, metadata, and state in React Query."
+          }
+        ]
       }
     },
     {
@@ -44,24 +55,46 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "cacheTime: Duration in milliseconds before unused queries are garbage collected. Default: 5 minutes.",
-          "staleTime: Duration before data is considered stale and eligible for background refetch. Default: 0 (always stale).",
-          "refetchOnWindowFocus: Refetch when the user returns to the tab. Default: true.",
-          "refetchOnReconnect: Refetch when the network reconnects. Default: true."
-        ],
-        "title": "Options"
+        "text": "React Query exposes several configuration options that control caching behavior. The most important are `cacheTime`, `staleTime`, `refetchOnWindowFocus`, and `refetchOnReconnect`. These can be set globally on the QueryClient or overridden per query."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Option", "Default", "Purpose"],
+        "rows": [
+          ["cacheTime", "5 minutes", "How long unused queries stay in cache before removal"],
+          ["staleTime", "0 (always stale)", "How long data is considered fresh before background refetching"],
+          ["refetchOnWindowFocus", "true", "Refetch when user returns to the tab"],
+          ["refetchOnReconnect", "true", "Refetch when the network reconnects"]
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Global Default Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Set defaults once when creating your QueryClient. All queries in your application inherit these values unless explicitly overridden. This is the recommended approach for maintaining consistent behavior across your app."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Global cache configuration",
+        "title": "Global cache configuration with QueryClient",
         "code": "import { QueryClient } from '@tanstack/react-query';\n\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      cacheTime: 1000 * 60 * 10, // 10 minutes\n      staleTime: 1000 * 60 * 5, // 5 minutes\n      refetchOnWindowFocus: true,\n      refetchOnReconnect: true,\n      retry: 2,\n    },\n  },\n});",
         "language": "tsx",
-        "content": "Set sensible defaults at the QueryClient level."
+        "content": "Set sensible defaults at the QueryClient level so all queries inherit consistent cache behavior."
       }
     },
     {
@@ -74,24 +107,92 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "You can override global defaults at the individual query level. This is useful when one query needs different caching behavior than the rest."
+        "text": "Individual queries can override global defaults. This is useful when a specific endpoint returns data that rarely changes, or when a query is expensive and should be cached for longer. Per-query overrides take precedence over global settings."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Per-query configuration",
-        "code": "const { data } = useQuery({\n  queryKey: ['todos'],\n  queryFn: fetchTodos,\n  staleTime: 1000 * 60 * 60, // 1 hour for todos\n  cacheTime: 1000 * 60 * 30, // 30 minutes\n  refetchInterval: 5000, // refetch every 5 seconds\n});",
+        "title": "Per-query configuration override",
+        "code": "const { data } = useQuery({\n  queryKey: ['todos'],\n  queryFn: fetchTodos,\n  staleTime: 1000 * 60 * 60, // 1 hour â€” data rarely changes\n  cacheTime: 1000 * 60 * 30, // 30 minutes\n  refetchInterval: 5000, // refetch every 5 seconds for live data\n});",
         "language": "tsx",
-        "content": "Per-query options override global defaults."
+        "content": "Per-query options override global defaults for fine-grained cache control."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "warning",
-        "text": "Setting `cacheTime` too high can cause memory leaks in long-running applications with many unique query keys. Monitor cache size in production.",
-        "title": "Memory Considerations"
+        "variant": "tip",
+        "title": "When to Use Per-Query Overrides",
+        "text": "Override staleTime for data that never changes (e.g., country list: staleTime: Infinity). Override cacheTime for expensive queries that users revisit frequently. Leave refetchOnWindowFocus on for dashboard data but turn it off for form-heavy pages."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: Global vs Per-Query"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Global Defaults vs Per-Query Overrides",
+        "cards": [
+          {
+            "title": "Global Defaults",
+            "description": "Configured once on QueryClient. Applies to all queries uniformly.",
+            "pros": ["Consistent behavior across app", "Single place to manage", "Easy to audit"],
+            "cons": ["Too coarse for varied data", "Hard to tune per endpoint"],
+            "tags": ["recommended"]
+          },
+          {
+            "title": "Per-Query Overrides",
+            "description": "Set directly on useQuery call. Takes precedence over global.",
+            "pros": ["Fine-grained control", "Adapt to data freshness needs", "Mix static and live data"],
+            "cons": ["Scattered across components", "Can be forgotten"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Configure Cache for a Dashboard",
+        "description": "You are building a dashboard with three data sources: user profile (rarely changes), notifications (updates every 30 seconds), and a settings page (changes on explicit save). Configure staleTime and cacheTime for each query appropriately.",
+        "steps": [
+          "Set staleTime: Infinity for the user profile query.",
+          "Set refetchInterval: 30000 for notifications.",
+          "Set refetchOnWindowFocus: false for the settings form.",
+          "Set a global cacheTime of 10 minutes for all other queries."
+        ],
+        "expectedOutcome": "Your dashboard loads cached data instantly for the profile, polls notifications every 30 seconds, and avoids disruptive refetches while the user edits settings."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Cache Configuration FAQ",
+        "items": [
+          {
+            "question": "What is the difference between staleTime and cacheTime?",
+            "answer": "staleTime controls when data is considered outdated and eligible for background refetching. cacheTime controls how long unused queries stay in memory before being garbage collected. A query can be stale while still in cache, and it can be fresh but get garbage collected if no component is using it."
+          },
+          {
+            "question": "What happens if I set staleTime to Infinity?",
+            "answer": "Data is never considered stale. React Query will never background refetch it, making it behave like a client-side cache. This is ideal for static reference data like country lists or configuration values."
+          },
+          {
+            "question": "Can I change cacheTime after creating the QueryClient?",
+            "answer": "You can set defaults on the QueryClient, but individual query cache times are controlled per query. To change defaults globally after creation, update queryClient.defaultOptions.queries.cacheTime."
+          }
+        ]
       }
     },
     {
@@ -99,10 +200,10 @@
       "data": {
         "title": "Cache Configuration Key Points",
         "points": [
-          "staleTime controls freshness, cacheTime controls retention.",
-          "Global defaults are set on QueryClient.",
-          "Per-query overrides allow fine-grained control.",
-          "Balance memory usage with user experience."
+          "staleTime controls freshness; cacheTime controls retention in memory.",
+          "Global defaults are set on QueryClient and inherited by all queries.",
+          "Per-query overrides allow fine-grained control per data type.",
+          "Balance memory usage with user experience needs."
         ],
         "takeaway": "Proper cache configuration is the foundation of a performant React Query application."
       }
@@ -111,6 +212,6 @@
   "relatedLessons": [],
   "furtherReading": [],
   "prerequisites": [
-    "what-is-react-query"
+    "query-hooks"
   ]
 }

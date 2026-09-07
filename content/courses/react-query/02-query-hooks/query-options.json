@@ -2,46 +2,240 @@
   "id": "lesson-rq-005",
   "slug": "query-options-react-query",
   "moduleSlug": "query-hooks",
+  "courseSlug": "react-query",
   "title": "Query Options",
-  "description": "Learn all the options available for configuring queries.",
+  "description": "Master all major useQuery options for fine-grained control over caching, refetching, and data selection.",
   "order": 1,
   "difficulty": "intermediate",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 25,
   "tags": [
     "react-query",
     "options",
     "configuration",
-    "caching"
+    "caching",
+    "staleTime",
+    "gcTime",
+    "retry",
+    "select"
   ],
+  "prerequisites": ["query-basics"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "useQuery accepts many options to control caching, refetching, and behavior."
+        "text": "useQuery accepts over 20 configuration options that control every aspect of query behavior: how long data stays fresh, how retries work, when to refetch, how to transform results, and more. This lesson covers the most important options with practical examples."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Common Options"
+        "text": "Caching Options: staleTime and gcTime"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "staleTime and gcTime are the two most important caching options. They work together to control when data is refetched and how long unused data stays in memory."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Options",
-        "content": "Configuring query behavior",
-        "language": "jsx",
-        "code": "const { data } = useQuery({\n  queryKey: ['users'],\n  queryFn: fetchUsers,\n  \n  // Caching\n  staleTime: 1000 * 60 * 5,    // Data fresh for 5 min\n  gcTime: 1000 * 60 * 30,      // Cache for 30 min\n  \n  // Refetching\n  refetchOnWindowFocus: true,  // Refetch on focus\n  refetchOnMount: true,        // Refetch on mount\n  refetchInterval: 5000,       // Poll every 5 sec\n  \n  // Behavior\n  enabled: !!userId,           // Conditional query\n  retry: 3,                    // Retry 3 times\n  retryDelay: 1000,            // Wait between retries\n  \n  // Data transformation\n  select: (data) => data.users // Transform response\n});"
+        "title": "Configuring staleTime and gcTime",
+        "content": "Setting caching behavior for a user profile query",
+        "language": "tsx",
+        "code": "import { useQuery } from '@tanstack/react-query';\n\nfunction UserProfile({ userId }: { userId: string }) {\n  const { data, isLoading, isFetching } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    staleTime: 1000 * 60 * 10, // 10 minutes â€” data stays fresh\n    gcTime: 1000 * 60 * 60,   // 1 hour â€” cache kept after unmount\n  });\n\n  // isFetching is true during background refetches even when\n  // data is available â€” useful for showing a subtle refresh indicator\n  return (\n    <div>\n      {isFetching && !isLoading && <span className=\"refresh-badge\">Updating...</span>}\n      {data && <h1>{data.name}</h1>}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-stale-gc-time",
+        "caption": "How staleTime and gcTime control the query lifecycle",
+        "definition": "flowchart LR\n    A[Query\n    completes] --> B[Data in cache\n    is FRESH]\n    B -->|staleTime elapsed| C[Data becomes\n    STALE]\n    C -->|Next render or\n    window focus| D[Background\n    refetch]\n    B -->|Component\n    unmounts| E[Data stays in cache\n    for gcTime duration]\n    E -->|gcTime elapsed\n    and still unused| F[Garbage\n    collected]\n    E -->|Component\n    remounts within gcTime| G[Return cached\n    data immediately]"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "staleTime vs gcTime",
+        "cards": [
+          {
+            "title": "staleTime",
+            "description": "Controls when data is considered stale and eligible for refetching. While data is fresh, React Query returns it without making a network request.",
+            "pros": [
+              "Prevents unnecessary refetches for stable data",
+              "Improves perceived performance",
+              "Widely used for user profiles, settings"
+            ],
+            "cons": [
+              "Set too high and data stays outdated silently",
+              "Default is 0 â€” most beginners miss this option"
+            ],
+            "tags": ["freshness", "refetching"]
+          },
+          {
+            "title": "gcTime",
+            "description": "Controls how long unused cached data persists before being garbage-collected. Data is removed from memory after this period if no component is subscribed.",
+            "pros": [
+              "Prevents memory leaks from accumulating cache entries",
+              "Allows returning to a view without a refetch (within gcTime window)"
+            ],
+            "cons": [
+              "Long gcTime increases memory usage",
+              "Short gcTime causes unnecessary refetches on navigation"
+            ],
+            "tags": ["memory", "cache-duration"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Refetching Options"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query refetches data automatically in several scenarios. You can fine-tune or disable each of these behaviors to match your application's needs."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Option", "Default", "Description"],
+        "rows": [
+          ["refetchOnWindowFocus", "true", "Refetch when user switches back to the tab"],
+          ["refetchOnMount", "true", "Refetch when a mounted component re-renders"],
+          ["refetchOnReconnect", "true", "Refetch when the browser detects network reconnection"],
+          ["refetchInterval", "false", "Poll interval in ms. Set to a number for polling, false to disable"],
+          ["refetchIntervalInBackground", "false", "Keep polling when the tab is in the background"]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "staleTime vs gcTime",
-        "text": "staleTime controls when data is considered stale (triggers refetch). gcTime controls how long unused data stays in cache."
+        "variant": "warning",
+        "title": "Disable refetchOnWindowFocus for Sensitive Forms",
+        "text": "If a user is filling out a form and switches tabs, refetching on window focus could overwrite their in-progress changes. Disable refetchOnWindowFocus for mutation-heavy pages."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry Options"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "By default, failed queries retry 3 times with exponential backoff. Configure retry and retryDelay to control error recovery behavior."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Retry Configuration",
+        "content": "Fine-tuning retry behavior for an unstable API",
+        "language": "tsx",
+        "code": "function UnstableResource() {\n  const { data, error } = useQuery({\n    queryKey: ['unstable-resource'],\n    queryFn: fetchUnstableResource,\n    retry: 2,              // Retry at most 2 times (3 total attempts)\n    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),\n    // Exponential backoff: 1s, 2s, 4s... capped at 5s\n  });\n\n  if (error) {\n    return <p>Failed after retries: {error.message}</p>;\n  }\n  return <pre>{JSON.stringify(data, null, 2)}</pre>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Transformation: select"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The select option lets you transform the raw response before it reaches your component. This is useful for extracting a nested field, filtering a list, or computing derived data â€” without polluting your queryFn."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "select â€” Transform Query Data",
+        "content": "Extracting a subset of data with the select option",
+        "language": "tsx",
+        "code": "interface ApiResponse {\n  users: User[];\n  total: number;\n  page: number;\n}\n\nfunction UserNames() {\n  // select transforms the data â€” component only sees string[]\n  const { data: userNames } = useQuery({\n    queryKey: ['users'],\n    queryFn: async () => {\n      const res = await fetch('/api/users');\n      return res.json() as Promise<ApiResponse>;\n    },\n    select: (response) => response.users.map(u => u.name),\n  });\n\n  // userNames is string[] here, not ApiResponse\n  return (\n    <ul>\n      {userNames?.map((name, i) => (\n        <li key={i}>{name}</li>\n      ))}\n    </ul>\n  );\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "All Options Reference"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Option", "Type", "Default", "Notes"],
+        "rows": [
+          ["queryKey", "QueryKey", "required", "Unique array identifying the query"],
+          ["queryFn", "() => Promise<T>", "required", "Async function that fetches the data"],
+          ["staleTime", "number", "0", "Data freshness duration in ms"],
+          ["gcTime", "number", "5 min", "Cache retention after unmount in ms"],
+          ["enabled", "boolean", "true", "Whether the query runs automatically"],
+          ["retry", "number | boolean", "3", "Retry count or false to disable"],
+          ["retryDelay", "number | fn", "exponential", "Delay between retries in ms"],
+          ["select", "(data) => S", "none", "Transform data before it reaches the component"],
+          ["placeholderData", "T | fn", "none", "Fallback when cache is empty"],
+          ["initialData", "T | fn", "none", "Data for the very first render only"],
+          ["refetchOnWindowFocus", "boolean", "true", "Refetch on tab focus"],
+          ["refetchOnMount", "boolean", "true", "Refetch on component mount"],
+          ["refetchOnReconnect", "boolean", "true", "Refetch on network reconnection"],
+          ["refetchInterval", "number | false", "false", "Poll interval in ms"],
+          ["suspense", "boolean", "false", "Enable React Suspense integration"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Configure a Dashboard Query",
+        "description": "Create a Dashboard component that displays real-time server metrics. Configure useQuery options to balance freshness, performance, and user experience.",
+        "steps": [
+          "Create a mock fetchMetrics function that returns server CPU, memory, and request counts",
+          "Use useQuery with queryKey ['metrics'] and a 30-second refetchInterval for live updates",
+          "Set staleTime to 10000ms so data is considered fresh for 10 seconds",
+          "Set gcTime to 1000 * 60 * 5 (5 minutes) so returning users see cached data",
+          "Use select to extract only the cpu and memory fields from the response",
+          "Show a 'Live' indicator when isFetching is true but data is already displayed",
+          "Configure retry: 1 and show a 'Reconnecting...' message on error"
+        ],
+        "expectedOutcome": "A dashboard that updates every 30 seconds while the tab is active, shows stale data gracefully during refetches, and reconnects silently on transient errors."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
       }
     },
     {
@@ -49,16 +243,18 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "staleTime controls refetching",
-          "gcTime controls cache duration",
-          "enabled for conditional queries",
-          "select transforms data"
+          "staleTime controls when data is refetched â€” higher = fewer network requests",
+          "gcTime controls how long unused data stays in cache",
+          "refetchOnWindowFocus, refetchOnMount, and refetchOnReconnect control automatic refetching triggers",
+          "retry and retryDelay configure error recovery behavior",
+          "select transforms data before it reaches your component",
+          "refetchInterval enables polling for live data",
+          "All options can be set globally (defaultOptions) or per-query"
         ],
-        "takeaway": "Query options give you fine-grained control."
+        "takeaway": "Query options give you fine-grained control over every aspect of the data-fetching lifecycle. Start with defaults and tune each option based on your data's freshness requirements."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

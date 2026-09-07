@@ -2,46 +2,184 @@
   "id": "lesson-rq-006",
   "slug": "pagination",
   "moduleSlug": "query-hooks",
+  "courseSlug": "react-query",
   "title": "Pagination",
-  "description": "Learn how to implement paginated queries.",
-  "order": 2,
+  "description": "Implement paginated queries with keepPreviousData for smooth page transitions.",
+  "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 20,
   "tags": [
     "react-query",
     "pagination",
     "pages",
-    "data"
+    "keepPreviousData",
+    "placeholderData",
+    "ux"
   ],
+  "prerequisites": ["query-options-react-query", "initial-data-placeholder"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**useQuery** can handle pagination by including the page number in the query key."
+        "text": "Pagination with React Query means including the page number in the query key so that each page is cached separately. The `placeholderData: keepPreviousData` option ensures the old page data remains visible while the new page loads â€” eliminating the jarring flash of a loading state."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Paginated Query"
+        "text": "How Pagination Works with React Query"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When the user clicks \"Next\", the page state updates. React Query detects that the queryKey has changed (e.g., from ['users', 1] to ['users', 2]) and fetches the new page. Because the old page data is still in the cache, placeholderData: keepPreviousData returns it immediately while the new request is in flight."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-pagination-flow",
+        "caption": "Data flow when the user navigates between paginated pages",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant C as Component\n    participant RQ as React Query Cache\n    participant S as Server\n    U->>C: Click \"Next\" â†’ page = 2\n    C->>RQ: useQuery(['users', 2]) â€” cache miss\n    RQ->>S: GET /api/users?page=2\n    Note over C,RQ: keepPreviousData shows page 1\n    C->>U: Render page 1 data (placeholder)\n    S-->>RQ: Return page 2 data\n    RQ->>RQ: Cache page 2\n    RQ->>C: Deliver page 2 data\n    C->>U: Render page 2 data"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Pagination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The paginated query function receives a page parameter. Use useState to track the current page, include it in the queryKey, and use keepPreviousData to preserve the previous page's UI during the fetch."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Pagination",
-        "content": "Implementing pagination",
-        "language": "jsx",
-        "code": "function UserList() {\n  const [page, setPage] = useState(1);\n\n  const { data, isLoading, isPlaceholderData } = useQuery({\n    queryKey: ['users', page],\n    queryFn: () => fetchUsers(page),\n    placeholderData: keepPreviousData // Show old data while loading\n  });\n\n  return (\n    <div>\n      {isLoading && <p>Loading...</p>}\n      <ul>\n        {data.users.map(user => <li key={user.id}>{user.name}</li>)}\n      </ul>\n      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>\n        Previous\n      </button>\n      <button onClick={() => setPage(p => p + 1)} disabled={isPlaceholderData}>\n        Next\n      </button>\n    </div>\n  );\n}"
+        "title": "Paginated Users List",
+        "content": "Implementing pagination with keepPreviousData",
+        "language": "tsx",
+        "code": "import { useState } from 'react';\nimport { useQuery, keepPreviousData } from '@tanstack/react-query';\n\ninterface UsersPage {\n  users: User[];\n  nextPage: number | null;\n  totalPages: number;\n}\n\nasync function fetchUsersPage(page: number): Promise<UsersPage> {\n  const res = await fetch(`/api/users?page=${page}`);\n  return res.json();\n}\n\nfunction UserList() {\n  const [page, setPage] = useState(1);\n\n  const {\n    data,\n    isLoading,\n    isPlaceholderData,\n    isFetching,\n  } = useQuery({\n    queryKey: ['users', 'list', page],\n    queryFn: () => fetchUsersPage(page),\n    placeholderData: keepPreviousData,\n    staleTime: 1000 * 60 * 2,\n  });\n\n  return (\n    <div>\n      {isLoading && <p className=\"loading\">Loading page {page}...</p>}\n\n      <ul className=\"user-list\">\n        {data?.users.map((user) => (\n          <li key={user.id}>\n            <strong>{user.name}</strong> â€” {user.email}\n          </li>\n        ))}\n      </ul>\n\n      <nav className=\"pagination\">\n        <button\n          onClick={() => setPage((p) => Math.max(1, p - 1))}\n          disabled={page === 1 || isLoading}\n        >\n          Previous\n        </button>\n\n        <span className=\"page-indicator\">\n          Page {page} of {data?.totalPages ?? '?'}\n          {isFetching && !isPlaceholderData && <em> (fetching...)</em>}\n        </span>\n\n        <button\n          onClick={() => setPage((p) => p + 1)}\n          disabled={!data?.nextPage || isPlaceholderData}\n        >\n          {isPlaceholderData ? 'Loading...' : 'Next'}\n        </button>\n      </nav>\n    </div>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "keepPreviousData",
-        "text": "Use keepPreviousData (or placeholderData) to show previous page data while loading the new page for a smoother UX."
+        "title": "isPlaceholderData Flag",
+        "text": "When keepPreviousData is active, isPlaceholderData is true. Use it to show a loading indicator, disable navigation buttons, or apply a subtle opacity change to indicate the data is not yet confirmed."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Page State"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Keep the page number in useState. When the user navigates to a new page, the state updates, the queryKey changes, and React Query creates a new cache entry. Previous pages remain cached and can be revisited instantly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Pagination Best Practices",
+        "items": [
+          "Use a separate queryKey per page: ['items', 'list', page]",
+          "Use keepPreviousData to prevent the loading flash between pages",
+          "Disable the Next button while isPlaceholderData is true to prevent double-fetches",
+          "Show a page indicator so users know where they are in the result set",
+          "Disable Previous on page 1 and Next on the last page"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "keepPreviousData",
+            "definition": "A special placeholderData value in React Query v5 that returns the previous query result while a new page loads. Eliminates the loading flash during pagination."
+          },
+          {
+            "term": "isPlaceholderData",
+            "definition": "A boolean flag set to true when the displayed data came from placeholderData (not the real cache). Use it to show subtle loading indicators during pagination transitions."
+          },
+          {
+            "term": "Query Key per Page",
+            "definition": "Including the page number in the queryKey array (e.g., ['items', page]) so React Query caches each page independently."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pagination with Server Parameters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most paginated APIs accept page and limit parameters. Pass these as part of the queryKey so that changing the page size also triggers a refetch. React Query cancels the in-flight request automatically when the key changes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Page Size Selector",
+        "content": "Handling both page and limit in the query key",
+        "language": "tsx",
+        "code": "function PaginatedTable() {\n  const [page, setPage] = useState(1);\n  const [limit, setLimit] = useState(10);\n\n  const { data, isLoading } = useQuery({\n    queryKey: ['products', 'list', page, limit],\n    queryFn: () => fetchProducts({ page, limit }),\n    placeholderData: keepPreviousData,\n    // Changing page OR limit triggers a new cache entry\n  });\n\n  return (\n    <div>\n      <select value={limit} onChange={(e) => {\n        setLimit(Number(e.target.value));\n        setPage(1); // Reset to page 1 when limit changes\n      }}>\n        <option value=\"5\">5 per page</option>\n        <option value=\"10\">10 per page</option>\n        <option value=\"25\">25 per page</option>\n      </select>\n\n      {/* render table */}\n      {/* pagination controls */}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Paginated Article List",
+        "description": "Create a paginated article list that fetches from a mock API. Implement smooth page transitions with keepPreviousData and a page size selector.",
+        "steps": [
+          "Create a mock API fetchArticles(page, limit) that returns articles, totalCount, and totalPages after a 400ms delay",
+          "Create a PaginatedArticles component with useState for page and limit",
+          "Use useQuery with queryKey ['articles', 'list', page, limit]",
+          "Apply placeholderData: keepPreviousData for smooth transitions",
+          "Show 'Loading next page...' when isPlaceholderData is true",
+          "Add Previous/Next buttons with correct disabled states",
+          "Add a page size selector (5, 10, 20) that resets to page 1 on change",
+          "Style the pagination bar with Tailwind CSS"
+        ],
+        "expectedOutcome": "A paginated article list with no loading flash between pages, a working page size selector, and correct button states. Navigating back to page 1 after visiting page 3 loads instantly from cache."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
       }
     },
     {
@@ -49,16 +187,17 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Include page in query key",
-          "Use keepPreviousData for smooth transitions",
-          "Each page is cached separately",
-          "Disable next button when loading"
+          "Include the page number in the queryKey so each page is cached independently",
+          "Use placeholderData: keepPreviousData to show old data during page transitions",
+          "isPlaceholderData tells you when placeholder data is being displayed",
+          "Keep page state in useState and update it to trigger new fetches",
+          "Reset to page 1 when the page size (limit) changes",
+          "Each cached page can be revisited instantly without a network request"
         ],
-        "takeaway": "Pagination is straightforward with React Query."
+        "takeaway": "Pagination with React Query is simple: include the page in the key, use keepPreviousData, and let the cache handle the rest."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

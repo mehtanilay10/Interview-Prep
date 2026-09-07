@@ -25,7 +25,14 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "After a mutation, the server state has changed but the React Query cache still holds the old data. Invalidation tells React Query which queries are now stale and should be refetched. Without invalidation, users see outdated data after writes."
+        "text": "After a mutation changes data on the server, the React Query cache still holds the old result. Without invalidation, users see stale data until the staleTime window expires. Invalidation tells React Query which queries are now out of sync and should be refetched immediately â€” keeping the UI in sync with the server state."
+      }
+    },
+    {
+      "type": "quote",
+      "data": {
+        "text": "Cache invalidation is the bridge between mutations and fresh data. Without it, your UI and server state drift apart silently.",
+        "attribution": "Tanner Linsley, React Query creator"
       }
     },
     {
@@ -36,55 +43,159 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "invalidateQueries: Marks matching queries as stale and refetches them.",
-          "invalidateQueries({ exact: true }): Only matches the exact query key.",
-          "setQueryData: Manually update cache without refetching.",
-          "setQueriesData: Update multiple matching queries at once.",
-          "removeQueries: Delete queries from cache entirely."
-        ],
-        "title": "Methods"
+        "text": "The queryClient exposes several methods for managing cache after mutations. Each serves a different purpose: invalidation marks queries as stale and refetches them, setQueryData updates the cache directly without a network request, and removeQueries deletes cached data entirely."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Method", "Network Request", "Use Case"],
+        "rows": [
+          ["invalidateQueries", "Yes (refetch)", "After mutations when server state changed"],
+          ["setQueryData", "No (manual update)", "Optimistic updates or known new state"],
+          ["setQueriesData", "No (bulk update)", "Update multiple matching queries at once"],
+          ["removeQueries", "No (delete)", "Clear invalid or expired cached data"]
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidating After a Mutation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common pattern is calling `invalidateQueries` in the `onSuccess` callback of a mutation. This ensures the cache is updated only after the mutation succeeds, preventing stale data from overwriting the cache on failure."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Invalidating after mutation",
-        "code": "const queryClient = useQueryClient();\n\nconst addTodo = useMutation({\n  mutationFn: (newTodo) => axios.post('/api/todos', newTodo),\n  onSuccess: () => {\n    // Invalidate all queries matching 'todos'\n    queryClient.invalidateQueries({ queryKey: ['todos'] });\n  },\n});",
+        "title": "Invalidating after a mutation",
+        "code": "import { useQueryClient } from '@tanstack/react-query';\nimport { useMutation, useQuery } from '@tanstack/react-query';\n\nfunction TodoList() {\n  const queryClient = useQueryClient();\n\n  const { data: todos } = useQuery({\n    queryKey: ['todos'],\n    queryFn: fetchTodos,\n  });\n\n  const addTodo = useMutation({\n    mutationFn: (newTodo: { title: string }) =>\n      fetch('/api/todos', {\n        method: 'POST',\n        body: JSON.stringify(newTodo),\n      }).then((res) => res.json()),\n    onSuccess: () => {\n      // Mark all 'todos' queries as stale and refetch\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n\n  return (\n    <button onClick={() => addTodo.mutate({ title: 'New task' })}>\n      Add Todo\n    </button>\n  );\n}",
         "language": "tsx",
-        "content": "Invalidate the todos query after adding a new one."
+        "content": "Invalidate the todos query after successfully adding a new todo."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Selective Invalidation"
+        "text": "Optimistic Updates with setQueryData"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Use precise query keys to avoid refetching unrelated data. If you have paginated todos, invalidate only the affected page or use `invalidateQueries` with a predicate function."
+        "text": "For a snappier user experience, you can update the cache immediately using `setQueryData` before the mutation even completes. This is called an optimistic update. If the mutation fails, you revert the cache to its previous state."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Selective invalidation with predicate",
-        "code": "queryClient.invalidateQueries({\n  queryKey: ['todos'],\n  predicate: (query) => {\n    // Only invalidate queries with page 1\n    return query.queryKey[1]?.page === 1;\n  },\n});",
+        "title": "Optimistic update with setQueryData",
+        "code": "const addTodoOptimistic = useMutation({\n  mutationFn: (newTodo: { title: string }) =>\n    fetch('/api/todos', {\n      method: 'POST',\n      body: JSON.stringify(newTodo),\n    }).then((res) => res.json()),\n\n  onMutate: async (newTodo) => {\n    await queryClient.cancelQueries({ queryKey: ['todos'] });\n\n    const previousTodos = queryClient.getQueryData(['todos']);\n\n    queryClient.setQueryData(['todos'], (old: any) => [\n      ...old,\n      { id: Date.now(), title: newTodo.title, completed: false },\n    ]);\n\n    return { previousTodos };\n  },\n\n  onError: (_err, _newTodo, context) => {\n    if (context?.previousTodos) {\n      queryClient.setQueryData(['todos'], context.previousTodos);\n    }\n  },\n\n  onSettled: () => {\n    queryClient.invalidateQueries({ queryKey: ['todos'] });\n  },\n});",
         "language": "tsx",
-        "content": "Use a predicate for fine-grained control."
+        "content": "Optimistic update pattern: update cache immediately, rollback on error, refetch on settle."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Selective Invalidation with Predicates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For paginated or filtered data, invalidating all queries matching a prefix can cause unnecessary refetches. Use the `predicate` option with `invalidateQueries` to target only the queries that truly need refreshing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Selective invalidation with a predicate",
+        "code": "queryClient.invalidateQueries({\n  queryKey: ['todos'],\n  predicate: (query) => {\n    // Only invalidate queries on page 1 after adding a new item\n    const page = query.queryKey[1]?.page;\n    return page === 1;\n  },\n});",
+        "language": "tsx",
+        "content": "Use a predicate for fine-grained invalidation control."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "text": "Over-invalidation causes unnecessary network requests. Under-invalidation causes stale data. Aim for the minimum invalidation scope that keeps data fresh.",
-        "title": "Balance"
+        "title": "Over-Invalidation vs Under-Invalidation",
+        "text": "Over-invalidation causes unnecessary network requests and wasted bandwidth. Under-invalidation causes users to see stale data. Aim for the minimum invalidation scope that keeps data fresh. Use exact query keys and predicate functions to narrow the scope precisely."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "invalidateQueries vs setQueryData",
+        "cards": [
+          {
+            "title": "invalidateQueries",
+            "description": "Marks matching queries as stale and triggers a background refetch.",
+            "pros": ["Guarantees fresh data", "Simple to use", "Works with any query key"],
+            "cons": ["Causes a network request", "Brief loading state possible"]
+          },
+          {
+            "title": "setQueryData",
+            "description": "Manually updates the cache without any network request.",
+            "pros": ["Instant UI update", "No network overhead", "Full control over new state"],
+            "cons": ["Risk of stale data", "Must manually keep in sync with server"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Invalidate After a Delete Mutation",
+        "description": "Build a deleteTodo mutation that removes a todo from the server and invalidates the todos query. Then add an optimistic update that removes the todo from the cache immediately, reverting on error.",
+        "steps": [
+          "Create a useMutation that calls DELETE /api/todos/:id.",
+          "Use onMutate with setQueryData to optimistically remove the todo.",
+          "Store the previous cache state in context for rollback.",
+          "Use onError to restore the previous state if the request fails.",
+          "Use onSettled to invalidateQueries for a final server-authoritative refresh."
+        ],
+        "expectedOutcome": "The todo disappears instantly from the UI, reappears if the delete fails, and is confirmed by a final refetch."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Cache Invalidation FAQ",
+        "items": [
+          {
+            "question": "Should I invalidate after every mutation?",
+            "answer": "Yes, unless you use setQueryData for an optimistic update. Invalidating ensures the cache eventually reflects the true server state. Combine with optimistic updates for the best UX."
+          },
+          {
+            "question": "What is the difference between invalidateQueries and refetchQueries?",
+            "answer": "invalidateQueries marks queries as stale (background refetch). refetchQueries forces an immediate synchronous refetch. Use invalidateQueries in most cases; use refetchQueries only when you need fresh data right away."
+          },
+          {
+            "question": "How do I avoid invalidating too many queries?",
+            "answer": "Use precise, hierarchical query keys. Instead of ['todos'], use ['todos', { filter: 'active' }]. Use the predicate option to selectively invalidate. Consider using setQueryData when you already know the new state."
+          }
+        ]
       }
     },
     {
@@ -92,10 +203,10 @@
       "data": {
         "title": "Cache Invalidation Key Points",
         "points": [
-          "Invalidation marks queries as stale after mutations.",
-          "Use exact matching for precise control.",
-          "setQueryData enables optimistic updates without refetching.",
-          "Avoid over-invalidation to reduce network load."
+          "Invalidation marks queries as stale after mutations to trigger background refetching.",
+          "Use exact matching and predicate functions for precise invalidation scope.",
+          "setQueryData enables optimistic updates without a network request.",
+          "Always invalidate in onSettled to guarantee eventual consistency."
         ],
         "takeaway": "Cache invalidation is the bridge between mutations and fresh data."
       }

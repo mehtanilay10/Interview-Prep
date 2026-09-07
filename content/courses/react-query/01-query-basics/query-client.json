@@ -2,58 +2,268 @@
   "id": "lesson-rq-003",
   "slug": "query-client",
   "moduleSlug": "query-basics",
+  "courseSlug": "react-query",
   "title": "Query Client",
-  "description": "Understand the QueryClient and its role in React Query.",
+  "description": "Deep dive into the QueryClient and its methods for managing cache and queries.",
   "order": 3,
-  "difficulty": "intermediate",
+  "difficulty": "beginner",
   "estimatedMinutes": 18,
   "tags": [
     "react-query",
     "query-client",
     "cache",
-    "configuration"
+    "configuration",
+    "imperative-methods"
   ],
+  "prerequisites": ["setup"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**QueryClient** is the heart of React Query. It manages the cache, handles query execution, and provides methods to interact with queries."
+        "text": "The **QueryClient** is the central engine of React Query. It holds the cache, runs queries, and exposes imperative methods for cache manipulation. Most of the time you interact with it indirectly through hooks, but understanding the QueryClient unlocks advanced patterns like optimistic updates and manual cache management."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "QueryClient Methods"
+        "text": "Accessing the QueryClient"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "**getQueryData**: Read data from cache",
-          "**setQueryData**: Update cache directly",
-          "**invalidateQueries**: Mark queries as stale and refetch",
-          "**refetchQueries**: Force refetch queries",
-          "**cancelQueries**: Cancel ongoing queries"
-        ]
+        "text": "Inside a React component, use the useQueryClient hook to get a reference to the QueryClient instance. This is the most common way to interact with the cache programmatically."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "QueryClient",
-        "content": "Using QueryClient methods",
-        "language": "jsx",
-        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction MyComponent() {\n  const queryClient = useQueryClient();\n\n  // Read from cache\n  const users = queryClient.getQueryData(['users']);\n\n  // Update cache\n  queryClient.setQueryData(['users'], (old) => [...old, newUser]);\n\n  // Invalidate and refetch\n  const handleRefresh = () => {\n    queryClient.invalidateQueries({ queryKey: ['users'] });\n  };\n}"
+        "title": "useQueryClient Hook",
+        "content": "Accessing the QueryClient from within a component",
+        "language": "tsx",
+        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction RefreshButton() {\n  const queryClient = useQueryClient();\n\n  const handleRefresh = () => {\n    // Invalidate all queries matching the 'users' key\n    queryClient.invalidateQueries({ queryKey: ['users'] });\n  };\n\n  return <button onClick={handleRefresh}>Refresh Users</button>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core QueryClient Methods"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The QueryClient exposes methods for reading, writing, and invalidating cached data. Here are the most commonly used methods:"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Method", "Purpose", "Example Use Case"],
+        "rows": [
+          ["getQueryData", "Read cached data without subscribing", "Read cached users to show in a tooltip"],
+          ["setQueryData", "Write or update cached data directly", "Optimistically update after a mutation"],
+          ["invalidateQueries", "Mark queries as stale, trigger refetch", "After a mutation, refetch the affected list"],
+          ["refetchQueries", "Force an immediate refetch", "Manual refresh button"],
+          ["cancelQueries", "Cancel in-flight queries", "Cleanup in useEffect"],
+          ["removeQueries", "Delete cache entries", "Clear cache on user logout"],
+          ["getQueriesData", "Find all cached data matching a filter", "Find all cached user queries"],
+          ["setQueriesData", "Bulk update matching cached data", "Bulk update after a bulk mutation"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reading Cache: getQueryData"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "getQueryData lets you read data from the cache synchronously without triggering a network request. It returns undefined if the data is not in the cache or has been garbage-collected."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "getQueryData â€” Read from Cache",
+        "content": "Reading cached users without triggering a fetch",
+        "language": "tsx",
+        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction UserBadge({ userId }: { userId: string }) {\n  const queryClient = useQueryClient();\n\n  // Read the users list from cache â€” no fetch triggered\n  const usersCache = queryClient.getQueryData<string[]>(['users']);\n  const user = usersCache?.find(u => u.id === userId);\n\n  if (!user) return <span>Unknown user</span>;\n  return <span>{user.name}</span>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Writing Cache: setQueryData"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "setQueryData lets you write data directly to the cache. Use it for optimistic updates â€” updating the UI before the server confirms the change. The update function receives the previous cached value and must return the new value."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "setQueryData â€” Optimistic Update",
+        "content": "Updating cache after a mutation without waiting for refetch",
+        "language": "tsx",
+        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction AddUserForm() {\n  const queryClient = useQueryClient();\n\n  const handleSubmit = async (name: string) => {\n    const newUser = await createUserOnServer(name);\n\n    // Immediately update the cached users list\n    queryClient.setQueryData<string[]>(['users'], (old = []) => {\n      return [...old, newUser];\n    });\n  };\n\n  return <form onSubmit={handleSubmit}>{/* form fields */}</form>;\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidating Queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "invalidateQueries marks matching queries as stale and triggers a refetch. This is the standard way to refresh data after a mutation. React Query's default behavior is to refetch stale queries when the window regains focus, so invalidation keeps data fresh without manual polling."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-invalidation-flow",
+        "caption": "How invalidateQueries triggers a refetch cycle",
+        "definition": "sequenceDiagram\n    participant M as Mutation\n    participant QC as QueryClient\n    participant C as Component\n    participant S as Server\n    M->>QC: invalidateQueries(['users'])\n    QC->>QC: Mark 'users' query as stale\n    QC->>C: Notify subscribers of change\n    C->>QC: useQuery sees stale data\n    QC->>S: Refetch /api/users\n    S-->>QC: Return fresh data\n    QC->>QC: Update cache\n    QC->>C: Re-render with fresh data"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "invalidateQueries After Mutation",
+        "content": "Refreshing the users list after adding a new user",
+        "language": "tsx",
+        "code": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nfunction AddUserForm() {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: createUser,\n    onSuccess: () => {\n      // Mark all 'users' queries as stale\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n    },\n  });\n\n  return (\n    <form onSubmit={(e) => {\n      e.preventDefault();\n      mutation.mutate(newUserData);\n    }}>\n      {/* form fields */}\n    </form>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Refetching Queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "refetchQueries forces an immediate refetch regardless of the staleTime setting. Use this for manual refresh buttons where the user explicitly wants fresh data."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "refetchQueries â€” Manual Refresh",
+        "content": "Forcing a refetch on user action",
+        "language": "tsx",
+        "code": "import { useQueryClient } from '@tanstack/react-query';\n\nfunction RefreshButton() {\n  const queryClient = useQueryClient();\n\n  const handleRefresh = () => {\n    queryClient.refetchQueries({ queryKey: ['users'] });\n  };\n\n  return (\n    <button onClick={handleRefresh} disabled={isRefetching}>\n      Refresh Now\n    </button>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Query Keys",
-        "text": "Query keys identify queries in the cache. Use arrays like ['users', userId] for hierarchical keys."
+        "title": "invalidateQueries vs refetchQueries",
+        "text": "Use invalidateQueries after mutations â€” it marks data as stale and respects your staleTime/gcTime settings. Use refetchQueries only for explicit user-triggered refreshes where you want to bypass staleTime."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Query Keys and Hierarchy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Query keys are arrays that identify queries in the cache. React Query supports hierarchical keys: invalidating ['users'] also invalidates ['users', 1] and ['users', 'filtered']. This is one of the most powerful features of the library."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Query Key Patterns",
+        "items": [
+          "['users'] â€” all users, no filter",
+          "['users', userId] â€” a single user",
+          "['users', 'filtered', filter] â€” filtered user list",
+          "['users', 'infinite'] â€” infinite query for users",
+          "['posts', postId, 'comments'] â€” comments for a specific post"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Query Key",
+            "definition": "A unique array identifier for a query in the React Query cache. All parts of the array are used for matching â€” invalidating ['users'] also invalidates ['users', 1]."
+          },
+          {
+            "term": "Cache Invalidation",
+            "definition": "Marking cached data as stale so that React Query will refetch it on the next relevant render or window focus event."
+          },
+          {
+            "term": "Optimistic Update",
+            "definition": "Updating the cache immediately after a mutation before the server responds, so the UI feels instant. If the server fails, roll back the change."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Manual Cache Manipulation",
+        "description": "Build a simple todo list app that uses React Query's QueryClient methods directly. Practice getQueryData, setQueryData, and invalidateQueries without relying solely on hooks.",
+        "steps": [
+          "Set up a React app with QueryClientProvider using the configuration from the Setup lesson",
+          "Create a fetchTodos function that returns a Promise resolving to an array of todos",
+          "Use useQuery to load the initial todo list with queryKey ['todos']",
+          "Add a button that calls queryClient.getQueryData(['todos']) and logs the result",
+          "Add a button that calls queryClient.setQueryData to prepend a new todo without a network request",
+          "Add a form that uses useMutation to POST a new todo, then calls invalidateQueries(['todos']) in onSuccess",
+          "Verify that setQueryData updates the UI instantly, and invalidateQueries refreshes the list from the server"
+        ],
+        "expectedOutcome": "A working todo list where you can read the cache directly, optimistically add items, and see the list refresh after a successful mutation. Console logs confirm each QueryClient method was called correctly."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
       }
     },
     {
@@ -61,16 +271,18 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "QueryClient manages the cache",
-          "Provides methods to interact with queries",
-          "Query keys identify cached data",
-          "Use useQueryClient hook in components"
+          "QueryClient is the central cache manager for React Query",
+          "Use useQueryClient hook inside components to access it",
+          "getQueryData reads cache without triggering a fetch",
+          "setQueryData writes cache directly â€” great for optimistic updates",
+          "invalidateQueries marks data as stale and triggers refetch",
+          "refetchQueries forces an immediate refetch regardless of staleTime",
+          "Query keys are hierarchical â€” invalidating a parent key invalidates all children"
         ],
-        "takeaway": "QueryClient is the central cache manager."
+        "takeaway": "The QueryClient gives you imperative control over the cache when hooks alone are not enough."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

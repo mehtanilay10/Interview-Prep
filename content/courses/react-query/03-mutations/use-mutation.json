@@ -2,64 +2,284 @@
   "id": "lesson-rq-009",
   "slug": "use-mutation",
   "moduleSlug": "mutations",
+  "courseSlug": "react-query",
   "title": "useMutation",
-  "description": "Learn how to modify server data with useMutation.",
+  "description": "Learn how to modify server data with useMutation, handle all mutation states, and reset for reusable forms.",
   "order": 1,
   "difficulty": "intermediate",
   "estimatedMinutes": 20,
   "tags": [
     "react-query",
     "mutation",
+    "usemutation",
     "create",
     "update",
     "delete"
   ],
+  "prerequisites": ["query-hooks"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is useMutation?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "**useMutation** is the hook for creating, updating, or deleting data on the server. Unlike queries, mutations are triggered manually."
+        "text": "While `useQuery` is for fetching data, **useMutation** is for changing it. Mutations create, update, or delete records on your server. Unlike queries â€” which run automatically â€” mutations only fire when you explicitly call `mutate()`. React Query gives you detailed state tracking so you can show loading spinners, success messages, and error feedback to the user."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "useMutation",
+            "definition": "A React Query hook for performing data-changing operations (create, update, delete) on a server."
+          },
+          {
+            "term": "mutationFn",
+            "definition": "The async function passed to useMutation that performs the actual server request."
+          },
+          {
+            "term": "isPending",
+            "definition": "A boolean that is true while the mutation function is executing (React Query v5 equivalent of isLoading)."
+          },
+          {
+            "term": "mutate",
+            "definition": "The function returned by useMutation that triggers the mutation when called."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Mutation"
+        "text": "Mutation State Flags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query tracks five key states on every mutation object. Understanding each one lets you wire up the right UI at the right time: disable a submit button while `isPending` is true, show a success toast when `isSuccess` flips, or display an error banner when `isError` becomes true."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "State",
+          "Meaning",
+          "UI Use"
+        ],
+        "rows": [
+          [
+            "isPending",
+            "The mutation function has started but not yet resolved",
+            "Show a spinner, disable the submit button"
+          ],
+          [
+            "isSuccess",
+            "The mutation completed without errors",
+            "Show a success message or toast notification"
+          ],
+          [
+            "isError",
+            "The mutation threw an error",
+            "Display an error message and retry option"
+          ],
+          [
+            "isIdle",
+            "The mutation has not been called yet, or has been reset",
+            "Enable the submit button and show the form"
+          ],
+          [
+            "reset",
+            "A function to return all mutation state to idle",
+            "Call after a successful submit to reuse the form"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic useMutation Example"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Here is the simplest usage pattern: import `useMutation`, define a `mutationFn`, and call `mutate()` from an event handler. Notice how we disable the button and show all three user-facing states."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "useMutation",
-        "content": "Creating a mutation",
-        "language": "jsx",
-        "code": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nfunction AddUserForm() {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: async (newUser) => {\n      const response = await fetch('/api/users', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(newUser)\n      });\n      return response.json();\n    },\n    onSuccess: () => {\n      // Invalidate and refetch users query\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n    }\n  });\n\n  const handleSubmit = (e) => {\n    e.preventDefault();\n    mutation.mutate({ name: e.target.name.value });\n  };\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input name=\"name\" />\n      <button disabled={mutation.isPending}>\n        {mutation.isPending ? 'Adding...' : 'Add User'}\n      </button>\n      {mutation.isError && <p>Error: {mutation.error.message}</p>}\n      {mutation.isSuccess && <p>User added!</p>}\n    </form>\n  );\n}"
+        "title": "useMutation â€” React Query v5",
+        "content": "A complete AddUserForm using useMutation with all three UI states rendered explicitly.",
+        "language": "tsx",
+        "code": "import { useState, type FormEvent } from 'react';\nimport { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';\n\nasync function postUser(name: string): Promise<{ id: string; name: string }> {\n  const res = await fetch('/api/users', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ name }),\n  });\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\nfunction AddUserForm() {\n  const queryClient = useQueryClient();\n  const [name, setName] = useState('');\n\n  const mutation = useMutation({\n    mutationFn: () => postUser(name),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n      setName('');\n    },\n  }) as UseMutationResult<\n    { id: string; name: string },\n    Error,\n    void,\n    unknown\n  >;\n\n  const handleSubmit = (e: FormEvent) => {\n    e.preventDefault();\n    if (!name.trim()) return;\n    mutation.mutate();\n  };\n\n  return (\n    <form onSubmit={handleSubmit} className=\"user-form\">\n      <label htmlFor=\"name\">Name</label>\n      <input\n        id=\"name\"\n        value={name}\n        onChange={(e) => setName(e.target.value)}\n        disabled={mutation.isPending}\n      />\n\n      <button type=\"submit\" disabled={mutation.isPending || !name.trim()}>\n        {mutation.isPending ? 'Addingâ€¦' : 'Add User'}\n      </button>\n\n      {mutation.isSuccess && (\n        <p role=\"status\" className=\"success-msg\">User added!</p>\n      )}\n\n      {mutation.isError && (\n        <p role=\"alert\" className=\"error-msg\">\n          Error: {mutation.error.message}\n        </p>\n      )}\n    </form>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Mutation States",
-        "text": "Mutations have states: isPending, isSuccess, isError. Use these to show loading indicators and feedback."
+        "title": "Accessible Form Patterns",
+        "text": "Always associate inputs with labels using htmlFor/id, use role=\"alert\" for error messages, and disable the button during mutation to prevent double-submission."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resetting Mutation State"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After a successful mutation, the form may still show `isSuccess = true` on the next render cycle. Call `mutation.reset()` after handling success to return the mutation to its idle state. This is essential when a form is reused â€” such as an edit form that stays mounted after saving."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resetting Mutation State",
+        "content": "Using reset() after a successful save so the same form can be used again.",
+        "language": "tsx",
+        "code": "function EditProfile({ userId, initialName }: { userId: string; initialName: string }) {\n  const queryClient = useQueryClient();\n  const [name, setName] = useState(initialName);\n\n  const mutation = useMutation({\n    mutationFn: async (newName: string) => {\n      const res = await fetch(`/api/users/${userId}`, {\n        method: 'PATCH',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ name: newName }),\n      });\n      if (!res.ok) throw new Error(res.statusText);\n      return res.json();\n    },\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['users'] });\n      mutation.reset(); // Return to idle so the form is reusable\n    },\n  });\n\n  const handleSubmit = (e: FormEvent) => {\n    e.preventDefault();\n    mutation.mutate(name);\n  };\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input value={name} onChange={(e) => setName(e.target.value)} disabled={mutation.isPending} />\n      <button type=\"submit\" disabled={mutation.isPending}>{mutation.isPending ? 'Savingâ€¦' : 'Save'}</button>\n      {mutation.isSuccess && <p role=\"status\">Profile saved!</p>}\n      {mutation.isError && <p role=\"alert\">{mutation.error.message}</p>}\n    </form>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Reset After Success, Not Before",
+        "text": "Call mutation.reset() inside onSuccess after you have processed the result. Calling it before will discard the error state before the user can read it."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Mutation Lifecycle Callbacks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "useMutation accepts several lifecycle callbacks. Each has a distinct purpose: `onMutate` runs before the request (ideal for optimising UI), `onSuccess` runs after a successful response, `onError` handles failures, and `onSettled` always runs last, regardless of outcome."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Mutation Callbacks",
+        "items": [
+          "onMutate(variables) â€” fires before the mutationFn. Cancel in-flight queries here and snapshot previous cache state.",
+          "onSuccess(data, variables, context) â€” fires after the mutation succeeds. Great place to invalidate related queries.",
+          "onError(error, variables, context) â€” fires if the mutation fails. Use this to roll back optimistic updates.",
+          "onSettled(data, error, variables, context) â€” always fires last. Use it for cleanup that must run regardless of outcome."
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Watch Out For",
+        "items": [
+          "Calling mutate() inside the render body â€” it will fire on every render. Use an event handler instead.",
+          "Forgetting to invalidate related queries â€” the cache stays stale after a write.",
+          "Using the old onSuccess queryKey syntax â€” in v5, call invalidateQueries on the queryClient instance directly.",
+          "Not disabling the submit button â€” leads to duplicate requests and confusing UI."
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Todo Creator",
+        "description": "Create a form that uses useMutation to add a new todo to a list fetched by useQuery.",
+        "steps": [
+          "Set up a useQuery for fetching todos from /api/todos.",
+          "Create an AddTodoForm component using useMutation to POST new todos.",
+          "Invalidate the ['todos'] query in onSuccess so the list refreshes automatically.",
+          "Show isPending to disable the submit button while saving.",
+          "Show isSuccess to display a brief confirmation message.",
+          "Show isError to display an error message with the actual error text.",
+          "Call mutation.reset() on success so the form can be reused.",
+          "Add input validation: prevent submitting empty todos."
+        ],
+        "expectedOutcome": "A working form that adds a todo, refreshes the list via cache invalidation, disables the button during save, and shows clear success or error messages."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "quote",
+      "data": {
+        "text": "Mutations are not automatically executed â€” they sit idle until you call mutate. This design gives you full control over when side effects occur.",
+        "attribution": "TanStack Query Documentation"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "useMutation modifies server data",
-          "Triggered manually with mutate()",
-          "onSuccess callback for side effects",
-          "Invalidate queries to refetch data"
+          "useMutation is for create, update, and delete operations",
+          "Mutations are triggered manually via mutate() â€” they do not auto-run",
+          "isPending, isSuccess, and isError give you full UI control",
+          "Call mutation.reset() after success to make forms reusable",
+          "Always invalidate related queries in onSuccess to keep the cache fresh"
         ],
-        "takeaway": "useMutation handles data modifications."
+        "takeaway": "useMutation is the workhorse of data-changing operations. Master its state flags and lifecycle callbacks to build polished forms."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

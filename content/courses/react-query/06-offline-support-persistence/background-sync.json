@@ -26,37 +26,159 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "When a user submits a form while offline, the mutation fails. Background sync solves this by queueing the mutation locally and replaying it when connectivity returns. React Query does not have built-in offline mutation queuing, but you can implement it with a combination of local storage and network listeners."
+        "text": "When a user submits a form while offline, the mutation fails immediately. React Query does not have built-in offline mutation queuing, but you can implement it by storing failed mutations locally and replaying them when connectivity returns. This pattern â€” called background sync â€” makes your application resilient to any network condition."
+      }
+    },
+    {
+      "type": "quote",
+      "data": {
+        "text": "The best offline experience is the one the user doesn't notice. They should be able to work, submit, and continue â€” and everything syncs when they're back online.",
+        "attribution": "Jake Archibald, Google Chrome team"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Queueing Mutations"
+        "text": "The Mutation Queue Pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Store failed mutations in IndexedDB or localStorage with a unique ID, timestamp, and payload. When the app detects it is back online, replay the queue in order."
+        "text": "A mutation queue is a list of pending mutations stored locally. Each entry contains the mutation type, payload, timestamp, and a unique ID. When the app detects it is back online, it processes the queue in order, removing each entry only after a successful server response."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Mutation Queue",
+            "definition": "A local list of mutations that failed due to offline status, to be replayed when connectivity returns."
+          },
+          {
+            "term": "Background Sync",
+            "definition": "The process of replaying queued mutations in the background after connectivity is restored."
+          },
+          {
+            "term": "Optimistic Update",
+            "definition": "Updating the UI cache immediately before the server confirms the mutation, with rollback on failure."
+          }
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Offline mutation queue pattern",
-        "code": "const queue = async () => {\n  if (!navigator.onLine) {\n    const pending = JSON.parse(localStorage.getItem('mutationQueue') || '[]');\n    pending.push({ type: 'ADD_TODO', payload: newTodo, timestamp: Date.now() });\n    localStorage.setItem('mutationQueue', JSON.stringify(pending));\n    return;\n  }\n  // Process queue when online\n  const pending = JSON.parse(localStorage.getItem('mutationQueue') || '[]');\n  for (const mutation of pending) {\n    await axios.post('/api/todos', mutation.payload);\n  }\n  localStorage.removeItem('mutationQueue');\n  queryClient.invalidateQueries(['todos']);\n};\n\nwindow.addEventListener('online', queue);",
+        "title": "Offline mutation queue with localStorage",
+        "code": "type QueuedMutation = {\n  id: string;\n  type: string;\n  payload: unknown;\n  timestamp: number;\n};\n\nasync function queueOrExecute(\n  mutation: QueuedMutation,\n  execute: (payload: unknown) => Promise<void>,\n  queryClient: any\n) {\n  if (!navigator.onLine) {\n    const pending: QueuedMutation[] = JSON.parse(\n      localStorage.getItem('mutationQueue') || '[]'\n    );\n    pending.push(mutation);\n    localStorage.setItem('mutationQueue', JSON.stringify(pending));\n    queryClient.setQueryData(['todos'], (old: any) => [\n      ...old,\n      { ...mutation.payload, _pending: true },\n    ]);\n    return;\n  }\n\n  await execute(mutation.payload);\n  queryClient.invalidateQueries({ queryKey: ['todos'] });\n}\n\nasync function processQueue(\n  execute: (payload: unknown) => Promise<void>,\n  queryClient: any\n) {\n  const pending: QueuedMutation[] = JSON.parse(\n    localStorage.getItem('mutationQueue') || '[]'\n  );\n\n  for (const mutation of pending) {\n    try {\n      await execute(mutation.payload);\n    } catch (error) {\n      console.error('Failed to replay mutation:', mutation.id, error);\n      break;\n    }\n  }\n\n  localStorage.removeItem('mutationQueue');\n  queryClient.invalidateQueries({ queryKey: ['todos'] });\n}\n\nwindow.addEventListener('online', () => processQueue(execute, queryClient));",
         "language": "tsx",
-        "content": "Simple queue pattern using localStorage."
+        "content": "A complete offline mutation queue pattern using localStorage and event listeners."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deduplication and Ordering"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Users can trigger the same mutation multiple times while offline. Always deduplicate by ID to avoid duplicate entries when the queue is replayed. Also maintain insertion order so mutations are applied to the server in the same sequence the user created them."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "important",
-        "text": "Always deduplicate queued mutations by ID. If the user adds the same todo twice while offline, replaying the queue should not create duplicates.",
-        "title": "Deduplication"
+        "title": "Always Deduplicate",
+        "text": "If the user adds the same todo twice while offline, replaying the queue without deduplication will create duplicates on the server. Use a Set or check for existing IDs before pushing to the queue."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deduplicated mutation queue helper",
+        "code": "function addToQueue(mutation: QueuedMutation) {\n  const pending: QueuedMutation[] = JSON.parse(\n    localStorage.getItem('mutationQueue') || '[]'\n  );\n\n  // Deduplicate by mutation id\n  const filtered = pending.filter((m) => m.id !== mutation.id);\n  filtered.push(mutation);\n\n  localStorage.setItem('mutationQueue', JSON.stringify(filtered));\n}\n\n// Usage\naddToQueue({\n  id: crypto.randomUUID(),\n  type: 'ADD_TODO',\n  payload: { title: 'Buy milk' },\n  timestamp: Date.now(),\n});",
+        "language": "tsx",
+        "content": "Deduplicate by ID before adding to the queue to prevent duplicates on replay."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Service Worker Background Sync"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For progressive web apps, the Service Worker Background Sync API provides a more reliable mechanism. Instead of relying on the `online` event (which can fire multiple times), the service worker queues sync requests and replays them when the browser detects connectivity. This works even if the user closes the tab and reopens it later."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rq-background-sync",
+        "definition": "sequenceDiagram\n    participant User\n    participant App\n    participant MutationQueue\n    participant ServiceWorker\n    participant Server\n    User->>App: Submit form (offline)\n    App->>MutationQueue: Store mutation\n    App->>User: Show 'queued' indicator\n    Note over ServiceWorker: Browser detects network\n    ServiceWorker->>MutationQueue: Read pending mutations\n    loop For each queued mutation\n        MutationQueue->>Server: Replay mutation\n        Server-->>MutationQueue: Success response\n        MutationQueue->>MutationQueue: Remove from queue\n    end\n    MutationQueue->>App: Update cache via message\n    App->>User: Show 'synced' confirmation",
+        "caption": "Background sync flow: mutations are queued locally, then replayed by the service worker when the network returns."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Start Simple",
+        "text": "Begin with the localStorage queue pattern. Add service worker background sync once your app needs to handle tab closes or extended offline periods. The service worker approach is more robust but requires more setup."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Background Sync System",
+        "description": "Implement a background sync system for a todo app. Queue mutations when offline, show a pending count, and replay when the user comes back online.",
+        "steps": [
+          "Create a queue array in localStorage to store pending mutations.",
+          "Create an addMutation function that checks navigator.onLine before executing.",
+          "When offline, store the mutation in the queue and optimistically update the cache.",
+          "Listen for the 'online' event and call processQueue to replay all pending mutations.",
+          "Show a badge with the number of pending mutations in the UI.",
+          "Clear the queue only after all mutations have been confirmed by the server."
+        ],
+        "expectedOutcome": "Users can add todos while offline, see a pending count, and watch them sync automatically when the connection returns."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Background Sync FAQ",
+        "items": [
+          {
+            "question": "Do I need a service worker for background sync?",
+            "answer": "No. The localStorage + online event pattern works well for most apps. Service worker background sync is better for PWAs where the tab might be closed and reopened while offline."
+          },
+          {
+            "question": "What if a queued mutation fails on replay?",
+            "answer": "Handle the error gracefully: remove successfully replayed mutations from the queue, leave failed ones, and notify the user. Consider adding a manual retry button for failed items."
+          },
+          {
+            "question": "Can I use background sync with optimistic updates?",
+            "answer": "Yes. Apply the optimistic update immediately when the user triggers the mutation. If the queued replay later fails, roll back the optimistic update and show an error."
+          }
+        ]
       }
     },
     {
@@ -64,10 +186,11 @@
       "data": {
         "title": "Background Sync Key Points",
         "points": [
-          "Queue mutations when offline.",
-          "Replay queue in order when connectivity returns.",
-          "Use IndexedDB for larger mutation histories.",
-          "Combine with optimistic updates for perceived performance."
+          "Queue mutations when offline using localStorage or IndexedDB.",
+          "Replay the queue in order when connectivity returns.",
+          "Deduplicate queued mutations by ID to prevent duplicates.",
+          "Combine with optimistic updates for perceived performance.",
+          "Service worker background sync is more robust for PWAs."
         ],
         "takeaway": "Background sync makes React Query applications resilient to network interruptions."
       }

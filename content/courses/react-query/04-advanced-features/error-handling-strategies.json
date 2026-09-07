@@ -1,0 +1,391 @@
+{
+  "id": "lesson-react-query-037",
+  "slug": "error-handling-strategies",
+  "moduleSlug": "advanced-features",
+  "courseSlug": "react-query",
+  "title": "Error Handling Strategies",
+  "description": "Master error states, retry strategies, and error boundaries in React Query.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 22,
+  "tags": [
+    "react-query",
+    "error-handling",
+    "retry",
+    "error-boundary",
+    "isError"
+  ],
+  "prerequisites": ["suspense", "query-cancellation", "custom-hooks-react-query"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Understanding React Query Error States"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every query and mutation in React Query has a rich set of error-related states. Understanding `isError`, `error`, and the retry system is essential for building applications that gracefully handle failures. React Query does not swallow errors silently â€” it surfaces them so you can decide exactly how your user should be informed."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "isError",
+            "definition": "A boolean flag on a query or mutation object that is true when the latest request resulted in an error."
+          },
+          {
+            "term": "error",
+            "definition": "The Error object returned by a failed query or mutation, containing a message and optional stack trace."
+          },
+          {
+            "term": "retry",
+            "definition": "A configuration option (boolean or number) controlling how many times React Query will automatically retry a failed request."
+          },
+          {
+            "term": "retryDelay",
+            "definition": "A function or number that controls the wait time between automatic retries, typically used for exponential backoff."
+          },
+          {
+            "term": "error boundary",
+            "definition": "A React component that catches JavaScript errors in its child tree and displays a fallback UI instead of crashing the whole app."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Error State Lifecycle"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a query fails, React Query transitions through several states in order: the request starts, the error occurs, `isError` flips to `true`, the `error` property is populated, and then the retry logic activates if configured. If all retries are exhausted, `isError` remains `true` and it is your responsibility to display a user-facing error message."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-error-flow-037",
+        "caption": "Flow diagram showing how React Query processes a failed request and applies retry logic before surfacing the error.",
+        "definition": "flowchart TD\n    A[Request starts] --> B{HTTP response OK?}\n    B -->|Yes| C[Cache data as success]\n    B -->|No| D{Retries remaining?}\n    D -->|Yes| E[Wait retryDelay ms]\n    E --> A\n    D -->|No| F[Set isError = true]\n    F --> G[Populate error object]\n    G --> H[Trigger onError callback]\n    H --> I[User sees error UI]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query retries failed requests automatically, but the strategy matters. The simplest approach is `retry: false` â€” fail immediately. `retry: 3` retries three times with equal delay. For production APIs, exponential backoff is usually best, where delays grow between attempts to avoid overwhelming a struggling server."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Strategy",
+          "Configuration",
+          "Use Case",
+          "Trade-off"
+        ],
+        "rows": [
+          [
+            "No retry",
+            "retry: false",
+            "POST mutations, optimistic updates",
+            "Fastest failure, no server load"
+          ],
+          [
+            "Fixed count",
+            "retry: 3",
+            "GET requests to stable APIs",
+            "Simple but can stampede"
+          ],
+          [
+            "Exponential backoff",
+            "retryDelay: (attempt) => Math.min(1000 * 2**attempt, 30000)",
+            "Flaky third-party APIs",
+            "Respects server recovery time"
+          ],
+          [
+            "Conditional retry",
+            "retry: (failureCount, error) => error.status !== 404",
+            "Never retry client errors (4xx)",
+            "Avoids wasting requests on known failures"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Errors in Components"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest error display pattern checks `isError` and shows a message directly in the component. For larger apps, a global `onError` handler in the `QueryClient` can log or transform errors in one place, while individual components still decide what to show to the user."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Component-Level Error Handling",
+        "content": "Displaying user-friendly error messages in a component using React Query v5.",
+        "language": "tsx",
+        "code": "import { useQuery } from '@tanstack/react-query';\nimport { fetchPosts } from '../api/posts';\n\nfunction PostsList() {\n  const {\n    data: posts,\n    isError,\n    error,\n    refetch\n  } = useQuery({\n    queryKey: ['posts'],\n    queryFn: fetchPosts\n  });\n\n  if (isError) {\n    return (\n      <div role=\"alert\" className=\"error-banner\">\n        <h3>Unable to load posts</h3>\n        <p>{error?.message ?? 'Something went wrong. Please try again.'}</p>\n        <button onClick={() => refetch()}>Retry now</button>\n      </div>\n    );\n  }\n\n  return (\n    <ul>\n      {posts?.map((post) => (\n        <li key={post.id}>{post.title}</li>\n      ))}\n    </ul>\n  );\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Global Error Handling with QueryClient"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query lets you set a global `onError` handler when you create your `QueryClient`. This is the right place for error logging, sending errors to a monitoring service like Sentry, or transforming error objects. It runs for every failed query across the entire application, so keep the logic minimal and focused."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global Error Handler with React Query v5",
+        "content": "Setting up a global error handler that logs errors and normalises the error object.",
+        "language": "tsx",
+        "code": "import { QueryClient } from '@tanstack/react-query';\n\nexport const queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      retry: (failureCount, error) => {\n        if (error.status === 404) return false;\n        return failureCount < 3;\n      },\n      retryDelay: (attemptIndex) =>\n        Math.min(1000 * 2 ** attemptIndex, 30000),\n    },\n    mutations: {\n      retry: false,\n    },\n  },\n  // Global error logger\n  onError: (error, query, context) => {\n    console.error('[React Query Error]', {\n      queryKey: query?.queryKey,\n      message: error.message,\n      status: (error as any)?.status,\n      variables: query?.meta,\n    });\n    // Replace with: Sentry.captureException(error);\n  },\n  onSettled: (data, error, query) => {\n    if (query) {\n      queryClient.invalidateQueries({ queryKey: query.queryKey });\n    }\n  },\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Log All Errors",
+        "text": "A global onError handler ensures no error slips through silently. Hook it up to your error monitoring service from day one â€” it costs nothing and saves debugging time later."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Boundaries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Error boundaries catch render-time errors in React components. While React Query's `isError` state handles most data-fetching errors gracefully, errors thrown inside a render function (for example, accessing a property on `null` data before the guard runs) still crash the component tree. An error boundary catches these and shows a fallback UI."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Error Boundary Component",
+        "content": "A React error boundary that catches unhandled render errors in React Query components.",
+        "language": "tsx",
+        "code": "import { Component, type ReactNode } from 'react';\n\ninterface Props {\n  children: ReactNode;\n  fallback: ReactNode;\n}\n\ninterface State {\n  hasError: boolean;\n  error: Error | null;\n}\n\nclass QueryErrorBoundary extends Component<Props, State> {\n  state: State = { hasError: false, error: null };\n\n  static getDerivedStateFromError(error: Error): State {\n    return { hasError: true, error };\n  }\n\n  componentDidCatch(error: Error, info: { componentStack: string }) {\n    console.error('Unhandled query render error:', error, info);\n  }\n\n  render() {\n    if (this.state.hasError) {\n    return (\n      <div role=\"alert\" className=\"error-fallback\">\n        <h2>Something went wrong</h2>\n        <p>{this.state.error?.message}</p>\n        {this.props.fallback}\n      </div>\n    );\n  }\n\n  return this.props.children;\n}\n\n// Usage\nfunction App() {\n  return (\n    <QueryClientProvider client={queryClient}>\n      <QueryErrorBoundary\n        fallback={<button onClick={() => location.reload()}>Reload page</button>}\n      >\n        <PostsPage />\n      </QueryErrorBoundary>\n    </QueryClientProvider>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep Boundaries Narrow",
+        "text": "Wrap only the sections of your app that can actually throw â€” usually individual data-fetching components, not the whole application."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "User-Friendly Error Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Raw error messages from the server are often confusing or expose internal details. The best practice is to map HTTP status codes to friendly messages in a central helper function, keeping the message consistent across your app and hiding implementation details from users."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Friendly Error Message Mapper",
+        "content": "A utility function that converts API error responses into user-friendly messages.",
+        "language": "ts",
+        "code": "type HttpStatus = number;\n\nconst FRIENDLY_MESSAGES: Record<HttpStatus, string> = {\n  400: 'The request was invalid. Please check your input and try again.',\n  401: 'Your session has expired. Please sign in again.',\n  403: 'You don't have permission to do that.',\n  404: 'The resource you are looking for doesn't exist.',\n  409: 'This conflicts with existing data. Please refresh and try again.',\n  422: 'The data sent was not valid. Please correct the highlighted fields.',\n  429: 'Too many requests. Please wait a moment and try again.',\n  500: 'Something went wrong on our end. Please try again later.',\n  502: 'The server is temporarily unavailable. Please try again soon.',\n  503: 'The service is undergoing maintenance. Please try again shortly.',\n};\n\nexport function getFriendlyErrorMessage(error: unknown): string {\n  if (error instanceof Error) {\n    const status = (error as any)?.status as HttpStatus | undefined;\n    if (status && FRIENDLY_MESSAGES[status]) {\n      return FRIENDLY_MESSAGES[status];\n    }\n    return error.message || 'Something went wrong. Please try again.';\n  }\n  return 'An unexpected error occurred. Please try again later.';\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Error Handling FAQ",
+        "items": [
+          {
+            "question": "What is the difference between isError and isFetchError?",
+            "answer": "isError is true whenever the latest request fails. isFetchError is a more specific flag that is true only when the error came from a fetch operation (as opposed to a parse error, where isParseError is true)."
+          },
+          {
+            "question": "Should I always use a global onError handler?",
+            "answer": "It is strongly recommended. Use it for logging and monitoring. Component-level error handling should still be used to show user-facing messages â€” the global handler does not replace that."
+          },
+          {
+            "question": "What happens if all retries are exhausted?",
+            "answer": "React Query sets isError to true and populates the error object with the last error received. Your component is then responsible for rendering an appropriate error state and optionally offering a retry button."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Robust Error Handling Layer",
+        "description": "Practice implementing global error handling, retry policies, and error boundaries for a React Query application.",
+        "steps": [
+          "Create a QueryClient with a global onError handler that logs errors to the console with the query key and error message.",
+          "Set retry to false for all mutations so failed POST requests surface immediately.",
+          "Configure retry: 3 with exponential backoff for GET queries but exclude 404 responses.",
+          "Build a QueryErrorBoundary class component that catches render-time errors and shows a fallback with a reload button.",
+          "Create a getFriendlyErrorMessage utility that maps HTTP status codes to human-readable strings.",
+          "Wire it all up in App.tsx and intentionally cause a 404 to verify the flow."
+        ],
+        "expectedOutcome": "When a query fails, the global logger fires, retries run the configured number of times, and if all retries fail the error boundary catches any render crash while the user sees a friendly message with a retry button."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Retry Strategy Comparison",
+        "cards": [
+          {
+            "title": "No Retries",
+            "description": "The fastest way to fail. Best for mutations and POST requests.",
+            "pros": [
+              "No wasted network calls",
+              "Immediate user feedback"
+            ],
+            "cons": [
+              "No resilience for transient failures"
+            ],
+            "tags": ["retry: false"]
+          },
+          {
+            "title": "Fixed Retry Count",
+            "description": "Retry a set number of times with equal delays.",
+            "pros": [
+              "Simple to configure",
+              "Predictable behavior"
+            ],
+            "cons": [
+              "Can overwhelm a struggling server"
+            ],
+            "tags": ["retry: 3"]
+          },
+          {
+            "title": "Exponential Backoff",
+            "description": "Delays grow with each attempt, giving the server time to recover.",
+            "pros": [
+              "Respects server capacity",
+              "Best for flaky third-party APIs"
+            ],
+            "cons": [
+              "More complex configuration"
+            ],
+            "tags": ["retryDelay"]
+          },
+          {
+            "title": "Conditional Retry",
+            "description": "Retry only for specific error types, such as network errors or 5xx responses.",
+            "pros": [
+              "Avoids retrying known failures",
+              "Balances resilience and efficiency"
+            ],
+            "cons": [
+              "Requires understanding of error codes"
+            ],
+            "tags": ["retry: (fc, err) => ..."]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "isError and error surface every failed request in React Query",
+          "Use a global onError handler to centralise logging and monitoring",
+          "Configure retry and retryDelay per query type â€” use exponential backoff for flaky APIs",
+          "Error boundaries catch render-time crashes that isError cannot prevent",
+          "Map HTTP status codes to friendly messages for better user experience"
+        ],
+        "takeaway": "Good error handling is invisible to users â€” they see a helpful message and a retry button, not a crashed app."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

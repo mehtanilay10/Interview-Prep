@@ -455,6 +455,8 @@ import rqLesson32 from '../courses/react-query/09-real-world-patterns/auth-flows
 import rqLesson33 from '../courses/react-query/09-real-world-patterns/form-integration.json';
 import rqLesson34 from '../courses/react-query/09-real-world-patterns/polling-real-time-data.json';
 import rqLesson35 from '../courses/react-query/09-real-world-patterns/migration-patterns.json';
+import rqLesson36 from '../courses/react-query/02-query-hooks/initial-data-placeholder.json';
+import rqLesson37 from '../courses/react-query/04-advanced-features/error-handling-strategies.json';
 
 import apolloLesson1 from '../courses/apollo/01-apollo-basics/first-query.json';
 import apolloLesson2 from '../courses/apollo/01-apollo-basics/graphql-basics.json';
@@ -832,6 +834,7 @@ const rawLessons = [
   rqLesson10, rqLesson11, rqLesson12, rqLesson13, rqLesson14, rqLesson15, rqLesson16, rqLesson17, rqLesson18,
   rqLesson19, rqLesson20, rqLesson21, rqLesson22, rqLesson23, rqLesson24, rqLesson25, rqLesson26, rqLesson27,
   rqLesson28, rqLesson29, rqLesson30, rqLesson31, rqLesson32, rqLesson33, rqLesson34, rqLesson35,
+  rqLesson36, rqLesson37,
   apolloLesson1, apolloLesson2, apolloLesson3, apolloLesson4, apolloLesson5, apolloLesson6, apolloLesson7,
   apolloLesson8, apolloLesson9, apolloLesson10, apolloLesson11, apolloLesson12, apolloLesson13, apolloLesson14,
   apolloLesson15, apolloLesson16, apolloLesson17, apolloLesson18, apolloLesson19, apolloLesson20, apolloLesson21,

@@ -20,61 +20,159 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why Persist Cache?"
+        "text": "Why Persist the Cache?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "By default, React Query cache lives in memory. When the user refreshes the page, all cached data is lost. Persistence plugins save the cache to localStorage or IndexedDB, allowing the app to show cached data immediately on reload, even offline."
+        "text": "By default, React Query cache lives entirely in memory. When the user refreshes the page, closes the tab, or restarts the browser, all cached data is lost. Persistence plugins save the cache to a durable storage medium, allowing the app to show cached data immediately on reload â€” even while offline. This dramatically improves perceived performance and enables true offline-first experiences."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Instant Loads with Persistence",
+        "text": "With cache persistence, your app can render content before the network even responds. Users see cached data instantly while React Query validates freshness in the background. This is the same technique used by native mobile apps and progressive web apps."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Persistence Options"
+        "text": "Storage Options"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "localStorage: Simple key-value storage, synchronous, 5-10MB limit.",
-          "IndexedDB: Larger capacity, asynchronous, better for large datasets.",
-          "AsyncStorage (React Native): For mobile applications."
-        ],
-        "title": "Storage Options"
+        "text": "React Query supports multiple storage backends through its persister plugins. The two most common are localStorage (simple, synchronous, limited capacity) and IndexedDB (asynchronous, large capacity). Choose based on your dataset size and performance needs."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Storage", "Sync/Async", "Capacity", "Best For"],
+        "rows": [
+          ["localStorage", "Synchronous", "5â€“10 MB", "Simple apps, small datasets"],
+          ["IndexedDB", "Asynchronous", "Hundreds of MB+", "Large datasets, PWAs"],
+          ["sessionStorage", "Synchronous", "5â€“10 MB", "Tab-scoped caching (cleared on close)"]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Persister",
+            "definition": "An object that handles serializing and deserializing the React Query cache to and from a storage medium."
+          },
+          {
+            "term": "Hydration",
+            "definition": "The process of restoring the query cache from persisted storage when the app initializes."
+          },
+          {
+            "term": "PersistQueryClientProvider",
+            "definition": "A wrapper component that manages cache persistence and hydration automatically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Persisting with localStorage"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `createSyncStoragePersister` utility from `@tanstack/query-sync-storage-persister` wraps localStorage for simple persistence. It is synchronous, so hydration happens immediately on app load. Use this for small to medium datasets."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Persisting cache with localStorage",
-        "code": "import { QueryClient } from '@tanstack/react-query';\nimport { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';\nimport { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';\n\nconst queryClient = new QueryClient();\n\nconst persister = createSyncStoragePersister({\n  storage: window.localStorage,\n});\n\nfunction App() {\n  return (\n    <PersistQueryClientProvider client={queryClient} persister={persister}>\n      <YourApp />\n    </PersistQueryClientProvider>\n  );\n}",
+        "title": "localStorage persistence setup",
+        "code": "import { QueryClient } from '@tanstack/react-query';\nimport {\n  PersistQueryClientProvider,\n} from '@tanstack/react-query-persist-client';\nimport {\n  createSyncStoragePersister,\n} from '@tanstack/query-sync-storage-persister';\n\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      cacheTime: 1000 * 60 * 60, // 1 hour in memory\n      staleTime: 1000 * 60 * 5, // 5 minutes fresh\n    },\n  },\n});\n\nconst persister = createSyncStoragePersister({\n  storage: window.localStorage,\n  key: 'react-query-cache-v1',\n});\n\nfunction App() {\n  return (\n    <PersistQueryClientProvider\n      client={queryClient}\n      persistOptions={{ persister }}\n    >\n      <YourApp />\n    </PersistQueryClientProvider>\n  );\n}",
         "language": "tsx",
-        "content": "Wrap your app with PersistQueryClientProvider."
+        "content": "Wrap your app with PersistQueryClientProvider for automatic cache persistence."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hydration and Restoration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "On app initialization, the persister reads stored data and hydrates the query cache. Components can render immediately with cached data while React Query validates freshness in the background. If the storage is empty or corrupted, the cache starts fresh."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rq-hydration-flow",
+        "definition": "sequenceDiagram\n    participant App\n    participant Persister\n    participant Storage\n    participant QueryClient\n    App->>Persister: Initialize\n    Persister->>Storage: Read cached data\n    Storage-->>Persister: Return stored cache\n    Persister->>QueryClient: Hydrate cache\n    QueryClient-->>App: Cache ready\n    App->>App: Render with cached data\n    App->>QueryClient: Background refetch stale queries\n    QueryClient-->>App: Updated data",
+        "caption": "Cache hydration sequence on app initialization."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "text": "Never persist sensitive data. localStorage is unencrypted and accessible to any script on the page. Use secure storage for auth tokens.",
-        "title": "Security"
+        "title": "Security Warning",
+        "text": "Never persist sensitive data like auth tokens, personal information, or payment details in localStorage or IndexedDB. These storage mechanisms are accessible to any script on the page and persist across sessions. Use secure, HTTP-only cookies for sensitive data."
       }
     },
     {
-      "type": "heading",
+      "type": "exercise",
       "data": {
-        "level": 2,
-        "text": "Hydration"
+        "title": "Exercise: Add Persistence to an Existing App",
+        "description": "Add cache persistence to a React Query app that currently has no persistence. Measure the perceived load time before and after.",
+        "steps": [
+          "Install @tanstack/react-query-persist-client and @tanstack/query-sync-storage-persister.",
+          "Create a QueryClient with a 1-hour cacheTime.",
+          "Create a persister using localStorage with a unique cache key.",
+          "Wrap your app root with PersistQueryClientProvider.",
+          "Verify cached data appears instantly on page reload."
+        ],
+        "expectedOutcome": "Data appears instantly on reload instead of showing a loading spinner, confirming successful persistence."
       }
     },
     {
-      "type": "paragraph",
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
       "data": {
-        "text": "On app load, the persister hydrates the query cache with stored data. Components can render immediately with cached data while React Query validates freshness in the background."
+        "title": "Cache Persistence FAQ",
+        "items": [
+          {
+            "question": "Does persistence work with server-side rendering (SSR)?",
+            "answer": "Persistence plugins are client-side only. In SSR apps, wrap PersistQueryClientProvider inside a dynamic import with ssr: false to avoid server-side execution."
+          },
+          {
+            "question": "Can I use multiple persisters at once?",
+            "answer": "Yes, you can chain persisters or write a custom persister that delegates to multiple storage backends. React Query supports any storage interface that implements getItem, setItem, and removeItem."
+          },
+          {
+            "question": "How do I clear the persisted cache?",
+            "answer": "Call persister.removeClient() or clear the storage key directly: localStorage.removeItem('react-query-cache-v1'). You can also call queryClient.clear() to wipe the in-memory cache."
+          }
+        ]
       }
     },
     {
@@ -82,9 +180,9 @@
       "data": {
         "title": "Cache Persistence Key Points",
         "points": [
-          "Persistence survives page reloads and browser restarts.",
-          "localStorage is simple but limited in size.",
-          "IndexedDB handles larger datasets better.",
+          "Persistence survives page reloads, tab closes, and browser restarts.",
+          "localStorage is simple and synchronous but limited to ~5 MB.",
+          "Hydration restores the cache on app initialization.",
           "Never persist sensitive data in plain storage."
         ],
         "takeaway": "Cache persistence dramatically improves perceived performance and enables offline-first experiences."

@@ -2,8 +2,9 @@
   "id": "lesson-rq-010",
   "slug": "optimistic-updates",
   "moduleSlug": "mutations",
+  "courseSlug": "react-query",
   "title": "Optimistic Updates",
-  "description": "Learn how to update UI optimistically before server confirms.",
+  "description": "Make your app feel instant by updating the UI before the server confirms â€” with safe rollback on failure.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 22,
@@ -11,54 +12,254 @@
     "react-query",
     "optimistic",
     "updates",
-    "ux"
+    "ux",
+    "rollback"
   ],
+  "prerequisites": ["use-mutation"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Optimistic Updates?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "**Optimistic updates** update the UI immediately when a mutation is triggered, then rollback if it fails. This makes your app feel instant."
+        "text": "Users expect apps to feel instant. When they click to like a post or archive an email, they should see the change immediately â€” not wait for a round-trip to the server. **Optimistic updates** apply the change to the cache before the request even finishes. If the server responds with an error, React Query rolls back to the previous state. The user gets instant feedback with zero risk of confusing stale UI."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "optimistic update",
+            "definition": "Updating the local cache before the server confirms, giving the user instant feedback."
+          },
+          {
+            "term": "rollback",
+            "definition": "Restoring the previous cache state if the mutation fails, ensuring the UI is never wrong for long."
+          },
+          {
+            "term": "context",
+            "definition": "The object returned from onMutate that is passed to onError and onSettled, used to carry rollback data."
+          },
+          {
+            "term": "cancelQueries",
+            "definition": "A QueryClient method that pauses in-flight refetches so an optimistic update is not immediately overwritten."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Implementation"
+        "text": "The Three-Step Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Implementing optimistic updates requires three callbacks working together: `onMutate` applies the change and snapshots the old state, `onError` restores the snapshot if the mutation fails, and `onSettled` refetches to guarantee server-side consistency regardless of the outcome."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "The Optimistic Update Steps",
+        "items": [
+          "onMutate: Cancel pending queries, snapshot the current cache, apply the optimistic change, return the snapshot via the context object.",
+          "onError: Receive the context object from onMutate and restore the snapshot to roll back the optimistic change.",
+          "onSettled: Always refetch the query so the cache reflects the actual server state after the mutation finishes."
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Full Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The example below toggles a todo item's completion status. The checkbox ticks instantly. If the PATCH request fails, the checkbox ticks back to its original state without the user noticing anything went wrong."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Optimistic Update",
-        "content": "Updating UI before server confirms",
-        "language": "jsx",
-        "code": "const mutation = useMutation({\n  mutationFn: updateUser,\n  \n  // Optimistically update cache\n  onMutate: async (newUser) => {\n    // Cancel outgoing refetches\n    await queryClient.cancelQueries({ queryKey: ['users'] });\n\n    // Snapshot previous value\n    const previousUsers = queryClient.getQueryData(['users']);\n\n    // Optimistically update\n    queryClient.setQueryData(['users'], (old) =>\n      old.map(u => u.id === newUser.id ? { ...u, ...newUser } : u)\n    );\n\n    // Return context with previous value\n    return { previousUsers };\n  },\n  \n  // Rollback on error\n  onError: (err, newUser, context) => {\n    queryClient.setQueryData(['users'], context.previousUsers);\n  },\n  \n  // Always refetch after error or success\n  onSettled: () => {\n    queryClient.invalidateQueries({ queryKey: ['users'] });\n  }\n});"
+        "title": "Optimistic Toggle with Full Rollback",
+        "content": "A complete useMutation example using onMutate for optimistic update and onError for rollback.",
+        "language": "tsx",
+        "code": "import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';\nimport type { Todo } from '../types';\n\ninterface TogglePayload {\n  id: string;\n  completed: boolean;\n}\n\nasync function patchTodo({ id, completed }: TogglePayload): Promise<Todo> {\n  const res = await fetch(`/api/todos/${id}`, {\n    method: 'PATCH',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ completed }),\n  });\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\nfunction ToggleTodoButton({ todo }: { todo: Todo }) {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: () => patchTodo({ id: todo.id, completed: !todo.completed }),\n\n    onMutate: async () => {\n      // 1. Cancel outgoing refetches so our optimistic value isn't overwritten\n      await queryClient.cancelQueries({ queryKey: ['todos'] });\n\n      // 2. Snapshot the current list so we can roll back\n      const previousTodos = queryClient.getQueryData<Todo[]>(['todos']);\n\n      // 3. Apply the optimistic change\n      queryClient.setQueryData<Todo[]>(['todos'], (old = []) =>\n        old.map((t) =>\n          t.id === todo.id ? { ...t, completed: !t.completed } : t\n        )\n      );\n\n      // 4. Return context for onError rollback\n      return { previousTodos };\n    },\n\n    onError: (_err, _vars, context) => {\n      // 5. Restore snapshot on failure\n      if (context?.previousTodos) {\n        queryClient.setQueryData(['todos'], context.previousTodos);\n      }\n    },\n\n    onSettled: () => {\n      // 6. Always refetch to confirm server state\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  }) as UseMutationResult<Todo, Error, void, { previousTodos?: Todo[] }>;\n\n  return (\n    <label className=\"toggle-label\">\n      <input\n        type=\"checkbox\"\n        checked={todo.completed}\n        onChange={() => mutation.mutate()}\n        disabled={mutation.isPending}\n      />\n      {mutation.isPending && <span className=\"pending-indicator\" aria-hidden=\"true\">savingâ€¦</span>}\n    </label>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Rollback",
-        "text": "Always implement rollback in onError to revert the optimistic update if the mutation fails."
+        "variant": "important",
+        "title": "cancelQueries First",
+        "text": "Always call queryClient.cancelQueries at the start of onMutate. Without it, an in-flight refetch could overwrite your optimistic update before the mutation finishes."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Context Object"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The object returned from `onMutate` is passed through to `onError` and `onSettled` as the third argument. This is the bridge between your optimistic write and your rollback logic. You can pass anything you need â€” the previous cache value, a reference to the updated item, or metadata like the timestamp the action was taken."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-optimistic-flow-010",
+        "caption": "Flow showing how the context object travels through the optimistic update lifecycle.",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant C as Component\n    participant QC as QueryClient\n    participant API as Server\n\n    U->>C: Clicks toggle\n    C->>QC: onMutate fires\n    QC->>QC: cancelQueries\n    QC->>QC: Snapshot current state\n    QC->>QC: setQueryData (optimistic)\n    QC-->>C: Return context { previousTodos }\n    C->>API: mutationFn executes\n    API-->>C: Success response\n    C->>QC: onSettled fires\n    QC->>API: invalidateQueries (refetch)\n    Note over QC,API: If API had errored, onError fires with context\n    QC->>QC: setQueryData(previousTodos) rollback"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic vs Non-Optimistic Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Optimistic vs Standard Mutation",
+        "cards": [
+          {
+            "title": "Standard Mutation",
+            "description": "UI updates only after the server confirms the change.",
+            "pros": [
+              "Always reflects true server state",
+              "Simpler to implement",
+              "No rollback logic needed"
+            ],
+            "cons": [
+              "User waits for network round-trip",
+              "Can feel sluggish on slow connections"
+            ],
+            "tags": ["no onMutate"]
+          },
+          {
+            "title": "Optimistic Update",
+            "description": "UI updates immediately and rolls back on failure.",
+            "pros": [
+              "App feels instant",
+              "Great UX for small, frequent actions",
+              "Clear rollback path with context"
+            ],
+            "cons": [
+              "More code to write",
+              "Requires careful rollback handling",
+              "UI can flicker briefly on failure"
+            ],
+            "tags": ["onMutate + onError"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Optimistic Updates FAQ",
+        "items": [
+          {
+            "question": "Should I use optimistic updates for every mutation?",
+            "answer": "No. Use them for quick, frequent actions like toggling a checkbox or liking a post. For heavyweight operations like form submissions, a loading state is usually more appropriate."
+          },
+          {
+            "question": "What if the server is wrong and the optimistic update was right?",
+            "answer": "onSettled always invalidates and refetches. After refetch, the cache is updated with the true server state, correcting any discrepancy."
+          },
+          {
+            "question": "Can I use optimistic updates with variables from the mutation?",
+            "answer": "Yes. onMutate receives the variables as its first argument. Use it to determine which item to update in the cache."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Optimistic Like Button",
+        "description": "Build a like button that updates the UI instantly and rolls back if the API call fails.",
+        "steps": [
+          "Set up a useQuery to fetch a list of posts.",
+          "Create a LikeButton component using useMutation.",
+          "In onMutate, cancel the ['posts'] query, snapshot current posts, and toggle the liked count optimistically.",
+          "Return { previousPosts } from onMutate.",
+          "In onError, restore the snapshot if an error occurs.",
+          "In onSettled, invalidate ['posts'] to refetch.",
+          "Show a visual pending state when the mutation is in flight.",
+          "Test the rollback by temporarily causing the API to return a 500 error."
+        ],
+        "expectedOutcome": "Clicking the like button increments the count instantly. If the request fails, the count silently reverts. After the request settles, the real server value is confirmed via refetch."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Update UI immediately on mutate",
-          "Snapshot previous data in onMutate",
-          "Rollback on error",
-          "Refetch to ensure consistency"
+          "Optimistic updates make your app feel instant by updating the cache before the server responds",
+          "Always cancel in-flight queries before applying the optimistic change",
+          "Return a context object from onMutate so onError can roll back cleanly",
+          "Use onSettled to invalidate and refetch, guaranteeing eventual consistency",
+          "Use optimistic updates for small, frequent actions â€” not heavyweight form submissions"
         ],
-        "takeaway": "Optimistic updates make apps feel instant."
+        "takeaway": "Optimistic updates are the secret to snappy, native-feeling web apps. The rollback safety net means users get speed without risk."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

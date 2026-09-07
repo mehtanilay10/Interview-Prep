@@ -2,8 +2,9 @@
   "id": "lesson-rq-012",
   "slug": "suspense",
   "moduleSlug": "advanced-features",
+  "courseSlug": "react-query",
   "title": "React Suspense",
-  "description": "Learn how to use React Query with React Suspense.",
+  "description": "Use React Suspense with React Query to declaratively handle loading states.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 20,
@@ -13,52 +14,239 @@
     "loading",
     "boundaries"
   ],
+  "prerequisites": ["query-hooks"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is React Suspense?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "React Query supports **React Suspense**, allowing you to use Suspense boundaries for loading states instead of checking isLoading."
+        "text": "React Suspense lets components **declare** their loading state instead of manually checking `isLoading` or `isFetching`. With React Query, enabling `suspense: true` makes queries throw a special promise while loading, which Suspense catches and renders a fallback for. The result is cleaner component code and a single, declarative loading boundary."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Suspense boundary",
+            "definition": "A <Suspense> component that wraps loading components and displays a fallback while they fetch data."
+          },
+          {
+            "term": "suspense: true",
+            "definition": "A useQuery option that enables Suspense mode, causing the hook to suspend the component while loading."
+          },
+          {
+            "term": "throw Promise",
+            "definition": "The internal mechanism React Query uses to suspend â€” it throws a promise that Suspense recognises and catches."
+          },
+          {
+            "term": "fallback",
+            "definition": "The React element displayed inside a Suspense boundary while wrapped components are loading."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Suspense Mode"
+        "text": "Enabling Suspense Mode"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can enable Suspense globally on the `QueryClient` or per-query by passing `suspense: true` in the query options. Enabling it globally is more common in production apps â€” it removes the need to set the option on every individual query."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Suspense",
-        "content": "Using React Query with Suspense",
-        "language": "jsx",
-        "code": "import { Suspense } from 'react';\n\nfunction App() {\n  return (\n    <QueryClientProvider client={queryClient}>\n      <Suspense fallback={<p>Loading...</p>}>\n        <UserProfile userId={1} />\n      </Suspense>\n    </QueryClientProvider>\n  );\n}\n\nfunction UserProfile({ userId }) {\n  // This will suspend while loading\n  const { data: user } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    suspense: true\n  });\n\n  return <h1>{user.name}</h1>;\n}"
+        "title": "QueryClient with Global Suspense Enabled",
+        "content": "Configuring the QueryClient to enable Suspense mode by default for all queries.",
+        "language": "tsx",
+        "code": "import { QueryClient, QueryClientProvider } from '@tanstack/react-query';\n\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      // All queries will suspend by default\n      suspense: true,\n      // Retry once for transient failures\n      retry: 1,\n      // Keep stale data visible for 5 seconds\n      staleTime: 5_000,\n    },\n  },\n});\n\nfunction App() {\n  return (\n    <QueryClientProvider client={queryClient}>\n      <SuspenseUserList />\n    </QueryClientProvider>\n  );\n}\n\nfunction SuspenseUserList() {\n  // No isLoading check needed â€” component suspends here\n  const { data: users } = useQuery({\n    queryKey: ['users'],\n    queryFn: () => fetch('/api/users').then((r) => r.json()),\n  });\n\n  return (\n    <ul>\n      {users?.map((user) => (\n        <li key={user.id}>{user.name}</li>\n      ))}\n    </ul>\n  );\n}\n\nfunction LoadingFallback() {\n  return <p className=\"loading\">Loading usersâ€¦</p>;\n}\n\n// Wrap at the router or layout level\nfunction AppLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <Suspense fallback={<LoadingFallback />}>\n      {children}\n    </Suspense>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Enable Suspense",
-        "text": "Enable suspense in QueryClient config or per-query with suspense: true."
+        "variant": "info",
+        "title": "Suspense Boundaries Are Hierarchical",
+        "text": "Place Suspense boundaries at the route or section level. A nested boundary can show a skeleton for a specific widget while the rest of the page is already visible."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Per-Query Suspense"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When Suspense is not enabled globally, you can opt individual queries into it. This is useful when migrating an existing app â€” enable Suspense on one feature at a time instead of switching over the entire app at once."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Per-Query Suspense Option",
+        "content": "Enabling Suspense on a single query without changing global defaults.",
+        "language": "tsx",
+        "code": "function UserProfile({ userId }: { userId: string }) {\n  const { data: user } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    // Only this query suspends\n    suspense: true,\n    enabled: !!userId,\n  });\n\n  return <h1>{user.name}</h1>;\n}\n\nfunction Page() {\n  return (\n    <Suspense fallback={<ProfileSkeleton />}>\n      <UserProfile userId=\"123\" />\n    </Suspense>\n  );\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling in Suspense Mode"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When using Suspense, a failed query throws an error instead of setting `isError = true`. Wrap Suspense boundaries in an error boundary to catch thrown errors. This means you need both a Suspense boundary (for loading) and an error boundary (for failures) around any Suspense-enabled component."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Suspense Changes Error Handling",
+        "text": "In Suspense mode, errors are thrown rather than set on the mutation object. You need an error boundary to catch them. isError and error will not be available inside a Suspending component."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Suspense vs Manual Loading Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Suspense Mode vs Manual Loading Checks",
+        "cards": [
+          {
+            "title": "Manual Loading",
+            "description": "Check isLoading and isFetching flags in every component.",
+            "pros": [
+              "Fine-grained control over loading UI",
+              "No error boundary required for data errors"
+            ],
+            "cons": [
+              "Boilerplate in every component",
+              "Easy to forget loading checks",
+              "Mixed loading and data code in one place"
+            ],
+            "tags": ["isLoading"]
+          },
+          {
+            "title": "Suspense Mode",
+            "description": "Declarative loading â€” declare what should show while loading.",
+            "pros": [
+              "Cleaner component code",
+              "Loading state is declared, not scattered",
+              "Works with React Server Components"
+            ],
+            "cons": [
+              "Requires Suspense boundaries set up",
+              "Errors are thrown, not caught in-component",
+              "Not supported in all React versions"
+            ],
+            "tags": ["suspense: true"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use Suspense"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Good Candidates for Suspense",
+        "items": [
+          "Page-level data fetching where a skeleton is a natural loading pattern",
+          "React Server Components â€” Suspense is required there",
+          "Shared loading logic across many routes â€” one boundary instead of many checks",
+          "New projects or features being built from scratch"
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Migrate a Query to Suspense",
+        "description": "Convert an existing useQuery component from manual loading checks to Suspense mode.",
+        "steps": [
+          "Find an existing useQuery in your app that shows isLoading and isFetching.",
+          "Add suspense: true to the useQuery options.",
+          "Remove the isLoading check and any conditional rendering based on it.",
+          "Wrap the component in a <Suspense> boundary with a relevant fallback.",
+          "Add an error boundary above the Suspense boundary to catch thrown errors.",
+          "Verify the loading and error states still work correctly."
+        ],
+        "expectedOutcome": "The component no longer needs isLoading checks. The Suspense boundary shows a fallback while loading, and the error boundary catches failures. The component body is simplified to only render data."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "React Query supports Suspense",
-          "Use Suspense boundaries for loading",
-          "suspense: true enables per-query",
-          "Cleaner than isLoading checks"
+          "Suspense mode uses suspense: true to make queries throw a promise while loading",
+          "Wrap Suspense-enabled components in <Suspense> boundaries with fallbacks",
+          "Enable Suspense globally via defaultOptions or per-query",
+          "Errors in Suspense mode are thrown â€” use error boundaries to catch them",
+          "Suspense simplifies component code by removing manual isLoading checks"
         ],
-        "takeaway": "Suspense integration simplifies loading states."
+        "takeaway": "Suspense + React Query is a powerful combination for production apps. Declare your loading states once, and let React handle the rest."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

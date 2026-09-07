@@ -2,46 +2,197 @@
   "id": "lesson-rq-007",
   "slug": "infinite-queries",
   "moduleSlug": "query-hooks",
+  "courseSlug": "react-query",
   "title": "Infinite Queries",
-  "description": "Learn how to implement infinite scrolling with useInfiniteQuery.",
-  "order": 3,
+  "description": "Implement infinite scrolling and load-more patterns with useInfiniteQuery.",
+  "order": 4,
   "difficulty": "intermediate",
   "estimatedMinutes": 22,
   "tags": [
     "react-query",
     "infinite",
     "scrolling",
-    "pagination"
+    "pagination",
+    "load-more",
+    "useInfiniteQuery"
   ],
+  "prerequisites": ["pagination"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**useInfiniteQuery** is designed for infinite scrolling and load-more patterns. It manages multiple pages of data automatically."
+        "text": "**useInfiniteQuery** is a specialized hook for infinite scroll and load-more patterns. It manages multiple pages of data in a single cache entry, exposes fetchNextPage and hasNextPage, and handles the complexity of accumulating results across pages automatically."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Infinite Query"
+        "text": "useInfiniteQuery vs useQuery for Pagination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Both hooks can implement pagination, but they are suited to different UX patterns. useQuery with keepPreviousData is better for traditional numbered pagination. useInfiniteQuery is better for infinite scroll and \"Load More\" buttons where all pages accumulate in one list."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "useQuery vs useInfiniteQuery for Pagination",
+        "cards": [
+          {
+            "title": "useQuery + keepPreviousData",
+            "description": "Best for traditional numbered pagination where only one page is shown at a time.",
+            "pros": [
+              "Simpler API surface",
+              "Each page is a separate cache entry",
+              "Great for numbered page buttons"
+            ],
+            "cons": [
+              "Only shows one page at a time",
+              "Accumulating all pages requires manual merging",
+              "Not ideal for infinite scroll"
+            ],
+            "tags": ["numbered-pages", "simple"]
+          },
+          {
+            "title": "useInfiniteQuery",
+            "description": "Best for infinite scroll and Load More buttons where all loaded pages appear in one continuous list.",
+            "pros": [
+              "All pages accumulated in data.pages",
+              "Built-in fetchNextPage and hasNextPage",
+              "Designed for infinite scroll UX"
+            ],
+            "cons": [
+              "Slightly more complex API",
+              "All accumulated pages in memory at once",
+              "Manual cleanup needed on unmount"
+            ],
+            "tags": ["infinite-scroll", "load-more", "accumulated"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The useInfiniteQuery API"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "useInfiniteQuery requires three key pieces of configuration: a queryFn that accepts a pageParam, initialPageParam to set the starting page, and getNextPageParam to tell React Query when there are more pages to load."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "useInfiniteQuery",
-        "content": "Implementing infinite scroll",
-        "language": "jsx",
-        "code": "import { useInfiniteQuery } from '@tanstack/react-query';\n\nfunction UserFeed() {\n  const {\n    data,\n    fetchNextPage,\n    hasNextPage,\n    isFetchingNextPage,\n    isLoading\n  } = useInfiniteQuery({\n    queryKey: ['users'],\n    queryFn: ({ pageParam = 1 }) => fetchUsers(pageParam),\n    initialPageParam: 1,\n    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined\n  });\n\n  if (isLoading) return <p>Loading...</p>;\n\n  return (\n    <div>\n      {data.pages.map((page, i) => (\n        <div key={i}>\n          {page.users.map(user => (\n            <div key={user.id}>{user.name}</div>\n          ))}\n        </div>\n      ))}\n      <button\n        onClick={() => fetchNextPage()}\n        disabled={!hasNextPage || isFetchingNextPage}\n      >\n        {isFetchingNextPage ? 'Loading...' : 'Load More'}\n      </button>\n    </div>\n  );\n}"
+        "title": "Basic useInfiniteQuery",
+        "content": "Implementing infinite scroll with useInfiniteQuery",
+        "language": "tsx",
+        "code": "import { useInfiniteQuery } from '@tanstack/react-query';\n\ninterface PageResult {\n  items: Item[];\n  nextCursor: string | null;\n}\n\nasync function fetchItems({ pageParam }: { pageParam: string }): Promise<PageResult> {\n  const url = pageParam\n    ? `/api/items?cursor=${encodeURIComponent(pageParam)}`\n    : '/api/items';\n  const res = await fetch(url);\n  return res.json();\n}\n\nfunction InfiniteItemList() {\n  const {\n    data,\n    fetchNextPage,\n    hasNextPage,\n    isFetchingNextPage,\n    isLoading,\n    isError,\n    error,\n  } = useInfiniteQuery({\n    queryKey: ['items', 'infinite'],\n    queryFn: fetchItems,\n    initialPageParam: '',        // First request has no cursor\n    getNextPageParam: (lastPage) => lastPage.nextCursor,\n    // Returns nextCursor if more pages exist, undefined if done\n  });\n\n  if (isLoading) return <p>Loading items...</p>;\n  if (isError)   return <p>Error: {error.message}</p>;\n\n  // Flatten all pages into a single list for rendering\n  const allItems = data.pages.flatMap((page) => page.items);\n\n  return (\n    <div>\n      <ul>\n        {allItems.map((item) => (\n          <li key={item.id}>{item.title}</li>\n        ))}\n      </ul>\n\n      <button\n        onClick={() => fetchNextPage()}\n        disabled={!hasNextPage || isFetchingNextPage}\n      >\n        {isFetchingNextPage ? 'Loading more...' : 'Load More'}\n      </button>\n\n      {!hasNextPage && <p className=\"end-marker\">You've reached the end.</p>}\n    </div>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "getNextPageParam",
-        "text": "getNextPageParam returns the next page parameter or undefined if there are no more pages."
+        "variant": "important",
+        "title": "initialPageParam is Required in v5",
+        "text": "React Query v5 requires initialPageParam to be explicitly set. The first call to queryFn receives this value. Set it to null, '', 0, or 1 depending on your API's expected page parameter format."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-infinite-query-flow",
+        "caption": "How useInfiniteQuery accumulates pages and determines when to stop",
+        "definition": "flowchart TD\n    A[Component mounts\n    initialPageParam: ''] --> B[queryFn called\n    pageParam = '']\n    B --> C[Server returns page 1\n    nextCursor: 'abc123']\n    C --> D[Cache: pages = [page1]]\n    D --> E{User clicks\n    Load More?}\n    E -->|Yes| F[fetchNextPage]\n    F --> G[queryFn called\n    pageParam = 'abc123']\n    G --> H[Server returns page 2\n    nextCursor: 'def456']\n    H --> I[Cache: pages = [page1, page2]]\n    I --> E\n    E -->|Yes| F\n    E -->|No| J[Render all pages]\n    H -->|nextCursor = null| K[hasNextPage = false]\n    K --> L[Show end message]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Return Value Properties"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Property", "Type", "Description"],
+        "rows": [
+          ["data", "{ pages, pageParams }", "All fetched pages and their params"],
+          ["data.pages", "T[]", "Array of all successfully fetched page results"],
+          ["data.pageParams", "P[]", "Array of pageParams used for each page"],
+          ["fetchNextPage", "function", "Triggers a fetch for the next page"],
+          ["hasNextPage", "boolean", "True if getNextPageParam returned a value for the last page"],
+          ["isFetchingNextPage", "boolean", "True while fetchNextPage is in progress"],
+          ["isLoading", "boolean", "True on first render with no cache data"],
+          ["isFetching", "boolean", "True during any fetch, including next-page fetches"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cursor-based vs Offset-based Pagination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "useInfiniteQuery works with both cursor-based (token/string) and offset-based (page number) APIs. For offset-based pagination, pass the page number as pageParam and increment it in getNextPageParam."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Offset-based Infinite Query",
+        "content": "Using page numbers instead of cursors with useInfiniteQuery",
+        "language": "tsx",
+        "code": "function PaginatedFeed() {\n  const {\n    data,\n    fetchNextPage,\n    hasNextPage,\n    isFetchingNextPage,\n  } = useInfiniteQuery({\n    queryKey: ['posts', 'feed'],\n    queryFn: ({ pageParam = 1 }) => fetchPostsPage(pageParam),\n    initialPageParam: 1,\n    getNextPageParam: (lastPage) => {\n      // Return next page number, or undefined if no more pages\n      return lastPage.hasMore ? lastPage.page + 1 : undefined;\n    },\n  });\n\n  const allPosts = data?.pages.flatMap((page) => page.posts) ?? [];\n\n  return (\n    <div>\n      {allPosts.map((post) => (\n        <article key={post.id}>\n          <h3>{post.title}</h3>\n          <p>{post.excerpt}</p>\n        </article>\n      ))}\n      <button\n        onClick={() => fetchNextPage()}\n        disabled={!hasNextPage || isFetchingNextPage}\n      >\n        {isFetchingNextPage ? 'Loading...' : 'Load More'}\n      </button>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build an Infinite Image Gallery",
+        "description": "Create an infinite-scrolling image gallery using useInfiniteQuery. Each 'page' from the API returns 8 images with a nextCursor. Implement the gallery with a Load More button.",
+        "steps": [
+          "Create a mock API fetchImagePage(cursor) that returns 8 images, a title, and a nextCursor (null on the last page)",
+          "Create a function generateImage(id) to create consistent mock image objects",
+          "Create an InfiniteImageGallery component using useInfiniteQuery",
+          "Set initialPageParam to null and use cursor-based pagination",
+          "Render images in a responsive CSS grid using Tailwind (grid-cols-2 md:grid-cols-4)",
+          "Show a 'Load More' button disabled when !hasNextPage or isFetchingNextPage",
+          "Show a spinner during isFetchingNextPage",
+          "Show a 'You've seen all images!' message when !hasNextPage and data exists",
+          "Add a fade-in animation for newly loaded images"
+        ],
+        "expectedOutcome": "A responsive image gallery that loads 8 images per click, accumulates all loaded images in one scrollable grid, shows loading and end states correctly, and never makes duplicate page requests."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
       }
     },
     {
@@ -49,16 +200,18 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "useInfiniteQuery for infinite scroll",
-          "Manages multiple pages automatically",
-          "fetchNextPage loads more data",
-          "getNextPageParam determines next page"
+          "useInfiniteQuery manages multiple pages of data in a single cache entry",
+          "data.pages is an array of all successfully fetched page results",
+          "initialPageParam is required in v5 and sets the starting page parameter",
+          "getNextPageParam returns the next page param or undefined when there are no more pages",
+          "fetchNextPage loads the next page; hasNextPage tells you if more pages exist",
+          "Use useInfiniteQuery for infinite scroll and Load More; use useQuery for numbered pagination",
+          "Cursor-based APIs pass strings; offset-based APIs pass numbers as pageParam"
         ],
-        "takeaway": "Infinite queries simplify load-more patterns."
+        "takeaway": "useInfiniteQuery turns the complexity of accumulating paginated data into a simple hook with two functions: fetchNextPage and hasNextPage."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

@@ -26,8 +26,31 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "IndexedDB is a low-level API for client-side storage of significant amounts of structured data. Unlike localStorage, it is asynchronous, supports transactions, and can store much larger datasets—often hundreds of megabytes or more. For React Query apps with large caches, IndexedDB is the right choice."
+        "text": "IndexedDB is a low-level, transactional database built into every modern browser. Unlike localStorage, it is fully asynchronous, supports structured data and indexes, and can store hundreds of megabytes or more. For React Query apps with large caches â€” think chat histories, document stores, or analytics data â€” IndexedDB is the correct choice."
       }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "localStorage vs IndexedDB",
+        "cards": [
+          {
+            "title": "localStorage",
+            "description": "Simple synchronous key-value store built into all browsers.",
+            "pros": ["Simple API", "Synchronous â€” no async handling", "Works everywhere"],
+            "cons": ["~5â€“10 MB limit", "Blocks main thread", "Stores strings only"]
+          },
+          {
+            "title": "IndexedDB",
+            "description": "Asynchronous transactional database with indexes and large capacity.",
+            "pros": ["Huge capacity", "Fully async â€” no blocking", "Stores complex objects"],
+            "cons": ["Verbose API", "Older browser polyfills needed", "Hydration requires async handling"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
     },
     {
       "type": "heading",
@@ -39,24 +62,106 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "React Query provides an async persister for IndexedDB through the `@tanstack/query-async-storage-persister` package. It uses `idb-keyval` or similar libraries under the hood."
+        "text": "React Query provides an async persister for IndexedDB through the `@tanstack/query-async-storage-persister` package. It uses `idb-keyval` under the hood for a simple key-value interface over IndexedDB. Because it is asynchronous, hydration happens after the initial render â€” you should handle this gracefully in your UI."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "idb-keyval",
+            "definition": "A tiny library that wraps IndexedDB with a simple Promise-based key-value API."
+          },
+          {
+            "term": "Async Hydration",
+            "definition": "Restoring the cache from async storage after the initial render, requiring a loading state."
+          },
+          {
+            "term": "createAsyncStoragePersister",
+            "definition": "A React Query utility that creates an async persister using idb-keyval and IndexedDB."
+          }
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "IndexedDB persistence setup",
-        "code": "import { QueryClient } from '@tanstack/react-query';\nimport { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';\nimport { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';\n\nconst queryClient = new QueryClient();\n\nconst persister = createAsyncStoragePersister({\n  storage: window.indexedDB,\n  key: 'react-query-cache',\n});\n\nfunction App() {\n  return (\n    <PersistQueryClientProvider client={queryClient} persister={persister}>\n      <YourApp />\n    </PersistQueryClientProvider>\n  );\n}",
+        "title": "IndexedDB persistence with async persister",
+        "code": "import { QueryClient } from '@tanstack/react-query';\nimport { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';\nimport { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';\nimport { openDB } from 'idb';\n\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      cacheTime: 1000 * 60 * 60, // 1 hour\n      staleTime: 1000 * 60 * 5, // 5 minutes\n    },\n  },\n});\n\nconst persister = createAsyncStoragePersister({\n  storage: openDB('react-query-cache', 1, {\n    upgrade(db) {\n      db.createObjectStore('cache');\n    },\n  }),\n  key: 'RQ_CACHE',\n});\n\nfunction App() {\n  return (\n    <PersistQueryClientProvider\n      client={queryClient}\n      persistOptions={{ persister }}\n    >\n      <YourApp />\n    </PersistQueryClientProvider>\n  );\n}",
         "language": "tsx",
-        "content": "Async persister for IndexedDB."
+        "content": "Async persister setup using IndexedDB via idb-keyval."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Async Hydration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because IndexedDB access is asynchronous, the app may render before hydration completes. During this window, the query cache is empty. Use a loading state or skeleton UI to bridge this gap gracefully."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Handling async hydration with a loading state",
+        "code": "import { useState, useEffect } from 'react';\nimport { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';\n\nfunction App() {\n  const [isHydrated, setIsHydrated] = useState(false);\n\n  useEffect(() => {\n    persister.restore().then(() => setIsHydrated(true));\n  }, []);\n\n  if (!isHydrated) {\n    return <div className=\"loading-screen\">Loading your data...</div>;\n  }\n\n  return (\n    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>\n      <YourApp />\n    </PersistQueryClientProvider>\n  );\n}",
+        "language": "tsx",
+        "content": "Show a loading state while the IndexedDB cache is being hydrated."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "info",
-        "text": "IndexedDB persistence is asynchronous, which means the app may render before hydration completes. Show a loading state or stale data during this period.",
-        "title": "Async Hydration"
+        "title": "Async Hydration Note",
+        "text": "The PersistQueryClientProvider handles hydration internally. The loading state example above is illustrative â€” in practice, you can listen to the persister's restore promise or use the onRestore callback."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Migrate from localStorage to IndexedDB",
+        "description": "Your app currently uses localStorage persistence. Migrate it to IndexedDB to support larger datasets. Ensure the app handles async hydration gracefully.",
+        "steps": [
+          "Install @tanstack/query-async-storage-persister and idb.",
+          "Replace createSyncStoragePersister with createAsyncStoragePersister.",
+          "Configure the IndexedDB database name and object store.",
+          "Add a loading state that shows while hydration is in progress.",
+          "Test with a large dataset (e.g., 1000+ cached items) and verify it persists correctly."
+        ],
+        "expectedOutcome": "The app persists and hydrates a large cache using IndexedDB, with no data loss and a smooth loading state."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "IndexedDB Persistence FAQ",
+        "items": [
+          {
+            "question": "Does IndexedDB work in all browsers?",
+            "answer": "IndexedDB is supported in all modern browsers. For older browsers, consider a fallback to localStorage or include an IndexedDB polyfill."
+          },
+          {
+            "question": "Will async hydration cause a visible flash?",
+            "answer": "It can, if not handled. Use a loading state or skeleton UI to cover the hydration period. Many apps show cached data immediately and accept that the first paint may use the previous session's data."
+          },
+          {
+            "question": "How do I inspect the IndexedDB cache?",
+            "answer": "Open Chrome DevTools â†’ Application â†’ Storage â†’ IndexedDB. You will see your database name and can browse the stored cache entries directly."
+          }
+        ]
       }
     },
     {
@@ -64,9 +169,9 @@
       "data": {
         "title": "IndexedDB Persistence Key Points",
         "points": [
-          "IndexedDB handles large datasets better than localStorage.",
-          "Async persistence requires hydration handling.",
-          "Use for apps with significant cached data.",
+          "IndexedDB handles large datasets far beyond localStorage limits.",
+          "Async persistence requires handling the hydration loading window.",
+          "Use idb-keyval for a simple Promise-based interface.",
           "Consider fallback to localStorage for older browsers."
         ],
         "takeaway": "IndexedDB persistence enables rich offline experiences for data-intensive applications."

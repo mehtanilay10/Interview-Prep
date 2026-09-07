@@ -2,8 +2,9 @@
   "id": "lesson-rq-013",
   "slug": "query-cancellation",
   "moduleSlug": "advanced-features",
+  "courseSlug": "react-query",
   "title": "Query Cancellation",
-  "description": "Learn how to cancel queries when they're no longer needed.",
+  "description": "Learn how AbortController and React Query's signal propagation cancel in-flight requests.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 18,
@@ -11,54 +12,230 @@
     "react-query",
     "cancellation",
     "abort",
-    "cleanup"
+    "cleanup",
+    "signal"
   ],
+  "prerequisites": ["query-hooks", "suspense"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Cancel Queries?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "React Query supports **query cancellation** using AbortController. This is useful for canceling requests when components unmount or when a new request supersedes the old one."
+        "text": "Users interact with apps quickly. They might type a search term, navigate away, type a new term â€” all before the first request finishes. Left uncancelled, those orphaned requests still consume server resources and may race to overwrite fresh data with stale results. **Query cancellation** ensures only the request that the user actually cares about completes."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "AbortController",
+            "definition": "A browser API that provides an AbortSignal to cancel asynchronous operations like fetch requests."
+          },
+          {
+            "term": "signal",
+            "definition": "The abort signal passed to fetch or Axios. When aborted, the underlying HTTP request is terminated."
+          },
+          {
+            "term": "race condition",
+            "definition": "A bug where an older, slower request finishes after a newer one, overwriting correct data with stale data."
+          },
+          {
+            "term": "cleanup",
+            "definition": "Releasing resources (network requests, timers, subscriptions) when a component unmounts or a query is superseded."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Cancellation"
+        "text": "How React Query Cancels Automatically"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query v5 passes an `AbortSignal` as the second argument to `queryFn`. The signal is automatically aborted when the component unmounts, the query key changes, or the query is garbage collected. All you need to do is pass the signal to your fetch call â€” React Query handles the rest."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-cancellation-flow-013",
+        "caption": "Flow showing the automatic cancellation triggers and how the signal propagates to the fetch call.",
+        "definition": "flowchart TD\n    A[Component mounts / query key changes] --> B[queryFn called with signal]\n    B --> C[fetch request in progress]\n    C --> D{Trigger fires?}\n    D -->|Component unmounts| E[signal.abort() called]\n    D -->|Query key changes| E\n    D -->|GC collects query| E\n    E --> F[fetch throws AbortError]\n    F --> G[React Query handles silently â€” no onError fired]\n    G --> H[New request starts]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Cancellation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `queryFn` receives two arguments in v5: the query context object and the `AbortSignal`. Destructure `signal` from the context and pass it directly to `fetch`. This single change gives you automatic cancellation with no additional configuration."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "AbortController",
-        "content": "Canceling queries with AbortController",
-        "language": "jsx",
-        "code": "const { data } = useQuery({\n  queryKey: ['user', userId],\n  queryFn: async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId}`, {\n      signal // Pass signal to fetch\n    });\n    return response.json();\n  }\n});\n\n// React Query automatically cancels when:\n// - Component unmounts\n// - Query key changes\n// - Query is garbage collected"
+        "title": "Query Cancellation with fetch",
+        "content": "Passing the AbortSignal from the query context to the native fetch API.",
+        "language": "tsx",
+        "code": "import { useQuery } from '@tanstack/react-query';\n\ninterface SearchResult {\n  id: string;\n  title: string;\n}\n\nasync function searchRepos(query: string, signal: AbortSignal): Promise<SearchResult[]> {\n  const res = await fetch(\n    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}`,\n    { signal } // <-- pass the AbortSignal here\n  );\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\nfunction SearchInput() {\n  const [term, setTerm] = useState('');\n\n  const { data, isFetching } = useQuery({\n    queryKey: ['search', term],\n    // React Query passes the AbortSignal as the second argument\n    queryFn: ({ signal }) => searchRepos(term, signal),\n    // Only run when term is non-empty\n    enabled: term.length > 0,\n    // Keep results briefly to avoid refetching on same key\n    staleTime: 30_000,\n  });\n\n  return (\n    <div>\n      <input\n        value={term}\n        onChange={(e) => setTerm(e.target.value)}\n        placeholder=\"Search GitHub reposâ€¦\"\n      />\n      {isFetching && <span className=\"fetching-indicator\">Searchingâ€¦</span>}\n      <ul>\n        {data?.items?.map((item) => (\n          <li key={item.id}><a href={item.html_url}>{item.full_name}</a></li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Automatic Cancellation",
-        "text": "React Query automatically cancels queries when they're no longer needed. Just pass the signal to your fetch call."
+        "title": "No AbortError in onError",
+        "text": "When React Query cancels a request automatically, it does not call onError. The AbortError is handled silently, so your error handlers do not need to filter it out."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cancellation with Axios"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you use Axios, pass the signal to the `AxiosRequestConfig` as `signal`. Axios v0.27+ supports AbortSignal natively, so no AbortController wrapping is needed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Axios with Cancellation",
+        "content": "Passing the React Query signal to an Axios request configuration.",
+        "language": "tsx",
+        "code": "import axios from 'axios';\nimport { useQuery } from '@tanstack/react-query';\n\nfunction useGitHubUser(username: string) {\n  return useQuery({\n    queryKey: ['github-user', username],\n    queryFn: async ({ signal }) => {\n      const { data } = await axios.get('https://api.github.com/users/' + username, {\n        signal, // Axios handles AbortSignal natively\n      });\n      return data;\n    },\n    enabled: !!username,\n  });\n}"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Race Conditions Without Cancellation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without cancellation, a slower earlier request can complete after a newer one. The newer data is then immediately overwritten by the stale response from the older request. This is most visible in search inputs: typing 'react' waits for the response, then typing 'react query' fires a second request. If the first request returns after the second, the user briefly sees results for 'react' instead of 'react query'."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Symptoms of a Race Condition",
+        "items": [
+          "Typing in a search box shows results for an earlier, shorter query",
+          "Selecting an item in a list briefly shows data for a previously selected item",
+          "Pagination: navigating to page 3 briefly shows page 2 data"
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Query Cancellation FAQ",
+        "items": [
+          {
+            "question": "Does React Query create a new AbortController for every request?",
+            "answer": "Yes. React Query creates and manages the AbortController lifecycle internally. You do not need to create or manage one yourself."
+          },
+          {
+            "question": "Will onError fire when a request is cancelled?",
+            "answer": "No. React Query treats AbortError as a normal cancellation event and handles it silently. onError is only called for genuine errors."
+          },
+          {
+            "question": "What if my API library does not support AbortSignal?",
+            "answer": "Use the native fetch API, or wrap your library call with an AbortController manually. Modern Axios and ky both support AbortSignal."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Debounced Search",
+        "description": "Create a search input that cancels in-flight requests and avoids race conditions.",
+        "steps": [
+          "Create a useQuery that fetches GitHub repos, receiving signal as the second argument.",
+          "Add a useState for the search term and wire it to an input.",
+          "Set enabled: term.length > 2 so the query only runs with at least 3 characters.",
+          "Test by typing quickly: 're', 'rea', 'react'. Confirm that only the final request completes.",
+          "Verify that no stale results appear by intentionally adding a setTimeout delay inside the queryFn.",
+          "Add isFetching display to show the loading state between requests."
+        ],
+        "expectedOutcome": "A search input where only the most recent request completes. Old requests are cancelled and never overwrite the UI with stale data."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use AbortController for cancellation",
-          "Pass signal to fetch",
-          "Automatic cancellation on unmount",
-          "Prevents stale data updates"
+          "React Query automatically cancels requests on unmount, key change, or garbage collection",
+          "Pass signal from the queryFn context to fetch to enable automatic cancellation",
+          "AbortError is handled silently â€” onError is not called for cancellations",
+          "Cancellation prevents race conditions in search, pagination, and filtering UIs",
+          "Axios and other modern libraries support AbortSignal natively"
         ],
-        "takeaway": "Cancellation prevents unnecessary network requests."
+        "takeaway": "Cancellation is automatic once you pass the signal. No extra AbortController management needed â€” just wire signal to your fetch call and let React Query handle the rest."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

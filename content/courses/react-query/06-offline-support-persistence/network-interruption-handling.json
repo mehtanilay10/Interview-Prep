@@ -26,35 +26,63 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Mobile users experience network drops, flaky connections, and captive portals. React Query provides built-in retry logic, but production apps need more nuanced handling: exponential backoff, offline queuing, and graceful UI states."
+        "text": "Mobile users regularly experience network drops, flaky connections, captive portals, and spotty coverage. React Query provides built-in retry logic out of the box, but production applications need more nuanced handling: exponential backoff to reduce server load, offline detection to adjust behavior, and graceful UI states that keep users informed without alarm."
       }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Design for Failure",
+        "text": "Assume the network will fail at some point. Good offline handling makes your app feel reliable even on poor connections. Show cached data, queue mutations, and inform the user â€” never leave them staring at a broken error screen."
+      }
+    },
+    {
+      "type": "divider"
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Retry and Backoff"
+        "text": "Retry and Exponential Backoff"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "retry: Number of retry attempts. Default: 3.",
-          "retryDelay: Delay between retries. Can be a function for exponential backoff.",
-          "retryOnMount: Retry failed queries when component mounts."
-        ],
-        "title": "Retry Options"
+        "text": "React Query retries failed queries automatically. The default is 3 retries with exponential backoff. You can customize this with a `retry` function that decides whether to retry based on the error, and a `retryDelay` function that controls the wait between attempts."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Option", "Type", "Default", "Purpose"],
+        "rows": [
+          ["retry", "number | function", "3", "Number of retry attempts"],
+          ["retryDelay", "number | function", "Exponential (1s, 2s, 4s)", "Delay in ms between retries"],
+          ["retryOnMount", "boolean", "true", "Retry failed queries on component mount"]
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Exponential backoff retry",
-        "code": "const { data, error } = useQuery({\n  queryKey: ['todos'],\n  queryFn: fetchTodos,\n  retry: (failureCount, error) => {\n    // Don't retry on 404\n    if (error.response?.status === 404) return false;\n    // Exponential backoff: 1s, 2s, 4s\n    return failureCount < 3;\n  },\n  retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),\n});",
+        "title": "Custom retry logic with exponential backoff",
+        "code": "import { useQuery } from '@tanstack/react-query';\n\nconst { data, error } = useQuery({\n  queryKey: ['todos'],\n  queryFn: fetchTodos,\n\n  retry: (failureCount, error) => {\n    // Don't retry on 404 â€” resource truly doesn't exist\n    if (error.response?.status === 404) return false;\n\n    // Don't retry on 401 â€” auth token is invalid\n    if (error.response?.status === 401) return false;\n\n    // Retry up to 3 times for transient errors\n    return failureCount < 3;\n  },\n\n  retryDelay: (attempt) => {\n    // Exponential backoff: 1s, 2s, 4s, capped at 30s\n    return Math.min(1000 * 2 ** attempt, 30000);\n  },\n});",
         "language": "tsx",
-        "content": "Custom retry logic with backoff."
+        "content": "Custom retry function that skips 404 and 401 errors but retries transient failures with backoff."
       }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rq-retry-flow",
+        "definition": "flowchart TD\n    A[Query Fails] --> B{Retry Attempt <= Max?}\n    B -->|No| C[Show Error to User]\n    B -->|Yes| D{Is Error Transient?}\n    D -->|No (4xx auth/not-found)| E[Stop Retrying]\n    D -->|Yes (5xx/network)| F[Wait: Exponential Backoff]\n    F --> G[Retry Query]\n    G --> H{Success?}\n    H -->|Yes| I[Update Cache with Fresh Data]\n    H -->|No| B",
+        "caption": "Retry decision flow: when to retry, when to stop, and how backoff works."
+      }
+    },
+    {
+      "type": "divider"
     },
     {
       "type": "heading",
@@ -66,15 +94,87 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Use the browser `navigator.onLine` API and React Query context to adjust behavior when offline. You can disable refetching, show cached data, or queue mutations for later."
+        "text": "The browser provides `navigator.onLine` to detect connectivity status, but it is not always reliable. Pair it with React Query's `networkMode` option and event listeners for `online` and `offline` events to build a robust offline detection system."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Offline detection hook",
+        "code": "import { useState, useEffect } from 'react';\n\nfunction useOnlineStatus() {\n  const [isOnline, setIsOnline] = useState(navigator.onLine);\n\n  useEffect(() => {\n    const handleOnline = () => setIsOnline(true);\n    const handleOffline = () => setIsOnline(false);\n\n    window.addEventListener('online', handleOnline);\n    window.addEventListener('offline', handleOffline);\n\n    return () => {\n      window.removeEventListener('online', handleOnline);\n      window.removeEventListener('offline', handleOffline);\n    };\n  }, []);\n\n  return isOnline;\n}\n\nfunction StatusBanner() {\n  const isOnline = useOnlineStatus();\n\n  if (isOnline) return null;\n\n  return (\n    <div className=\"offline-banner\">\n      You are currently offline. Showing cached data.\n    </div>\n  );\n}",
+        "language": "tsx",
+        "content": "A simple custom hook that tracks online/offline status and shows a banner when offline."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "text": "Show an offline banner when `navigator.onLine` is false. Allow users to continue reading cached data while preventing writes that would fail.",
-        "title": "User Communication"
+        "title": "Graceful Degradation",
+        "text": "When offline, show cached data with a clear indication that it may be outdated. Allow users to read and interact with cached content. Prevent mutations that will fail, or queue them for later."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "networkMode for Offline Queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query v5 introduced `networkMode` to control query behavior when offline. Set it to `'offlineFirst'` to use cached data when offline and skip the network request entirely. Set it to `'always'` to attempt refetching regardless of connection status."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using networkMode for offline-first queries",
+        "code": "const { data } = useQuery({\n  queryKey: ['todos'],\n  queryFn: fetchTodos,\n  networkMode: 'offlineFirst', // use cache when offline\n  staleTime: 1000 * 60 * 60, // keep data fresh for 1 hour\n});\n\n// For mutations â€” always attempt when online\nconst mutation = useMutation({\n  mutationFn: addTodo,\n  networkMode: 'always',\n});",
+        "language": "tsx",
+        "content": "networkMode: 'offlineFirst' prevents failed network requests when offline."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build an Offline-Aware Todo App",
+        "description": "Add network interruption handling to a todo app. Show an offline banner, prevent mutations when offline, and retry with backoff.",
+        "steps": [
+          "Create a useOnlineStatus hook using navigator.onLine and event listeners.",
+          "Show an offline banner when isOnline is false.",
+          "Disable the add-todo button when offline, with a tooltip explaining why.",
+          "Configure retry with exponential backoff for the todos query.",
+          "Add a retry count display next to the error message."
+        ],
+        "expectedOutcome": "Users see an offline banner when disconnected, cannot submit when offline, and queries retry with visible backoff when the network is unstable."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Network Interruption FAQ",
+        "items": [
+          {
+            "question": "Is navigator.onLine reliable?",
+            "answer": "It reports the browser's network status, but it can be inaccurate. A user might be on a network that blocks specific domains. Use it as a signal, not a guarantee. Always handle query errors gracefully regardless of the reported status."
+          },
+          {
+            "question": "What is the difference between networkMode and retry?",
+            "answer": "networkMode controls whether React Query attempts a network request at all (e.g., skipping it when offline). retry controls what happens after a request fails â€” whether to try again and how many times."
+          },
+          {
+            "question": "Should I show retry counts to users?",
+            "answer": "For critical data, showing a subtle retry indicator helps users understand that the app is working. For non-critical data, silent retries are usually better UX."
+          }
+        ]
       }
     },
     {
@@ -82,10 +182,10 @@
       "data": {
         "title": "Network Interruption Key Points",
         "points": [
-          "Retry logic handles transient failures.",
-          "Exponential backoff reduces server load.",
-          "Detect offline state and adjust UX accordingly.",
-          "Queue mutations when offline for later sync."
+          "Retry logic with exponential backoff handles transient failures gracefully.",
+          "navigator.onLine combined with event listeners provides offline detection.",
+          "networkMode: 'offlineFirst' prevents unnecessary failed requests.",
+          "Show cached data and communicate status clearly to users."
         ],
         "takeaway": "Robust network handling makes your app feel reliable even on poor connections."
       }

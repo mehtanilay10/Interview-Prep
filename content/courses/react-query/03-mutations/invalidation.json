@@ -2,8 +2,9 @@
   "id": "lesson-rq-011",
   "slug": "invalidation",
   "moduleSlug": "mutations",
+  "courseSlug": "react-query",
   "title": "Query Invalidation",
-  "description": "Learn how to invalidate and refetch queries after mutations.",
+  "description": "Learn how to invalidate and refetch queries after mutations to keep the cache fresh.",
   "order": 3,
   "difficulty": "intermediate",
   "estimatedMinutes": 18,
@@ -11,54 +12,292 @@
     "react-query",
     "invalidation",
     "refetch",
-    "cache"
+    "cache",
+    "stale"
   ],
+  "prerequisites": ["use-mutation"],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is Query Invalidation?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "**Query invalidation** marks cached data as stale and triggers a refetch. This ensures your UI shows fresh data after mutations."
+        "text": "React Query keeps fetched data in a client-side cache. After a mutation changes server data, the cached version is now **stale** â€” it no longer reflects reality. **Query invalidation** marks affected cached queries as stale and triggers a refetch. This is the primary mechanism for keeping your UI in sync with the server."
       }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "invalidateQueries",
+            "definition": "A QueryClient method that marks matching cached queries as stale and schedules them to be refetched."
+          },
+          {
+            "term": "stale",
+            "definition": "The state of cached data that may no longer be accurate and should be refetched before being shown."
+          },
+          {
+            "term": "queryKey",
+            "definition": "The unique array-based identifier for a query in the cache, used to target specific queries for invalidation."
+          },
+          {
+            "term": "refetch",
+            "definition": "Re-executing the queryFn to replace stale cache data with fresh data from the server."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Invalidation Patterns"
+        "text": "Invalidation Methods"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`invalidateQueries` accepts a flexible `queryKey` argument. You can target an exact query by passing the same key used in `useQuery`, use a prefix to invalidate a whole family of queries, or supply a `predicate` function for fine-grained control."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Method",
+          "Code",
+          "Effect"
+        ],
+        "rows": [
+          [
+            "Exact key",
+            "invalidateQueries({ queryKey: ['users', userId] })",
+            "Only the single user query is marked stale"
+          ],
+          [
+            "Prefix (v5)",
+            "invalidateQueries({ queryKey: ['users'] })",
+            "All queries whose key starts with ['users'] are marked stale"
+          ],
+          [
+            "Predicate",
+            "invalidateQueries({ queryKey: ['users'], predicate: (q) => q.state.status === 'success' })",
+            "Only successful queries matching the predicate are invalidated"
+          ],
+          [
+            "All queries",
+            "invalidateQueries()",
+            "Every cached query is invalidated â€” use carefully in large apps"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common pattern is to invalidate in the `onSuccess` callback of a mutation. For mutations that affect a list (adding a comment to a post), you may need to invalidate both the list query and the individual item query. The order matters â€” invalidate the specific item query first, then the list."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Invalidation",
-        "content": "Invalidating queries after mutation",
-        "language": "jsx",
-        "code": "const mutation = useMutation({\n  mutationFn: addUser,\n  onSuccess: () => {\n    // Invalidate all user queries\n    queryClient.invalidateQueries({ queryKey: ['users'] });\n  }\n});\n\n// Invalidate specific query\nqueryClient.invalidateQueries({ queryKey: ['users', userId] });\n\n// Invalidate with predicate\nqueryClient.invalidateQueries({\n  queryKey: ['users'],\n  predicate: (query) => query.state.data?.length > 10\n});"
+        "title": "Invalidating Multiple Related Queries",
+        "content": "Using onSuccess to invalidate both a list and an individual resource after a mutation.",
+        "language": "tsx",
+        "code": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nasync function addComment(postId: string, body: string) {\n  const res = await fetch(`/api/posts/${postId}/comments`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ body }),\n  });\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n\nfunction CommentForm({ postId }: { postId: string }) {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: (body: string) => addComment(postId, body),\n\n    onSuccess: () => {\n      // Invalidate both the individual post and the comments list\n      queryClient.invalidateQueries({ queryKey: ['post', postId] });\n      queryClient.invalidateQueries({ queryKey: ['comments', postId] });\n    },\n\n    onError: (error) => {\n      console.error('Failed to add comment:', error);\n    },\n  });\n\n  return (\n    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(e.target.body.value); }}>\n      <textarea name=\"body\" disabled={mutation.isPending} />\n      <button type=\"submit\" disabled={mutation.isPending}>\n        {mutation.isPending ? 'Postingâ€¦' : 'Post Comment'}\n      </button>\n    </form>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Automatic Invalidation",
-        "text": "Consider using @tanstack/query-axios-adapter or similar libraries that handle invalidation automatically based on HTTP methods."
+        "title": "Granular Invalidation Keeps UI Smooth",
+        "text": "Invalidate only the queries that actually changed. Invalidating everything triggers a burst of network requests that can slow down the app."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidation Timing with onSettled"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you invalidate only in `onSuccess`, queries that failed to invalidate on error may never be refreshed. Moving invalidation to `onSettled` guarantees it runs regardless of whether the mutation succeeds or fails â€” a safer default for production apps."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "onSettled Invalidation Pattern",
+        "content": "Using onSettled to invalidate whether the mutation succeeds or fails.",
+        "language": "tsx",
+        "code": "const mutation = useMutation({\n  mutationFn: deleteUser,\n  onSuccess: () => {\n    // Show success toast here\n    showToast('User deleted');\n  },\n  onError: (error) => {\n    // Show error toast here\n    showToast('Could not delete user', 'error');\n  },\n  // Invalidation runs regardless of outcome\n  onSettled: () => {\n    queryClient.invalidateQueries({ queryKey: ['users'] });\n  },\n});"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidation vs setQueryData"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Both `invalidateQueries` and `setQueryData` can update the cache after a mutation, but they serve different purposes. `invalidateQueries` is safer because it re-fetches from the server and guarantees data freshness. `setQueryData` is faster because it skips the network request but can diverge from the server if you get the update logic wrong."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "When to Use Each Approach",
+        "cards": [
+          {
+            "title": "invalidateQueries",
+            "description": "Marks queries as stale and refetches from the server.",
+            "pros": [
+              "Guarantees server-authoritative data",
+              "Simple mental model",
+              "Works automatically"
+            ],
+            "cons": [
+              "Triggers extra network request",
+              "Brief loading flash on refetch"
+            ],
+            "tags": ["recommended default"]
+          },
+          {
+            "title": "setQueryData",
+            "description": "Directly patches the cache without a network request.",
+            "pros": [
+              "Zero network overhead",
+              "Instant UI update",
+              "Works offline"
+            ],
+            "cons": [
+              "Easy to get wrong if the patch logic is buggy",
+              "Can diverge from server state",
+              "Must manually keep in sync"
+            ],
+            "tags": ["use sparingly"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Query Invalidation FAQ",
+        "items": [
+          {
+            "question": "Does invalidation happen immediately or in the background?",
+            "answer": "In React Query v5, invalidation marks queries as stale and triggers a background refetch. If the query is currently being displayed, it will update when the refetch resolves."
+          },
+          {
+            "question": "Can I invalidate queries from anywhere in my app?",
+            "answer": "Yes, as long as you have access to the QueryClient instance. Pass it down via context, a hook, or a prop."
+          },
+          {
+            "question": "What if a query is not currently active?",
+            "answer": "It is simply marked as stale in the cache. The next time it is fetched, React Query will refetch it before returning the data."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Invalidate After Delete",
+        "description": "Practice invalidating multiple query keys after a delete mutation.",
+        "steps": [
+          "Create a useQuery that fetches a list of projects from /api/projects.",
+          "Create a DeleteProjectButton that calls DELETE /api/projects/:id using useMutation.",
+          "In onSettled, invalidate ['projects'] to refresh the list.",
+          "In onSuccess, also invalidate ['project', projectId] in case the detail view is open.",
+          "Add a predicate to only invalidate successful queries: predicate: (q) => q.state.status === 'success'.",
+          "Verify by deleting a project and watching both the list and any open detail view update."
+        ],
+        "expectedOutcome": "After deleting a project, the list refreshes automatically. If the detail page is open for the deleted project, it also refetches and shows a not-found state."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-invalidation-flow-011",
+        "caption": "How query invalidation propagates through the cache and triggers refetch.",
+        "definition": "flowchart LR\n    M[Mutation succeeds] --> I[invalidateQueries called]\n    I --> S[Query marked as stale]\n    S --> F{Query currently active?}\n    F -->|Yes| R[Background refetch triggered]\n    F -->|No| W[Wait for next subscriber]\n    W --> R\n    R --> U[Cache updated with fresh data]\n    U --> C[UI re-renders automatically]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "invalidateQueries marks data as stale",
-          "Triggers automatic refetch",
-          "Can invalidate specific or all queries",
-          "Use in onSuccess callback"
+          "invalidateQueries marks matching cached queries as stale and schedules refetch",
+          "Call invalidation in onSuccess or onSettled after a mutation",
+          "Use queryKey prefixes to invalidate a family of queries at once",
+          "Use predicates for fine-grained control over which queries to refresh",
+          "Prefer invalidateQueries over setQueryData for most cases â€” safety over speed"
         ],
-        "takeaway": "Invalidation keeps data fresh after mutations."
+        "takeaway": "Query invalidation is the primary mechanism for keeping the cache consistent after data changes. Master it and your cache will rarely lie to your users."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "courseSlug": "react-query"
+  "furtherReading": []
 }

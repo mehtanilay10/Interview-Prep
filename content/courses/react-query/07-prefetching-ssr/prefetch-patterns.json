@@ -9,6 +9,7 @@
   "difficulty": "advanced",
   "estimatedMinutes": 25,
   "tags": ["prefetching", "advanced-patterns", "visibility-api", "router", "lifecycle"],
+  "prerequisites": ["query-options"],
   "blocks": [
     {
       "type": "paragraph",
@@ -33,10 +34,22 @@
       "type": "example",
       "data": {
         "title": "Prefetch on Mount",
-        "content": "Prefetching when a component mounts",
+        "content": "Prefetching dashboard data when the component mounts",
         "language": "tsx",
         "code": "'use client';\n\nimport { useEffect } from 'react';\nimport { useQueryClient } from '@tanstack/react-query';\n\nfunction Dashboard() {\n  const queryClient = useQueryClient();\n\n  useEffect(() => {\n    queryClient.prefetchQuery({\n      queryKey: ['dashboard'],\n      queryFn: fetchDashboard,\n      staleTime: 1000 * 60 * 2\n    });\n  }, [queryClient]);\n\n  return <DashboardView />;\n}"
       }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Server-First Mount Prefetching",
+        "text": "In Next.js App Router, prefetch on mount is better done in the Server Component using prefetchQuery. The client-side mount prefetch is a fallback for Client Components that need the same treatment."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -55,7 +68,7 @@
       "type": "example",
       "data": {
         "title": "Visibility-Based Prefetch",
-        "content": "Prefetching when the tab becomes visible",
+        "content": "Prefetching feed data when the tab becomes visible",
         "language": "tsx",
         "code": "'use client';\n\nimport { useEffect } from 'react';\nimport { useQueryClient } from '@tanstack/react-query';\n\nfunction App() {\n  const queryClient = useQueryClient();\n\n  useEffect(() => {\n    const handleVisibilityChange = () => {\n      if (document.visibilityState === 'visible') {\n        queryClient.prefetchQuery({\n          queryKey: ['feed'],\n          queryFn: fetchFeed,\n          staleTime: 1000 * 60\n        });\n      }\n    };\n\n    document.addEventListener('visibilitychange', handleVisibilityChange);\n    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);\n  }, [queryClient]);\n\n  return <YourApp />;\n}"
       }
@@ -77,18 +90,14 @@
       "type": "example",
       "data": {
         "title": "Router Prefetch Pattern",
-        "content": "Prefetching on route hover with React Router or Next.js",
+        "content": "Prefetching on route hover with Next.js Link",
         "language": "tsx",
         "code": "'use client';\n\nimport { useQueryClient } from '@tanstack/react-query';\nimport Link from 'next/link';\n\nfunction ProductCard({ product }: { product: Product }) {\n  const queryClient = useQueryClient();\n\n  return (\n    <Link\n      href={`/products/${product.id}`}\n      onMouseEnter={() => {\n        queryClient.prefetchQuery({\n          queryKey: ['product', product.id],\n          queryFn: () => fetchProduct(product.id)\n        });\n      }}\n    >\n      {product.name}\n    </Link>\n  );\n}"
       }
     },
     {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Prefetch Budget",
-        "text": "Limit concurrent prefetches to 2-3 at a time. Use a simple queue or throttle to prevent saturating the user's bandwidth and avoid competing with active page requests."
-      }
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "heading",
@@ -107,7 +116,7 @@
       "type": "example",
       "data": {
         "title": "Coordinated Refetch Strategy",
-        "content": "Balancing prefetch with background refetching",
+        "content": "Configuring QueryClient defaults for prefetch and refetch coordination",
         "language": "tsx",
         "code": "const queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      // Data stays fresh for 2 minutes\n      staleTime: 1000 * 60 * 2,\n      // Cache kept for 30 minutes after unused\n      gcTime: 1000 * 60 * 30,\n      // Refetch when window refocuses\n      refetchOnWindowFocus: true,\n      // Refetch when network reconnects\n      refetchOnReconnect: true,\n      // Do not refetch on mount if data is fresh\n      refetchOnMount: false\n    }\n  }\n});"
       }
@@ -115,7 +124,7 @@
     {
       "type": "mermaid",
       "data": {
-        "id": "prefetch-lifecycle",
+        "id": "prefetch-lifecycle-027",
         "caption": "Prefetch and refetch lifecycle coordination",
         "definition": "flowchart LR\n    A[User Hovers] --> B[prefetchQuery]\n    B --> C[Data Cached]\n    C --> D[User Clicks]\n    D --> E[useQuery Returns Cached Data]\n    E --> F{Is Stale?}\n    F -->|No| G[Render from Cache]\n    F -->|Yes| H[Background Refetch]\n    H --> I[Update Cache]\n    I --> J[Re-render with Fresh Data]"
       }
@@ -145,9 +154,43 @@
       "type": "example",
       "data": {
         "title": "Search Prefetch",
-        "content": "Prefetching search results on input change",
+        "content": "Prefetching search results as the user types",
         "language": "tsx",
-        "code": "function SearchBar() {\n  const queryClient = useQueryClient();\n  const [query, setQuery] = useState('');\n\n  useEffect(() => {\n    if (query.length > 2) {\n      queryClient.prefetchQuery({\n        queryKey: ['search', query],\n        queryFn: () => searchProducts(query),\n        staleTime: 1000 * 60 * 5\n      });\n    }\n  }, [query, queryClient]);\n\n  return (\n    <input\n      value={query}\n      onChange={(e) => setQuery(e.target.value)}\n      placeholder=\"Search products...\"\n    />\n  );\n}"
+        "code": "'use client';\n\nimport { useState, useEffect } from 'react';\nimport { useQueryClient } from '@tanstack/react-query';\n\nfunction SearchBar() {\n  const queryClient = useQueryClient();\n  const [query, setQuery] = useState('');\n\n  useEffect(() => {\n    if (query.length > 2) {\n      const timer = setTimeout(() => {\n        queryClient.prefetchQuery({\n          queryKey: ['search', query],\n          queryFn: () => searchProducts(query),\n          staleTime: 1000 * 60 * 5\n        });\n      }, 150);\n\n      return () => clearTimeout(timer);\n    }\n  }, [query, queryClient]);\n\n  return (\n    <input\n      value={query}\n      onChange={(e) => setQuery(e.target.value)}\n      placeholder=\"Search products...\"\n    />\n  );\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Page Visibility API",
+            "definition": "Browser API that exposes whether the current tab is visible or hidden, enabling context-aware data loading."
+          },
+          {
+            "term": "Prefetch Budget",
+            "definition": "A limit on concurrent prefetch requests to prevent network saturation. Typically 2-3 simultaneous fetches."
+          },
+          {
+            "term": "staleTime",
+            "definition": "Duration after which data is considered stale and eligible for background refetching."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Prefetch-Aware Navigation System",
+        "description": "Implement a navigation sidebar where hovering over any link prefetches that page's data. Include a prefetch budget of 2 concurrent requests.",
+        "steps": [
+          "Create a NavLink component that accepts a queryKey and queryFn",
+          "Implement a simple prefetch queue that limits concurrent prefetches to 2",
+          "Use useQueryClient.prefetchQuery on mouseEnter",
+          "Add a visual indicator showing which links have been prefetched",
+          "Verify in DevTools that only 2 requests are in flight at any time"
+        ],
+        "expectedOutcome": "Hovering nav links prefetches data with a concurrency limit. Navigation feels instant."
       }
     },
     {
@@ -167,6 +210,5 @@
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "prerequisites": ["query-options"]
+  "furtherReading": []
 }
