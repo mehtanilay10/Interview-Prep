@@ -3,62 +3,244 @@
   "slug": "async-await",
   "moduleSlug": "advanced-features",
   "title": "Async/Await",
-  "description": "Learn asynchronous programming in C#.",
+  "description": "Master asynchronous programming in C# with async/await, Task, and Task<T> for non-blocking, responsive applications.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 22,
+  "estimatedMinutes": 28,
   "tags": [
     "csharp",
     "async",
     "await",
     "task",
-    "asynchronous"
+    "task-parallel-library",
+    "asynchronous",
+    "non-blocking"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Async/await** enables asynchronous programming, allowing your code to perform non-blocking operations."
+        "text": "Asynchronous programming allows your application to stay responsive while waiting for long-running operations to complete — such as network calls, file I/O, or database queries. Instead of blocking the calling thread, async/await frees it up to do other work and resumes execution when the operation finishes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Async/Await"
+        "text": "Synchronous vs. Asynchronous"
       }
     },
     {
-      "type": "example",
+      "type": "paragraph",
       "data": {
-        "title": "async/await",
-        "content": "Asynchronous method execution",
-        "language": "csharp",
-        "code": "public async Task<string> FetchDataAsync()\n{\n    using var client = new HttpClient();\n    string result = await client.GetStringAsync(\"https://api.example.com/data\");\n    return result;\n}\n\n// Usage\nstring data = await FetchDataAsync();"
+        "text": "In a synchronous model, each line of code waits for the previous one to fully finish before running. If a network call takes three seconds, the entire thread — and in UI apps, the whole interface — is frozen. Asynchronous code releases the thread during the wait and resumes when data is ready, keeping the application fluid and responsive."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-sync-vs-async",
+        "caption": "Comparing synchronous blocking versus asynchronous non-blocking execution",
+        "definition": "sequenceDiagram\n    participant U as User / Caller\n    participant T as Thread\n    participant N as Network/IO\n\n    Note over U,N: Synchronous (blocking)\n    U->>T: Request data\n    T->>N: Send request\n    N-->>T: [3s wait — thread blocked]\n    T-->>U: Return data\n\n    Note over U,N: Asynchronous (non-blocking)\n    U->>T: Request data async\n    T->>N: Send request\n    N-->>T: [thread freed — can serve other work]\n    N-->>T: Data ready — resume here\n    T-->>U: Return data"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Task and Task<T>"
+        "text": "Basic async/await"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An async method returns Task (for operations with no return value) or Task<TResult> (for operations that return a value). The await keyword pauses execution of that method without blocking the thread — the compiler transforms the rest of the method into a continuation that resumes automatically when the awaited task completes."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Task",
-        "content": "Working with Task",
+        "title": "Async Method — Fetching Data from an API",
+        "content": "Demonstrates the async/await pattern with HttpClient",
         "language": "csharp",
-        "code": "// Task represents async operation\npublic async Task DoWorkAsync()\n{\n    await Task.Delay(1000); // Wait 1 second\n    Console.WriteLine(\"Done\");\n}\n\n// Task<T> returns a value\npublic async Task<int> CalculateAsync()\n{\n    await Task.Delay(100);\n    return 42;\n}\n\n// Run multiple tasks\nvar task1 = FetchData1Async();\nvar task2 = FetchData2Async();\nawait Task.WhenAll(task1, task2);"
+        "code": "using System;\nusing System.Net.Http;\nusing System.Threading.Tasks;\n\npublic class ApiClient\n{\n    // The async keyword enables the await operator inside this method\n    // Task<string> means: this is an async operation that will return a string\n    public async Task<string> FetchWeatherAsync(string city)\n    {\n        // HttpClient is intended to be reused; 'using' here is for demonstration\n        using var client = new HttpClient();\n\n        // await pauses THIS method only — the calling thread is NOT blocked\n        // Execution returns to the caller until the HTTP response arrives\n        string url = $\"https://api.example.com/weather?city={Uri.EscapeDataString(city)}\";\n        string json = await client.GetStringAsync(url);\n\n        // When the response arrives, execution resumes here on a thread-pool thread\n        return json; // Compiler wraps this in a Task<string> automatically\n    }\n}\n\npublic class AsyncDemo\n{\n    public static async Task Main()\n    {\n        ApiClient client = new ApiClient();\n\n        // Call the async method — we must await it\n        string weatherData = await client.FetchWeatherAsync(\"London\");\n\n        Console.WriteLine($\"Weather data received ({weatherData.Length} chars)\");\n        Console.WriteLine(weatherData);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Task vs. Task<TResult>"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Task represents an ongoing or completed operation that does not produce a return value. Task<TResult> represents an operation that will eventually produce a value of type TResult. Both have useful properties like IsCompleted, IsCanceled, and IsFaulted, and can be awaited, chained with ContinueWith, or run concurrently with Task.WhenAll."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Task and Task<TResult> in Practice",
+        "content": "Shows fire-and-forget, value-returning, and concurrent task execution",
+        "language": "csharp",
+        "code": "using System;\nusing System.Diagnostics;\nusing System.Threading.Tasks;\n\npublic class TaskDemo\n{\n    // Task — no return value\n    public async Task LogAsync(string message)\n    {\n        await Task.Delay(500); // Simulates async I/O\n        Console.WriteLine($\"[Log] {message}\");\n    }\n\n    // Task<TResult> — returns a value\n    public async Task<int> ComputeSumAsync(int a, int b)\n    {\n        await Task.Delay(200); // Simulate work\n        return a + b;\n    }\n\n    public static async Task Main()\n    {\n        TaskDemo demo = new TaskDemo();\n\n        // Run three tasks concurrently, not sequentially\nn        Task task1 = demo.LogAsync(\"Starting...\");\n        Task<int> task2 = demo.ComputeSumAsync(10, 20);\n        Task<int> task3 = demo.ComputeSumAsync(5, 15);\n\n        // Wait for all to complete — throws if any faulted\n        await Task.WhenAll(task1, task2, task3);\n\n        // Retrieve results\n        int sum2 = task2.Result; // 30\n        int sum3 = task3.Result; // 20\n        Console.WriteLine($\"Results: {sum2}, {sum3}\");\n\n        // WhenAny — get the first completed task\n        Task<int> fastest = await Task.WhenAny(task2, task3);\n        Console.WriteLine($\"First to finish returned: {fastest.Result}\");\n\n        // Measure elapsed wall-clock time\n        Stopwatch sw = Stopwatch.StartNew();\nn        await Task.WhenAll(\n            Task.Delay(1000),\n            Task.Delay(1000),\n            Task.Delay(1000)\n        );\n        sw.Stop();\n        Console.WriteLine($\"3 concurrent delays took {sw.ElapsedMilliseconds}ms (not 3000!)\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Returning from an Async Method"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An async method can return in three ways: by reaching a return statement (the compiler wraps the value in a completed Task<TResult>), by reaching the end of the method (equivalent to returning default), or by throwing an exception that is captured inside the returned Task. Exceptions thrown inside an async method are not thrown on the calling thread — they are stored in the Task and re-thrown when the caller awaits or accesses the Result property."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "How Exceptions Propagate in async Methods",
+        "content": "Demonstrates exception capture and re-throw on await",
+        "language": "csharp",
+        "code": "using System;\nusing System.Threading.Tasks;\n\npublic class ExceptionPropagation\n{\n    public static async Task<string> RiskyOperationAsync(bool shouldFail)\n    {\n        await Task.Delay(100);\n\n        if (shouldFail)\n        {\n            // Exception is captured inside the returned Task, not thrown now\n            throw new InvalidOperationException(\"Something went wrong!\");\n        }\n\n        return \"Success!\";\n    }\n\n    public static async Task Main()\n    {\n        try\n        {\n            // Exception is re-thrown HERE, when we await\n            string result = await RiskyOperationAsync(true);\n            Console.WriteLine(result);\n        }\n        catch (InvalidOperationException ex)\n        {\n            Console.WriteLine($\"Caught: {ex.Message}\");\n        }\n\n        // Without await, the exception is stored — unobserved Task fault\n        Task<string> unobserved = RiskyOperationAsync(true);\n        // Accessing .Result would also re-throw the exception\n        try\n        {\n            string val = unobserved.Result;\n        }\n        catch (AggregateException ex)\n        {\n            Console.WriteLine($\"Via .Result: {ex.InnerException?.Message}\");\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Task.WhenAll and Task.WhenAny"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Task.WhenAll accepts a collection of tasks and returns a single task that completes when all of them finish. If any task faults, the returned task faults too (with an AggregateException in .NET Framework, or the first exception in .NET 6+). Task.WhenAny completes as soon as the first of the supplied tasks finishes, returning that task."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Parallel API Calls with Task.WhenAll",
+        "content": "Fetching data from multiple endpoints concurrently",
+        "language": "csharp",
+        "code": "using System;\nusing System.Net.Http;\nusing System.Threading.Tasks;\n\npublic class ParallelApiDemo\n{\n    static readonly HttpClient client = new HttpClient();\n\n    static async Task<string> FetchJsonAsync(string url)\n    {\n        return await client.GetStringAsync(url);\n    }\n\n    public static async Task Main()\n    {\n        string[] urls =\n        {\n            \"https://api.example.com/users\",\n            \"https://api.example.com/posts\",\n            \"https://api.example.com/comments\"\n        };\n\n        // Start all requests immediately (they run in parallel)\n        Task<string>[] tasks = new Task<string>[urls.Length];\n        for (int i = 0; i < urls.Length; i++)\n        {\n            tasks[i] = FetchJsonAsync(urls[i]);\n        }\n\n        // Await all at once — total time ≈ slowest single request, not the sum\n        string[] results = await Task.WhenAll(tasks);\n\n        for (int i = 0; i < results.Length; i++)\n        {\n            Console.WriteLine($\"URL {i + 1}: {results[i].Length} chars\");\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ConfigureAwait and Deadlocks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "By default, await captures the current synchronization context and tries to resume on it. In UI apps (WinForms, WPF) this ensures UI updates happen on the main thread. In ASP.NET (pre-Core) and some test environments, capturing the context can cause deadlocks when code blocks the context with .Result or .Wait(). Use ConfigureAwait(false) in library code to skip context capture and avoid deadlocks."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "Avoid async void",
-        "text": "Use async Task instead of async void except for event handlers. async void can't be awaited and errors are hard to catch."
+        "title": "Never Block on Async Code",
+        "text": "Avoid .Result and .Wait() on Tasks in application code. They block the thread, can cause deadlocks, and defeat the purpose of async. Always use await all the way up the call stack."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ValueTask<T> — Avoiding Allocations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ValueTask<T> is a value-type alternative to Task<TResult> designed for hot paths where the result is often already available synchronously (e.g., from an in-memory cache). It avoids heap allocation in the synchronous path but adds complexity — only use it after profiling shows Task<TResult> allocations are a real bottleneck."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Task vs. ValueTask<T>",
+        "cards": [
+          {
+            "title": "Task<TResult>",
+            "description": "Reference type. Always heap-allocated. The standard and recommended choice.",
+            "pros": ["Simple and well-understood", "Thread-safe", "Can be awaited multiple times"],
+            "cons": ["Heap allocation on every call"],
+            "tags": ["standard", "recommended"]
+          },
+          {
+            "title": "ValueTask<TResult>",
+            "description": "Value type. Avoids allocation when the result is available immediately.",
+            "pros": ["No allocation on the synchronous path", "Useful for high-throughput scenarios"],
+            "cons": ["Can only be awaited once", "More complex to use correctly", "Not thread-safe for multiple awaits"],
+            "tags": ["performance", "advanced"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Concurrent File Reader",
+        "description": "Build an async tool that reads multiple text files concurrently and returns the total line count.",
+        "steps": [
+          "Create a method ReadFileLinesAsync(string path) that returns Task<int>.",
+          "Use StreamReader and ReadToEndAsync inside the method — do not use blocking reads.",
+          "Create a list of at least 3 file paths to read.",
+          "Start all ReadFileLinesAsync calls without awaiting them yet.",
+          "Use Task.WhenAll to await all reads simultaneously.",
+          "Sum up the line counts and print the total.",
+          "Measure elapsed time and compare it to reading files sequentially (one after another)."
+        ],
+        "expectedOutcome": "A working async file reader that demonstrates how concurrent I/O dramatically reduces total wait time compared to sequential processing."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Async/Await Checklist",
+        "items": [
+          { "text": "I can mark a method as async and return Task or Task<T>", "hint": "async Task and async Task<T> — never async void except event handlers." },
+          { "text": "I understand what await does to the calling thread", "hint": "It does NOT block — it registers a continuation and returns." },
+          { "text": "I can await multiple tasks concurrently with Task.WhenAll", "hint": "Start tasks, then await Task.WhenAll(tasks)." },
+          { "text": "I know how async exceptions propagate", "hint": "Stored in the Task, re-thrown on await or .Result access." },
+          { "text": "I avoid .Result and .Wait() in application code", "hint": "Use async/await all the way up." },
+          { "text": "I know when to use ConfigureAwait(false)", "hint": "In library code, not UI code — to avoid deadlocks." }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can an async method not use await?",
+            "answer": "Yes — but the compiler will warn you, and the method runs synchronously. The only legitimate exception is an async method that returns a cached or already-completed Task.FromResult(value)."
+          },
+          {
+            "question": "Does async/await create new threads?",
+            "answer": "No — async/await does not create threads. It uses the existing thread pool and returns threads to the pool while waiting for I/O. The continuation may run on a different thread, but no new thread is created for the wait itself."
+          },
+          {
+            "question": "What is the difference between Task.Run and await?",
+            "answer": "Task.Run offloads CPU-bound work to a thread-pool thread — useful for compute-heavy operations. await releases the thread while waiting for I/O (network, disk, database). Mix them: await Task.Run(CpuBoundWork) for CPU-bound async."
+          },
+          {
+            "question": "Should every method in my app be async?",
+            "answer": "No — only methods that perform I/O-bound or CPU-bound work benefit from async. Simple getters, property accessors, and pure calculations should remain synchronous. Async adds complexity and should be used intentionally."
+          }
+        ]
       }
     },
     {
@@ -66,12 +248,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "async/await for non-blocking code",
-          "Task represents async operation",
-          "Task<T> returns a value",
-          "Avoid async void"
+          "async/await enables non-blocking I/O without thread blocking",
+          "async Task for fire-and-forget or void-returning operations",
+          "async Task<T> for operations that produce a value",
+          "await pauses the method, not the thread — the thread returns to the pool",
+          "Task.WhenAll runs multiple tasks concurrently",
+          "ConfigureAwait(false) prevents deadlocks in library code",
+          "Avoid .Result and .Wait() — always use await"
         ],
-        "takeaway": "Async/await is essential for responsive apps."
+        "takeaway": "Async/await is essential for building responsive applications. The pattern is simple, but the mental model — cooperative, non-blocking concurrency — takes practice to internalize."
       }
     }
   ],
