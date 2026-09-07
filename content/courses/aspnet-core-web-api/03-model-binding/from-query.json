@@ -17,31 +17,165 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**[FromQuery]** binds data from the query string. It's commonly used for filtering, sorting, and pagination."
+        "text": "**[FromQuery]** binds action parameters from the query string. It is commonly used for filtering, sorting, and pagination because those values live naturally in the URL without requiring a request body."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Query string parameters are key-value pairs appended to the URL after the ? character. ASP.NET Core parses them, converts the values to the target parameter types, and applies default values when a parameter is absent."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "FromQuery",
+            "definition": "An attribute that tells model binding to source a parameter from the query string."
+          },
+          {
+            "term": "Query String",
+            "definition": "The portion of a URL after the ? sign, containing key-value pairs separated by &."
+          },
+          {
+            "term": "Query Model",
+            "definition": "A dedicated class that groups related query parameters so they can be bound as a single complex type."
+          },
+          {
+            "term": "Default Value",
+            "definition": "A fallback value assigned to a parameter when the client omits it from the query string."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-query-flow",
+        "caption": "How query string values are parsed and bound to action parameters.",
+        "definition": "flowchart LR\n    A[/api/products?term=laptop&page=2&pageSize=20/] --> B{Parse Query String}\n    B -->|term=laptop| C[Extract Values]\n    B -->|page=2| C\n    B -->|pageSize=20| C\n    C --> D{Convert Types}\n    D -->|Valid| E[Bind Parameter]\n    D -->|Invalid| F[400 Bad Request]\n    E --> G[Controller Action]\n    F --> G"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Usage"
+        "text": "Binding to Individual Parameters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For simple filters, you can bind each query value to its own parameter. Use default values to make parameters optional."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "FromQuery",
-        "content": "Binding query parameters",
+        "title": "Individual Query Parameters",
+        "content": "Binding search and pagination values directly from the query string.",
         "language": "csharp",
-        "code": "[HttpGet]\npublic IActionResult Search(\n    [FromQuery] string term,\n    [FromQuery] int page = 1,\n    [FromQuery] int pageSize = 10)\n{\n    // /api/users/search?term=john&page=2&pageSize=20\n    var results = _context.Users\n        .Where(u => u.Name.Contains(term))\n        .Skip((page - 1) * pageSize)\n        .Take(pageSize)\n        .ToList();\n    \n    return Ok(results);\n}\n\n// Bind to a model\n[HttpGet]\npublic IActionResult List([FromQuery] QueryParams parameters)\n{\n    // /api/users?search=john&page=1\n    // parameters.Search = \"john\", parameters.Page = 1\n}"
+        "code": "[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly AppDbContext _context;\n\n    public ProductsController(AppDbContext context)\n    {\n        _context = context;\n    }\n\n    [HttpGet(\"search\")]\n    public IActionResult Search(\n        [FromQuery] string term,\n        [FromQuery] int page = 1,\n        [FromQuery] int pageSize = 10)\n    {\n        // /api/products/search?term=laptop&page=2&pageSize=20\n        var query = _context.Products.AsQueryable();\n\n        if (!string.IsNullOrEmpty(term))\n        {\n            query = query.Where(p => p.Name.Contains(term));\n        }\n\n        var results = query\n            .Skip((page - 1) * pageSize)\n            .Take(pageSize)\n            .ToList();\n\n        return Ok(results);\n    }\n}"
       }
     },
     {
-      "type": "callout",
+      "type": "heading",
       "data": {
-        "variant": "tip",
-        "title": "Query Model",
-        "text": "Create a class for query parameters when you have many options. ASP.NET Core binds automatically."
+        "level": 2,
+        "text": "Binding to a Query Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you have many related options, create a dedicated query model class. ASP.NET Core binds each query key to a matching property by name."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Query Model Binding",
+        "content": "Grouping query parameters into a single model class for cleaner signatures.",
+        "language": "csharp",
+        "code": "public class SearchParams\n{\n    [MaxLength(100)]\n    public string? Term { get; set; }\n\n    [Range(1, 100)]\n    public int Page { get; set; } = 1;\n\n    [Range(1, 50)]\n    public int PageSize { get; set; } = 10;\n\n    public bool IncludeInactive { get; set; } = false;\n}\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly AppDbContext _context;\n\n    public ProductsController(AppDbContext context)\n    {\n        _context = context;\n    }\n\n    [HttpGet(\"search\")]\n    public IActionResult Search([FromQuery] SearchParams parameters)\n    {\n        // /api/products/search?term=laptop&page=1&pageSize=20&includeInactive=true\n        // parameters.Term = \"laptop\"\n        // parameters.Page = 1\n        // parameters.PageSize = 20\n        // parameters.IncludeInactive = true\n\n        var query = _context.Products.AsQueryable();\n\n        if (!string.IsNullOrEmpty(parameters.Term))\n        {\n            query = query.Where(p => p.Name.Contains(parameters.Term));\n        }\n\n        if (!parameters.IncludeInactive)\n        {\n            query = query.Where(p => p.IsActive);\n        }\n\n        var results = query\n            .Skip((parameters.Page - 1) * parameters.PageSize)\n            .Take(parameters.PageSize)\n            .ToList();\n\n        return Ok(results);\n    }\n}"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Query Binding Approaches",
+        "cards": [
+          {
+            "title": "Individual Parameters",
+            "description": "Bind each query value to a separate action parameter.",
+            "pros": [
+              "Explicit and easy to read",
+              "Supports default values inline",
+              "Good for two or three values"
+            ],
+            "cons": [
+              "Method signature grows with each new option",
+              "Harder to reuse across endpoints"
+            ],
+            "tags": ["simple"]
+          },
+          {
+            "title": "Query Model Class",
+            "description": "Group related options into a dedicated class and bind it once.",
+            "pros": [
+              "Keeps action signatures short",
+              "Supports validation attributes",
+              "Easily reused across controllers"
+            ],
+            "cons": [
+              "Requires an extra class",
+              "Implicit binding can hide which values are expected"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "FromQuery Checklist",
+        "items": [
+          {
+            "text": "Use [FromQuery] for filtering, sorting, and pagination"
+          },
+          {
+            "text": "Assign default values to optional parameters so clients can omit them"
+          },
+          {
+            "text": "Validate ranges with [Range] when numeric parameters have upper or lower bounds"
+          },
+          {
+            "text": "Use a query model class when the endpoint accepts more than three options"
+          },
+          {
+            "text": "Limit maximum pageSize to prevent denial-of-service from huge result sets"
+          },
+          {
+            "text": "Document expected query keys in OpenAPI so consumers know what to send"
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Search Endpoint",
+        "description": "Create a search action that supports filtering by category, sorting by price, and pagination.",
+        "steps": [
+          "Create a ProductSearchParams class with properties: CategoryId (int?), SortBy (string), MinPrice (decimal?), MaxPrice (decimal?), Page (int), and PageSize (int).",
+          "Add [Range] attributes to numeric properties.",
+          "Create a GET api/products/search action that accepts [FromQuery] ProductSearchParams.",
+          "Apply category and price filters when the corresponding values are present.",
+          "Sort by name ascending if SortBy is missing or unknown.",
+          "Return paginated results with metadata: page, pageSize, and totalCount."
+        ],
+        "expectedOutcome": "A search endpoint that cleanly handles optional filters, validates input, and returns paginated product results."
       }
     },
     {
@@ -49,12 +183,12 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "[FromQuery] binds query string",
-          "Used for filtering, sorting, pagination",
-          "Can bind to individual params or model",
-          "Default values supported"
+          "[FromQuery] binds values from the URL query string",
+          "Use it for filters, sorts, and pagination",
+          "Default values make parameters optional",
+          "Query model classes keep signatures clean and reusable"
         ],
-        "takeaway": "FromQuery handles query string parameters."
+        "takeaway": "FromQuery is the simplest way to accept optional input without a request body."
       }
     }
   ],

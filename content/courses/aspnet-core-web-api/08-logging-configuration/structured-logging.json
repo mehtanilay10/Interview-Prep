@@ -16,43 +16,173 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Structured logging** stores logs as structured data (JSON) rather than plain text, making them searchable and queryable."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Serilog Example"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Structured Log with Serilog",
-        "content": "Write structured logs that can be queried",
-        "language": "csharp",
-        "code": "Log.Information(\"User {UserId} logged in from {IpAddress}\",\n  userId, ipAddress);\n\n// Outputs JSON:\n// {\"UserId\": 123, \"IpAddress\": \"192.168.1.1\"}\n\n// This enables queries like:\n// UserId = 123 AND IpAddress = \"192.168.1.1\""
+        "text": "**Structured logging** stores log events as discrete key-value properties (typically serialized as JSON) instead of an opaque string. This makes the data **queryable**, **aggregatable**, and **searchable** in tools like Seq, Elasticsearch, Splunk, Application Insights, or Datadog."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "info",
-        "title": "Why Structured Logging?",
-        "text": "Structured logs can be filtered, aggregated, and analyzed in tools like Seq, Splunk, or ELK stack."
+        "title": "Why structured logging?",
+        "text": "Plain-text logs are great for humans but terrible for machines. Structured logs let you ask real questions: \"how many 500-errors did tenant 42 see in the last hour?\" — without writing regex."
       }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Structured vs. unstructured", "anchor": "vs-unstructured" }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Unstructured vs. structured logging",
+        "cards": [
+          {
+            "title": "Unstructured",
+            "description": "User 42 logged in from 192.168.1.1",
+            "pros": ["Easy to read for humans", "Works with every log viewer"],
+            "cons": ["Hard to query", "Requires regex to extract fields", "No schema"],
+            "tags": ["plain-text"]
+          },
+          {
+            "title": "Structured",
+            "description": "{\"Event\":\"Login\",\"UserId\":42,\"IpAddress\":\"192.168.1.1\"}",
+            "pros": ["Queryable by any field", "Aggregatable", "Schema-aware"],
+            "cons": ["Less human-readable on its own", "Slightly more setup"],
+            "tags": ["json", "recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "structured-log-flow",
+        "caption": "How a structured log event flows from code to sink",
+        "definition": "flowchart LR\n  A[Code:<br/>Log.Information] --> B[Message template<br/>+ property bag]\n  B --> C[Enrichers<br/>MachineName, RequestId]\n  C --> D[Sinks<br/>Console, File, Seq]\n  D --> E[(JSON / columnar store)]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Serilog: the de-facto .NET choice", "anchor": "serilog" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Serilog** is a popular structured logging library for .NET. Its message-template syntax (`{PropertyName}`) preserves the value as a first-class property rather than concatenating it into a string."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Structured log message with Serilog",
+        "content": "Use named placeholders so the value is captured as a property, not just text.",
+        "language": "csharp",
+        "code": "using Serilog;\n\nLog.Information(\n    \"User {UserId} logged in from {IpAddress} at {LoginAt:o}\",\n    userId: 42,\n    ipAddress: \"192.168.1.1\",\n    loginAt: DateTimeOffset.UtcNow);\n\n// Emitted JSON event:\n// {\n//   \"Timestamp\": \"2026-09-07T12:00:00Z\",\n//   \"Level\": \"Information\",\n//   \"MessageTemplate\": \"User {UserId} logged in from {IpAddress} at {LoginAt:o}\",\n//   \"Properties\": {\n//     \"UserId\": 42,\n//     \"IpAddress\": \"192.168.1.1\",\n//     \"LoginAt\": \"2026-09-07T12:00:00.0000000+00:00\"\n//   }\n// }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Wiring Serilog into ASP.NET Core", "anchor": "wiring-serilog" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Serilog in Program.cs",
+        "content": "Replace the default logger with Serilog and write JSON to the console.",
+        "language": "csharp",
+        "code": "using Serilog;\nusing Serilog.Formatting.Compact;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nLog.Logger = new LoggerConfiguration()\n    .MinimumLevel.Information()\n    .Enrich.FromLogContext()\n    .Enrich.WithProperty(\"Application\", \"MyApi\")\n    .WriteTo.Console(new RenderedCompactJsonFormatter())\n    .CreateLogger();\n\nbuilder.Host.UseSerilog();\n\nvar app = builder.Build();\napp.Run();"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Template fragment", "Captured property", "Query example"],
+        "rows": [
+          ["{UserId}", "UserId = 42", "UserId = 42"],
+          ["{IpAddress}", "IpAddress = \"192.168.1.1\"", "IpAddress starts with \"192.168\""],
+          ["{Elapsed:000} ms", "Elapsed = 123 (ms)", "Elapsed > 500"],
+          ["{@Order}", "Order = serialized object", "Order.Total > 100"],
+          ["{$Custom}", "Custom = ToString() of value", "Custom = \"VIP\""]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Message template", "definition": "A string with `{Name}` placeholders that Serilog preserves as structured properties." },
+          { "term": "Enricher", "definition": "Adds extra properties (MachineName, RequestId, TenantId) to every log event." },
+          { "term": "Sink", "definition": "Where log events are written — Console, File, Seq, Elasticsearch, etc." },
+          { "term": "CompactJsonFormatter", "definition": "Serilog formatter that emits one JSON object per line (CLEF format), ideal for log aggregators." },
+          { "term": "Destructuring (@)", "definition": "Prefix `@` to capture an object's properties individually instead of calling ToString()." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't log secrets",
+        "text": "Even with structured logging, you can accidentally serialize a `Password` or `ConnectionString` property. Use `[NotLogged]` attributes, custom destructuring policies, or simply exclude sensitive fields."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Capturing exceptions with context", "anchor": "exception-context" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Logging exceptions with structured context",
+        "content": "Capture the exception as a property and add ambient context with LogContext.",
+        "language": "csharp",
+        "code": "using Serilog.Context;\n\ntry\n{\n    await _orderService.PlaceAsync(order);\n}\ncatch (Exception ex)\n{\n    using (LogContext.PushProperty(\"OrderId\", order.Id))\n    using (LogContext.PushProperty(\"CustomerId\", order.CustomerId))\n    {\n        Log.Error(ex, \"Failed to place order {OrderId}\", order.Id);\n    }\n}"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Switch to structured logging",
+        "description": "Replace the default ASP.NET Core logger with Serilog and verify the JSON output.",
+        "steps": [
+          "Add the NuGet packages `Serilog.AspNetCore` and `Serilog.Formatting.Compact`.",
+          "In Program.cs, replace `builder.Logging` with `builder.Host.UseSerilog()` and configure a Console sink that uses `RenderedCompactJsonFormatter`.",
+          "In an existing controller, change one `_logger.LogInformation(\"...\")` call to use a `{UserId}` placeholder.",
+          "Run the API and verify the console now emits one JSON object per line.",
+          "Pipe the JSON into `jq` or another tool and query by the new property."
+        ],
+        "expectedOutcome": "You should be able to filter console output by a structured field (e.g. only logs where UserId = 42) without regex."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Structured-logging checklist",
+        "items": [
+          { "text": "Use `{Name}` placeholders — never string interpolation." },
+          { "text": "Push ambient context with `LogContext.PushProperty` for request/tenant/correlation IDs." },
+          { "text": "Use `@` for object destructuring when you want its properties captured." },
+          { "text": "Write JSON to stdout so log shippers can ingest it cleanly." },
+          { "text": "Mask or exclude secrets and PII before the log hits a sink." }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Structured logs use key-value pairs",
-          "Serilog is the most popular .NET logger",
-          "JSON output enables powerful querying"
+          "Structured logs use named properties, not concatenated strings.",
+          "Serilog's message-template syntax preserves properties end-to-end.",
+          "JSON output (e.g. CompactJsonFormatter) is the lingua franca of log aggregators.",
+          "Enrichers add ambient context (machine, request, tenant) automatically.",
+          "Tools like Seq, Elasticsearch and Application Insights make structured logs truly queryable."
         ],
-        "takeaway": "Structured logging transforms logs into actionable insights."
+        "takeaway": "Structured logging turns logs from strings into searchable, aggregatable events."
       }
     }
   ],

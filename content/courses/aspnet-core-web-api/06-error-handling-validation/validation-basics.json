@@ -16,43 +16,257 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Input validation** is crucial for building secure and reliable APIs. ASP.NET Core provides built-in validation attributes and mechanisms."
+        "text": "**Input validation** is the foundation of any reliable HTTP API. Without it, malformed or malicious data can reach your domain layer, corrupt your database, or expose security flaws. ASP.NET Core provides built-in data annotation attributes that let you declare rules directly on your model and have the framework enforce them automatically."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Data Annotations",
+            "definition": "Attributes placed on model properties that describe validation rules such as required, length, range, and format constraints."
+          },
+          {
+            "term": "ModelState",
+            "definition": "A dictionary that holds the result of model binding and validation. The [ApiController] attribute checks ModelState.IsValid automatically before actions run."
+          },
+          {
+            "term": "ValidationAttribute",
+            "definition": "The base class for all built-in attributes. You can subclass it to create custom validation logic for business rules."
+          },
+          {
+            "term": "IValidatableObject",
+            "definition": "An interface that lets a model validate itself as a whole, enabling cross-property rules that single attributes cannot express."
+          }
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Data Annotations"
+        "text": "Why Validate at the Edge?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Validating at the boundary of your application — inside controllers or middleware — keeps invalid data out of your services and repositories. This protects business invariants, simplifies error reporting, and gives clients fast, descriptive feedback before any expensive work runs."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-validation-pipeline",
+        "caption": "How a request flows through ASP.NET Core validation.",
+        "definition": "flowchart LR\n  A[HTTP Request] --> B[Model Binding]\n  B --> C{Data Annotations}\n  C -->|Invalid| D[ModelState Errors]\n  D --> E[400 ProblemDetails]\n  C -->|Valid| F[Action Method]\n  B --> G[JSON Deserialization]\n  G --> C"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Data Annotation Attributes"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Attribute", "Purpose", "Example"],
+        "rows": [
+          ["[Required]", "Ensures the property is not null or empty", "[Required] public string Name { get; set; }"],
+          ["[StringLength]", "Caps the maximum length and optionally the minimum", "[StringLength(100, MinimumLength = 2)]"],
+          ["[Range]", "Validates numeric ranges", "[Range(18, 120)] public int Age { get; set; }"],
+          ["[EmailAddress]", "Validates email format using a regex", "[EmailAddress] public string Email { get; set; }"],
+          ["[RegularExpression]", "Matches a custom pattern", "[RegularExpression(\"^[A-Z]{3}$\")] public string Code { get; set; }"],
+          ["[Compare]", "Ensures two properties match (for passwords)", "[Compare(\"Password\")] public string ConfirmPassword { get; set; }"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Applying Attributes to a DTO"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Define a request DTO with validation attributes. The framework will run them after model binding but before your action executes when the controller is decorated with [ApiController]."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Validation Attributes",
-        "content": "Using data annotations for validation",
+        "title": "Validation Attributes on a Request DTO",
+        "content": "Decorating properties with [Required], [StringLength], [Range], and [EmailAddress] enforces rules before the action runs.",
         "language": "csharp",
-        "code": "public class CreateUserRequest {\n  [Required]\n  [StringLength(100)]\n  public string Name { get; set; }\n\n  [Range(18, 120)]\n  public int Age { get; set; }\n\n  [EmailAddress]\n  public string Email { get; set; }\n}"
+        "code": "public sealed class CreateUserRequest\n{\n    [Required(ErrorMessage = \"Name is required.\")]\n    [StringLength(100, MinimumLength = 2)]\n    public string Name { get; set; } = string.Empty;\n\n    [Range(18, 120, ErrorMessage = \"Age must be between 18 and 120.\")]\n    public int Age { get; set; }\n\n    [Required]\n    [EmailAddress]\n    public string Email { get; set; } = string.Empty;\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "ModelState",
-        "text": "ASP.NET Core automatically checks ModelState.IsValid in API controllers when using [ApiController] attribute."
+        "title": "ModelState Is Automatic with [ApiController]",
+        "text": "When a controller is annotated with [ApiController], ASP.NET Core automatically returns a 400 Bad Request with RFC 7807 ProblemDetails whenever ModelState.IsValid is false. You do not need to check it manually in every action."
       }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Manual Validation in an Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you are not using [ApiController] (for example, in a minimal API without the attribute), you can still inspect ModelState and short-circuit the request with a 400 response."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Manual ModelState Check",
+        "content": "Returning a ValidationProblem when ModelState is invalid.",
+        "language": "csharp",
+        "code": "[HttpPost]\npublic IActionResult Create(CreateUserRequest request)\n{\n    if (!ModelState.IsValid)\n    {\n        return ValidationProblem(ModelState);\n    }\n\n    // Persist and return success\n    return CreatedAtAction(nameof(GetById), new { id = 1 }, request);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Built-in vs Custom Attributes"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Choosing a Validation Approach",
+        "cards": [
+          {
+            "title": "Built-in Data Annotations",
+            "description": "Declarative attributes on properties.",
+            "pros": [
+              "Simple and readable",
+              "Discovered by Swagger",
+              "Automatic with [ApiController]"
+            ],
+            "cons": [
+              "Limited to single-property rules",
+              "Cannot easily express conditional logic"
+            ],
+            "tags": ["recommended"]
+          },
+          {
+            "title": "Custom ValidationAttribute",
+            "description": "Subclass ValidationAttribute to encapsulate reusable rules.",
+            "pros": [
+              "Reusable across projects",
+              "Encapsulates complex logic",
+              "Testable in isolation"
+            ],
+            "cons": [
+              "Requires writing a class",
+              "More ceremony than attributes"
+            ]
+          },
+          {
+            "title": "IValidatableObject",
+            "description": "Implement Validate on the model itself for cross-property rules.",
+            "pros": [
+              "Full access to all properties",
+              "Great for conditional business rules"
+            ],
+            "cons": [
+              "Tightly coupled to the model",
+              "Harder to unit test"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Validation Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom ValidationAttribute",
+        "content": "A reusable attribute that ensures a string starts with a prefix.",
+        "language": "csharp",
+        "code": "public sealed class StartsWithAttribute : ValidationAttribute\n{\n    private readonly string _prefix;\n\n    public StartsWithAttribute(string prefix)\n    {\n        _prefix = prefix;\n    }\n\n    public override bool IsValid(object? value)\n    {\n        if (value is null)\n        {\n            return true; // let [Required] handle null\n        }\n\n        var text = value.ToString();\n        return text is not null && text.StartsWith(_prefix, StringComparison.Ordinal);\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't Skip Server Validation",
+        "text": "Client-side validation improves UX, but it can be bypassed. Always enforce the same rules on the server; otherwise attackers can submit invalid data directly with curl or Postman."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practice Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Validate a Product DTO",
+        "description": "Create a CreateProductRequest DTO with strict validation rules and test it with an invalid payload.",
+        "steps": [
+          "Create a CreateProductRequest class with Name, SKU, Price, and ReleaseDate.",
+          "Annotate Name with [Required] and [StringLength(80, MinimumLength = 2)].",
+          "Annotate SKU with [RegularExpression] matching three uppercase letters followed by four digits, e.g. ABC1234.",
+          "Annotate Price with [Range(0.01, 99999.99)].",
+          "Annotate ReleaseDate with a custom ValidationAttribute that disallows dates in the past.",
+          "POST a payload that violates each rule and confirm the API returns 400 with field-level errors."
+        ],
+        "expectedOutcome": "An API that rejects bad input with descriptive ProblemDetails and accepts well-formed requests with 201 Created."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Pre-commit Validation Checklist",
+        "items": [
+          { "text": "Every public request DTO has [Required] on string properties" },
+          { "text": "String and collection properties have explicit maximum length" },
+          { "text": "Numeric ranges use [Range] rather than manual checks" },
+          { "text": "Custom business rules live in a reusable ValidationAttribute" },
+          { "text": "Controllers use [ApiController] so ModelState is automatic" },
+          { "text": "Client-side validation mirrors server-side rules" }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use data annotations for validation rules",
-          "ModelState.IsValid checks validation automatically",
-          "Return 400 Bad Request for invalid models"
+          "Use data annotations to declare rules directly on properties",
+          "[ApiController] checks ModelState.IsValid before the action runs",
+          "Invalid models automatically produce RFC 7807 ProblemDetails",
+          "Custom ValidationAttribute encapsulates complex, reusable rules",
+          "Always validate on the server, even when the client validates"
         ],
-        "takeaway": "Validation keeps your API data clean and secure."
+        "takeaway": "Validate at the boundary so your domain layer can trust the data it receives."
       }
     }
   ],

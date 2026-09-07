@@ -16,35 +16,256 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Global exception handling** ensures consistent error responses across your entire API without try-catch in every controller."
+        "text": "**Global exception handling** centralizes how unexpected failures are translated into HTTP responses. Instead of wrapping every controller action in try/catch, you let a single piece of middleware observe the entire request pipeline and produce a uniform error payload when something goes wrong."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Middleware",
+            "definition": "A component that participates in the request pipeline. Middleware can short-circuit a request or pass it to the next component."
+          },
+          {
+            "term": "UseExceptionHandler",
+            "definition": "Built-in middleware that catches exceptions, logs them, and re-executes an alternative branch to produce a custom response."
+          },
+          {
+            "term": "IExceptionHandler",
+            "definition": "A .NET 8+ interface for a single-purpose exception handler that can be chained with other handlers."
+          },
+          {
+            "term": "IExceptionHandlerFeature",
+            "definition": "An HTTP feature exposed to the exception handler branch that exposes the original exception and request path."
+          },
+          {
+            "term": "ILogger",
+            "definition": "The standard logging abstraction in ASP.NET Core. Use it to record structured details about unhandled exceptions."
+          }
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "UseExceptionHandler Middleware"
+        "text": "How Middleware Catches Exceptions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Middleware components form a pipeline around your endpoints. When a downstream component throws, the exception bubbles up the stack until a component decides to handle it. UseExceptionHandler sits near the front of the pipeline and re-executes a small branch that builds the final response."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-exception-handler-flow",
+        "caption": "Lifecycle of an unhandled exception under UseExceptionHandler.",
+        "definition": "flowchart TD\n  A[Incoming Request] --> B[UseExceptionHandler]\n  B --> C[Routing]\n  C --> D[AuthN / AuthZ]\n  D --> E[Endpoint]\n  E -->|throws| F[Exception bubbles up]\n  F --> B\n  B --> G[Re-execute error branch]\n  G --> H[ProblemDetails Response]\n  B --> I[ILogger captures exception]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Built-in UseExceptionHandler"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "UseExceptionHandler() registers middleware that catches unhandled exceptions and re-executes a small inline branch to produce the response. Pair it with AddProblemDetails() to get RFC 7807 payloads for free."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Global Error Handler",
-        "content": "Configure global error handling in Program.cs",
+        "title": "Configuring UseExceptionHandler in Program.cs",
+        "content": "A minimal handler that logs the exception and writes a ProblemDetails response with status 500.",
         "language": "csharp",
-        "code": "var app = builder.Build();\n\nif (!app.Environment.IsDevelopment()) {\n  app.UseExceptionHandler(errorApp => {\n    errorApp.Run(async context => {\n      var feature = context.Features.Get<IExceptionHandlerFeature>();\n      var exception = feature?.Error;\n      // Log exception\n      // Return ProblemDetails\n      context.Response.StatusCode = 500;\n      await context.Response.WriteAsJsonAsync(new {\n        type = \"https://httpstatuses.com/500\",\n        title = \"Server Error\",\n        detail = exception?.Message\n      });\n    });\n  });\n}"
+        "code": "var app = builder.Build();\n\napp.UseExceptionHandler(errorApp =>\n{\n    errorApp.Run(async context =>\n    {\n        var feature = context.Features.Get<IExceptionHandlerFeature>();\n        var exception = feature?.Error;\n\n        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()\n            .CreateLogger(\"GlobalExceptionHandler\");\n        logger.LogError(exception, \"Unhandled exception on {Path}\", context.Request.Path);\n\n        var problem = new ProblemDetails\n        {\n            Type = \"https://httpstatuses.com/500\",\n            Title = \"Server Error\",\n            Status = StatusCodes.Status500InternalServerError,\n            Detail = app.Environment.IsDevelopment() ? exception?.Message : \"An unexpected error occurred.\",\n            Instance = context.Request.Path\n        };\n\n        context.Response.StatusCode = StatusCodes.Status500InternalServerError;\n        context.Response.ContentType = \"application/problem+json\";\n        await context.Response.WriteAsJsonAsync(problem);\n    });\n});\n\napp.UseRouting();\napp.UseAuthorization();\napp.MapControllers();\n\napp.Run();"
       }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Hide Detail in Production",
+        "text": "Never leak raw exception messages, stack traces, or connection strings to clients in production. The example above conditionally includes the message only when the environment is Development."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "IExceptionHandler (.NET 8+)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": ".NET 8 introduced IExceptionHandler. Each implementation handles a single exception type or category and returns true when it has produced a response. Multiple handlers can be chained in order, and the first one to return true wins."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom IExceptionHandler",
+        "content": "A handler that converts a domain NotFoundException into a 404 ProblemDetails response.",
+        "language": "csharp",
+        "code": "public sealed class NotFoundExceptionHandler : IExceptionHandler\n{\n    private readonly ILogger<NotFoundExceptionHandler> _logger;\n\n    public NotFoundExceptionHandler(ILogger<NotFoundExceptionHandler> logger)\n    {\n        _logger = logger;\n    }\n\n    public async ValueTask<bool> TryHandleAsync(\n        HttpContext httpContext,\n        Exception exception,\n        CancellationToken cancellationToken)\n    {\n        if (exception is not NotFoundException notFound)\n        {\n            return false;\n        }\n\n        _logger.LogWarning(notFound, \"Resource not found\");\n\n        var problem = new ProblemDetails\n        {\n            Type = \"https://example.com/errors/not-found\",\n            Title = \"Resource not found\",\n            Status = StatusCodes.Status404NotFound,\n            Detail = notFound.Message,\n            Instance = httpContext.Request.Path\n        };\n\n        httpContext.Response.StatusCode = problem.Status.Value;\n        httpContext.Response.ContentType = \"application/problem+json\";\n        await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken);\n        return true;\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Handlers and UseExceptionHandler",
+        "content": "Add the handlers to DI and enable them with UseExceptionHandler.",
+        "language": "csharp",
+        "code": "builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();\nbuilder.Services.AddExceptionHandler<ValidationExceptionHandler>();\nbuilder.Services.AddProblemDetails();\n\nvar app = builder.Build();\n\napp.UseExceptionHandler();\napp.UseRouting();\napp.UseAuthorization();\napp.MapControllers();\n\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Try/Catch vs Global Handlers"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Choosing an Exception Strategy",
+        "cards": [
+          {
+            "title": "Try/Catch in Each Action",
+            "description": "Wrap every controller method in try/catch.",
+            "pros": [
+              "Fine-grained control per action",
+              "Easy to add contextual recovery logic"
+            ],
+            "cons": [
+              "Repetitive boilerplate",
+              "Inconsistent error shapes across the API",
+              "Easy to forget on a new endpoint"
+            ]
+          },
+          {
+            "title": "Centralized UseExceptionHandler",
+            "description": "One middleware component owns error responses.",
+            "pros": [
+              "Consistent error payloads",
+              "Less duplication",
+              "Easy to add logging and telemetry in one place"
+            ],
+            "cons": [
+              "Less context than per-action try/catch",
+              "Must remember to register new handlers"
+            ],
+            "tags": ["recommended"]
+          },
+          {
+            "title": "Chained IExceptionHandler",
+            "description": ".NET 8+ pattern for composable handlers.",
+            "pros": [
+              "Each handler focuses on one exception family",
+              "Trivially testable in isolation",
+              "Plays well with AddProblemDetails()"
+            ],
+            "cons": [
+              "Requires .NET 8 or newer",
+              "Slightly more setup"
+            ],
+            "tags": ["recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Order Matters",
+        "text": "Register handlers from most specific to most general. The framework calls them in the order they were added, and the first one to return true produces the response."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Status Code Pages and 404s"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "UseStatusCodePages() converts empty error responses (such as a 404 from the routing system) into a body. Combined with AddProblemDetails(), it ensures even unmapped routes return a ProblemDetails payload."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Handling Empty Status Codes",
+        "content": "Turn empty 404 responses into structured ProblemDetails.",
+        "language": "csharp",
+        "code": "app.UseStatusCodePages();\napp.UseExceptionHandler();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise: Build a Resilient Error Pipeline"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Compose Handlers for a Sample API",
+        "description": "Wire up a complete exception handling pipeline with three custom handlers.",
+        "steps": [
+          "Define a domain NotFoundException, ValidationException, and ConflictException.",
+          "Implement an IExceptionHandler for each that produces a ProblemDetails response.",
+          "Register all three handlers with AddExceptionHandler<T>() in Program.cs.",
+          "Call AddProblemDetails() and UseExceptionHandler() to enable the pipeline.",
+          "Throw each exception from a test endpoint and verify the resulting status codes and content types."
+        ],
+        "expectedOutcome": "Every unhandled exception maps to a ProblemDetails response with the correct status code, content type, and correlation id."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Global Error Handling Checklist",
+        "items": [
+          { "text": "UseExceptionHandler() is registered before MapControllers()" },
+          { "text": "AddProblemDetails() is registered in the service container" },
+          { "text": "UseStatusCodePages() converts empty 404 responses to ProblemDetails" },
+          { "text": "Handlers log the exception with structured data (path, trace id)" },
+          { "text": "Production responses hide internal exception details" },
+          { "text": "Each domain exception family has its own IExceptionHandler" }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "UseExceptionHandler catches unhandled exceptions",
-          "Return consistent ProblemDetails responses",
-          "Log exceptions for debugging"
+          "UseExceptionHandler centralizes error responses and logging",
+          "Pair it with AddProblemDetails for RFC 7807 payloads",
+          "IExceptionHandler (in .NET 8+) enables composable, testable handlers",
+          "Never expose internal exception messages in production",
+          "Add a trace id to every error response for supportability"
         ],
-        "takeaway": "Global error handling improves API reliability."
+        "takeaway": "Global error handling turns brittle controller logic into a predictable, observable API."
       }
     }
   ],

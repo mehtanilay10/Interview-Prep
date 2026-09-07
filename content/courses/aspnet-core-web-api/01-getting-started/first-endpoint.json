@@ -17,44 +17,354 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Let's create a simple API controller with endpoints."
+        "text": "Now that you understand the project structure, it is time to build a **real endpoint**. In this lesson you will create a small `UsersController` that exposes the full CRUD surface — list, read one, create, update, and delete — using only an in-memory list."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You will learn how routing attributes map URLs to C# methods, how `[ApiController]` enables automatic model validation, and how to return the right `IActionResult` for each scenario."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Controller",
+            "definition": "A class that groups related HTTP endpoints. Inherits from `ControllerBase` (for APIs) or `Controller` (for MVC views)."
+          },
+          {
+            "term": "Action",
+            "definition": "A public method on a controller that handles a specific HTTP request."
+          },
+          {
+            "term": "Attribute Routing",
+            "definition": "Routing driven by attributes like `[Route]`, `[HttpGet]`, `[HttpPost]` rather than a centralized route table."
+          },
+          {
+            "term": "IActionResult",
+            "definition": "The return type that lets an action send any HTTP response (200, 404, 400, etc.) from a single method."
+          },
+          {
+            "term": "[ApiController]",
+            "definition": "Attribute that enables opinionated defaults: automatic 400 responses, binding source inference, problem details for errors."
+          }
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Creating a Controller"
+        "text": "The User Model",
+        "anchor": "user-model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Define a simple `User` record to represent our resource. Records give us value-based equality and a clean constructor for free — perfect for DTO-shaped types."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Controller",
-        "content": "Basic API controller",
+        "title": "Models/User.cs",
+        "content": "A minimal record representing a user.",
         "language": "csharp",
-        "code": "using Microsoft.AspNetCore.Mvc;\n\nnamespace MyWebApi.Controllers;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class UsersController : ControllerBase\n{\n    private static List<User> users = new();\n\n    // GET: api/users\n    [HttpGet]\n    public ActionResult<IEnumerable<User>> Get()\n    {\n        return Ok(users);\n    }\n\n    // GET: api/users/1\n    [HttpGet(\"{id}\")]\n    public ActionResult<User> Get(int id)\n    {\n        var user = users.FirstOrDefault(u => u.Id == id);\n        if (user == null) return NotFound();\n        return Ok(user);\n    }\n\n    // POST: api/users\n    [HttpPost]\n    public ActionResult<User> Post(User user)\n    {\n        users.Add(user);\n        return CreatedAtAction(nameof(Get), new { id = user.Id }, user);\n    }\n}"
+        "code": "namespace MyWebApi.Models;\n\npublic record User(int Id, string Name, string Email);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Records vs classes",
+        "text": "Use a **record** for immutable DTOs and a regular **class** when you need mutable state, inheritance, or EF Core entity behavior."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Controller",
+        "anchor": "creating-a-controller"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add a new file at `Controllers/UsersController.cs`. The `[ApiController]` attribute turns on the standard API conventions; `[Route]` sets the URL prefix, and `[HttpGet]` / `[HttpPost]` map individual methods to HTTP verbs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Controllers/UsersController.cs",
+        "content": "Full CRUD controller with five endpoints and correct `using` directives.",
+        "language": "csharp",
+        "code": "using Microsoft.AspNetCore.Mvc;\nusing MyWebApi.Models;\n\nnamespace MyWebApi.Controllers;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class UsersController : ControllerBase\n{\n    private static readonly List<User> Users = new();\n\n    // GET: api/users\n    [HttpGet]\n    public ActionResult<IEnumerable<User>> GetAll() => Ok(Users);\n\n    // GET: api/users/1\n    [HttpGet(\"{id:int}\")]\n    public ActionResult<User> GetById(int id)\n    {\n        var user = Users.FirstOrDefault(u => u.Id == id);\n        return user is null ? NotFound() : Ok(user);\n    }\n\n    // POST: api/users\n    [HttpPost]\n    public ActionResult<User> Create([FromBody] User user)\n    {\n        Users.Add(user);\n        return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);\n    }\n\n    // PUT: api/users/1\n    [HttpPut(\"{id:int}\")]\n    public ActionResult<User> Update(int id, [FromBody] User user)\n    {\n        var existing = Users.FirstOrDefault(u => u.Id == id);\n        if (existing is null) return NotFound();\n\n        Users.Remove(existing);\n        Users.Add(user);\n        return Ok(user);\n    }\n\n    // DELETE: api/users/1\n    [HttpDelete(\"{id:int}\")]\n    public IActionResult Delete(int id)\n    {\n        var existing = Users.FirstOrDefault(u => u.Id == id);\n        if (existing is null) return NotFound();\n\n        Users.Remove(existing);\n        return NoContent();\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Fixes applied to the snippet",
+        "text": "Compared to a naive first draft, the code above adds the `MyWebApi.Models` namespace, renames the parameterless `Get` to `GetAll` to avoid overload resolution issues, and adds the `[FromBody]` attribute on `Create` so the JSON body binds correctly."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Endpoint",
+          "HTTP",
+          "URL",
+          "Action",
+          "Success status",
+          "Error status"
+        ],
+        "rows": [
+          [
+            "List users",
+            "GET",
+            "/api/users",
+            "GetAll()",
+            "200 OK",
+            "—"
+          ],
+          [
+            "Get one user",
+            "GET",
+            "/api/users/{id}",
+            "GetById(id)",
+            "200 OK",
+            "404 Not Found"
+          ],
+          [
+            "Create user",
+            "POST",
+            "/api/users",
+            "Create(user)",
+            "201 Created",
+            "400 Bad Request (auto)"
+          ],
+          [
+            "Update user",
+            "PUT",
+            "/api/users/{id}",
+            "Update(id, user)",
+            "200 OK",
+            "404 Not Found"
+          ],
+          [
+            "Delete user",
+            "DELETE",
+            "/api/users/{id}",
+            "Delete(id)",
+            "204 No Content",
+            "404 Not Found"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Routing Resolves",
+        "anchor": "how-routing-resolves"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core combines the controller-level `[Route]` template with each action's HTTP-method attribute to build the final URL. The literal `[controller]` token is replaced with the controller class name **minus** the `Controller` suffix."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-routing",
+        "caption": "How `[Route]`, `[HttpGet]`, and `[controller]` combine into a URL.",
+        "definition": "flowchart LR\n    A[Class: UsersController] -->|\"[controller]\"| C[users]\n    B[\"[Route('api/[controller]')]\"] --> D[api/users]\n    E[\"[HttpGet]\"] --> F[/]\n    G[\"[HttpGet('{id:int}')]\"] --> H[/{id:int}]\n    D --> I[Final URL template]\n    C --> I\n    F --> I\n    H --> I"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "{id:int}",
+            "definition": "A route constraint — matches only integer values. `/api/users/abc` returns 404 instead of a binding error."
+          },
+          {
+            "term": "[FromBody]",
+            "definition": "Tells the binder to deserialize the request body (JSON by default) into the parameter."
+          },
+          {
+            "term": "CreatedAtAction",
+            "definition": "Returns 201 with a `Location` header pointing at the URL of the newly created resource."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Action Results You Will Use Daily",
+        "anchor": "action-results"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Pick the right result for the situation",
+        "cards": [
+          {
+            "title": "Ok(data)",
+            "description": "Returns `200 OK` with an optional body.",
+            "tags": [
+              "200",
+              "success"
+            ],
+            "pros": [
+              "Standard for successful reads and updates",
+              "Caller receives the resource back"
+            ],
+            "cons": [
+              "Not appropriate for 'created' — use `CreatedAtAction` instead so the client gets a Location header"
+            ]
+          },
+          {
+            "title": "CreatedAtAction(...)",
+            "description": "Returns `201 Created` with a `Location` header pointing at the new resource.",
+            "tags": [
+              "201",
+              "POST"
+            ],
+            "pros": [
+              "Signals that a new resource was created",
+              "Gives clients a stable URL for the new resource"
+            ],
+            "cons": [
+              "Requires you to know the action name and route parameter names"
+            ]
+          },
+          {
+            "title": "NotFound()",
+            "description": "Returns `404 Not Found` with no body.",
+            "tags": [
+              "404",
+              "missing"
+            ],
+            "pros": [
+              "Trivially indicates 'the resource you asked for is not there'"
+            ],
+            "cons": [
+              "Empty body — consider `Problem(...)` for a richer error message"
+            ]
+          },
+          {
+            "title": "NoContent()",
+            "description": "Returns `204 No Content` with no body.",
+            "tags": [
+              "204",
+              "DELETE"
+            ],
+            "pros": [
+              "Idiomatic for successful DELETE when there is nothing meaningful to return"
+            ],
+            "cons": [
+              "Do not use if you need to confirm what was deleted — return `Ok` instead"
+            ]
+          },
+          {
+            "title": "BadRequest() / ValidationProblem()",
+            "description": "Returns `400 Bad Request` with optional error details.",
+            "tags": [
+              "400",
+              "validation"
+            ],
+            "pros": [
+              "With `[ApiController]`, model validation errors auto-return `ValidationProblem`"
+            ],
+            "cons": [
+              "You rarely need to call it manually"
+            ]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Action Results",
-        "text": "Return ActionResult<T> with helper methods: Ok(), NotFound(), BadRequest(), CreatedAtAction()."
+        "title": "ActionResult<T> vs IActionResult",
+        "text": "Prefer `ActionResult<T>` on actions so the **Swagger/OpenAPI generator** knows the success type. `IActionResult` alone leaves the response shape unknown to tooling."
       }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Before you move on, confirm...",
+        "items": [
+          {
+            "text": "The controller inherits from `ControllerBase`.",
+            "hint": "Not `Controller` — that adds view support you do not need in an API."
+          },
+          {
+            "text": "Every action method is decorated with an HTTP-method attribute.",
+            "hint": "`[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[HttpDelete]`."
+          },
+          {
+            "text": "POST and PUT accept `[FromBody]` parameters.",
+            "hint": "Without it, the binder may try to read from the query string."
+          },
+          {
+            "text": "The class has `[ApiController]` and a `[Route]` attribute.",
+            "hint": "Otherwise, automatic 400 responses will not kick in."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Extend the controller",
+        "description": "Practice the patterns you just learned by adding a small enhancement to the controller.",
+        "steps": [
+          "Add a `[HttpGet(\"search\")]` action that returns users filtered by a `name` query string parameter (case-insensitive `Contains`).",
+          "Return `404 Not Found` when no users match.",
+          "Use the `MyWebApi.http` file (or Postman) to POST a user, then GET `/api/users/search?name=<your substring>` to verify.",
+          "Add a `Count` field to the `User` record (or remove it if you prefer) and confirm the controller still compiles and runs."
+        ],
+        "expectedOutcome": "A new `/api/users/search?name=...` endpoint that returns the filtered list (or 404 if none), and a working confirmation flow in your HTTP client of choice."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Controllers inherit ControllerBase",
-          "Route attributes define URLs",
-          "HTTP method attributes map verbs",
-          "Return ActionResult for responses"
+          "Controllers inherit `ControllerBase` and are decorated with `[ApiController]` and `[Route]`.",
+          "HTTP-method attributes (`[HttpGet]`, `[HttpPost]`, ...) map actions to verbs; `[FromBody]` tells the binder to use JSON.",
+          "Return `ActionResult<T>` so OpenAPI tooling knows the response shape.",
+          "Use `Ok`, `CreatedAtAction`, `NoContent`, and `NotFound` to communicate the right status code for each outcome.",
+          "Route constraints like `{id:int}` keep invalid input from reaching your action."
         ],
-        "takeaway": "Controllers handle API requests."
+        "takeaway": "Controllers are the bridge between HTTP and C#. Master the attributes, return the right status codes, and the rest is regular C# code."
       }
     }
   ],

@@ -16,48 +16,165 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Logging** is essential for monitoring, debugging, and diagnosing issues in production applications."
+        "text": "**Logging** is essential for monitoring, debugging, and diagnosing issues in production applications. ASP.NET Core ships with a built-in logging abstraction that lets you plug in providers such as Console, Debug, EventSource, and third-party sinks like Serilog, NLog, or Seq without changing your application code."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Why logging matters",
+        "text": "Logs are usually the first place you look when something goes wrong in production. Choose a log level and message format that helps you (and your future self) understand *what happened*, *when*, and *why*."
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "How logging works in ASP.NET Core", "anchor": "how-it-works" }
+    },
+    {
+      "type": "paragraph",
       "data": {
-        "level": 2,
-        "text": "Log Levels"
+        "text": "The framework provides an `ILoggerFactory` that creates `ILogger<TCategory>` instances. When you request an `ILogger<MyService>`, the category name is automatically set to `MyService`, which makes filtering by area of the application trivial."
       }
     },
     {
-      "type": "bullet-list",
+      "type": "mermaid",
       "data": {
-        "items": [
-          "Trace: Detailed diagnostic info",
-          "Debug: Debugging information",
-          "Information: General informational messages",
-          "Warning: Warnings that don't stop execution",
-          "Error: Errors and exceptions",
-          "Critical: Critical failures"
+        "id": "logging-flow",
+        "caption": "ASP.NET Core logging pipeline",
+        "definition": "flowchart LR\n  A[Application code<br/>ILogger&lt;T&gt;] --> B[ILoggerFactory]\n  B --> C[LoggerProvider 1<br/>Console]\n  B --> D[LoggerProvider 2<br/>Debug]\n  B --> E[LoggerProvider 3<br/>Serilog / Seq]\n  C --> F[(Console output)]\n  D --> G[Debug window]\n  E --> H[(Structured sink)]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Log Levels", "anchor": "log-levels" }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Level", "Value", "When to use"],
+        "rows": [
+          ["Trace", "0", "Detailed diagnostic info — method entry/exit, variable values"],
+          ["Debug", "1", "Debugging information during development"],
+          ["Information", "2", "General informational messages — request handled, job completed"],
+          ["Warning", "3", "Abnormal or unexpected events that don't stop execution"],
+          ["Error", "4", "Errors and exceptions that affected an operation"],
+          ["Critical", "5", "Critical failures that require immediate attention"]
         ]
       }
     },
     {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "ILogger<T>", "definition": "Generic logging interface injected via constructor. The type parameter becomes the log category." },
+          { "term": "ILoggerFactory", "definition": "Creates ILogger instances and manages the registered providers." },
+          { "term": "Log Level", "definition": "Severity filter that controls which messages are written to each sink." },
+          { "term": "LoggerProvider", "definition": "A pluggable sink (Console, Debug, File, Seq, etc.) that writes log messages somewhere." },
+          { "term": "Category", "definition": "A label, usually the class name, used to group and filter log messages." }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Using ILogger in a controller", "anchor": "using-ilogger" }
+    },
+    {
       "type": "example",
       "data": {
-        "title": "Using ILogger",
-        "content": "Inject and use ILogger in controllers",
+        "title": "Injecting and using ILogger<T>",
+        "content": "Inject ILogger<TCategory> into a controller and log at appropriate levels.",
         "language": "csharp",
-        "code": "[ApiController]\n[Route(\"api/[controller]\")]\npublic class WeatherController : ControllerBase {\n  private readonly ILogger<WeatherController> _logger;\n\n  public WeatherController(ILogger<WeatherController> logger) {\n    _logger = logger;\n  }\n\n  [HttpGet]\n  public IActionResult Get() {\n    _logger.LogInformation(\"Fetching weather data\");\n    try {\n      // logic\n      return Ok(data);\n    } catch (Exception ex) {\n      _logger.LogError(ex, \"Failed to fetch weather\");\n      return StatusCode(500);\n    }\n  }\n}"
+        "code": "using Microsoft.AspNetCore.Mvc;\n\nnamespace MyApi.Controllers;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class WeatherController : ControllerBase\n{\n    private readonly ILogger<WeatherController> _logger;\n\n    public WeatherController(ILogger<WeatherController> logger)\n    {\n        _logger = logger;\n    }\n\n    [HttpGet]\n    public IActionResult Get()\n    {\n        _logger.LogInformation(\"Fetching weather data at {Time}\", DateTime.UtcNow);\n\n        try\n        {\n            var data = new { Temperature = 72, Condition = \"Sunny\" };\n            return Ok(data);\n        }\n        catch (Exception ex)\n        {\n            _logger.LogError(ex, \"Failed to fetch weather data\");\n            return StatusCode(500, \"An error occurred while fetching weather.\");\n        }\n    }\n}"
       }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Always pass the exception object",
+        "text": "Use the `LogError(exception, message)` overload so the full stack trace is captured. Never stringify an exception into a message — you lose the type, stack, and inner exceptions."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Log method overloads",
+        "cards": [
+          {
+            "title": "LogInformation(\"msg\")",
+            "description": "Plain message — no structured data.",
+            "pros": ["Simple to read"],
+            "cons": ["Not queryable", "Hard to correlate across services"],
+            "tags": ["unstructured"]
+          },
+          {
+            "title": "LogInformation(\"User {UserId} did {Action}\", id, action)",
+            "description": "Structured message template with named placeholders.",
+            "pros": ["Searchable in log sinks", "Type-safe values", "Aggregatable"],
+            "cons": ["Slightly more verbose"],
+            "tags": ["structured", "recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Configuring providers", "anchor": "configuring-providers" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering providers in Program.cs",
+        "content": "Add or remove logging providers at startup.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Logging.ClearProviders();\nbuilder.Logging.AddConsole();\nbuilder.Logging.AddDebug();\nbuilder.Logging.AddSimpleConsole(options =>\n{\n    options.IncludeScopes = true;\n    options.SingleLine = true;\n});\n\nvar app = builder.Build();\napp.Run();"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Pre-flight logging checklist",
+        "items": [
+          { "text": "Pick a default minimum level (Information for production, Debug for development).", "hint": "Set in appsettings.json under Logging:LogLevel:Default." },
+          { "text": "Add a structured sink (Console JSON, Seq, Application Insights, etc.)." },
+          { "text": "Always pass the Exception object to LogError / LogCritical." },
+          { "text": "Avoid logging secrets, passwords, or full credit-card numbers." },
+          { "text": "Use request-scoped correlation IDs to trace a single request through your API." }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add logging to a CRUD endpoint",
+        "description": "Practice adding structured logging to an existing ASP.NET Core Web API endpoint.",
+        "steps": [
+          "Create a new controller `ProductsController` with a GET / POST / DELETE action.",
+          "Inject `ILogger<ProductsController>` via the constructor.",
+          "Log an Information message when each action starts, including the product id.",
+          "Wrap the DELETE action in a try/catch and use `LogError(ex, ...)` on failure.",
+          "Run the API, hit each endpoint, and verify the messages appear in the console."
+        ],
+        "expectedOutcome": "You should see distinct log lines per request with the correct level and category, and any exception should include a full stack trace."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use ILogger for structured logging",
-          "Choose appropriate log levels",
-          "Include exceptions in Error logs"
+          "Use ILogger<T> for structured, category-scoped logging.",
+          "Choose the right severity — Information for normal flow, Warning/Error for trouble.",
+          "Always pass the Exception object instead of stringifying it.",
+          "Plug in providers via builder.Logging in Program.cs.",
+          "Avoid logging secrets or sensitive personal data."
         ],
-        "takeaway": "Good logging saves hours of debugging."
+        "takeaway": "Good logging saves hours of debugging and is the foundation of observable services."
       }
     }
   ],

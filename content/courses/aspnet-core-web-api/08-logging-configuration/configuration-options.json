@@ -16,35 +16,172 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "The **Options pattern** provides a way to access configuration settings using strongly-typed classes."
+        "text": "The **Options pattern** provides a strongly-typed way to access configuration settings. Instead of reading raw strings from `IConfiguration`, you bind a section to a plain C# class and inject the bound instance into your services."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Why use the Options pattern?",
+        "text": "Strongly-typed settings give you IntelliSense, compile-time safety, easier unit testing, and natural integration with DI, validation, and hot-reload."
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "The three options interfaces", "anchor": "interfaces" }
+    },
+    {
+      "type": "table",
       "data": {
-        "level": 2,
-        "text": "IOptions and IOptionsSnapshot"
+        "headers": ["Interface", "Lifetime", "Reloads on change?", "Typical use"],
+        "rows": [
+          ["IOptions<T>", "Singleton", "No", "Read-only settings that never change at runtime."],
+          ["IOptionsSnapshot<T>", "Scoped", "Yes", "Per-request settings that need to refresh when appsettings.json changes."],
+          ["IOptionsMonitor<T>", "Singleton", "Yes", "Long-lived services that watch for config changes and react to them."]
+        ]
       }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "options-pattern",
+        "caption": "How configuration flows through the Options pattern",
+        "definition": "flowchart LR\n  A[appsettings.json<br/>+ env vars] --> B[IConfiguration]\n  B --> C[Configure&lt;T&gt; binding]\n  C --> D[IOptions&lt;T&gt;]\n  C --> E[IOptionsSnapshot&lt;T&gt;]\n  C --> F[IOptionsMonitor&lt;T&gt;]\n  D --> G[Singleton consumers]\n  E --> H[Scoped consumers]\n  F --> I[Singleton watchers]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Defining a settings class", "anchor": "settings-class" }
     },
     {
       "type": "example",
       "data": {
-        "title": "Options Pattern",
-        "content": "Bind configuration to a strongly-typed class",
+        "title": "Settings POCO with validation",
+        "content": "Create a plain class that mirrors the configuration section.",
         "language": "csharp",
-        "code": "public class MySettings {\n  public string ApiUrl { get; set; }\n  public int TimeoutSeconds { get; set; }\n}\n\n// Program.cs\nbuilder.Services.Configure<MySettings>(\n  builder.Configuration.GetSection(\"MySettings\"));\n\n// Controller\npublic class HomeController : ControllerBase {\n  private readonly MySettings _settings;\n\n  public HomeController(IOptions<MySettings> options) {\n    _settings = options.Value;\n  }\n}"
+        "code": "using System.ComponentModel.DataAnnotations;\n\nnamespace MyApi.Settings;\n\npublic class MySettings\n{\n    [Required]\n    public string ApiUrl { get; set; } = string.Empty;\n\n    [Range(1, 120)]\n    public int TimeoutSeconds { get; set; } = 30;\n\n    public FeatureFlags Features { get; set; } = new();\n}\n\npublic class FeatureFlags\n{\n    public bool EnableNewCheckout { get; set; }\n    public bool EnableBetaSearch { get; set; }\n}"
       }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Registering and consuming options", "anchor": "registering" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bind options and inject IOptions<T>",
+        "content": "Wire up the options in Program.cs and consume them via constructor injection.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Options;\nusing MyApi.Settings;\n\nvar builder = WebApplication.CreateBuilder(args);\n\n// Bind the \"MySettings\" section to MySettings and validate on startup.\nbuilder.Services\n    .AddOptions<MySettings>()\n    .Bind(builder.Configuration.GetSection(\"MySettings\"))\n    .ValidateDataAnnotations()\n    .ValidateOnStart();\n\nvar app = builder.Build();\napp.Run();\n\n// --- Consumer ---\npublic class HomeController : ControllerBase\n{\n    private readonly MySettings _settings;\n\n    public HomeController(IOptions<MySettings> options)\n    {\n        _settings = options.Value;\n    }\n\n    [HttpGet(\"config\")]\n    public IActionResult GetConfig() => Ok(new\n    {\n        _settings.ApiUrl,\n        _settings.TimeoutSeconds,\n        _settings.Features.EnableNewCheckout\n    });\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "IOptions<T>", "definition": "Singleton wrapper around a settings instance. Best for immutable configuration." },
+          { "term": "IOptionsSnapshot<T>", "definition": "Scoped, recomputed per request. Supports live reload of appsettings.json." },
+          { "term": "IOptionsMonitor<T>", "definition": "Singleton that watches for changes and raises a OnChange callback." },
+          { "term": "ValidateDataAnnotations", "definition": "Extension that runs DataAnnotation attributes (Required, Range, etc.) on the settings class." },
+          { "term": "ValidateOnStart", "definition": "Forces validation at startup so the app fails fast on misconfiguration." }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "IOptionsMonitor with change tracking", "anchor": "options-monitor" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reacting to live config changes",
+        "content": "Use IOptionsMonitor to react when appsettings.json changes on disk.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Options;\n\npublic class FeatureWatcher : IDisposable\n{\n    private readonly IDisposable? _changeTracker;\n\n    public FeatureWatcher(IOptionsMonitor<MySettings> monitor)\n    {\n        _changeTracker = monitor.OnChange(settings =>\n        {\n            Console.WriteLine(\n                \"Config reloaded — EnableNewCheckout = {0}\",\n                settings.Features.EnableNewCheckout);\n        });\n    }\n\n    public void Dispose() => _changeTracker?.Dispose();\n}"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "IOptions vs. IOptionsSnapshot vs. IOptionsMonitor",
+        "cards": [
+          {
+            "title": "IOptions<T>",
+            "description": "Read once, used for the lifetime of the app.",
+            "pros": ["Cheapest", "Safe for singletons"],
+            "cons": ["No live reload"],
+            "tags": ["singleton"]
+          },
+          {
+            "title": "IOptionsSnapshot<T>",
+            "description": "Re-read per request from the latest configuration.",
+            "pros": ["Always fresh", "Scoped lifetime fits per-request services"],
+            "cons": ["Cannot be injected into singletons"],
+            "tags": ["scoped"]
+          },
+          {
+            "title": "IOptionsMonitor<T>",
+            "description": "Singleton wrapper that raises OnChange callbacks.",
+            "pros": ["Live reload + long-lived consumers"],
+            "cons": ["Slightly more code to manage the change token"],
+            "tags": ["singleton", "reactive"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Don't inject IOptions<T> into a singleton if you need reloads",
+        "text": "IOptions<T> snapshots the value at first construction. If a singleton needs to react to changes, inject IOptionsMonitor<T> instead."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Options-pattern checklist",
+        "items": [
+          { "text": "Bind every section to a strongly-typed POCO." },
+          { "text": "Annotate required and bounded fields with DataAnnotations." },
+          { "text": "Call ValidateOnStart() so the app fails fast on bad config." },
+          { "text": "Use IOptions<T> for singletons that don't need reloads." },
+          { "text": "Use IOptionsMonitor<T> when you need to react to live changes." }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add options to an existing API",
+        "description": "Refactor an existing controller to read settings via the Options pattern.",
+        "steps": [
+          "Create a `JwtSettings` class with Issuer, Audience, and SigningKey properties.",
+          "Add a `Jwt` section to appsettings.json.",
+          "In Program.cs, register `AddOptions<JwtSettings>().Bind(...).ValidateDataAnnotations().ValidateOnStart()`.",
+          "Inject `IOptions<JwtSettings>` into a controller and expose a debug endpoint that returns the bound values (omit the key in real apps).",
+          "Change a value in appsettings.json, restart, and confirm the new value is reflected."
+        ],
+        "expectedOutcome": "The endpoint returns configuration values without ever reading `IConfiguration` directly, and the app refuses to launch if a required field is missing."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "IOptions<T> binds configuration to classes",
-          "IOptionsSnapshot reloads on change",
-          "Strongly-typed settings are easier to test"
+          "The Options pattern turns configuration into strongly-typed POCOs.",
+          "IOptions<T> is singleton, IOptionsSnapshot<T> is scoped and reloads, IOptionsMonitor<T> is singleton and reactive.",
+          "DataAnnotations + ValidateOnStart give you fail-fast configuration.",
+          "Live reload works out of the box for appsettings.json when you use Snapshot or Monitor.",
+          "Avoid scattering `IConfiguration[\"...\"]` reads across your codebase — centralize with options."
         ],
-        "takeaway": "The Options pattern makes configuration type-safe and maintainable."
+        "takeaway": "The Options pattern makes configuration type-safe, validated, and easy to test."
       }
     }
   ],

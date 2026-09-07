@@ -16,35 +16,242 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**ProblemDetails** is a standardized way to return machine-readable error details in HTTP responses, following RFC 7807."
+        "text": "**ProblemDetails** is the standardized, machine-readable format ASP.NET Core uses to communicate HTTP error information. It is defined by **RFC 7807** (and extended by **RFC 9457**) and gives every client a predictable shape to parse instead of free-form error strings."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "RFC 7807",
+            "definition": "The original IETF specification that defines the Problem Details for HTTP APIs JSON format."
+          },
+          {
+            "term": "RFC 9457",
+            "definition": "The 2023 successor to RFC 7807 that clarifies the format and adds minor extensions."
+          },
+          {
+            "term": "ProblemDetails",
+            "definition": "The .NET type that represents the RFC 7807 payload. It includes type, title, status, detail, and instance."
+          },
+          {
+            "term": "ValidationProblemDetails",
+            "definition": "A subclass that adds an Errors dictionary mapping property names to error messages."
+          },
+          {
+            "term": "application/problem+json",
+            "definition": "The media type clients use to identify ProblemDetails responses."
+          }
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Automatic Problem Details"
+        "text": "Anatomy of a ProblemDetails Response"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Field", "Type", "Meaning"],
+        "rows": [
+          ["type", "URI", "A URL identifying the error type. Defaults to about:blank."],
+          ["title", "string", "A short, human-readable summary of the problem."],
+          ["status", "integer", "The HTTP status code (e.g. 400, 404, 500)."],
+          ["detail", "string", "A longer, human-readable explanation specific to this occurrence."],
+          ["instance", "URI", "A unique identifier for this specific occurrence (often the request path)."],
+          ["traceId", "string", "The distributed trace id, when activity tracing is enabled."]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-problem-details-flow",
+        "caption": "How validation failures become ProblemDetails responses.",
+        "definition": "sequenceDiagram\n  participant Client\n  participant ApiController\n  participant ModelBinder\n  Client->>ApiController: POST /users (invalid JSON)\n  ApiController->>ModelBinder: Bind and validate\n  ModelBinder-->>ApiController: ModelState.IsValid = false\n  ApiController-->>Client: 400 application/problem+json\n  Client->>Client: Parse type/title/status/errors"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automatic Validation ProblemDetails"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a controller is decorated with [ApiController] and model validation fails, ASP.NET Core emits a ValidationProblemDetails response automatically. You do not need to write any code to enable it."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Automatic Error Response",
-        "content": "ASP.NET Core automatically returns ProblemDetails for validation failures",
+        "title": "Automatic 400 ValidationProblemDetails",
+        "content": "The JSON body returned by ASP.NET Core when CreateUserRequest fails validation. The errors dictionary maps property names to arrays of messages.",
         "language": "json",
-        "code": "{\n  \"type\": \"https://tools.ietf.org/html/rfc7231#section-6.5.1\",\n  \"title\": \"One or more validation errors occurred.\",\n  \"status\": 400,\n  \"traceId\": \"|12345.abcde|\",\n  \"errors\": {\n    \"Name\": [\"The Name field is required.\"]\n  }\n}"
+        "code": "{\n  \"type\": \"https://tools.ietf.org/html/rfc9110#section-15.5.1\",\n  \"title\": \"One or more validation errors occurred.\",\n  \"status\": 400,\n  \"errors\": {\n    \"Name\": [\"The Name field is required.\"],\n    \"Email\": [\"The Email field is not a valid e-mail address.\"]\n  },\n  \"traceId\": \"00-abc123def456-7890-01\"\n}"
       }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Default Content-Type",
+        "text": "ASP.NET Core serializes ProblemDetails with the content type application/problem+json. Clients can branch on this header to render error UIs differently from success payloads."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Returning ProblemDetails from an Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can return ProblemDetails from any action by using the ControllerBase.Problem helper or by returning ValidationProblem. These helpers fill in sensible defaults and produce the correct content type."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Returning ProblemDetails Manually",
+        "content": "Using ControllerBase.Problem to return a 404 with a stable type URL.",
+        "language": "csharp",
+        "code": "[HttpGet(\"{id:int}\")]\npublic IActionResult GetById(int id)\n{\n    var user = _repository.Find(id);\n    if (user is null)\n    {\n        return Problem(\n            type: \"https://example.com/errors/user-not-found\",\n            title: \"User not found\",\n            detail: $\"No user exists with id {id}.\",\n            statusCode: StatusCodes.Status404NotFound,\n            instance: HttpContext.Request.Path);\n    }\n\n    return Ok(user);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Customizing the Default Behavior"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core exposes AddProblemDetails() so you can configure how every ProblemDetails response is shaped. You can customize the default type URI, add extension members, and decide which status codes produce ProblemDetails."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring ProblemDetails in Program.cs",
+        "content": "Registering and customizing AddProblemDetails so 404 and 406 responses also return RFC 7807 payloads.",
+        "language": "csharp",
+        "code": "builder.Services.AddProblemDetails(options =>\n{\n    options.CustomizeProblemDetails = context =>\n    {\n        context.ProblemDetails.Extensions[\"traceId\"] =\n            System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;\n        context.ProblemDetails.Extensions[\"requestId\"] = context.HttpContext.Request.Headers[\"X-Request-Id\"].ToString();\n    };\n});\n\nbuilder.Services.AddControllers()\n    .ConfigureApiBehaviorOptions(options =>\n    {\n        options.SuppressMapClientErrors = false;\n    });"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Register AddProblemDetails Once",
+        "text": "AddProblemDetails() is enough on its own to enable ProblemDetails for client errors and exceptions when paired with UseExceptionHandler(). You do not need to call AddControllers().AddProblemDetails() separately."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Standard vs Custom Problem Types"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Default vs Customized ProblemDetails",
+        "cards": [
+          {
+            "title": "Default ProblemDetails",
+            "description": "Out-of-the-box behavior with [ApiController].",
+            "pros": [
+              "Zero configuration",
+              "Automatically emitted for 400 responses",
+              "Standards-compliant"
+            ],
+            "cons": [
+              "Generic type URIs (about:blank)",
+              "No custom extension fields"
+            ],
+            "tags": ["default"]
+          },
+          {
+            "title": "Customized ProblemDetails",
+            "description": "Configured via AddProblemDetails() in DI.",
+            "pros": [
+              "Stable, documented type URIs",
+              "Includes correlation IDs and tenant info",
+              "Consistent across client and server errors"
+            ],
+            "cons": [
+              "Slightly more setup",
+              "Clients must know your type URIs"
+            ],
+            "tags": ["recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise: Standardize Your Errors"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add Custom ProblemDetails to a Sample API",
+        "description": "Refactor an existing controller to return ProblemDetails for every error path.",
+        "steps": [
+          "Add AddProblemDetails() to the DI container in Program.cs.",
+          "Add UseStatusCodePages() so empty 404 responses become ProblemDetails.",
+          "Replace every return NotFound() / return BadRequest() with Problem(...).",
+          "Add a custom extension that includes the correlation id.",
+          "Use curl or Postman to confirm the response uses application/problem+json."
+        ],
+        "expectedOutcome": "Every error response in the API uses the same JSON envelope, with stable type URIs and a correlation id."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "ProblemDetails Readiness Checklist",
+        "items": [
+          { "text": "AddProblemDetails() is registered in the service container" },
+          { "text": "Controllers are decorated with [ApiController]" },
+          { "text": "Every action returns Problem(...) or ValidationProblem(...) for failures" },
+          { "text": "Response content type is application/problem+json" },
+          { "text": "Trace id is included as an extension field" },
+          { "text": "Documented type URIs are stable across releases" }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
     },
     {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "ProblemDetails follows RFC 7807",
-          "ASP.NET Core returns them automatically for 400 errors",
-          "They provide structured error information"
+          "ProblemDetails follows RFC 7807 / RFC 9457",
+          "ASP.NET Core emits them automatically for 400 responses with [ApiController]",
+          "Use AddProblemDetails() to customize extensions and defaults",
+          "Return Problem(...) or ValidationProblem(...) for consistent error shapes",
+          "Always include a trace id for debugging"
         ],
-        "takeaway": "ProblemDetails make APIs easier to debug and consume."
+        "takeaway": "Standardized error payloads turn 'works on my machine' into 'works for every client.'"
       }
     }
   ],

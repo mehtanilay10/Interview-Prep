@@ -17,7 +17,44 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**[FromBody]** binds data from the request body, typically JSON. It's used for POST and PUT requests."
+        "text": "**[FromBody]** tells ASP.NET Core to read the entire request body and deserialize it into a .NET object. It is the standard way to accept JSON payloads for POST and PUT operations."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you apply [FromBody] to an action parameter, the framework uses the registered input formatter — typically System.Text.Json — to read the raw request stream and materialize it into your DTO or entity type."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "FromBody",
+            "definition": "An attribute that instructs model binding to read the parameter value from the HTTP request body."
+          },
+          {
+            "term": "Input Formatter",
+            "definition": "A service that reads the request body and converts it to a .NET type. ASP.NET Core includes System.Text.Json and supports third-party formatters."
+          },
+          {
+            "term": "JSON Deserialization",
+            "definition": "The process of converting JSON text into .NET objects using an input formatter."
+          },
+          {
+            "term": "Content-Type",
+            "definition": "The HTTP header that indicates the media type of the request body, such as application/json."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-frombody-flow",
+        "caption": "How [FromBody] reads and deserializes a JSON payload.",
+        "definition": "sequenceDiagram\n    participant C as Client\n    participant M as Middleware\n    participant B as Model Binder\n    participant A as Action\n    C->>M: POST /api/users (JSON body)\n    M->>B: Read request body stream\n    B->>B: Deserialize JSON to DTO\n    B->>A: Inject bound parameter\n    A->>C: 201 Created with location header"
       }
     },
     {
@@ -28,20 +65,152 @@
       }
     },
     {
+      "type": "paragraph",
+      "data": {
+        "text": "Apply [FromBody] to complex types that represent a create or update payload. Use data annotations on the DTO to enforce validation before the action body executes."
+      }
+    },
+    {
       "type": "example",
       "data": {
-        "title": "FromBody",
-        "content": "Binding request body",
+        "title": "FromBody with Validation",
+        "content": "A POST action that binds a JSON body to a validated DTO.",
         "language": "csharp",
-        "code": "[HttpPost]\npublic IActionResult Create([FromBody] User user)\n{\n    // user is automatically deserialized from JSON\n    if (!ModelState.IsValid)\n        return BadRequest(ModelState);\n    \n    _context.Users.Add(user);\n    _context.SaveChanges();\n    \n    return CreatedAtAction(nameof(Get), new { id = user.Id }, user);\n}"
+        "code": "public sealed class CreateUserRequest\n{\n    [Required(ErrorMessage = \"Name is required.\")]\n    [StringLength(100, MinimumLength = 2)]\n    public string Name { get; set; } = string.Empty;\n\n    [Required]\n    [EmailAddress]\n    public string Email { get; set; } = string.Empty;\n\n    [Range(18, 120)]\n    public int Age { get; set; }\n}\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class UsersController : ControllerBase\n{\n    private readonly AppDbContext _context;\n\n    public UsersController(AppDbContext context)\n    {\n        _context = context;\n    }\n\n    [HttpPost]\n    public async Task<ActionResult<UserDto>> Create(\n        [FromBody] CreateUserRequest request)\n    {\n        if (!ModelState.IsValid)\n        {\n            return ValidationProblem(ModelState);\n        }\n\n        var user = new User\n        {\n            Name = request.Name,\n            Email = request.Email,\n            Age = request.Age\n        };\n\n        _context.Users.Add(user);\n        await _context.SaveChangesAsync();\n\n        var dto = new UserDto(user.Id, user.Name, user.Email);\n\n        return CreatedAtAction(nameof(Get), new { id = user.Id }, dto);\n    }\n\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<UserDto>> Get(int id)\n    {\n        var user = await _context.Users.FindAsync(id);\n\n        if (user is null)\n        {\n            return NotFound();\n        }\n\n        return Ok(new UserDto(user.Id, user.Name, user.Email));\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Supported Content Types"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Content-Type",
+          "Formatter",
+          "Use Case"
+        ],
+        "rows": [
+          [
+            "application/json",
+            "System.Text.Json",
+            "Default for REST APIs"
+          ],
+          [
+            "application/xml",
+            "XmlSerializer",
+            "Legacy SOAP or XML clients"
+          ],
+          [
+            "text/json",
+            "System.Text.Json",
+            "Some JavaScript clients"
+          ],
+          [
+            "application/octet-stream",
+            "Custom formatter",
+            "Binary payloads"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Model Validation",
-        "text": "Use data annotations on your model for automatic validation: [Required], [StringLength], [Range]."
+        "title": "ApiController Makes Validation Automatic",
+        "text": "When a controller is decorated with [ApiController], invalid [FromBody] payloads automatically return 400 Bad Request with RFC 7807 ProblemDetails. You rarely need to check ModelState manually."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Body Binding Options",
+        "cards": [
+          {
+            "title": "[FromBody] Attribute",
+            "description": "Explicitly binds a single parameter from the request body using input formatters.",
+            "pros": [
+              "Clear intent",
+              "Supports complex types",
+              "Works with JSON, XML, and custom formatters"
+            ],
+            "cons": [
+              "Only one parameter per action by default",
+              "Requires a readable body stream"
+            ],
+            "tags": ["recommended"]
+          },
+          {
+            "title": "[FromForm] Attribute",
+            "description": "Binds from form data, typically used in MVC views or file uploads.",
+            "pros": [
+              "Supports multipart/form-data",
+              "Good for file uploads"
+            ],
+            "cons": [
+              "Not intended for JSON APIs",
+              "Requires form-urlencoded or multipart content"
+            ]
+          },
+          {
+            "title": "[ApiController] Auto-Binding",
+            "description": "In API controllers, complex parameters are inferred as [FromBody] without the attribute.",
+            "pros": [
+              "Reduces boilerplate",
+              "Consistent with REST conventions"
+            ],
+            "cons": [
+              "Implicit behavior can confuse beginners",
+              "Still limited to one complex parameter"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "FromBody Checklist",
+        "items": [
+          {
+            "text": "Use a dedicated request DTO instead of binding entities directly"
+          },
+          {
+            "text": "Annotate DTO properties with [Required], [StringLength], and [Range]"
+          },
+          {
+            "text": "Return 400 with ValidationProblem when ModelState is invalid"
+          },
+          {
+            "text": "Use CreatedAtAction on success to return the new resource location"
+          },
+          {
+            "text": "Accept only the media types your API supports"
+          },
+          {
+            "text": "Never trust the client — validate again on the server even if [ApiController] helps"
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement a POST Endpoint",
+        "description": "Create a POST endpoint that accepts a JSON body, validates it, and returns the created resource.",
+        "steps": [
+          "Define a CreateProductRequest DTO with Name, SKU, Price, and ReleaseDate properties.",
+          "Add validation attributes: [Required] and [StringLength] for Name, [Range] for Price, and a custom [RegularExpression] for SKU.",
+          "Create a POST api/products action that accepts [FromBody] CreateUserRequest.",
+          "Return ValidationProblem(ModelState) when the payload is invalid.",
+          "Return CreatedAtAction with the new product when valid."
+        ],
+        "expectedOutcome": "A POST endpoint that rejects malformed JSON with 400 and returns 201 Created with a Location header for valid requests."
       }
     },
     {
@@ -49,12 +218,12 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "[FromBody] binds JSON body",
-          "Used for POST/PUT requests",
-          "Automatic deserialization",
-          "Model validation with annotations"
+          "[FromBody] binds JSON or other formatted payloads from the request stream",
+          "Use DTOs with validation attributes for create and update actions",
+          "[ApiController] returns automatic 400 responses for invalid bodies",
+          "Avoid binding entities directly; prefer request DTOs"
         ],
-        "takeaway": "FromBody handles JSON request data."
+        "takeaway": "FromBody turns JSON into usable .NET objects with built-in validation."
       }
     }
   ],
