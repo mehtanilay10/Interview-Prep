@@ -1,20 +1,27 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
-import { Highlight, themes } from "prism-react-renderer";
+import { ShikiHighlighter } from 'react-shiki';
 
 
 function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
   if (!text) return [];
-  const tokens = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
+  const tokens = text.split(/(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
   return tokens.map((token, i) => {
     if (token.startsWith('**') && token.endsWith('**')) {
       return <strong key={i} className="font-semibold text-fg-default">{token.slice(2, -2)}</strong>;
+    }
+    if (token.startsWith('~~') && token.endsWith('~~')) {
+      return <del key={i} className="text-fg-muted line-through">{token.slice(2, -2)}</del>;
+    }
+    if (token.startsWith('`') && token.endsWith('`') && token.length > 1) {
+      return <code key={i}>{token.slice(1, -1)}</code>;
     }
     if (token.startsWith('[') && token.includes('](')) {
       const match = token.match(/\[([^\]]+)\]\(([^)]+)\)/);
@@ -49,38 +56,43 @@ interface ContentBlockRendererProps {
 }
 
 function CustomCodeBlock({ code, language }: { code: string; language?: string }) {
-  const displayLanguage = language || 'code';
-  
+  const { theme } = useTheme();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shikiTheme = theme === 'dark' ? 'github-dark' : 'github-light';
+
   return (
-    <div className="my-4 overflow-hidden rounded-xl border border-border shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border shadow-sm">
       <div className="flex items-center justify-between border-b border-border bg-canvas-subtle px-4 py-2">
         <span className="text-xs font-medium text-fg-muted uppercase tracking-wider">
-          {displayLanguage}
+          {language || 'code'}
         </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded-md px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-canvas hover:text-fg-default"
+          aria-label={copied ? 'Copied' : 'Copy code'}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
       </div>
-      <div className="overflow-x-auto bg-canvas">
-        <Highlight theme={themes.nightOwl} code={code} language={language || "text"}>
-            {({ style, tokens, getLineProps, getTokenProps }) => (
-            <div className="flex">
-              <div className="select-none border-r border-border bg-canvas-subtle px-4 py-3 text-right text-xs text-fg-subtle min-w-[3rem]" aria-hidden="true">
-                {tokens.map((_, i) => (
-                  <div key={i} className="leading-6 font-mono">
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-              <div className="flex-1 p-4">
-                {tokens.map((line, i) => (
-                  <div key={i} {...getLineProps({ line })} className="table-row">
-                    {line.map((token, key) => (
-                      <span key={key} {...getTokenProps({ token })} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Highlight>
+      <div className="overflow-x-auto bg-canvas text-sm">
+        <ShikiHighlighter
+          language={language || 'text'}
+          theme={shikiTheme}
+          showLineNumbers
+          startingLineNumber={1}
+          addDefaultStyles={false}
+          className="rs-code-block"
+        >
+          {code}
+        </ShikiHighlighter>
       </div>
     </div>
   );

@@ -210,12 +210,12 @@ export default async function CourseLessonDetailPage({ params }: Params) {
           aria-label="Page navigation"
         >
           <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto space-y-6 p-4">
-            <TableOfContents entries={toc} />
             <ProgressTracker
               lessonSlug={lessonSlug}
               moduleSlug={moduleSlug}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
             />
+            <TableOfContents entries={toc} />
           </div>
         </aside>
       </div>

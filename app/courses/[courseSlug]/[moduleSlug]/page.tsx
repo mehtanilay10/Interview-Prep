@@ -39,11 +39,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function CourseModuleDetailPage({ params }: Params) {
   const { courseSlug, moduleSlug } = await params;
   const course = getCourseBySlug(courseSlug);
-  const mod = getModuleBySlug(moduleSlug);
+  const courseModules = getModulesForCourse(courseSlug);
+  const mod = courseModules.find((m) => m.slug === moduleSlug);
   if (!course || !mod) notFound();
 
   const lessons = getLessonsForModule(moduleSlug, courseSlug);
-  const courseModules = getModulesForCourse(courseSlug);
   const currentIdx = courseModules.findIndex((m) => m.slug === moduleSlug);
   const prevModule = currentIdx > 0 ? courseModules[currentIdx - 1] : null;
   const nextModule = currentIdx < courseModules.length - 1 ? courseModules[currentIdx + 1] : null;

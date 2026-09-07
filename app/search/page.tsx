@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Search, BookOpen, Clock } from 'lucide-react';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { SectionHeader } from '@/components/sections/SectionHeader';
@@ -9,7 +10,9 @@ import { formatMinutes } from '@/lib/utils';
 import type { SearchResult } from '@/types';
 
 export default function SearchPage() {
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
