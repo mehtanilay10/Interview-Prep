@@ -1,5 +1,5 @@
 {
-  "id": "lesson-gql-6-performance-1",
+  "id": "lesson-gql-601",
   "slug": "dataloader",
   "moduleSlug": "06-performance",
   "title": "DataLoader",
@@ -15,37 +15,113 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "In this lesson, you will learn about dataloader in GraphQL with Hot Chocolate."
+        "text": "The N+1 problem is the most common performance issue in GraphQL. DataLoader batches and caches data fetches so you make one query instead of N+1."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Overview"
+        "text": "The N+1 Problem"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding this concept is essential for building robust GraphQL APIs."
+        "text": "When a query fetches a list of books and then resolves the author for each book, you execute one query for books plus N queries for authors."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-n1",
+        "caption": "N+1 query pattern vs DataLoader batching.",
+        "definition": "graph LR\n    A[N+1 Pattern] --> B[1 query: Get Books]\n    B --> C[N queries: Get Author per Book]\n    C --> D[Total: N+1 queries]\n\n    E[DataLoader] --> F[1 query: Get Books]\n    F --> G[1 batched query: Get Authors by IDs]\n    G --> H[Total: 2 queries]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using DataLoader in Hot Chocolate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hot Chocolate provides built-in DataLoader support through `IDataLoader` and batch loaders."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Code Example",
-        "content": "Here is a practical example of dataloader.",
-        "code": "type Query {\n  items: [Item!]!\n}\n\ntype Item {\n  id: ID!\n  name: String!\n}",
-        "language": "graphql"
+        "title": "Author DataLoader",
+        "content": "Batch-load authors by ID.",
+        "language": "csharp",
+        "code": "public class AuthorBatchLoader : BatchDataLoader<int, Author>\n{\n    private readonly IAuthorRepository _repository;\n\n    public AuthorBatchLoader(\n        IAuthorRepository repository,\n        IBatchScheduler batchScheduler)\n        : base(batchScheduler)\n    {\n        _repository = repository;\n    }\n\n    protected override async Task<IReadOnlyDictionary<int, Author>> LoadBatchAsync(\n        IReadOnlyList<int> keys,\n        CancellationToken cancellationToken)\n    {\n        var authors = await _repository.GetByIdsAsync(keys);\n        return authors.ToDictionary(a => a.Id);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using the DataLoader in a Resolver"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Inject the DataLoader into your resolver and call `LoadAsync` with the key."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resolver with DataLoader",
+        "content": "Resolve author efficiently.",
+        "language": "csharp",
+        "code": "public class Book\n{\n    public int Id { get; set; }\n    public int AuthorId { get; set; }\n\n    [Resolver]\n    public async Task<Author> GetAuthorAsync(\n        AuthorBatchLoader loader)\n    {\n        return await loader.LoadAsync(AuthorId);\n    }\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "Pro Tip",
-        "text": "Always test your GraphQL schema with introspection to ensure it matches your expectations."
+        "variant": "tip",
+        "title": "Caching",
+        "text": "DataLoader caches results within a single request. If the same author ID is requested multiple times, only one database call is made."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "N+1 Problem",
+            "definition": "Executing one query for a list and then N additional queries for each item's relation."
+          },
+          {
+            "term": "DataLoader",
+            "definition": "A pattern that batches and caches data fetches to avoid the N+1 problem."
+          },
+          {
+            "term": "BatchDataLoader",
+            "definition": "A Hot Chocolate base class for implementing batch-loading logic."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Create a Genre DataLoader",
+        "description": "Build a GenreBatchLoader that loads multiple genres by ID in one database call, then use it in a resolver.",
+        "steps": [
+          "Create GenreBatchLoader inheriting from BatchDataLoader<int, Genre>",
+          "Load genres by IDs in LoadBatchAsync",
+          "Inject GenreBatchLoader into a Book resolver",
+          "Return the genre for the book's GenreId"
+        ],
+        "expectedOutcome": "Querying multiple books' genres now uses a single batch query instead of one query per book."
       }
     },
     {
@@ -53,15 +129,18 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Understand the core concept",
-          "Know how to implement it",
-          "Be aware of common pitfalls"
+          "DataLoader batches multiple loads into one query",
+          "Results are cached within a request",
+          "Use BatchDataLoader for list-based loading",
+          "Solve N+1 at the resolver level"
         ],
-        "takeaway": "Mastering dataloader is key to GraphQL success."
+        "takeaway": "Next, we'll explore caching strategies."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
+  "relatedLessons": [
+    "caching",
+    "query-complexity"
+  ],
   "courseSlug": "graphql-dotnet"
 }

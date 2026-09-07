@@ -488,6 +488,30 @@ import apolloLesson34 from '../courses/apollo/09-ssr-nextjs-performance/performa
 import apolloLesson35 from '../courses/apollo/09-ssr-nextjs-performance/common-pitfalls.json';
 import graphqlLesson25 from '../courses/graphql-dotnet/07-error-handling/error-handling-basics.json';
 import graphqlLesson26 from '../courses/graphql-dotnet/07-error-handling/custom-exceptions.json';
+import graphqlLesson1 from '../courses/graphql-dotnet/01-getting-started/introduction-to-graphql.json';
+import graphqlLesson2 from '../courses/graphql-dotnet/01-getting-started/installing-hotchocolate.json';
+import graphqlLesson3 from '../courses/graphql-dotnet/01-getting-started/creating-first-graphql-server.json';
+import graphqlLesson4 from '../courses/graphql-dotnet/01-getting-started/hotchocolate-project-setup.json';
+import graphqlLesson5 from '../courses/graphql-dotnet/02-schema-types/schema-basics.json';
+import graphqlLesson6 from '../courses/graphql-dotnet/02-schema-types/type-definitions.json';
+import graphqlLesson7 from '../courses/graphql-dotnet/02-schema-types/input-types.json';
+import graphqlLesson8 from '../courses/graphql-dotnet/02-schema-types/scalars-custom-types.json';
+import graphqlLesson9 from '../courses/graphql-dotnet/03-queries-mutations/query-basics.json';
+import graphqlLesson10 from '../courses/graphql-dotnet/03-queries-mutations/mutation-basics.json';
+import graphqlLesson11 from '../courses/graphql-dotnet/03-queries-mutations/subscriptions.json';
+import graphqlLesson12 from '../courses/graphql-dotnet/03-queries-mutations/resolvers.json';
+import graphqlLesson13 from '../courses/graphql-dotnet/04-filtering-pagination/filtering-basics.json';
+import graphqlLesson14 from '../courses/graphql-dotnet/04-filtering-pagination/pagination-basics.json';
+import graphqlLesson15 from '../courses/graphql-dotnet/04-filtering-pagination/complex-filters.json';
+import graphqlLesson16 from '../courses/graphql-dotnet/04-filtering-pagination/performance-pagination.json';
+import graphqlLesson17 from '../courses/graphql-dotnet/05-authentication/auth-basics.json';
+import graphqlLesson18 from '../courses/graphql-dotnet/05-authentication/authorization.json';
+import graphqlLesson19 from '../courses/graphql-dotnet/05-authentication/jwt-integration.json';
+import graphqlLesson20 from '../courses/graphql-dotnet/05-authentication/identity-integration.json';
+import graphqlLesson21 from '../courses/graphql-dotnet/06-performance/dataloader.json';
+import graphqlLesson22 from '../courses/graphql-dotnet/06-performance/caching.json';
+import graphqlLesson23 from '../courses/graphql-dotnet/06-performance/query-complexity.json';
+import graphqlLesson24 from '../courses/graphql-dotnet/06-performance/persisted-queries.json';
 
 import csharpLesson1 from '../courses/csharp-fundamentals/01-getting-started/first-program.json';
 import csharpLesson2 from '../courses/csharp-fundamentals/01-getting-started/setting-up.json';
@@ -807,7 +831,7 @@ const rawLessons = [
   apolloLesson15, apolloLesson16, apolloLesson17, apolloLesson18, apolloLesson19, apolloLesson20, apolloLesson21,
   apolloLesson22, apolloLesson23, apolloLesson24, apolloLesson25, apolloLesson26, apolloLesson27, apolloLesson28,
   apolloLesson29, apolloLesson30, apolloLesson31, apolloLesson32, apolloLesson33, apolloLesson34, apolloLesson35,
-  graphqlLesson25, graphqlLesson26,
+  graphqlLesson1, graphqlLesson2, graphqlLesson3, graphqlLesson4, graphqlLesson5, graphqlLesson6, graphqlLesson7, graphqlLesson8, graphqlLesson9, graphqlLesson10, graphqlLesson11, graphqlLesson12, graphqlLesson13, graphqlLesson14, graphqlLesson15, graphqlLesson16, graphqlLesson17, graphqlLesson18, graphqlLesson19, graphqlLesson20, graphqlLesson21, graphqlLesson22, graphqlLesson23, graphqlLesson24, graphqlLesson25, graphqlLesson26,
   csharpLesson1, csharpLesson2, csharpLesson3, csharpLesson4, csharpLesson5, csharpLesson6, csharpLesson7,
   csharpLesson8, csharpLesson9, csharpLesson10, csharpLesson11, csharpLesson12, csharpLesson13, csharpLesson14,
   csharpLesson15, csharpLesson16, csharpLesson17, csharpLesson18, csharpLesson19, csharpLesson20, csharpLesson21,
