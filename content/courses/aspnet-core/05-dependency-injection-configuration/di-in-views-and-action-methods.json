@@ -1,0 +1,283 @@
+{
+  "id": "lesson-asp-045",
+  "slug": "di-in-views-and-action-methods",
+  "moduleSlug": "dependency-injection-configuration",
+  "courseSlug": "aspnet-core",
+  "title": "Injecting Services Into Views and Action Methods",
+  "description": "Use @inject in Razor views and [FromServices] on action methods to consume DI services exactly where they are needed.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "asp.net core",
+    "dependency injection",
+    "@inject",
+    "FromServices",
+    "razor views",
+    "action methods"
+  ],
+  "blocks": [
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "@inject",
+            "definition": "A Razor directive that resolves a service from the DI container and makes it available as a property in the view."
+          },
+          {
+            "term": "[FromServices]",
+            "definition": "An MVC attribute placed on an action method parameter that causes the DI container to resolve it instead of the model binder."
+          },
+          {
+            "term": "IConfiguration",
+            "definition": "The raw key-value configuration API; useful for one-off lookups but less type-safe than the options pattern."
+          },
+          {
+            "term": "IOptions<T> in views",
+            "definition": "Strongly typed configuration injected into a Razor view via @inject IOptions<T>."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Constructor injection is the standard approach, but it isn't always the right fit. Sometimes only one action method needs a service, or a Razor view needs data the controller didn't pass. ASP.NET Core provides two narrower alternatives: `[FromServices]` for action methods and `@inject` for views."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "[FromServices] — Inject Into a Single Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add `[FromServices]` to an action parameter when only that method needs the service. The container resolves it at call time, keeping the controller constructor lean."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "[FromServices] on a single action parameter",
+        "content": "Resolving ProductSummary only for the Summary action method",
+        "language": "csharp",
+        "code": "public class ProductsController : Controller\n{\n    private readonly IProductRepository _repo;\n\n    public ProductsController(IProductRepository repo) => _repo = repo;\n\n    // Resolved from DI only when this action is called\n    public IActionResult Summary([FromServices] ProductSummary summary)\n    {\n        ViewBag.TotalValue = summary.TotalValue;\n        return View(_repo.GetAll());\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "When to use [FromServices]",
+        "text": "Use [FromServices] when one or two actions need a service but most don't. If most actions need it, use constructor injection to keep the dependency contract explicit."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "@inject — Inject Into a Razor View"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `@inject` directive resolves a service directly inside a Razor view. It is most useful for reading configuration in layout pages or rendering small pieces of data without controller involvement."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "@inject IOptions<AppSettings> into a layout view",
+        "content": "Accessing typed app settings directly in _Layout.cshtml",
+        "language": "csharp",
+        "code": "@using Microsoft.Extensions.Options\n@inject IOptions<AppSettings> App\n\n<footer class=\"border-t pt-4\">\n    <p class=\"text-sm text-gray-500\">\n        @App.Value.AppName — v@App.Value.Version\n    </p>\n</footer>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "@inject a time service into a view",
+        "content": "Injecting a custom IDateTimeProvider to display the current server time",
+        "language": "csharp",
+        "code": "@inject IDateTimeProvider Clock\n\n<p>Last updated: @Clock.UtcNow.ToString(\"yyyy-MM-dd HH:mm\")</p>"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Passing Data From Controller to View (Preferred)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A cleaner alternative to `@inject` is to resolve the service in the controller and pass the result via the model or ViewBag. This keeps the view free of DI concerns and is far easier to unit test."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resolving in the controller, passing to the view via ViewBag",
+        "content": "Controller resolves services; view only displays the passed data",
+        "language": "csharp",
+        "code": "public class ProductsController : Controller\n{\n    private readonly IProductRepository _repo;\n    private readonly ProductSummary _summary;\n\n    public ProductsController(IProductRepository repo, ProductSummary summary)\n    {\n        _repo = repo;\n        _summary = summary;\n    }\n\n    public IActionResult Index()\n    {\n        ViewBag.TotalValue = _summary.TotalValue;\n        return View(_repo.GetAll());\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading Raw Configuration With IConfiguration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For quick, one-off key lookups, inject `IConfiguration` directly. This is less type-safe than the options pattern but useful for ad-hoc reads."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading configuration values with IConfiguration",
+        "content": "Injecting IConfiguration into a controller for raw key-value lookups",
+        "language": "csharp",
+        "code": "public class SettingsController : Controller\n{\n    private readonly IConfiguration _config;\n\n    public SettingsController(IConfiguration config) => _config = config;\n\n    public IActionResult Index()\n    {\n        var appName    = _config[\"App:Name\"];\n        var logLevel   = _config[\"Logging:LogLevel:Default\"];\n        var connection = _config.GetConnectionString(\"DefaultConnection\");\n        return View((appName, logLevel, connection));\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing the Right Injection Point"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Approach",
+          "Resolved Where",
+          "Testability",
+          "Best For"
+        ],
+        "rows": [
+          ["Constructor injection", "Controller creation", "High — full mock/stub support", "Most actions share the dependency"],
+          ["[FromServices] on action", "Individual action call", "High — controller still testable", "One-off dependency for a single action"],
+          ["@inject in view", "View render time", "Lower — view logic is harder to test", "Layout pages, config lookups in views"],
+          ["Controller → ViewBag/Model", "Controller action", "High — data passed explicitly", "Preferred for most view data"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Guidelines"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Rules of thumb",
+        "items": [
+          "Use constructor injection by default — it makes all dependencies explicit.",
+          "Use [FromServices] when only one or two actions need a service.",
+          "Use @inject only for layout-level or read-only configuration concerns.",
+          "Never resolve services manually with new inside controllers or views.",
+          "Prefer IOptions<T> over raw IConfiguration lookups in all production code."
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Apply the Right Injection Technique",
+        "description": "Given a controller and layout view, choose and apply the correct DI technique for each scenario.",
+        "steps": [
+          "A WeatherController needs ApiSettings for every action — inject via constructor.",
+          "A single ExportPdf action needs IReportGenerator only for that action — use [FromServices].",
+          "A _Layout.cshtml needs the app name from IOptions<AppSettings> — use @inject.",
+          "A product list is rendered from the controller's model — keep the view free of @inject."
+        ],
+        "expectedOutcome": "A controller with constructor-injected shared services, [FromServices] on one-off actions, and @inject used only in the layout where the controller cannot pass the data."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Views and Actions DI Checklist",
+        "items": [
+          {
+            "text": "I know when to use constructor injection vs [FromServices]",
+            "hint": "Constructor = shared across actions; FromServices = single action only"
+          },
+          {
+            "text": "I can use @inject to bring a service into any Razor file",
+            "hint": "@inject IServiceName PropertyName"
+          },
+          {
+            "text": "I can inject IOptions<T> into a view for typed configuration",
+            "hint": "@inject IOptions<MySettings> Settings"
+          },
+          {
+            "text": "I understand why passing data from the controller is usually better than @inject",
+            "hint": "Testability, separation of concerns, explicit data flow"
+          },
+          {
+            "text": "I can read raw config with IConfiguration as a fallback",
+            "hint": "_config[\"Section:Key\"] or _config.GetConnectionString(\"name\")"
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Is [FromServices] the same as constructor injection?",
+            "answer": "The service comes from the same DI container either way. The difference is scope: [FromServices] resolves per action call, while constructor injection resolves once per controller instance."
+          },
+          {
+            "question": "Can I @inject a Scoped service into a view?",
+            "answer": "Yes. Views run within the HTTP request scope, so Scoped services are available. The same lifetime rules apply — do not use Scoped services inside Singletons."
+          },
+          {
+            "question": "Should I inject into views or pass data from the controller?",
+            "answer": "Passing from the controller is preferred. It keeps views simpler and makes controllers unit-testable. Use @inject for layout-level or read-only configuration concerns."
+          },
+          {
+            "question": "Can I use @inject inside a partial view?",
+            "answer": "Yes. @inject works in any Razor file: views, partials, layouts, and view components. Each file resolves its own injection independently."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Constructor injection is the default — it makes all dependencies explicit and testable.",
+          "[FromServices] is the right choice when only one action needs a service.",
+          "@inject is useful in layout pages and for read-only configuration, but prefer passing data from the controller.",
+          "IOptions<T> gives typed, IntelliSense-supported access to configuration everywhere.",
+          "Choose the narrowest injection point that fits — it keeps code clean, testable, and loosely coupled."
+        ],
+        "takeaway": "ASP.NET Core gives you many injection points. Use constructor injection by default, and reach for [FromServices] or @inject only when you have a specific reason to narrow the scope."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

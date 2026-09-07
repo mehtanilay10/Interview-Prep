@@ -1,0 +1,206 @@
+{
+  "id": "lesson-asp-045",
+  "slug": "parameterized-queries-and-security",
+  "moduleSlug": "ado-net-data-access",
+  "courseSlug": "aspnet-core",
+  "title": "Parameterized Queries and Security",
+  "description": "Use SqlParameter to build safe, efficient queries and prevent SQL injection attacks.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": ["ado-net", "sql-injection", "parameters", "security", "stored-procedures", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Security is critical when building data access code. The most common vulnerability in database applications is **SQL Injection**, which occurs when untrusted user input is concatenated directly into a SQL string. **Parameterized queries** eliminate this risk by separating the SQL command structure from the data values."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Danger of String Concatenation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Never build SQL queries by concatenating strings. An attacker can supply input that changes the meaning of your query, potentially reading, modifying, or deleting data they should not access."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "SQL Injection example",
+        "text": "If a user enters `'; DROP TABLE Inventory; --` into a search box and you concatenate it into SQL, the database may execute the DROP TABLE command. Parameterized queries prevent this entirely."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable Code (DO NOT USE)",
+        "content": "This pattern is extremely dangerous and must never be used.",
+        "language": "csharp",
+        "code": "// NEVER DO THIS\nstring userInput = Request.Form[\"search\"];\nstring sql = \"SELECT * FROM Inventory WHERE Name = '\" + userInput + \"'\";\nSqlCommand command = new SqlCommand(sql, connection);\ncommand.ExecuteReader();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using SqlParameter"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**SqlParameter** objects represent values in a parameterized query. The database receives the SQL structure and the parameter values separately, so user input can never be interpreted as SQL code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe Parameterized Query",
+        "content": "Use parameters to safely pass user input to the database.",
+        "language": "csharp",
+        "code": "string userInput = Request.Form[\"search\"];\n\nusing (SqlConnection connection = new SqlConnection(connectionString))\n{\n    string sql = \"SELECT * FROM Inventory WHERE Name = @Name\";\n\n    using (SqlCommand command = new SqlCommand(sql, connection))\n    {\n        command.Parameters.AddWithValue(\"@Name\", userInput);\n\n        connection.Open();\n        using (SqlDataReader reader = command.ExecuteReader())\n        {\n            while (reader.Read())\n            {\n                // Process safe results\n            }\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SQL Injection",
+            "definition": "A security vulnerability where untrusted input alters the structure of a SQL query."
+          },
+          {
+            "term": "Parameterized Query",
+            "definition": "A SQL query that uses placeholders (@param) for values, with values provided separately as parameters."
+          },
+          {
+            "term": "SqlParameter",
+            "definition": "An object that represents a single parameter in a parameterized query."
+          },
+          {
+            "term": "Stored Procedure",
+            "definition": "A precompiled SQL statement stored in the database, called by name from application code."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Specifying Parameter Types"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`AddWithValue` infers the SQL type from the .NET type, which can sometimes lead to suboptimal query plans. For production code, explicitly set the `SqlDbType` when the type matters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Explicit Parameter Types",
+        "content": "Specify SqlDbType for precise type mapping.",
+        "language": "csharp",
+        "code": "using (SqlCommand command = new SqlCommand(sql, connection))\n{\n    SqlParameter nameParam = new SqlParameter(\"@Name\", SqlDbType.VarChar, 50)\n    {\n        Value = model.Name\n    };\n    command.Parameters.Add(nameParam);\n\n    SqlParameter priceParam = new SqlParameter(\"@Price\", SqlDbType.Decimal)\n    {\n        Value = model.Price\n    };\n    command.Parameters.Add(priceParam);\n\n    connection.Open();\n    command.ExecuteNonQuery();\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Working with Stored Procedures"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **stored procedure** is a batch of SQL statements stored in the database. Using stored procedures with ADO.NET provides benefits like execution plan reuse, reduced network traffic, and an extra layer of security."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Calling a Stored Procedure",
+        "content": "Execute a stored procedure named CreateInventory.",
+        "language": "csharp",
+        "code": "using (SqlConnection connection = new SqlConnection(connectionString))\n{\n    using (SqlCommand command = new SqlCommand(\"CreateInventory\", connection))\n    {\n        command.CommandType = CommandType.StoredProcedure;\n\n        command.Parameters.AddWithValue(\"@Name\", model.Name);\n        command.Parameters.AddWithValue(\"@Price\", model.Price);\n        command.Parameters.AddWithValue(\"@Quantity\", model.Quantity);\n\n        // Output parameter example\n        SqlParameter idParam = new SqlParameter(\"@NewId\", SqlDbType.Int)\n        {\n            Direction = ParameterDirection.Output\n        };\n        command.Parameters.Add(idParam);\n\n        connection.Open();\n        command.ExecuteNonQuery();\n\n        int newId = (int)idParam.Value;\n    }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The corresponding SQL stored procedure would look like this:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL: CreateInventory Stored Procedure",
+        "content": "Create this stored procedure in SQL Server.",
+        "language": "sql",
+        "code": "CREATE PROCEDURE CreateInventory\n    @Name VARCHAR(50),\n    @Price MONEY,\n    @Quantity INT,\n    @NewId INT OUTPUT\nAS\nBEGIN\n    INSERT INTO Inventory (Name, Price, Quantity, AddedOn)\n    VALUES (@Name, @Price, @Quantity, GETDATE());\n\n    SET @NewId = SCOPE_IDENTITY();\nEND"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices for Secure Data Access"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Always use parameterized queries for user-supplied values.",
+          "Never concatenate user input into SQL strings.",
+          "Use `using` statements to ensure connections and commands are disposed.",
+          "Validate input on the server side, even if client-side validation exists.",
+          "Apply the principle of least privilege to database accounts.",
+          "Use output parameters sparingly and validate their values."
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Secure the Search Feature",
+        "description": "Convert a vulnerable search feature into a secure parameterized query.",
+        "steps": [
+          "Create a search form that accepts a product name.",
+          "Write the vulnerable concatenation-based query (for demonstration only).",
+          "Rewrite the query using SqlParameter with @Name.",
+          "Add a second filter for minimum price using @MinPrice.",
+          "Verify that entering SQL special characters like ' OR 1=1 -- returns no results."
+        ],
+        "expectedOutcome": "You can write parameterized queries that safely handle any user input without SQL injection risk."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Never concatenate user input into SQL strings.",
+          "SqlParameter separates code from data, preventing SQL injection.",
+          "Stored procedures offer performance and security benefits.",
+          "Always validate input on the server side."
+        ],
+        "takeaway": "Secure data access is not optional. Parameterized queries are the single most important defense against SQL injection in ADO.NET."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

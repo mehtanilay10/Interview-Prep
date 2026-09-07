@@ -1,0 +1,240 @@
+{
+  "id": "lesson-asp-046",
+  "slug": "transactions-and-best-practices",
+  "moduleSlug": "ado-net-data-access",
+  "courseSlug": "aspnet-core",
+  "title": "Transactions and Best Practices in ADO.NET",
+  "description": "Implement database transactions, handle errors gracefully, and follow connection management best practices.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": ["ado-net", "transactions", "error-handling", "best-practices", "sql-server", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real-world applications often need to perform multiple database operations as a single logical unit. **Transactions** ensure that either all operations succeed or none do. Combined with proper error handling and connection management, transactions make your data access code robust and reliable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is a Transaction?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **transaction** is a group of one or more database operations that are executed as a single unit. A transaction has four key properties, known by the acronym **ACID**:"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Atomicity** — All operations succeed, or none do.",
+          "**Consistency** — The database remains in a valid state before and after the transaction.",
+          "**Isolation** — Concurrent transactions do not interfere with each other.",
+          "**Durability** — Once committed, changes survive system failures."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "ado-net-transaction-flow",
+        "caption": "Transaction flow in ADO.NET",
+        "definition": "graph LR\n    A[Begin Transaction] --> B[Operation 1: INSERT]\n    B --> C{Success?}\n    C -->|Yes| D[Operation 2: UPDATE]\n    C -->|No| E[Rollback]\n    D --> F{Success?}\n    F -->|Yes| G[Commit]\n    F -->|No| E\n    G --> H[Changes Saved]\n    E --> I[All Changes Discarded]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Transactions with SqlTransaction"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In ADO.NET, you create a transaction by calling `BeginTransaction()` on an open `SqlConnection`. All `SqlCommand` objects created from that connection participate in the transaction until you call `Commit()` or `Rollback()`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Transfer Between Inventory Items",
+        "content": "Decrease quantity from one item and increase another in a single transaction.",
+        "language": "csharp",
+        "code": "using (SqlConnection connection = new SqlConnection(connectionString))\n{\n    connection.Open();\n    SqlTransaction transaction = connection.BeginTransaction();\n\n    try\n    {\n        // Decrease quantity of item #1\n        using (SqlCommand command1 = new SqlCommand(\n            \"UPDATE Inventory SET Quantity = Quantity - 1 WHERE Id = @Id1\", connection, transaction))\n        {\n            command1.Parameters.AddWithValue(\"@Id1\", 1);\n            command1.ExecuteNonQuery();\n        }\n\n        // Increase quantity of item #2\n        using (SqlCommand command2 = new SqlCommand(\n            \"UPDATE Inventory SET Quantity = Quantity + 1 WHERE Id = @Id2\", connection, transaction))\n        {\n            command2.Parameters.AddWithValue(\"@Id2\", 2);\n            command2.ExecuteNonQuery();\n        }\n\n        transaction.Commit();\n    }\n    catch (Exception ex)\n    {\n        transaction.Rollback();\n        // Log the error\n        Console.WriteLine($\"Transaction failed: {ex.Message}\");\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Transaction rules",
+        "text": "Always call Commit() only after all operations succeed. If any command throws an exception, call Rollback() in the catch block. The transaction is automatically rolled back if the connection closes without a commit."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Database operations can fail for many reasons: network issues, constraint violations, deadlocks, or timeout. A robust data access layer handles these gracefully and provides useful feedback."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Robust Error Handling Pattern",
+        "content": "Wrap database operations in try-catch with specific exception handling.",
+        "language": "csharp",
+        "code": "public bool TryUpdateInventory(Inventory model)\n{\n    try\n    {\n        using (SqlConnection connection = new SqlConnection(connectionString))\n        {\n            connection.Open();\n            using (SqlTransaction transaction = connection.BeginTransaction())\n            using (SqlCommand command = new SqlCommand(\n                \"UPDATE Inventory SET Price = @Price, Quantity = @Quantity WHERE Id = @Id\",\n                connection, transaction))\n            {\n                command.Parameters.AddWithValue(\"@Id\", model.Id);\n                command.Parameters.AddWithValue(\"@Price\", model.Price);\n                command.Parameters.AddWithValue(\"@Quantity\", model.Quantity);\n\n                int rows = command.ExecuteNonQuery();\n                transaction.Commit();\n                return rows > 0;\n            }\n        }\n    }\n    catch (SqlException ex)\n    {\n        // Handle SQL-specific errors (deadlocks, timeouts, constraint violations)\n        Console.WriteLine($\"SQL Error {ex.Number}: {ex.Message}\");\n        return false;\n    }\n    catch (Exception ex)\n    {\n        // Handle general errors\n        Console.WriteLine($\"Error: {ex.Message}\");\n        return false;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Connection Management Best Practices"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Proper connection management is essential for performance and scalability. Connections are a limited server resource, and poor management leads to connection pool exhaustion."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Connection Management Approaches",
+        "cards": [
+          {
+            "title": "using Statement (Recommended)",
+            "description": "Wraps the connection in a using block, ensuring Dispose() is called even if an exception occurs.",
+            "pros": ["Guaranteed disposal", "Exception-safe", "Concise syntax", "Recommended by Microsoft"],
+            "tags": ["csharp", "best-practice"]
+          },
+          {
+            "title": "Manual Close",
+            "description": "Explicitly calling Close() in a finally block.",
+            "pros": ["Explicit control", "Works in older code"],
+            "cons": ["Easy to forget Close()", "Verbose", "Error-prone"],
+            "tags": ["legacy"]
+          },
+          {
+            "title": "Connection Pooling",
+            "description": "Enabled by default. Reuses physical connections instead of creating new ones each time.",
+            "pros": ["Significantly faster", "Reduces server load", "No code changes needed"],
+            "tags": ["performance"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Additional Best Practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Always wrap SqlConnection, SqlCommand, and SqlDataReader in using statements.",
+          "Open connections as late as possible and close them as early as possible.",
+          "Use async methods (`OpenAsync`, `ExecuteReaderAsync`, etc.) for scalable web applications.",
+          "Set appropriate CommandTimeout values for long-running queries.",
+          "Log exceptions with enough context to diagnose issues (SQL, parameters, user context).",
+          "Avoid storing connection strings in source control; use user secrets or environment variables."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently Asked Questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "ADO.NET FAQ",
+        "items": [
+          {
+            "question": "Do I need to call connection.Close() if I use a using statement?",
+            "answer": "No. The using statement calls Dispose() on the connection, which implicitly closes it. The using pattern is preferred over manual Close() calls."
+          },
+          {
+            "question": "What happens if I forget to rollback a transaction?",
+            "answer": "If the connection closes or the command times out without an explicit Commit or Rollback, SQL Server automatically rolls back the transaction. However, you should always call Rollback() explicitly in your catch block for clarity."
+          },
+          {
+            "question": "Should I use transactions for every database operation?",
+            "answer": "No. Single INSERT, UPDATE, or DELETE statements are atomic by default in SQL Server. Use transactions only when you need to combine multiple operations into an atomic unit."
+          },
+          {
+            "question": "What is the difference between Rollback and Dispose?",
+            "answer": "Rollback explicitly undoes changes made during the transaction. Dispose cleans up the SqlTransaction object. Calling Dispose without Commit implicitly rolls back the transaction in SQL Server."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Production Readiness Checklist",
+        "items": [
+          {
+            "text": "All connections, commands, and readers use using statements.",
+            "hint": "Verify no manual Close() calls without using."
+          },
+          {
+            "text": "Transactions use try-catch with explicit Commit or Rollback.",
+            "hint": "Rollback in catch, Commit only on success."
+          },
+          {
+            "text": "SqlException is caught separately from general Exception.",
+            "hint": "Allows specific handling for deadlocks, timeouts, and constraint violations."
+          },
+          {
+            "text": "Connection strings are loaded from configuration, not hardcoded.",
+            "hint": "Use IConfiguration or environment variables."
+          },
+          {
+            "text": "Async methods are used for I/O-bound operations in ASP.NET Core.",
+            "hint": "Use OpenAsync, ExecuteReaderAsync, etc."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Transactions group multiple operations into an atomic unit using SqlTransaction.",
+          "Always call Commit() on success and Rollback() on failure.",
+          "using statements guarantee proper disposal of connections and commands.",
+          "Async methods improve scalability in ASP.NET Core web applications."
+        ],
+        "takeaway": "You now have the complete ADO.NET toolkit: architecture, setup, reading, CRUD, security, and transactions. You are ready to build production-ready data access code."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

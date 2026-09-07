@@ -1,0 +1,234 @@
+{
+  "id": "lesson-asp-041",
+  "slug": "cors-best-practices-troubleshooting",
+  "moduleSlug": "cors-cross-origin",
+  "courseSlug": "aspnet-core",
+  "title": "CORS Best Practices and Troubleshooting",
+  "description": "Learn production-ready CORS patterns and how to diagnose and fix common CORS errors.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 8,
+  "tags": [
+    "asp.net core",
+    "cors",
+    "best practices",
+    "troubleshooting",
+    "security"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CORS Best Practices"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CORS is a security boundary, not just a configuration checkbox. Following these practices keeps your API safe while still allowing legitimate frontend applications to work."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Production CORS Checklist",
+        "items": [
+          {
+            "text": "Never use AllowAnyOrigin() in production — it defeats the purpose of CORS",
+            "hint": "AllowAnyOrigin allows every website on the internet to call your API."
+          },
+          {
+            "text": "Pair AllowCredentials() with WithOrigins() and explicit domain names",
+            "hint": "AllowAnyOrigin and AllowCredentials together cause a runtime CORS error."
+          },
+          {
+            "text": "Use HTTPS origins only in WithOrigins()",
+            "hint": "Browsers block mixed-content requests from HTTPS pages to HTTP origins."
+          },
+          {
+            "text": "Apply the most restrictive policy that still works",
+            "hint": "Start with a narrow allowlist and expand only when needed."
+          },
+          {
+            "text": "Place app.UseCors() after UseRouting and before UseAuthorization()",
+            "hint": "CORS must run before authorization so the browser preflight is handled correctly."
+          },
+          {
+            "text": "Do not use CORS as a replacement for authentication or authorization",
+            "hint": "CORS is a browser-enforced convenience; server-side auth is still required."
+          }
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Development vs Production CORS",
+        "cards": [
+          {
+            "title": "Development",
+            "description": "Local development usually runs the frontend and API on different ports.",
+            "pros": [
+              "AllowAnyOrigin is convenient while building",
+              "Fast iteration without managing domain lists"
+            ],
+            "cons": [
+              "Not safe to deploy as-is",
+              "Should be replaced with a real allowlist before production"
+            ]
+          },
+          {
+            "title": "Production",
+            "description": "Production APIs should restrict access to known origins only.",
+            "pros": [
+              "Reduces attack surface",
+              "Prevents unauthorized websites from using your API",
+              "Required for credentials-based flows"
+            ],
+            "cons": [
+              "Requires maintaining a list of allowed origins",
+              "New frontend domains need explicit approval"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common CORS Errors and Fixes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The browser console is your best friend when debugging CORS. Below are the most common errors and their typical fixes."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Error Message",
+          "Typical Cause",
+          "Fix"
+        ],
+        "rows": [
+          [
+            "No 'Access-Control-Allow-Origin' header is present on the requested resource",
+            "The server did not enable CORS for this endpoint",
+            "Register and apply a CORS policy in Program.cs"
+          ],
+          [
+            "The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*' when the request's credentials mode is 'include'",
+            "AllowAnyOrigin was used with AllowCredentials",
+            "Replace AllowAnyOrigin with WithOrigins and explicit domains"
+          ],
+          [
+            "Request header field Authorization is not allowed by Access-Control-Allow-Headers",
+            "The preflight response did not include the header",
+            "Add .AllowAnyHeader() or .WithHeaders(\"Authorization\") to the policy"
+          ],
+          [
+            "Method POST is not allowed by Access-Control-Allow-Methods",
+            "The policy did not allow the HTTP method",
+            "Add .AllowAnyMethod() or .WithMethods(\"POST\") to the policy"
+          ],
+          [
+            "CORS preflight channel did not succeed",
+            "The OPTIONS request returned a non-2xx status or the route was not matched",
+            "Ensure UseCors is placed after UseRouting and before UseAuthorization"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Debug Tip",
+        "text": "Always inspect the Network tab in browser DevTools. Look at the OPTIONS request first: check its response status and response headers. The actual failing request will usually have a CORS error only because the preflight already failed."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CORS Is Not Authentication"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A common misunderstanding is treating CORS as a security wall. It is not. CORS is enforced by the browser, not the server. Any server-side client (curl, Postman, server-to-server HTTP) can ignore CORS headers completely. Always keep authentication and authorization on your API endpoints regardless of CORS settings."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — Correct Middleware Order",
+        "content": "Place CORS in the right order to avoid preflight failures.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"ProductionPolicy\", policy =>\n    {\n        policy\n            .WithOrigins(\"https://app.example.com\")\n            .AllowAnyHeader()\n            .AllowAnyMethod()\n            .AllowCredentials();\n    });\n});\n\nbuilder.Services.AddControllers();\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\n\napp.UseCors(\"ProductionPolicy\");\n\napp.UseAuthentication();\napp.UseAuthorization();\n\napp.MapControllers();\napp.Run();"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix a Broken CORS Configuration",
+        "description": "A developer reports that their frontend cannot call the API. Review and fix the code.",
+        "steps": [
+          "Read the following broken configuration: the API uses AllowAnyOrigin() together with AllowCredentials().",
+          "Identify why this causes a CORS error in the browser.",
+          "Rewrite the policy to use WithOrigins(\"https://trusted.example.com\") and AllowCredentials().",
+          "Move UseCors to the correct position in the middleware pipeline.",
+          "Confirm the project builds successfully."
+        ],
+        "expectedOutcome": "A corrected CORS configuration that works in production without runtime errors."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Lesson Checkpoint",
+        "items": [
+          {
+            "text": "I know why AllowAnyOrigin and AllowCredentials should never be used together"
+          },
+          {
+            "text": "I can read a CORS error and match it to a fix"
+          },
+          {
+            "text": "I understand that CORS is a browser-side mechanism, not a server-side security boundary"
+          },
+          {
+            "text": "I can place UseCors in the correct middleware order"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Module Summary",
+        "points": [
+          "CORS relaxes the same-origin policy so trusted frontends can call your API",
+          "Use named policies for maintainable, reusable rules",
+          "Preflight OPTIONS requests are handled automatically by ASP.NET Core middleware",
+          "Always pair AllowCredentials with explicit origins, not wildcards",
+          "CORS is not a replacement for authentication and authorization"
+        ],
+        "takeaway": "You now have the full picture: from same-origin basics to production-ready CORS configuration in ASP.NET Core."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

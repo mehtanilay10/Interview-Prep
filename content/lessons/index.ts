@@ -165,24 +165,33 @@ import aspLesson1 from '../courses/aspnet-core/01-getting-started-aspnet-core-mv
 import aspLesson2 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/first-crud-application-aspnet-core-mvc.json';
 import aspLesson3 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/introduction-to-aspnet-core-mvc.json';
 import aspLesson4 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/learn-aspnet-core-examples-codes.json';
+import aspLesson40 from '../courses/aspnet-core/01-getting-started-aspnet-core-mvc/setting-up-development-environment.json';
 import aspLesson5 from '../courses/aspnet-core/02-controllers-routing/actions-in-aspnet-core.json';
 import aspLesson6 from '../courses/aspnet-core/02-controllers-routing/aspnet-core-convention-based-routing.json';
 import aspLesson7 from '../courses/aspnet-core/02-controllers-routing/controllers-in-aspnet-core.json';
+import aspLesson38 from '../courses/aspnet-core/02-controllers-routing/attribute-routing-aspnet-core.json';
+import aspLesson39 from '../courses/aspnet-core/02-controllers-routing/route-parameters-constraints-aspnet-core.json';
 import aspLesson8 from '../courses/aspnet-core/03-model-binding-validation/advanced-model-binding-concepts.json';
 import aspLesson9 from '../courses/aspnet-core/03-model-binding-validation/model-binding-aspnet-core-beginner-advanced.json';
 import aspLesson10 from '../courses/aspnet-core/03-model-binding-validation/model-validation-aspnet-core-beginner-expert.json';
+import aspLesson41 from '../courses/aspnet-core/03-model-binding-validation/data-annotation-attributes-client-side-validation.json';
 import aspLesson11 from '../courses/aspnet-core/04-views-tag-helpers/built-in-tag-helpers.json';
 import aspLesson12 from '../courses/aspnet-core/04-views-tag-helpers/custom-tag-helper.json';
 import aspLesson13 from '../courses/aspnet-core/04-views-tag-helpers/introduction-to-tag-helpers.json';
 import aspLesson14 from '../courses/aspnet-core/04-views-tag-helpers/views-in-aspnet-core.json';
 import aspLesson15 from '../courses/aspnet-core/05-dependency-injection-configuration/aspnet-core-configurations-program-middleware-appsettings.json';
 import aspLesson16 from '../courses/aspnet-core/05-dependency-injection-configuration/dependency-injection-aspnet-core.json';
+import aspLesson42 from '../courses/aspnet-core/05-dependency-injection-configuration/service-lifetimes-scoped-transient-singleton.json';
+import aspLesson43 from '../courses/aspnet-core/05-dependency-injection-configuration/options-pattern-strongly-typed-configuration.json';
+import aspLesson44 from '../courses/aspnet-core/05-dependency-injection-configuration/di-in-views-and-action-methods.json';
 import aspLesson17 from '../courses/aspnet-core/06-filters/aspnet-core-filters-dependency-injection-global-filters.json';
 import aspLesson18 from '../courses/aspnet-core/06-filters/filters-aspnet-core-beginner-expert.json';
 import aspLesson19 from '../courses/aspnet-core/07-web-api/call-web-api-aspnet-core-net10.json';
 import aspLesson20 from '../courses/aspnet-core/07-web-api/call-web-api-javascript-xmlhttprequest.json';
 import aspLesson21 from '../courses/aspnet-core/07-web-api/call-web-api-jquery-aspnet-core.json';
 import aspLesson22 from '../courses/aspnet-core/07-web-api/create-web-apis-aspnet-core-restful-pattern.json';
+import aspLesson45 from '../courses/aspnet-core/07-web-api/introduction-to-rest-api-concepts.json';
+import aspLesson46 from '../courses/aspnet-core/07-web-api/test-web-api-postman-curl.json';
 import aspLesson23 from '../courses/aspnet-core/08-authentication-identity/add-custom-user-properties-aspnet-core-identity.json';
 import aspLesson24 from '../courses/aspnet-core/08-authentication-identity/authentication-of-users-aspnet-core-identity.json';
 import aspLesson25 from '../courses/aspnet-core/08-authentication-identity/create-read-update-delete-users-aspnet-core-identity.json';
@@ -196,8 +205,19 @@ import aspLesson32 from '../courses/aspnet-core/08-authentication-identity/work-
 import aspLesson33 from '../courses/aspnet-core/09-localization-globalization/globalization-localization-resource-files.json';
 import aspLesson34 from '../courses/aspnet-core/09-localization-globalization/localization-portable-object-po-files.json';
 import aspLesson35 from '../courses/aspnet-core/09-localization-globalization/use-globalization-localization-aspnet-core.json';
+import aspLesson47 from '../courses/aspnet-core/09-localization-globalization/introduction-to-globalization-localization-concepts.json';
+import aspLesson48 from '../courses/aspnet-core/09-localization-globalization/localize-validation-messages-data-annotations.json';
+import aspLesson57 from '../courses/aspnet-core/09-localization-globalization/testing-strategies-localized-apps.json';
 import aspLesson36 from '../courses/aspnet-core/10-ado-net-data-access/learn-ado-net-crud-operations-aspnet-core.json';
+import aspLesson49 from '../courses/aspnet-core/10-ado-net-data-access/setting-up-ado-net-project.json';
+import aspLesson50 from '../courses/aspnet-core/10-ado-net-data-access/reading-data-ado-net.json';
+import aspLesson51 from '../courses/aspnet-core/10-ado-net-data-access/crud-operations-ado-net.json';
+import aspLesson52 from '../courses/aspnet-core/10-ado-net-data-access/parameterized-queries-and-security.json';
 import aspLesson37 from '../courses/aspnet-core/11-cors-cross-origin/enable-cors-aspnet-core.json';
+import aspLesson53 from '../courses/aspnet-core/11-cors-cross-origin/01-understanding-cors-same-origin-policy.json';
+import aspLesson54 from '../courses/aspnet-core/11-cors-cross-origin/03-cors-policies-named-policies.json';
+import aspLesson55 from '../courses/aspnet-core/11-cors-cross-origin/04-cors-preflight-requests.json';
+import aspLesson56 from '../courses/aspnet-core/11-cors-cross-origin/05-cors-best-practices-troubleshooting.json';
 
 import linqLesson1 from '../courses/linq/01-getting-started-linq/learn-linq-step-by-step.json';
 import linqLesson2 from '../courses/linq/01-getting-started-linq/linq-api-in-net.json';
@@ -654,41 +674,6 @@ import oopLesson24 from '../courses/oops-concepts/06-interfaces-abstract-classes
 import oopLesson25 from '../courses/oops-concepts/07-design-principles/solid-principles.json';
 import oopLesson26 from '../courses/oops-concepts/07-design-principles/dry-principle.json';
 
-const rawLessons = [sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8, sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16, sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24, sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32, sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40, sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48, sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56, sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64, sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72, sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80, sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88, sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96, sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104, sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112, sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120, sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128, sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136, sqlLesson137, sqlLesson138, sqlLesson139,   sqlLesson140, sqlLesson141, sqlLesson142, sqlLesson143, sqlLesson144, sqlLesson145, sqlLesson146, sqlLesson147, sqlLesson148, sqlLesson149, sqlLesson150, sqlLesson151, sqlLesson152, sqlLesson153, sqlLesson154, sqlLesson155, sqlLesson156, sqlLesson157, sqlLesson158, sqlLesson159, sqlLesson160, aspLesson1, aspLesson2, aspLesson3, aspLesson4, aspLesson5, aspLesson6, aspLesson7, aspLesson8, aspLesson9, aspLesson10, aspLesson11, aspLesson12, aspLesson13, aspLesson14, aspLesson15, aspLesson16, aspLesson17, aspLesson18, aspLesson19, aspLesson20, aspLesson21, aspLesson22, aspLesson23, aspLesson24, aspLesson25, aspLesson26, aspLesson27, aspLesson28, aspLesson29, aspLesson30, aspLesson31, aspLesson32, aspLesson33, aspLesson34, aspLesson35, aspLesson36, aspLesson37, linqLesson1, linqLesson2, linqLesson3, linqLesson4, linqLesson5, linqLesson6, linqLesson7, linqLesson8, linqLesson9, linqLesson10, linqLesson11, linqLesson12, linqLesson13, linqLesson14, linqLesson15, linqLesson16, linqLesson17, linqLesson18, linqLesson19, linqLesson20, linqLesson21, linqLesson22, linqLesson23, linqLesson24, linqLesson25, linqLesson26, linqLesson27, linqLesson28, linqLesson29, linqLesson30, linqLesson31, linqLesson32, linqLesson33, linqLesson34, linqLesson35, linqLesson36, linqLesson37, linqLesson38, linqLesson39, linqLesson40, efLesson1, efLesson2, efLesson3, efLesson4, efLesson5, efLesson6, efLesson7, efLesson8, efLesson9, efLesson10, efLesson11, efLesson12, efLesson13, efLesson14, efLesson15, efLesson16, efLesson17, efLesson18, efLesson19, efLesson20, efLesson21, efLesson22, efLesson23, efLesson24, efLesson25, efLesson26, efLesson27, efLesson28, efLesson29, efLesson30, efLesson31, efLesson32, efLesson33, efLesson34, efLesson35, efLesson36, efLesson37, efLesson38, efLesson39, efLesson40, efLesson41, reactFundLesson1, reactFundLesson2, reactFundLesson3, reactFundLesson4, reactFundLesson5, reactFundLesson6, reactFundLesson7, reactFundLesson8, reactFundLesson9, reactFundLesson10, reactFundLesson11, reactFundLesson12, reactFundLesson13, reactFundLesson14, reactFundLesson15, reactFundLesson16, reactFundLesson17, reactFundLesson18, reactFundLesson19, reactFundLesson20, reactFundLesson21, reactFundLesson22, reactFundLesson23, reactFundLesson24, reactFundLesson25, reactFundLesson26, reactFundLesson27, reactFundLesson28, reactFundLesson29, reactFundLesson30, reactFundLesson31, reactFundLesson32, reactAdvLesson1, reactAdvLesson2, reactAdvLesson3, reactAdvLesson4, reactAdvLesson5, reactAdvLesson6, reactAdvLesson7, reactAdvLesson8, reactAdvLesson9, reactAdvLesson10, reactAdvLesson11,   reactAdvLesson12, reactAdvLesson13, reactAdvLesson14, reactAdvLesson15, reactAdvLesson16, reactAdvLesson17, reactAdvLesson18, reactAdvLesson19, reactAdvLesson20, reactAdvLesson21, reactAdvLesson22, reactAdvLesson23, reactAdvLesson24, reactAdvLesson25, reactAdvLesson26, reactAdvLesson27, reactAdvLesson28, reactAdvLesson29, reactAdvLesson30, reactAdvLesson31, reactAdvLesson32, reactAdvLesson33, reactAdvLesson34, reactAdvLesson35, tsrLesson1, tsrLesson2, tsrLesson3, tsrLesson4, tsrLesson5, tsrLesson6, tsrLesson7, tsrLesson8, tsrLesson9, tsrLesson10, tsrLesson11, tsrLesson12, tsrLesson13, tsrLesson14, tsrLesson15, tsrLesson16, tsrLesson17, reduxLesson1, reduxLesson2, reduxLesson3, reduxLesson4, reduxLesson5, reduxLesson6, reduxLesson7, reduxLesson8, reduxLesson9, reduxLesson10, reduxLesson11, reduxLesson12, reduxLesson13, reduxLesson14, reduxLesson15, reduxLesson16, rqLesson1, rqLesson2, rqLesson3, rqLesson4, rqLesson5, rqLesson6,   rqLesson7, rqLesson8, rqLesson9, rqLesson10, rqLesson11, rqLesson12, rqLesson13, rqLesson14, rqLesson15, rqLesson16, rqLesson17, rqLesson18, rqLesson19, rqLesson20, rqLesson21, rqLesson22, rqLesson23, rqLesson24, rqLesson25, rqLesson26, rqLesson27, rqLesson28, rqLesson29, rqLesson30, rqLesson31, rqLesson32, rqLesson33, rqLesson34,   rqLesson35, apolloLesson1, apolloLesson2, apolloLesson3, apolloLesson4, apolloLesson5, apolloLesson6, apolloLesson7, apolloLesson8, apolloLesson9, apolloLesson10, apolloLesson11, apolloLesson12, apolloLesson13, apolloLesson14, apolloLesson15, apolloLesson16, apolloLesson17, apolloLesson18, apolloLesson19, apolloLesson20, apolloLesson21, apolloLesson22, apolloLesson23, apolloLesson24, apolloLesson25, apolloLesson26, apolloLesson27, apolloLesson28, apolloLesson29, apolloLesson30, apolloLesson31, apolloLesson32, apolloLesson33, apolloLesson34, apolloLesson35, csharpLesson1, csharpLesson2, csharpLesson3, csharpLesson4, csharpLesson5, csharpLesson6, csharpLesson7, csharpLesson8, csharpLesson9, csharpLesson10, csharpLesson11, csharpLesson12, csharpLesson13, csharpLesson14, csharpLesson15, csharpLesson16, csharpLesson17, csharpLesson18, csharpLesson19, webApiLesson1, webApiLesson2, webApiLesson3, webApiLesson4, webApiLesson5, webApiLesson6, webApiLesson7, webApiLesson8, webApiLesson9, webApiLesson10, webApiLesson11, webApiLesson12, webApiLesson13, webApiLesson14, webApiLesson15, webApiLesson16, webApiLesson17, webApiLesson18, webApiLesson19, webApiLesson20, webApiLesson21, webApiLesson22, webApiLesson23, webApiLesson24, webApiLesson25, authLesson1, authLesson2, authLesson3, authLesson4, authLesson5, authLesson6, authLesson7, authLesson8, authLesson9, authLesson10, authLesson11, authLesson12, authLesson13, authLesson14, cleanCodeLesson1, cleanCodeLesson2, cleanCodeLesson3, cleanCodeLesson4, cleanCodeLesson5, cleanCodeLesson6, cleanCodeLesson7, cleanCodeLesson8, cleanCodeLesson9, cleanCodeLesson10, cleanCodeLesson11, cleanCodeLesson12, cleanCodeLesson13, cleanCodeLesson14, cleanCodeLesson15, cleanCodeLesson16, cleanCodeLesson17, cleanCodeLesson18, cleanCodeLesson19, cleanCodeLesson20, cleanCodeLesson21, cleanCodeLesson22, cleanCodeLesson23, cleanCodeLesson24, cleanCodeLesson25, unitTestLesson1, unitTestLesson2, unitTestLesson3, unitTestLesson4, unitTestLesson5, unitTestLesson6, unitTestLesson7, unitTestLesson8, unitTestLesson9, unitTestLesson10, unitTestLesson11, unitTestLesson12, unitTestLesson13, unitTestLesson14, unitTestLesson15, unitTestLesson16, unitTestLesson17, unitTestLesson18, unitTestLesson19, unitTestLesson20, reactTestLesson1, reactTestLesson2, reactTestLesson3, reactTestLesson4, reactTestLesson5, reactTestLesson6, reactTestLesson7, reactTestLesson8, reactTestLesson9, reactTestLesson10, reactTestLesson11, reactTestLesson12, reactTestLesson13, reactTestLesson14, reactTestLesson15, reactTestLesson16, reactTestLesson17, reactTestLesson18, reactTestLesson19, reactTestLesson20, reactTestLesson21, reactTestLesson22, reactTestLesson23, reactTestLesson24, reactTestLesson25, oopLesson1, oopLesson2, oopLesson3, oopLesson4, oopLesson5, oopLesson6, oopLesson7, oopLesson8, oopLesson9, oopLesson10, oopLesson11, oopLesson12, oopLesson13, oopLesson14, oopLesson15, oopLesson16, oopLesson17, oopLesson18, oopLesson19, oopLesson20, oopLesson21, oopLesson22, oopLesson23, oopLesson24, oopLesson25, oopLesson26, iqLessonB01, iqLessonB02, iqLessonB03, iqLessonB04, iqLessonB05, iqLessonB06, iqLessonB07, iqLessonB08, iqLessonB09, iqLessonB10, iqLessonB11, iqLessonB12, iqLessonB13, iqLessonB14, iqLessonB15, iqLessonB16, iqLessonB17, iqLessonB18, iqLessonB19, iqLessonB20, iqLessonI01, iqLessonI02, iqLessonI03, iqLessonI04, iqLessonI05, iqLessonA01, iqLessonA02, iqLessonA03, iqLessonA04, iqLessonA05, iqLessonS01, iqLessonS02, iqLessonS03, iqLessonSD01, iqLessonSD02, iqLessonR01, iqLessonR02, iqLessonR03,   iqLessonT01, iqLessonT02,
-  fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10, fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19, fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25,
-  csharpLesson20, csharpLesson21, csharpLesson22, csharpLesson23, csharpLesson24, csharpLesson25, csharpLesson26, csharpLesson27, csharpLesson28,
-  unitTestLesson21, unitTestLesson22, unitTestLesson23, unitTestLesson24, unitTestLesson25, unitTestLesson26,
-  reduxLesson17, reduxLesson18, reduxLesson19, reduxLesson20, reduxLesson21, reduxLesson22, reduxLesson23, reduxLesson24, reduxLesson25,
-  graphqlLesson25, graphqlLesson26,
-  designLesson17, designLesson18, designLesson19, designLesson20, designLesson21, designLesson22, designLesson23, designLesson24, designLesson25
-];
-
-export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
-
-export function getLessonBySlug(slug: string): Lesson | undefined {
-  return lessons.find((l) => l.slug === slug);
-}
-
-export function getLessonsByModule(moduleSlug: string, courseSlug?: string): Lesson[] {
-  return lessons
-    .filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug))
-    .sort((a, b) => a.order - b.order);
-}
-
-export function getAdjacentLessons(
-  lesson: Lesson,
-  allLessons: Lesson[]
-): { prev: Lesson | null; next: Lesson | null } {
-  const moduleLessons = allLessons
-    .filter((l) => l.moduleSlug === lesson.moduleSlug)
-    .sort((a, b) => a.order - b.order);
-  const idx = moduleLessons.findIndex((l) => l.slug === lesson.slug);
-  return {
-    prev: idx > 0 ? moduleLessons[idx - 1] : null,
-    next: idx < moduleLessons.length - 1 ? moduleLessons[idx + 1] : null,
-  };
-}
-
 import iqLessonB01 from '../courses/interview-qa/01-beginner-questions/beginner-q1.json';
 import iqLessonB02 from '../courses/interview-qa/01-beginner-questions/beginner-q2.json';
 import iqLessonB03 from '../courses/interview-qa/01-beginner-questions/beginner-q3.json';
@@ -709,30 +694,24 @@ import iqLessonB17 from '../courses/interview-qa/01-beginner-questions/beginner-
 import iqLessonB18 from '../courses/interview-qa/01-beginner-questions/beginner-q18.json';
 import iqLessonB19 from '../courses/interview-qa/01-beginner-questions/beginner-q19.json';
 import iqLessonB20 from '../courses/interview-qa/01-beginner-questions/beginner-q20.json';
-
 import iqLessonI01 from '../courses/interview-qa/02-intermediate-questions/intermediate-q1.json';
 import iqLessonI02 from '../courses/interview-qa/02-intermediate-questions/intermediate-q2.json';
 import iqLessonI03 from '../courses/interview-qa/02-intermediate-questions/intermediate-q3.json';
 import iqLessonI04 from '../courses/interview-qa/02-intermediate-questions/intermediate-q4.json';
 import iqLessonI05 from '../courses/interview-qa/02-intermediate-questions/intermediate-q5.json';
-
 import iqLessonA01 from '../courses/interview-qa/03-advanced-questions/advanced-q1.json';
 import iqLessonA02 from '../courses/interview-qa/03-advanced-questions/advanced-q2.json';
 import iqLessonA03 from '../courses/interview-qa/03-advanced-questions/advanced-q3.json';
 import iqLessonA04 from '../courses/interview-qa/03-advanced-questions/advanced-q4.json';
 import iqLessonA05 from '../courses/interview-qa/03-advanced-questions/advanced-q5.json';
-
 import iqLessonS01 from '../courses/interview-qa/04-scenario-based/scenario-q1.json';
 import iqLessonS02 from '../courses/interview-qa/04-scenario-based/scenario-q2.json';
 import iqLessonS03 from '../courses/interview-qa/04-scenario-based/scenario-q3.json';
-
 import iqLessonSD01 from '../courses/interview-qa/05-system-design/system-q1.json';
 import iqLessonSD02 from '../courses/interview-qa/05-system-design/system-q2.json';
-
 import iqLessonR01 from '../courses/interview-qa/06-rapid-fire/rapid-q1.json';
 import iqLessonR02 from '../courses/interview-qa/06-rapid-fire/rapid-q2.json';
 import iqLessonR03 from '../courses/interview-qa/06-rapid-fire/rapid-q3.json';
-
 import iqLessonT01 from '../courses/interview-qa/07-interview-traps/trap-q1.json';
 import iqLessonT02 from '../courses/interview-qa/07-interview-traps/trap-q2.json';
 
@@ -761,3 +740,135 @@ import fsLesson22 from '../courses/fullstack-security/07-environment-secrets/sec
 import fsLesson23 from '../courses/fullstack-security/07-environment-secrets/credential-handling.json';
 import fsLesson24 from '../courses/fullstack-security/08-security-testing/security-testing-fundamentals.json';
 import fsLesson25 from '../courses/fullstack-security/08-security-testing/penetration-testing-basics.json';
+
+const rawLessons = [
+  sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8,
+  sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16,
+  sqlLesson17, sqlLesson18, sqlLesson19, sqlLesson20, sqlLesson21, sqlLesson22, sqlLesson23, sqlLesson24,
+  sqlLesson25, sqlLesson26, sqlLesson27, sqlLesson28, sqlLesson29, sqlLesson30, sqlLesson31, sqlLesson32,
+  sqlLesson33, sqlLesson34, sqlLesson35, sqlLesson36, sqlLesson37, sqlLesson38, sqlLesson39, sqlLesson40,
+  sqlLesson41, sqlLesson42, sqlLesson43, sqlLesson44, sqlLesson45, sqlLesson46, sqlLesson47, sqlLesson48,
+  sqlLesson49, sqlLesson50, sqlLesson51, sqlLesson52, sqlLesson53, sqlLesson54, sqlLesson55, sqlLesson56,
+  sqlLesson57, sqlLesson58, sqlLesson59, sqlLesson60, sqlLesson61, sqlLesson62, sqlLesson63, sqlLesson64,
+  sqlLesson65, sqlLesson66, sqlLesson67, sqlLesson68, sqlLesson69, sqlLesson70, sqlLesson71, sqlLesson72,
+  sqlLesson73, sqlLesson74, sqlLesson75, sqlLesson76, sqlLesson77, sqlLesson78, sqlLesson79, sqlLesson80,
+  sqlLesson81, sqlLesson82, sqlLesson83, sqlLesson84, sqlLesson85, sqlLesson86, sqlLesson87, sqlLesson88,
+  sqlLesson89, sqlLesson90, sqlLesson91, sqlLesson92, sqlLesson93, sqlLesson94, sqlLesson95, sqlLesson96,
+  sqlLesson97, sqlLesson98, sqlLesson99, sqlLesson100, sqlLesson101, sqlLesson102, sqlLesson103, sqlLesson104,
+  sqlLesson105, sqlLesson106, sqlLesson107, sqlLesson108, sqlLesson109, sqlLesson110, sqlLesson111, sqlLesson112,
+  sqlLesson113, sqlLesson114, sqlLesson115, sqlLesson116, sqlLesson117, sqlLesson118, sqlLesson119, sqlLesson120,
+  sqlLesson121, sqlLesson122, sqlLesson123, sqlLesson124, sqlLesson125, sqlLesson126, sqlLesson127, sqlLesson128,
+  sqlLesson129, sqlLesson130, sqlLesson131, sqlLesson132, sqlLesson133, sqlLesson134, sqlLesson135, sqlLesson136,
+  sqlLesson137, sqlLesson138, sqlLesson139, sqlLesson140, sqlLesson141, sqlLesson142, sqlLesson143, sqlLesson144,
+  sqlLesson145, sqlLesson146, sqlLesson147, sqlLesson148, sqlLesson149, sqlLesson150, sqlLesson151, sqlLesson152,
+  sqlLesson153, sqlLesson154, sqlLesson155, sqlLesson156, sqlLesson157, sqlLesson158, sqlLesson159, sqlLesson160,
+  aspLesson1, aspLesson2, aspLesson3, aspLesson4, aspLesson40, aspLesson5, aspLesson6, aspLesson7,
+  aspLesson38, aspLesson39, aspLesson8, aspLesson9, aspLesson10, aspLesson41, aspLesson11, aspLesson12,
+  aspLesson13, aspLesson14, aspLesson15, aspLesson16, aspLesson42, aspLesson43, aspLesson44, aspLesson17,
+  aspLesson18, aspLesson19, aspLesson20, aspLesson21, aspLesson22, aspLesson45, aspLesson46, aspLesson23,
+  aspLesson24, aspLesson25, aspLesson26, aspLesson27, aspLesson28, aspLesson29, aspLesson30, aspLesson31,
+  aspLesson32, aspLesson33, aspLesson34, aspLesson35, aspLesson47, aspLesson48, aspLesson57, aspLesson36, aspLesson49,
+  aspLesson50, aspLesson51, aspLesson52, aspLesson37, aspLesson53, aspLesson54, aspLesson55, aspLesson56,
+  linqLesson1, linqLesson2, linqLesson3, linqLesson4, linqLesson5, linqLesson6, linqLesson7, linqLesson8,
+  linqLesson9, linqLesson10, linqLesson11, linqLesson12, linqLesson13, linqLesson14, linqLesson15, linqLesson16,
+  linqLesson17, linqLesson18, linqLesson19, linqLesson20, linqLesson21, linqLesson22, linqLesson23, linqLesson24,
+  linqLesson25, linqLesson26, linqLesson27, linqLesson28, linqLesson29, linqLesson30, linqLesson31, linqLesson32,
+  linqLesson33, linqLesson34, linqLesson35, linqLesson36, linqLesson37, linqLesson38, linqLesson39, linqLesson40,
+  efLesson1, efLesson2, efLesson3, efLesson4, efLesson5, efLesson6, efLesson7, efLesson8, efLesson9, efLesson10,
+  efLesson11, efLesson12, efLesson13, efLesson14, efLesson15, efLesson16, efLesson17, efLesson18, efLesson19,
+  efLesson20, efLesson21, efLesson22, efLesson23, efLesson24, efLesson25, efLesson26, efLesson27, efLesson28,
+  efLesson29, efLesson30, efLesson31, efLesson32, efLesson33, efLesson34, efLesson35, efLesson36, efLesson37,
+  efLesson38, efLesson39, efLesson40, efLesson41,
+  reactFundLesson1, reactFundLesson2, reactFundLesson3, reactFundLesson4, reactFundLesson5,
+  reactFundLesson6, reactFundLesson7, reactFundLesson8, reactFundLesson9, reactFundLesson10, reactFundLesson11,
+  reactFundLesson12, reactFundLesson13, reactFundLesson14, reactFundLesson15, reactFundLesson16, reactFundLesson17,
+  reactFundLesson18, reactFundLesson19, reactFundLesson20, reactFundLesson21, reactFundLesson22, reactFundLesson23,
+  reactFundLesson24, reactFundLesson25, reactFundLesson26, reactFundLesson27, reactFundLesson28, reactFundLesson29,
+  reactFundLesson30, reactFundLesson31, reactFundLesson32,
+  reactAdvLesson1, reactAdvLesson2, reactAdvLesson3, reactAdvLesson4, reactAdvLesson5, reactAdvLesson6,
+  reactAdvLesson7, reactAdvLesson8, reactAdvLesson9, reactAdvLesson10, reactAdvLesson11, reactAdvLesson12,
+  reactAdvLesson13, reactAdvLesson14, reactAdvLesson15, reactAdvLesson16, reactAdvLesson17, reactAdvLesson18,
+  reactAdvLesson19, reactAdvLesson20, reactAdvLesson21, reactAdvLesson22, reactAdvLesson23, reactAdvLesson24,
+  reactAdvLesson25, reactAdvLesson26, reactAdvLesson27, reactAdvLesson28, reactAdvLesson29, reactAdvLesson30,
+  reactAdvLesson31, reactAdvLesson32, reactAdvLesson33, reactAdvLesson34, reactAdvLesson35,
+  tsrLesson1, tsrLesson2, tsrLesson3, tsrLesson4, tsrLesson5, tsrLesson6, tsrLesson7, tsrLesson8,
+  tsrLesson9, tsrLesson10, tsrLesson11, tsrLesson12, tsrLesson13, tsrLesson14, tsrLesson15, tsrLesson16,
+  tsrLesson17,
+  reduxLesson1, reduxLesson2, reduxLesson3, reduxLesson4, reduxLesson5, reduxLesson6, reduxLesson7,
+  reduxLesson8, reduxLesson9, reduxLesson10, reduxLesson11, reduxLesson12, reduxLesson13, reduxLesson14,
+  reduxLesson15, reduxLesson16, reduxLesson17, reduxLesson18, reduxLesson19, reduxLesson20, reduxLesson21,
+  reduxLesson22, reduxLesson23, reduxLesson24, reduxLesson25,
+  rqLesson1, rqLesson2, rqLesson3, rqLesson4, rqLesson5, rqLesson6, rqLesson7, rqLesson8, rqLesson9,
+  rqLesson10, rqLesson11, rqLesson12, rqLesson13, rqLesson14, rqLesson15, rqLesson16, rqLesson17, rqLesson18,
+  rqLesson19, rqLesson20, rqLesson21, rqLesson22, rqLesson23, rqLesson24, rqLesson25, rqLesson26, rqLesson27,
+  rqLesson28, rqLesson29, rqLesson30, rqLesson31, rqLesson32, rqLesson33, rqLesson34, rqLesson35,
+  apolloLesson1, apolloLesson2, apolloLesson3, apolloLesson4, apolloLesson5, apolloLesson6, apolloLesson7,
+  apolloLesson8, apolloLesson9, apolloLesson10, apolloLesson11, apolloLesson12, apolloLesson13, apolloLesson14,
+  apolloLesson15, apolloLesson16, apolloLesson17, apolloLesson18, apolloLesson19, apolloLesson20, apolloLesson21,
+  apolloLesson22, apolloLesson23, apolloLesson24, apolloLesson25, apolloLesson26, apolloLesson27, apolloLesson28,
+  apolloLesson29, apolloLesson30, apolloLesson31, apolloLesson32, apolloLesson33, apolloLesson34, apolloLesson35,
+  graphqlLesson25, graphqlLesson26,
+  csharpLesson1, csharpLesson2, csharpLesson3, csharpLesson4, csharpLesson5, csharpLesson6, csharpLesson7,
+  csharpLesson8, csharpLesson9, csharpLesson10, csharpLesson11, csharpLesson12, csharpLesson13, csharpLesson14,
+  csharpLesson15, csharpLesson16, csharpLesson17, csharpLesson18, csharpLesson19, csharpLesson20, csharpLesson21,
+  csharpLesson22, csharpLesson23, csharpLesson24, csharpLesson25, csharpLesson26, csharpLesson27, csharpLesson28,
+  webApiLesson1, webApiLesson2, webApiLesson3, webApiLesson4, webApiLesson5, webApiLesson6, webApiLesson7,
+  webApiLesson8, webApiLesson9, webApiLesson10, webApiLesson11, webApiLesson12, webApiLesson13, webApiLesson14,
+  webApiLesson15, webApiLesson16, webApiLesson17, webApiLesson18, webApiLesson19, webApiLesson20, webApiLesson21,
+  webApiLesson22, webApiLesson23, webApiLesson24, webApiLesson25,
+  authLesson1, authLesson2, authLesson3, authLesson4, authLesson5, authLesson6, authLesson7, authLesson8,
+  authLesson9, authLesson10, authLesson11, authLesson12, authLesson13, authLesson14,
+  cleanCodeLesson1, cleanCodeLesson2, cleanCodeLesson3, cleanCodeLesson4, cleanCodeLesson5, cleanCodeLesson6,
+  cleanCodeLesson7, cleanCodeLesson8, cleanCodeLesson9, cleanCodeLesson10, cleanCodeLesson11, cleanCodeLesson12,
+  cleanCodeLesson13, cleanCodeLesson14, cleanCodeLesson15, cleanCodeLesson16, cleanCodeLesson17, cleanCodeLesson18,
+  cleanCodeLesson19, cleanCodeLesson20, cleanCodeLesson21, cleanCodeLesson22, cleanCodeLesson23, cleanCodeLesson24,
+  cleanCodeLesson25,
+  unitTestLesson1, unitTestLesson2, unitTestLesson3, unitTestLesson4, unitTestLesson5, unitTestLesson6,
+  unitTestLesson7, unitTestLesson8, unitTestLesson9, unitTestLesson10, unitTestLesson11, unitTestLesson12,
+  unitTestLesson13, unitTestLesson14, unitTestLesson15, unitTestLesson16, unitTestLesson17, unitTestLesson18,
+  unitTestLesson19, unitTestLesson20, unitTestLesson21, unitTestLesson22, unitTestLesson23, unitTestLesson24,
+  unitTestLesson25, unitTestLesson26,
+  reactTestLesson1, reactTestLesson2, reactTestLesson3, reactTestLesson4, reactTestLesson5, reactTestLesson6,
+  reactTestLesson7, reactTestLesson8, reactTestLesson9, reactTestLesson10, reactTestLesson11, reactTestLesson12,
+  reactTestLesson13, reactTestLesson14, reactTestLesson15, reactTestLesson16, reactTestLesson17, reactTestLesson18,
+  reactTestLesson19, reactTestLesson20, reactTestLesson21, reactTestLesson22, reactTestLesson23, reactTestLesson24,
+  reactTestLesson25,
+  oopLesson1, oopLesson2, oopLesson3, oopLesson4, oopLesson5, oopLesson6, oopLesson7, oopLesson8, oopLesson9,
+  oopLesson10, oopLesson11, oopLesson12, oopLesson13, oopLesson14, oopLesson15, oopLesson16, oopLesson17,
+  oopLesson18, oopLesson19, oopLesson20, oopLesson21, oopLesson22, oopLesson23, oopLesson24, oopLesson25,
+  oopLesson26,
+  iqLessonB01, iqLessonB02, iqLessonB03, iqLessonB04, iqLessonB05, iqLessonB06, iqLessonB07, iqLessonB08,
+  iqLessonB09, iqLessonB10, iqLessonB11, iqLessonB12, iqLessonB13, iqLessonB14, iqLessonB15, iqLessonB16,
+  iqLessonB17, iqLessonB18, iqLessonB19, iqLessonB20, iqLessonI01, iqLessonI02, iqLessonI03, iqLessonI04,
+  iqLessonI05, iqLessonA01, iqLessonA02, iqLessonA03, iqLessonA04, iqLessonA05, iqLessonS01, iqLessonS02,
+  iqLessonS03, iqLessonSD01, iqLessonSD02, iqLessonR01, iqLessonR02, iqLessonR03, iqLessonT01, iqLessonT02,
+  fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10,
+  fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19,
+  fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25
+];
+
+export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
+
+export function getLessonBySlug(slug: string): Lesson | undefined {
+  return lessons.find((l) => l.slug === slug);
+}
+
+export function getLessonsByModule(moduleSlug: string, courseSlug?: string): Lesson[] {
+  return lessons
+    .filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug))
+    .sort((a, b) => a.order - b.order);
+}
+
+export function getAdjacentLessons(
+  lesson: Lesson,
+  allLessons: Lesson[]
+): { prev: Lesson | null; next: Lesson | null } {
+  const moduleLessons = allLessons
+    .filter((l) => l.moduleSlug === lesson.moduleSlug)
+    .sort((a, b) => a.order - b.order);
+  const idx = moduleLessons.findIndex((l) => l.slug === lesson.slug);
+  return {
+    prev: idx > 0 ? moduleLessons[idx - 1] : null,
+    next: idx < moduleLessons.length - 1 ? moduleLessons[idx + 1] : null,
+  };
+}

@@ -1,0 +1,253 @@
+{
+  "id": "lesson-asp-043",
+  "slug": "reading-data-ado-net",
+  "moduleSlug": "ado-net-data-access",
+  "courseSlug": "aspnet-core",
+  "title": "Reading Data with ADO.NET",
+  "description": "Learn to read data using SqlDataReader in connected mode and SqlDataAdapter with DataTable in disconnected mode.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 45,
+  "tags": ["ado-net", "sql-server", "datareader", "dataadapter", "datatable", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reading data is the most common database operation. ADO.NET provides two primary approaches: the **connected** approach using `SqlDataReader`, and the **disconnected** approach using `SqlDataAdapter` and `DataTable`. Each has distinct trade-offs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The SqlConnection Object"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every ADO.NET operation starts with a **SqlConnection**. It represents a physical session with the SQL Server database. You must open the connection before executing commands and close it afterward to release resources back to the connection pool."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating and Opening a SqlConnection",
+        "content": "Always wrap the connection in a using statement so it is disposed automatically.",
+        "language": "csharp",
+        "code": "string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\nusing (SqlConnection connection = new SqlConnection(connectionString))\n{\n    connection.Open();\n    // Execute commands here while the connection is open\n    connection.Close();\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Connection pooling",
+        "text": "SqlConnection uses connection pooling by default. Calling Close() or disposing the connection returns it to the pool rather than truly closing the physical connection. This makes ADO.NET very efficient for repeated operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading with SqlDataReader (Connected Mode)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**SqlDataReader** provides a forward-only, read-only stream of rows from the database. It is the most efficient way to read large result sets because it processes one row at a time without loading the entire result set into memory."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sql-data-reader-flow",
+        "caption": "Data flow using SqlDataReader in connected mode",
+        "definition": "sequenceDiagram\n    participant App as Application\n    participant Conn as SqlConnection\n    participant Cmd as SqlCommand\n    participant Reader as SqlDataReader\n    participant DB as Database\n    App->>Conn: new SqlConnection(connectionString)\n    App->>Conn: Open()\n    Conn->>DB: Establish session\n    App->>Cmd: new SqlCommand(query, connection)\n    App->>Cmd: ExecuteReader()\n    Cmd->>DB: Send SQL query\n    DB-->>Reader: Return result set\n    loop For each row\n        App->>Reader: Read()\n        Reader-->>App: Next row\n        App->>Reader: Get value by column name\n    end\n    App->>Reader: Dispose (implicit via using)\n    App->>Conn: Close()"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Important rules for SqlDataReader:"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "The connection must be **open** before calling ExecuteReader().",
+          "Only one SqlDataReader can be active per connection at a time (unless MARS is enabled).",
+          "The Read() method advances to the next row and returns false when there are no more rows.",
+          "Access column values using the column name (string) or ordinal index (int).",
+          "Use GetOrdinal() once to map column names to indexes for better performance."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading All Inventory Records",
+        "content": "Iterate through all rows using SqlDataReader.",
+        "language": "csharp",
+        "code": "string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\nusing (SqlConnection connection = new SqlConnection(connectionString))\n{\n    connection.Open();\n\n    string sql = \"SELECT Id, Name, Price, Quantity, AddedOn FROM Inventory\";\n    using (SqlCommand command = new SqlCommand(sql, connection))\n    using (SqlDataReader reader = command.ExecuteReader())\n    {\n        while (reader.Read())\n        {\n            int id = Convert.ToInt32(reader[\"Id\"]);\n            string name = reader[\"Name\"]?.ToString() ?? string.Empty;\n            decimal price = Convert.ToDecimal(reader[\"Price\"]);\n            int quantity = Convert.ToInt32(reader[\"Quantity\"]);\n            DateTime addedOn = Convert.ToDateTime(reader[\"AddedOn\"]);\n\n            // Process the row (e.g., add to a list)\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding Hard-Coded Column Names"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hard-coding column names is error-prone. If the database schema changes, your code breaks silently. Use `FieldCount`, `GetName()`, and `GetValue()` to iterate columns dynamically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dynamic Column Reading",
+        "content": "Iterate over all columns without hard-coding names.",
+        "language": "csharp",
+        "code": "using (SqlDataReader reader = command.ExecuteReader())\n{\n    while (reader.Read())\n    {\n        for (int i = 0; i < reader.FieldCount; i++)\n        {\n            string columnName = reader.GetName(i);\n            object value = reader.GetValue(i);\n            // Process columnName and value\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Multiple Result Sets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can return multiple result sets from a single query by separating them with a semicolon. Use `NextResult()` to advance the reader to the next result set."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading Multiple Result Sets",
+        "content": "Query two tables in one round-trip.",
+        "language": "csharp",
+        "code": "string sql = \"SELECT Id, Name, Price FROM Inventory; SELECT COUNT(*) AS Total FROM Inventory\";\n\nusing (SqlCommand command = new SqlCommand(sql, connection))\nusing (SqlDataReader reader = command.ExecuteReader())\n{\n    // First result set\n    while (reader.Read())\n    {\n        // Process Inventory rows\n    }\n\n    // Move to next result set\n    if (reader.NextResult())\n    {\n        while (reader.Read())\n        {\n            int total = reader.GetInt32(0);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading with SqlDataAdapter (Disconnected Mode)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**SqlDataAdapter** fills a **DataTable** with data from the database. Unlike SqlDataReader, it opens and closes the connection automatically, so you can work with the data after the connection is closed."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The DataTable is an in-memory representation of a database table. You can filter, sort, and modify rows locally, then use the DataAdapter to push changes back to the database."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Filling a DataTable with SqlDataAdapter",
+        "content": "Retrieve all Inventory rows into a DataTable.",
+        "language": "csharp",
+        "code": "string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\nusing (SqlConnection connection = new SqlConnection(connectionString))\n{\n    DataTable dataTable = new DataTable();\n    string sql = \"SELECT Id, Name, Price, Quantity, AddedOn FROM Inventory\";\n\n    using (SqlCommand command = new SqlCommand(sql, connection))\n    using (SqlDataAdapter adapter = new SqlDataAdapter(command))\n    {\n        adapter.Fill(dataTable);\n    }\n\n    // Connection is now closed; work with dataTable in memory\n    foreach (DataRow row in dataTable.Rows)\n    {\n        string name = row[\"Name\"].ToString();\n        decimal price = Convert.ToDecimal(row[\"Price\"]);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Using a Stored Procedure with DataAdapter"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can also use a stored procedure instead of raw SQL. Set the `CommandType` to `CommandType.StoredProcedure`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "DataAdapter with a Stored Procedure",
+        "content": "Fill a DataTable using a stored procedure named ReadInventory.",
+        "language": "csharp",
+        "code": "using (SqlConnection connection = new SqlConnection(connectionString))\n{\n    DataTable dataTable = new DataTable();\n\n    using (SqlCommand command = new SqlCommand(\"ReadInventory\", connection))\n    {\n        command.CommandType = CommandType.StoredProcedure;\n        using (SqlDataAdapter adapter = new SqlDataAdapter(command))\n        {\n            adapter.Fill(dataTable);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Connected vs Disconnected Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "SqlDataReader vs SqlDataAdapter",
+        "cards": [
+          {
+            "title": "SqlDataReader",
+            "description": "Forward-only, read-only stream of data. Requires an open connection.",
+            "pros": ["Fastest read performance", "Low memory usage", "Best for large result sets"],
+            "cons": ["Connection must stay open", "Read-only", "Single-direction only"],
+            "tags": ["connected"]
+          },
+          {
+            "title": "SqlDataAdapter + DataTable",
+            "description": "Fills an in-memory DataTable and closes the connection automatically.",
+            "pros": ["Disconnected - connection closes", "Supports filtering and sorting", "Can update the database"],
+            "cons": ["Higher memory usage", "Slower for very large data", "More overhead"],
+            "tags": ["disconnected"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Read Inventory Data",
+        "description": "Write code that reads all Inventory records using both approaches.",
+        "steps": [
+          "Create a controller action that uses SqlDataReader to read all Inventory rows.",
+          "Map each row to an Inventory model object and add it to a list.",
+          "Return the list to a view and display the data in a simple HTML table.",
+          "Repeat the same action using SqlDataAdapter and DataTable.",
+          "Compare the code structure and note the differences."
+        ],
+        "expectedOutcome": "You can read data from SQL Server using both connected and disconnected patterns and understand when to choose each."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "SqlDataReader is the fastest way to read data but requires an open connection.",
+          "SqlDataAdapter automatically manages the connection and fills a DataTable.",
+          "Use NextResult() to read multiple result sets from a single query.",
+          "Disconnected mode is better when you need to work with data offline."
+        ],
+        "takeaway": "Next, you will use these reading skills to build complete Create, Read, Update, and Delete operations."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

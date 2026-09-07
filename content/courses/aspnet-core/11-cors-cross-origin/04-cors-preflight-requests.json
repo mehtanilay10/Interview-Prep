@@ -1,0 +1,244 @@
+{
+  "id": "lesson-asp-040",
+  "slug": "cors-preflight-requests",
+  "moduleSlug": "cors-cross-origin",
+  "courseSlug": "aspnet-core",
+  "title": "CORS Preflight Requests and the OPTIONS Method",
+  "description": "Understand why browsers send preflight OPTIONS requests and how ASP.NET Core responds to them.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 10,
+  "tags": [
+    "asp.net core",
+    "cors",
+    "preflight",
+    "OPTIONS",
+    "cross-origin"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is a Preflight Request?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before sending certain cross-origin requests, the browser sends a preflight request. It uses the HTTP OPTIONS method to ask the server: \"May I send the actual request with these headers and this method?\" The server must respond with the right CORS headers, and only then does the browser send the real request."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Preflight Request",
+            "definition": "An automatic OPTIONS request the browser sends to check whether the actual request is safe to send."
+          },
+          {
+            "term": "Actual Request",
+            "definition": "The real request (GET, POST, etc.) the browser sends after the preflight succeeds."
+          },
+          {
+            "term": "Simple Request",
+            "definition": "A cross-origin request that does not trigger a preflight because it uses only safe methods and standard headers."
+          },
+          {
+            "term": "Access-Control-Request-Method",
+            "definition": "A preflight header that tells the server which HTTP method the actual request will use."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When Does Preflight Happen?",
+        "text": "A preflight is triggered when the request uses a method other than GET, HEAD, or POST, or when it sends non-simple headers such as Authorization, Content-Type: application/json, or custom headers."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cors-preflight-sequence",
+        "caption": "The preflight handshake before a cross-origin POST",
+        "definition": "sequenceDiagram\n    participant Browser as Browser\n    participant Server as API Server\n    Browser->>Server: OPTIONS /api/orders\n    Note right of Browser: Access-Control-Request-Method: POST\n    Note right of Browser: Access-Control-Request-Headers: content-type, authorization\n    Server-->>Browser: 204 No Content\n    Note left of Server: Access-Control-Allow-Origin: https://app.example.com\n    Note left of Server: Access-Control-Allow-Methods: POST, GET\n    Note left of Server: Access-Control-Allow-Headers: content-type, authorization\n    Browser->>Server: POST /api/orders (real request)\n    Server-->>Browser: 201 Created"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How ASP.NET Core Handles Preflight"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you call UseCors, ASP.NET Core automatically intercepts OPTIONS requests and returns the correct CORS headers. You usually do not need to write a controller action for OPTIONS unless you have very custom requirements."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — CORS Middleware Handles OPTIONS Automatically",
+        "content": "Enable CORS with a named policy and let the middleware respond to preflight requests.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"ApiPolicy\", policy =>\n    {\n        policy\n            .WithOrigins(\"https://app.example.com\")\n            .AllowAnyHeader()\n            .AllowAnyMethod()\n            .AllowCredentials();\n    });\n});\n\nbuilder.Services.AddControllers();\n\nvar app = builder.Build();\n\napp.UseCors(\"ApiPolicy\");\n\napp.MapControllers();\napp.Run();"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With this setup, any OPTIONS request to a mapped controller endpoint receives a 204 response with the CORS headers. The browser then proceeds with the actual POST, PUT, DELETE, or other request."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Customizing the Preflight Cache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The browser caches the preflight result so it does not ask the server for every single request. The Access-Control-Max-Age header controls how long the result is cached. ASP.NET Core sets a default, but you can tune it with SetPreflightMaxAge."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — Setting Preflight Max Age",
+        "content": "Cache preflight results for 10 minutes (600 seconds).",
+        "language": "csharp",
+        "code": "builder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"ApiPolicy\", policy =>\n    {\n        policy\n            .WithOrigins(\"https://app.example.com\")\n            .AllowAnyHeader()\n            .AllowAnyMethod()\n            .WithExposedHeaders(\"X-Request-Id\", \"X-Correlation-Id\")\n            .SetPreflightMaxAge(TimeSpan.FromMinutes(10));\n    });\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Expose Custom Headers",
+        "text": "Use WithExposedHeaders when your API returns custom headers such as X-Total-Count or X-Request-Id. Without it, JavaScript cannot read those headers from a cross-origin response."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Simple vs Non-Simple Requests"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Condition",
+          "Simple Request",
+          "Preflight Request"
+        ],
+        "rows": [
+          [
+            "Method",
+            "GET, HEAD, or POST",
+            "PUT, DELETE, PATCH, etc."
+          ],
+          [
+            "Content-Type",
+            "application/x-www-form-urlencoded, multipart/form-data, text/plain",
+            "application/json, application/xml, etc."
+          ],
+          [
+            "Custom Headers",
+            "Only simple headers (Accept, Accept-Language, Content-Language, Content-Type with simple values)",
+            "Authorization, X-Custom-Header, etc."
+          ],
+          [
+            "Browser Behavior",
+            "Sends actual request directly",
+            "Sends OPTIONS first, waits for success, then sends actual request"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Inspect a Preflight Request",
+        "description": "Use browser DevTools to observe the preflight handshake.",
+        "steps": [
+          "Open an ASP.NET Core API with CORS enabled.",
+          "From a different origin, use fetch() to POST JSON data with an Authorization header.",
+          "Open the Network tab in DevTools and filter by 'Fetch/XHR'.",
+          "Find the OPTIONS request before the POST request.",
+          "Inspect the request and response headers of the OPTIONS call."
+        ],
+        "expectedOutcome": "You should see the browser send an OPTIONS request and the server respond with Access-Control-Allow-Origin and related headers before the POST is sent."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Do I need to create a controller action for OPTIONS?",
+            "answer": "No. The CORS middleware handles OPTIONS automatically when UseCors is configured."
+          },
+          {
+            "question": "Why does my POST request fail with a CORS error even though I allowed the origin?",
+            "answer": "The preflight may be failing. Check that Access-Control-Allow-Headers includes the headers your actual request uses (for example, Content-Type: application/json or Authorization)."
+          },
+          {
+            "question": "Can I disable preflight completely?",
+            "answer": "You cannot disable it in the browser, but you can avoid triggering it by sticking to simple requests: GET, HEAD, or POST with a simple Content-Type and no custom headers."
+          }
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Lesson Checkpoint",
+        "items": [
+          {
+            "text": "I can explain why browsers send a preflight OPTIONS request"
+          },
+          {
+            "text": "I know the difference between a simple request and a preflighted request"
+          },
+          {
+            "text": "I understand that ASP.NET Core handles OPTIONS automatically through the CORS middleware"
+          },
+          {
+            "text": "I can use SetPreflightMaxAge and WithExposedHeaders to tune preflight behavior"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Preflight is an OPTIONS request that checks if the actual request is allowed",
+          "Non-simple methods, non-simple Content-Type, and custom headers trigger preflight",
+          "ASP.NET Core CORS middleware responds to OPTIONS automatically",
+          "SetPreflightMaxAge reduces the number of preflight requests the browser sends"
+        ],
+        "takeaway": "Next, you will learn best practices for CORS and how to troubleshoot common issues."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

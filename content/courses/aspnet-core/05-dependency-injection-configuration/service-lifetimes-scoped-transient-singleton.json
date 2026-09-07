@@ -1,0 +1,358 @@
+{
+  "id": "lesson-asp-043",
+  "slug": "options-pattern-strongly-typed-configuration",
+  "moduleSlug": "dependency-injection-configuration",
+  "courseSlug": "aspnet-core",
+  "title": "The Options Pattern: Strongly Typed Configuration",
+  "description": "Learn to use IOptions<T>, IOptionsMonitor<T>, and IOptionsSnapshot<T> to bind appsettings.json sections to typed C# classes.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": [
+    "asp.net core",
+    "configuration",
+    "options pattern",
+    "IOptions",
+    "appsettings",
+    "strongly typed"
+  ],
+  "blocks": [
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Options Pattern",
+            "definition": "A recommended ASP.NET Core pattern that binds configuration sections to plain C# classes and injects them via IOptions<T>."
+          },
+          {
+            "term": "IOptions<T>",
+            "definition": "A singleton, read-only snapshot of configuration that is populated at app startup and does not reload when the file changes."
+          },
+          {
+            "term": "IOptionsMonitor<T>",
+            "definition": "A singleton that detects changes to the configuration source and fires callbacks when values are updated at runtime."
+          },
+          {
+            "term": "IOptionsSnapshot<T>",
+            "definition": "A scoped service that re-reads configuration on every HTTP request, useful for per-request changes."
+          },
+          {
+            "term": "Bind / GetSection",
+            "definition": "Configuration APIs that map a JSON section to a C# class instance."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Raw `IConfiguration` string lookups like `_config[\"Api:Url\"]` work, but they are error-prone: a misspelled key silently returns null at runtime. The **Options pattern** solves this by binding a configuration section to a plain C# class, giving you compile-time IntelliSense, validation, and a clean DI-friendly API."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Step 1 — Define a POCO Options Class"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Create a plain C# class whose property names match the keys in your appsettings.json section. ASP.NET Core uses case-insensitive matching, so casing does not need to match exactly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "appsettings.json — an API settings section",
+        "content": "A JSON section we want to bind to a typed options class",
+        "language": "csharp",
+        "code": "{\n  \"ApiSettings\": {\n    \"Name\": \"OpenWeatherMap\",\n    \"BaseUrl\": \"https://api.openweathermap.org\",\n    \"ApiKey\": \"your-api-key\",\n    \"TimeoutSeconds\": 10,\n    \"IsSecured\": true\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ApiSettings.cs — the matching POCO class",
+        "content": "A plain C# class that mirrors the structure of the ApiSettings JSON section",
+        "language": "csharp",
+        "code": "public class ApiSettings\n{\n    public string Name { get; set; } = string.Empty;\n    public string BaseUrl { get; set; } = string.Empty;\n    public string ApiKey { get; set; } = string.Empty;\n    public int TimeoutSeconds { get; set; }\n    public bool IsSecured { get; set; }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Step 2 — Register the Options Class in Program.cs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Call `Services.Configure<T>()` and pass the configuration section you want to bind. This registers `IOptions<T>`, `IOptionsMonitor<T>`, and `IOptionsSnapshot<T>` automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering ApiSettings in Program.cs",
+        "content": "Binding the ApiSettings section to the ApiSettings class using the options pattern",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Bind the ApiSettings section to the ApiSettings class\nbuilder.Services.Configure<ApiSettings>(\n    builder.Configuration.GetSection(\"ApiSettings\"));\n\nbuilder.Services.AddControllersWithViews();\nvar app = builder.Build();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Step 3 — Inject IOptions<T> Into a Controller"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Inject `IOptions<ApiSettings>` into any class that needs the configuration. Access values through the `.Value` property — with full IntelliSense support."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Consuming ApiSettings in a controller via IOptions<T>",
+        "content": "Injecting strongly typed configuration into a controller using IOptions<T>",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Options;\n\npublic class WeatherController : Controller\n{\n    private readonly ApiSettings _settings;\n\n    public WeatherController(IOptions<ApiSettings> options)\n    {\n        _settings = options.Value;\n    }\n\n    public async Task<IActionResult> Index()\n    {\n        var url = $\"{_settings.BaseUrl}/weather?q=London&appid={_settings.ApiKey}\";\n        // use _settings.TimeoutSeconds, _settings.IsSecured, etc.\n        return View();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "IOptions<T> vs IOptionsMonitor<T> vs IOptionsSnapshot<T>"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "All three interfaces provide the same `T Value`, but they differ in when and how often the configuration is reloaded. Choosing the right one depends on whether you need live reloads and whether you're inside or outside a request scope."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Choosing the right options interface",
+        "cards": [
+          {
+            "title": "IOptions<T>",
+            "description": "A singleton, read-only snapshot populated once at startup. It does not detect file changes after the app starts.",
+            "pros": [
+              "Singleton — safe to inject anywhere",
+              "No overhead per request",
+              "Simplest to use"
+            ],
+            "cons": [
+              "Does not reload on file change",
+              "All consumers see the same snapshot"
+            ],
+            "tags": ["Singleton", "startup-only config"]
+          },
+          {
+            "title": "IOptionsMonitor<T>",
+            "description": "A singleton that watches for configuration changes and fires an OnChange callback whenever the source file is modified and saved.",
+            "pros": [
+              "Reloads automatically when appsettings.json changes",
+              "OnChange event lets you react to live updates",
+              "Singleton — safe everywhere"
+            ],
+            "cons": [
+              "Slightly more complex to set up",
+              "Not all providers support reload-on-change"
+            ],
+            "tags": ["Singleton", "live reload", "advanced"]
+          },
+          {
+            "title": "IOptionsSnapshot<T>",
+            "description": "A scoped service that re-reads the configuration fresh for every HTTP request.",
+            "pros": [
+              "Per-request fresh values",
+              "Works with reloadOnChange sources"
+            ],
+            "cons": [
+              "Scoped — only available during an HTTP request",
+              "Cannot be injected into Singletons"
+            ],
+            "tags": ["Scoped", "per-request config"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Interface",
+          "Lifetime",
+          "Reloads on Change",
+          "Injected Into",
+          "Use When"
+        ],
+        "rows": [
+          ["IOptions<T>",      "Singleton", "No",  "Anywhere",    "Config rarely changes; simplest choice"],
+          ["IOptionsMonitor<T>","Singleton", "Yes", "Anywhere",    "Config may change while app is running"],
+          ["IOptionsSnapshot<T>","Scoped",   "Yes", "Controllers / Views", "Need per-request fresh values"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validating Options With IValidateOptions<T>"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A misconfigured appsettings.json can cause runtime failures that are hard to diagnose. Use `IValidateOptions<T>` to validate options at startup and fail fast with a clear error message."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validating ApiSettings — fail fast on bad config",
+        "content": "Implementing IValidateOptions<T> to enforce rules on ApiSettings at startup",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Options;\n\npublic class ApiSettingsValidator : IValidateOptions<ApiSettings>\n{\n    public ValidateOptionsResult Validate(\n        string? name, ApiSettings options)\n    {\n        var errors = new List<string>();\n\n        if (string.IsNullOrWhiteSpace(options.BaseUrl))\n            errors.Add(\"ApiSettings:BaseUrl is required.\");\n\n        if (options.TimeoutSeconds is < 1 or > 120)\n            errors.Add(\"ApiSettings:TimeoutSeconds must be between 1 and 120.\");\n\n        return errors.Count == 0\n            ? ValidateOptionsResult.Success\n            : ValidateOptionsResult.Fail(errors);\n    }\n}\n\n// Register the validator in Program.cs\nbuilder.Services.AddSingleton<IValidateOptions<ApiSettings>, ApiSettingsValidator>();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Fail fast at startup",
+        "text": "Validation runs when the app starts. If appsettings.json has an invalid value, the app will not start and the console will show exactly which setting is wrong."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Named Options"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you have multiple instances of the same options type — for example, several different external APIs — use **named options** to distinguish them by a string key."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "appsettings.json — two named API configurations",
+        "content": "Storing multiple API configurations under named sections in appsettings.json",
+        "language": "csharp",
+        "code": "{\n  \"ExternalApis\": {\n    \"Weather\": {\n      \"BaseUrl\": \"https://api.openweathermap.org\",\n      \"ApiKey\": \"key-weather\"\n    },\n    \"Geocoding\": {\n      \"BaseUrl\": \"https://api.geocoding.example.com\",\n      \"ApiKey\": \"key-geo\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering and consuming named options",
+        "content": "Using IOptionsMonitor<T> to retrieve named configuration instances at runtime",
+        "language": "csharp",
+        "code": "// Program.cs — register each named section\nbuilder.Services.Configure<ApiSettings>(\n    \"Weather\",\n    builder.Configuration.GetSection(\"ExternalApis:Weather\"));\nbuilder.Services.Configure<ApiSettings>(\n    \"Geocoding\",\n    builder.Configuration.GetSection(\"ExternalApis:Geocoding\"));\n\n// Controller — retrieve a named options instance\npublic class ExternalApiController : Controller\n{\n    private readonly ApiSettings _weatherSettings;\n    private readonly ApiSettings _geoCodingSettings;\n\n    public ExternalApiController(IOptionsMonitor<ApiSettings> monitor)\n    {\n        _weatherSettings  = monitor.Get(\"Weather\");\n        _geoCodingSettings = monitor.Get(\"Geocoding\");\n    }\n}"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Bind and Validate Options",
+        "description": "Practice the full options pattern workflow from appsettings.json to validated injection.",
+        "steps": [
+          "Add a MailSettings section to appsettings.json with SmtpServer, Port, and UseSsl keys.",
+          "Create a MailSettings POCO class with matching properties.",
+          "Register the options in Program.cs using builder.Configuration.GetSection(\"MailSettings\").",
+          "Add a MailSettingsValidator that requires SmtpServer and Port > 0.",
+          "Inject IOptions<MailSettings> into a ContactController and read the values."
+        ],
+        "expectedOutcome": "A working options class, a registered validator, and a controller that receives fully typed configuration via DI with no string-key lookups."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Options Pattern Checklist",
+        "items": [
+          {
+            "text": "I can explain why IOptions<T> is safer than raw IConfiguration string lookups",
+            "hint": "Think about IntelliSense, compile-time safety, and validation"
+          },
+          {
+            "text": "I can create a POCO class that matches an appsettings.json section",
+            "hint": "Property names must match the JSON keys (case-insensitive)"
+          },
+          {
+            "text": "I know how to register options in Program.cs with Configure<T>()",
+            "hint": "builder.Services.Configure<T>(config.GetSection(\"SectionName\"))"
+          },
+          {
+            "text": "I can choose between IOptions<T>, IOptionsMonitor<T>, and IOptionsSnapshot<T>",
+            "hint": "Singleton vs scoped vs live-reload"
+          },
+          {
+            "text": "I can set up IValidateOptions<T> to catch bad configuration at startup",
+            "hint": "Fail fast — the app should not start with invalid config"
+          },
+          {
+            "text": "I can use named options for multiple instances of the same type",
+            "hint": "Configure<T>(\"name\", section) + IOptionsMonitor<T>.Get(\"name\")"
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Do I need to call AddOptions() before Configure<T>()?",
+            "answer": "No. Configure<T>() registers all three options interfaces automatically. AddOptions() is only needed for advanced customization like named options or post-configuration."
+          },
+          {
+            "question": "Can IOptions<T> values change while the app is running?",
+            "answer": "Only if you use IOptionsMonitor<T> or IOptionsSnapshot<T>. IOptions<T> is a one-time snapshot taken at startup."
+          },
+          {
+            "question": "What's the difference between Bind() and Configure<T>()?",
+            "answer": "Configure<T>(section) is shorthand that calls Bind internally and registers the options. Use Bind() directly only when you need to configure options programmatically without a JSON source."
+          },
+          {
+            "question": "Can I combine multiple configuration sources for one options class?",
+            "answer": "Yes. Use PostConfigure<T>() to apply additional settings after the initial bind, or layer sources (appsettings.json → appsettings.Production.json → environment variables) — ASP.NET Core merges them in order."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "The Options pattern replaces raw string-based IConfiguration lookups with typed C# classes.",
+          "Register options with Services.Configure<T>(config.GetSection(\"SectionName\")).",
+          "IOptions<T> is a startup snapshot; IOptionsMonitor<T> reloads on change; IOptionsSnapshot<T> refreshes per request.",
+          "IValidateOptions<T> lets you enforce rules and fail fast at startup.",
+          "Named options (Configure<T>(\"name\", section)) handle multiple instances of the same configuration type."
+        ],
+        "takeaway": "Strongly typed configuration makes your app safer, more testable, and easier to refactor — stop using magic strings for settings."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

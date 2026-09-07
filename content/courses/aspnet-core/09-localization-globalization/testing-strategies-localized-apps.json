@@ -1,0 +1,331 @@
+{
+  "id": "lesson-asp-042",
+  "slug": "testing-strategies-localized-apps",
+  "moduleSlug": "localization-globalization",
+  "courseSlug": "aspnet-core",
+  "title": "Testing Strategies for Localized ASP.NET Core Applications",
+  "description": "Write unit and integration tests for localized controllers and views, verify resource completeness, and ensure culture switching works correctly across your application.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": [
+    "asp.net core",
+    "localization",
+    "testing",
+    "unit testing",
+    "integration testing",
+    "xUnit",
+    "resource completeness"
+  ],
+  "blocks": [
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Unit Test",
+            "definition": "A test that verifies a single class or method in isolation. For localization, you test that IStringLocalizer returns the correct string for a given culture."
+          },
+          {
+            "term": "Integration Test",
+            "definition": "A test that exercises the full request pipeline. For localization, you send an HTTP request with a culture and verify the response body contains the correct language."
+          },
+          {
+            "term": "WebApplicationFactory<T>",
+            "definition": "An ASP.NET Core testing helper that boots your app in-memory, allowing you to send HTTP requests to it without a running server."
+          },
+          {
+            "term": "CultureInfo.CurrentCulture",
+            "definition": "The .NET thread-static property that controls date, number, and currency formatting. Can be set in tests to simulate a specific culture."
+          },
+          {
+            "term": "Resource Completeness",
+            "definition": "The property that every key present in the default resource file also exists in every culture-specific resource file. Missing keys silently fall back to English."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Test Localization?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Localization bugs are silent — the app doesn't crash, it just shows English text to a French user. Common bugs include: missing resource keys, wrong culture codes, middleware placed after routing, and resource files in the wrong folder. Automated tests catch all of these."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Localization bugs to watch for",
+        "items": [
+          "A translation key is missing from a culture-specific .resx or .po file — falls back to English silently.",
+          "Culture code in query string doesn't match any supported culture — falls back to default silently.",
+          "UseRequestLocalization middleware is placed after UseRouting — culture is never set.",
+          "Resource file is in the wrong folder — ASP.NET Core can't find it.",
+          "Culture is set but strings still show in English — resource key has a trailing space mismatch."
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Test 1 — Unit Test IStringLocalizer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can unit test that a controller returns the correct localized string by mocking `IStringLocalizer<T>` with a stub implementation. This avoids spinning up the full localization pipeline:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tests/Controllers/HomeControllerLocalizationTests.cs",
+        "content": "Unit test that verifies the controller returns the correct localized message using a mock IStringLocalizer.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Localization;\nusing Xunit;\nusing LocalizationDemo.Controllers;\nusing LocalizationDemo.Models;\n\nnamespace LocalizationDemo.Tests.Controllers;\n\npublic class HomeControllerLocalizationTests\n{\n    [Theory]\n    [InlineData(\"en\", \"Application submitted successfully\")]\n    [InlineData(\"fr\", \"Demande soumise avec succès\")]\n    [InlineData(\"es\", \"Solicitud enviada con éxito\")]\n    public async Task Index_Returns_Localized_Success_Message(string culture, string expectedMessage)\n    {\n        // Arrange — create a mock IStringLocalizer that returns the expected translation\n        var localizer = new MockStringLocalizer(new Dictionary<string, string>\n        {\n            [\"Application submitted successfully\"] = expectedMessage\n        });\n\n        var controller = new HomeController(localizer);\n\n        // Act\n        var result = controller.Index(new JobApplication()) as ViewResult;\n\n        // Assert\n        Assert.NotNull(result);\n        Assert.Equal(expectedMessage, controller.ViewBag.SuccessMessage);\n    }\n}\n\n// Minimal IStringLocalizer stub for testing\npublic class MockStringLocalizer : IStringLocalizer\n{\n    private readonly Dictionary<string, string> _translations;\n\n    public MockStringLocalizer(Dictionary<string, string> translations)\n    {\n        _translations = translations;\n    }\n\n    public LocalizedString this[string name]\n    {\n        get\n        {\n            _translations.TryGetValue(name, out var translation);\n            return new LocalizedString(name, translation ?? name, translation != null);\n        }\n    }\n\n    public LocalizedString this[string name, params object[] arguments]\n    {\n        get\n        {\n            var value = _translations.GetValueOrDefault(name, name);\n            return new LocalizedString(name, string.Format(value, arguments), true);\n        }\n    }\n\n    public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) => _translations\n        .Select(kv => new LocalizedString(kv.Key, kv.Value, true));\n\n    public IStringLocalizer WithCulture(CultureInfo culture) => this;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Why use a mock IStringLocalizer?",
+        "text": "Mocking IStringLocalizer avoids loading real .resx or .po files in unit tests. Your test runs fast, is deterministic, and tests the controller logic — not the localization infrastructure."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Test 2 — Integration Test Full Request with Culture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Integration tests use `WebApplicationFactory<T>` to send real HTTP requests through the full pipeline. Set the culture via query string and verify the response body:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tests/Integration/LocalizationIntegrationTests.cs",
+        "content": "Use WebApplicationFactory to send requests with culture query strings and verify the response contains the correct language.",
+        "language": "csharp",
+        "code": "using System.Net;\nusing System.Net.Http.Json;\nusing Xunit;\nusing LocalizationDemo;\n\nnamespace LocalizationDemo.Tests.Integration;\n\npublic class LocalizationIntegrationTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly HttpClient _client;\n\n    public LocalizationIntegrationTests(WebApplicationFactory<Program> factory)\n    {\n        _client = factory.CreateClient();\n    }\n\n    [Theory]\n    [InlineData(\"en-US\", \"Job Application\")]\n    [InlineData(\"fr-FR\", \"Demande d'emploi\")]\n    [InlineData(\"es-ES\", \"Solicitud de empleo\")]\n    public async Task Index_Returns_Correct_Language(string culture, string expectedHeading)\n    {\n        // Act\n        var response = await _client.GetAsync($\"/Home/Index?culture={culture}&ui-culture={culture}\");\n        var html = await response.Content.ReadAsStringAsync();\n\n        // Assert\n        response.EnsureSuccessStatusCode();\n        Assert.Contains(expectedHeading, html);\n    }\n\n    [Fact]\n    public async Task CultureMiddleware_Is_Active()\n    {\n        // Verify the localization middleware is in the pipeline\n        var response = await _client.GetAsync(\"/Home/CultureDemo?culture=fr-FR\");\n        var html = await response.Content.ReadAsStringAsync();\n\n        // French dates contain 'janvier' — if middleware is broken, you'd see English\n        Assert.Contains(\"janvier\", html, StringComparison.OrdinalIgnoreCase);\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Test 3 — Verify Resource File Completeness"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Missing keys in secondary resource files are one of the most common localization bugs. This test scans resource files and fails if any culture is missing a key present in the default culture:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tests/Integration/ResourceCompletenessTests.cs",
+        "content": "Reflection-based test that loads resource files and ensures all cultures contain the same keys.",
+        "language": "csharp",
+        "code": "using System.Resources;\nusing Xunit;\nusing LocalizationDemo.Resources.Models;\n\nnamespace LocalizationDemo.Tests.Integration;\n\npublic class ResourceCompletenessTests\n{\n    [Fact]\n    public void All_Culture_Files_Have_Same_Keys_As_Default()\n    {\n        // Arrange — load the default (English) resource keys\n        var defaultResource = new ResourceManager(\n            \"LocalizationDemo.Resources.Models.JobApplication\",\n            typeof(JobApplication).Assembly);\n\n        var defaultKeys = defaultResource.GetResourceSet(\n            CultureInfo.InvariantCulture, true, true)\n            .Cast<DictionaryEntry>()\n            .Select(e => e.Key.ToString()!)\n            .OrderBy(k => k)\n            .ToHashSet();\n\n        // Act + Assert — check each supported culture\n        var cultures = new[] { \"fr\", \"es\", \"de\" };\n        foreach (var culture in cultures)\n        {\n            var cultureResource = defaultResource.GetResourceSet(\n                new CultureInfo(culture), true, true);\n\n            var cultureKeys = cultureResource!\n                .Cast<DictionaryEntry>()\n                .Select(e => e.Key.ToString()!)\n                .OrderBy(k => k)\n                .ToHashSet();\n\n            // Assert: no keys missing from the culture file\n            var missingKeys = defaultKeys.Except(cultureKeys).ToList();\n            Assert.Empty(missingKeys);\n\n            // Assert: no extra keys in the culture file\n            var extraKeys = cultureKeys.Except(defaultKeys).ToList();\n            Assert.Empty(extraKeys);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Run resource completeness tests in CI",
+        "text": "This test catches missing translations before they reach production. Add it to your CI pipeline so a PR that forgets to translate a key fails the build."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Test 4 — Test Culture Switching Behavior"}
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Test that the culture cookie is set correctly and persists across requests. Use `HttpClient` to simulate a POST that sets the cookie and then verify the cookie on subsequent requests:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tests/Integration/CultureCookieTests.cs",
+        "content": "Test that posting to SetLanguage sets the culture cookie with the correct value and expiry.",
+        "language": "csharp",
+        "code": "using System.Net;\nusing Xunit;\nusing LocalizationDemo;\n\nnamespace LocalizationDemo.Tests.Integration;\n\npublic class CultureCookieTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly WebApplicationFactory<Program> _factory;\n    private readonly HttpClient _client;\n\n    public CultureCookieTests(WebApplicationFactory<Program> factory)\n    {\n        _factory = factory;\n        _client = factory.CreateClient(new WebApplicationFactoryClientOptions\n        {\n            AllowAutoRedirect = false\n        });\n    }\n\n    [Fact]\n    public async Task SetLanguage_Sets_Culture_Cookie()\n    {\n        // Arrange\n        var formData = new FormUrlEncodedContent(new Dictionary<string, string>\n        {\n            [\"culture\"] = \"fr-FR\",\n            [\"returnUrl\"] = \"/\"\n        });\n\n        // Act\n        var response = await _client.PostAsync(\"/Home/SetLanguage\", formData);\n\n        // Assert — check the Set-Cookie header\n        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);\n        Assert.True(response.Headers.TryGetValues(\"Set-Cookie\", out var cookieValues));\n\n        var cookieHeader = string.Join(\", \", cookieValues);\n        Assert.Contains(\".AspNetCore.Culture\", cookieHeader);\n        Assert.Contains(\"fr-FR\", cookieHeader);\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Test 5 — Test Culture-Aware Formatting in Razor Views"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "End-to-end test that verifies the rendered HTML contains the correct culture-formatted values. This test confirms that the middleware pipeline correctly sets culture before the view renders:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tests/Integration/CultureFormattingTests.cs",
+        "content": "Send requests with different cultures and verify date and currency appear in the correct format in the HTML.",
+        "language": "csharp",
+        "code": "using Xunit;\nusing LocalizationDemo;\n\nnamespace LocalizationDemo.Tests.Integration;\n\npublic class CultureFormattingTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly HttpClient _client;\n\n    public CultureFormattingTests(WebApplicationFactory<Program> factory)\n    {\n        _client = factory.CreateClient();\n    }\n\n    [Theory]\n    [InlineData(\"en-US\", \"$\", \",\")]\n    [InlineData(\"fr-FR\", \"€\", \" \")]\n    [InlineData(\"es-ES\", \"€\", \".\")]\n    public async Task CultureDemo_Formats_Currency_Correctly(\n        string culture, string expectedSymbol, string expectedSeparator)\n    {\n        // Act\n        var response = await _client.GetAsync($\"/Home/CultureDemo?culture={culture}\");\n        var html = await response.Content.ReadAsStringAsync();\n\n        // Assert\n        Assert.Contains(expectedSymbol, html); // $ or €\n        if (expectedSeparator == \".\")\n        {\n            // Spanish: 1.234,56\n            Assert.Contains(\"1.234,56\", html);\n        }\n    }\n\n    [Theory]\n    [InlineData(\"en-US\", \",\")] // English: July 4, 2025\n    [InlineData(\"fr-FR\", \"juillet\")] // French: juillet\n    public async Task CultureDemo_Contains_Localized_Date(\n        string culture, string expectedFragment)\n    {\n        var response = await _client.GetAsync($\"/Home/CultureDemo?culture={culture}\");\n        var html = await response.Content.ReadAsStringAsync();\n\n        Assert.Contains(expectedFragment, html);\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automated Resource Completeness in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The resource completeness test (Test 3) is most valuable when it runs on every pull request. Add it to your CI pipeline (GitHub Actions, Azure DevOps, etc.) to block merges that introduce missing translations."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "CI enforcement pattern",
+        "text": "Run dotnet test --filter \"FullyQualifiedName~ResourceCompletenessTests\" as a separate CI step. If it fails, the build fails — ensuring no PR can introduce an untranslated key."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "testing-localization-layers",
+        "caption": "Three layers of localization testing coverage",
+        "definition": "flowchart TD\n    A[Localization Tests] --> B[Unit Tests]\n    A --> C[Integration Tests]\n    A --> D[CI Completeness Check]\n    B --> B1[Mock IStringLocalizer]\n    B --> B2[Verify controller returns correct translation per culture]\n    C --> C1[WebApplicationFactory]\n    C --> C2[Send request with ?culture=fr]\n    C --> C3[Assert response HTML contains French text]\n    D --> D1[Reflect over all .resx files]\n    D --> D2[Assert all cultures have same keys]\n    D --> D3[Fail build if any key is missing]"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Write a Full Localization Test Suite",
+        "description": "Add a complete localization test suite to an existing ASP.NET Core project.",
+        "steps": [
+          "Add the xUnit testing packages: Microsoft.AspNetCore.Mvc.Testing and xunit.",
+          "Write a unit test (Test 1 pattern) for your HomeController that verifies the correct French message is returned.",
+          "Write an integration test (Test 2 pattern) that GETs /Home/Index?culture=fr-FR and asserts the page contains 'Demande d'emploi'.",
+          "Write the resource completeness test (Test 3) for one of your model resource files.",
+          "Run all tests with dotnet test and confirm they pass.",
+          "Intentionally remove a key from the French resource file and confirm the completeness test fails — then add it back."
+        ],
+        "expectedOutcome": "A passing test suite that catches missing translations, wrong culture codes, and middleware ordering problems before they reach production."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Localization Testing Checklist",
+        "items": [
+          { "text": "Unit test verifies correct localized string per culture", "hint": "Mock IStringLocalizer; test each supported culture" },
+          { "text": "Integration test sends request with ?culture= and checks response HTML", "hint": "Use WebApplicationFactory<T>" },
+          { "text": "Resource completeness test runs and verifies no missing keys", "hint": "Reflect over ResourceManager to compare keys" },
+          { "text": "Culture cookie test verifies SetLanguage action sets the cookie", "hint": "Check Set-Cookie response header" },
+          { "text": "CI pipeline runs localization tests on every pull request", "hint": "Add as a separate CI step that can fail the build" },
+          { "text": "Deliberate removal of a key causes a test failure", "hint": "Confirm the safety net works before relying on it" }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Localization bugs are silent — the app doesn't crash, it just shows English to non-English users.",
+          "Unit test localization by mocking IStringLocalizer to return controlled translations.",
+          "Integration tests use WebApplicationFactory to send real HTTP requests with culture query strings.",
+          "The resource completeness test reflects over .resx files and asserts every culture has the same keys.",
+          "Run localization tests in CI to block PRs that introduce missing translations.",
+          "Test the culture cookie, middleware placement, and culture-aware formatting in views."
+        ],
+        "takeaway": "Testing is the only reliable way to ensure every user sees your app in their own language. Automate it and run it on every pull request."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Do I really need to test localization?",
+            "answer": "Yes. Localization bugs don't crash the app — they silently show English text to French users. Without tests, you won't know until users complain. Automated tests catch missing keys, wrong culture codes, and middleware misconfiguration."
+          },
+          {
+            "question": "Can I use a library to check resource completeness instead of writing my own test?",
+            "answer": "Some commercial tools exist, but the reflection-based ResourceManager test shown here is lightweight, requires no dependencies, and catches the most common bug: missing keys in secondary culture files."
+          },
+          {
+            "question": "Should I run localization tests in the CI pipeline?",
+            "answer": "Absolutely. Add the resource completeness test as a required check in your pull request validation. A missing translation should block the merge — it's a user-facing bug."
+          },
+          {
+            "question": "What about testing PO file completeness?",
+            "answer": "The same approach works for PO files. Parse each .po file, extract all msgid keys, and compare them across cultures. Any key present in the default file but missing from a culture file is a missing translation."
+          }
+        ]
+      }
+    }
+  ]
+}

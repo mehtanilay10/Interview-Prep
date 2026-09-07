@@ -1,0 +1,390 @@
+{
+  "id": "lesson-asp-041",
+  "slug": "localize-validation-messages-data-annotations",
+  "moduleSlug": "localization-globalization",
+  "courseSlug": "aspnet-core",
+  "title": "Localizing Validation Messages and Data Annotations",
+  "description": "Translate built-in and custom validation error messages using resource files, IStringLocalizer, and shared resources across your ASP.NET Core models.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "asp.net core",
+    "localization",
+    "data annotations",
+    "validation",
+    "IStringLocalizer",
+    "shared resources"
+  ],
+  "blocks": [
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "DataAnnotation",
+            "definition": "An attribute applied to model properties for validation and display metadata — e.g., [Required], [StringLength], [Range], [EmailAddress], [Display]."
+          },
+          {
+            "term": "ErrorMessageResourceName",
+            "definition": "A DataAnnotation property that specifies the key of the error message in a resource file, rather than embedding the message directly in code."
+          },
+          {
+            "term": "ErrorMessageResourceType",
+            "definition": "The type of the resource class that contains the localized error message. Used alongside ErrorMessageResourceName."
+          },
+          {
+            "term": "SharedResource",
+            "definition": "A common resource file (SharedResource.resx) accessible from any model, controller, or view in the app — avoids duplicating the same strings."
+          },
+          {
+            "term": "IStringLocalizerFactory",
+            "definition": "A service that creates IStringLocalizer instances for types that are not directly associated with a resource file — used with shared resources."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Localize Validation Messages?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a user submits an invalid form, they see the error message in the language of your app. If your app supports French and Spanish users, those users should see validation errors in their language too — not just your UI labels and buttons."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There are three main approaches to localizing validation messages, ordered from simplest to most flexible:"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Three approaches to validation localization",
+        "items": [
+          "Hardcoded string keys resolved by AddDataAnnotationsLocalization — simplest for small apps.",
+          "ErrorMessageResourceName / ErrorMessageResourceType pointing to a class resource file — strongly typed.",
+          "Custom ValidationAttribute with IStringLocalizer injected at runtime — most flexible."
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1 — AddDataAnnotationsLocalization (Simplest)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The easiest path is to keep your ErrorMessage strings in English in the model, then create resource files with matching keys. `AddDataAnnotationsLocalization()` handles the lookup automatically:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Models/Product.cs — model with localized-ready error messages",
+        "content": "ErrorMessage strings serve as keys that must match entries in the resource file exactly.",
+        "language": "csharp",
+        "code": "using System.ComponentModel.DataAnnotations;\n\nnamespace LocalizationDemo.Models;\n\npublic class Product\n{\n    [Required(ErrorMessage = \"Product name is required\")]\n    [StringLength(100, ErrorMessage = \"Product name must be under 100 characters\")]\n    [Display(Name = \"Product Name\")]\n    public string Name { get; set; } = string.Empty;\n\n    [Range(0.01, 9999.99, ErrorMessage = \"Price must be between {0} and {1}\")]\n    [Display(Name = \"Price\")]\n    public decimal Price { get; set; }\n\n    [EmailAddress(ErrorMessage = \"Invalid supplier email address\")]\n    [Display(Name = \"Supplier Email\")]\n    public string SupplierEmail { get; set; } = string.Empty;\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resources/Models/Product.fr.resx — French error messages",
+        "content": "Each data name matches the English ErrorMessage string exactly. The value is the French translation.",
+        "language": "xml",
+        "code": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <data name=\"Product name is required\" xml:space=\"preserve\">\n    <value>Le nom du produit est obligatoire</value>\n  </data>\n  <data name=\"Product name must be under 100 characters\" xml:space=\"preserve\">\n    <value>Le nom du produit ne peut pas dépasser 100 caractères</value>\n  </data>\n  <data name=\"Price must be between {0} and {1}\" xml:space=\"preserve\">\n    <value>Le prix doit être compris entre {0} et {1}</value>\n  </data>\n  <data name=\"Invalid supplier email address\" xml:space=\"preserve\">\n    <value>Adresse e-mail du fournisseur invalide</value>\n  </data>\n</root>"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Key matching is exact and case-sensitive",
+        "text": "The resource file key must match the ErrorMessage string character for character. If there's even a trailing space mismatch, ASP.NET Core won't find the translation and will fall back to the hardcoded English message."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2 — SharedResource for Cross-Cutting Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If multiple models share common validation messages (like 'This field is required'), a shared resource file avoids duplication:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resources/SharedResource.resx — shared English strings",
+        "content": "A resource file not tied to any specific class — accessible from anywhere via IStringLocalizerFactory.",
+        "language": "xml",
+        "code": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <data name=\"RequiredField\" xml:space=\"preserve\">\n    <value>This field is required</value>\n  </data>\n  <data name=\"InvalidEmail\" xml:space=\"preserve\">\n    <value>Please enter a valid email address</value>\n  </data>\n  <data name=\"MaxLengthExceeded\" xml:space=\"preserve\">\n    <value>This field cannot exceed {0} characters</value>\n  </data>\n</root>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resources/SharedResource.fr.resx — shared French strings",
+        "content": "French translations for the same shared keys.",
+        "language": "xml",
+        "code": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <data name=\"RequiredField\" xml:space=\"preserve\">\n    <value>Ce champ est obligatoire</value>\n  </data>\n  <data name=\"InvalidEmail\" xml:space=\"preserve\">\n    <value>Veuillez saisir une adresse e-mail valide</value>\n  </data>\n  <data name=\"MaxLengthExceeded\" xml:space=\"preserve\">\n    <value>Ce champ ne peut pas dépasser {0} caractères</value>\n  </data>\n</root>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using SharedResource in a custom validation attribute",
+        "content": "Inject IStringLocalizer<SharedResource> into a custom ValidationAttribute to pull shared, localized error messages.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Localization;\nusing System.ComponentModel.DataAnnotations;\n\nnamespace LocalizationDemo.Validation;\n\npublic class FrenchPhoneAttribute : ValidationAttribute\n{\n    protected override ValidationResult IsValid(object? value, ValidationContext context)\n    {\n        var localizer = context.GetService<IStringLocalizer<SharedResource>>();\n        if (localizer == null)\n        {\n            return new ValidationResult(\"Localization service unavailable\");\n        }\n\n        if (value is not string phone || string.IsNullOrWhiteSpace(phone))\n        {\n            return ValidationResult.Success;\n        }\n\n        // French phone numbers: 10 digits, optionally starting with +33\n        var digits = new string(phone.Where(char.IsDigit).ToArray());\n        var isValid = digits.Length == 10 || (digits.Length == 11 && digits.StartsWith(\"33\"));\n\n        if (!isValid)\n        {\n            var errorMessage = localizer[\"InvalidFrenchPhone\"];\n            return new ValidationResult(errorMessage);\n        }\n\n        return ValidationResult.Success;\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 3 — ErrorMessageResourceName / ErrorMessageResourceType"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For strongly typed access to resource messages, use `ErrorMessageResourceName` (the key) and `ErrorMessageResourceType` (the resource class). This approach works with auto-generated resource classes:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Models/Customer.cs — strongly typed resource references",
+        "content": "ErrorMessageResourceType points to the auto-generated resource class for the .resx file.",
+        "language": "csharp",
+        "code": "using System.ComponentModel.DataAnnotations;\nusing LocalizationDemo.Resources; // namespace of your .resx file\n\nnamespace LocalizationDemo.Models;\n\npublic class Customer\n{\n    [Required(\n        ErrorMessageResourceName = \"CustomerNameRequired\",\n        ErrorMessageResourceType = typeof(ValidationMessages))]\n    [Display(Name = \"Customer Name\", ResourceType = typeof(DisplayMessages))]\n    public string Name { get; set; } = string.Empty;\n\n    [Range(18, 120,\n        ErrorMessageResourceName = \"AgeRange\",\n        ErrorMessageResourceType = typeof(ValidationMessages))]\n    [Display(Name = \"Age\", ResourceType = typeof(DisplayMessages))]\n    public int Age { get; set; }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Resource class generation",
+        "text": "When you add a .resx file to your project, Visual Studio generates a strongly-typed class (e.g., ValidationMessages) with a property for each resource key. The class is in the same namespace as the .resx file."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Localizing Built-in Attribute Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Built-in attributes like [Required] and [EmailAddress] show English messages by default. To localize them, create a resource file and configure it via `AddDataAnnotationsLocalization`:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — register data annotations localization",
+        "content": "Call AddDataAnnotationsLocalization and optionally point it to a shared resource location.",
+        "language": "csharp",
+        "code": "builder.Services.AddControllersWithViews()\n    .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)\n    .AddDataAnnotationsLocalization(options =>\n    {\n        // By default, ASP.NET Core looks for\n        // Resources/DataAnnotations/[Culture].resx\n        options.DataAnnotationLocalizerProvider = (type, factory) =>\n        {\n            // Use a shared resource for all DataAnnotation messages\n            return factory.Create(typeof(SharedResource));\n        };\n    });"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resources/DataAnnotations.fr.resx — French built-in messages",
+        "content": "Keys are the default English messages; values are French translations.",
+        "language": "xml",
+        "code": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <!-- Required attribute default message -->\n  <data name=\"The {0} field is required.\" xml:space=\"preserve\">\n    <value>Le champ {0} est obligatoire.</value>\n  </data>\n  <!-- StringLength default message -->\n  <data name=\"The field {0} must be a string with a maximum length of {1}.\" xml:space=\"preserve\">\n    <value>Le champ {0} doit être une chaîne de {1} caractères maximum.</value>\n  </data>\n  <!-- Range default message -->\n  <data name=\"The field {0} must be between {1} and {2}.\" xml:space=\"preserve\">\n    <value>Le champ {0} doit être compris entre {1} et {2}.</value>\n  </data>\n  <!-- EmailAddress default message -->\n  <data name=\"The {0} field is not a valid e-mail address.\" xml:space=\"preserve\">\n    <value>Le champ {0} n'est pas une adresse e-mail valide.</value>\n  </data>\n</root>"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Validation Attribute with Localized Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most flexible approach is a custom ValidationAttribute that uses `IStringLocalizer` to look up messages at runtime. This keeps all error text in resource files, making it easy for translators to update:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validation/FutureDateAttribute.cs",
+        "content": "A custom validation attribute that checks a date is in the future, with localized error messages from a resource file.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Localization;\nusing System.ComponentModel.DataAnnotations;\n\nnamespace LocalizationDemo.Validation;\n\npublic class FutureDateAttribute : ValidationAttribute\n{\n    protected override ValidationResult IsValid(object? value, ValidationContext context)\n    {\n        var localizer = context.GetService<IStringLocalizer<FutureDateAttribute>>();\n\n        if (value is not DateTime date)\n        {\n            return ValidationResult.Success;\n        }\n\n        if (date > DateTime.Now)\n        {\n            var errorMessage = localizer?[\"DateCannotBeInFuture\"]\n                ?? \"The date cannot be in the future\";\n            return new ValidationResult(errorMessage);\n        }\n\n        return ValidationResult.Success;\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resources/Validation/FutureDateAttribute.fr.resx",
+        "content": "French translation for the custom validation error message.",
+        "language": "xml",
+        "code": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root>\n  <data name=\"DateCannotBeInFuture\" xml:space=\"preserve\">\n    <value>La date ne peut pas être dans le futur</value>\n  </data>\n</root>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using the custom attribute in a model",
+        "content": "The attribute name is all you write in the model — the error message comes from the resource file.",
+        "language": "csharp",
+        "code": "public class Event\n{\n    [Required(ErrorMessage = \"Event name is required\")]\n    public string Name { get; set; } = string.Empty;\n\n    [Required(ErrorMessage = \"Event date is required\")]\n    [FutureDate]\n    public DateTime Date { get; set; }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Verify Resource Completeness"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A common localization bug is missing keys in a secondary resource file. When ASP.NET Core can't find a translation, it silently falls back to the default language — which can be confusing for users and developers alike."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Missing key behavior",
+        "text": "If the French resource file doesn't contain the key 'Product name is required', ASP.NET Core silently uses the English ErrorMessage string. Always verify that all resource files contain the same set of keys."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "validation-localization-flow",
+        "caption": "How ASP.NET Core resolves a localized validation error message",
+        "definition": "flowchart LR\n    A[User submits form] --> B[Model Validation runs]\n    B --> C{[Required] on Name fires]\n    C --> D[Look for key in Product.fr.resx]\n    D -->|found| E[Return French message]\n    D -->|missing| F[Fall back to ErrorMessage string]\n    E --> G[Display in French]\n    F --> H[Display in English (fallback)]"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Localize an Order Model",
+        "description": "Apply all three validation localization approaches to an Order model.",
+        "steps": [
+          "Create an Order model with [Required], [Range], [EmailAddress], and [StringLength] on CustomerName, TotalAmount, CustomerEmail, and ShippingAddress.",
+          "Use Approach 1 (AddDataAnnotationsLocalization) for [Required] messages with ErrorMessage strings as keys.",
+          "Create Resources/Models/Order.fr.resx and Order.es.resx with French and Spanish translations for each ErrorMessage key.",
+          "Add a custom [FutureOrderDate] validation attribute that uses IStringLocalizer<FutureOrderAttribute> for its error message.",
+          "Create FutureOrderAttribute.fr.resx and FutureOrderAttribute.es.resx.",
+          "Register AddDataAnnotationsLocalization in Program.cs.",
+          "Run the app, submit an empty form, and verify the error messages appear in French when ?culture=fr-FR is set."
+        ],
+        "expectedOutcome": "An Order form where every validation error message appears in the user's selected language, including messages from the custom validation attribute."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Validation Localization Checklist",
+        "items": [
+          { "text": "AddDataAnnotationsLocalization() is chained on AddControllersWithViews()", "hint": "Program.cs services registration" },
+          { "text": "Every ErrorMessage string has a matching key in all culture resource files", "hint": "Key is case-sensitive and exact" },
+          { "text": "Custom ValidationAttributes use context.GetService<IStringLocalizer<T>>()", "hint": "Never hardcode error messages in custom attributes" },
+          { "text": "SharedResource.resx contains strings used across multiple models", "hint": "Avoids duplicating 'This field is required' everywhere" },
+          { "text": "Resource file placement matches the expected convention", "hint": "Resources/Models/[ClassName].[culture].resx or Resources/Validation/[ClassName].[culture].resx" },
+          { "text": "All cultures show the same set of keys — no missing translations", "hint": "Compare keys across .resx files" }
+        ]
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "AddDataAnnotationsLocalization() enables automatic translation of DataAnnotation error messages.",
+          "The ErrorMessage string is the resource key — it must match exactly across all .resx files.",
+          "Use ErrorMessageResourceName + ErrorMessageResourceType for strongly-typed resource access.",
+          "SharedResource.resx stores common strings used by multiple models and custom attributes.",
+          "Custom ValidationAttributes should inject IStringLocalizer via context.GetService<IStringLocalizer<T>>() — never hardcode error messages.",
+          "Always verify all resource files contain the same set of keys to avoid silent fallback to English."
+        ],
+        "takeaway": "Well-localized validation messages make your app feel truly native to each language. They are the detail users notice most when switching languages."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Do I need ErrorMessageResourceType for every attribute?",
+            "answer": "No. Use ErrorMessageResourceType only if you want strongly-typed access to a specific resource class. For most cases, AddDataAnnotationsLocalization with matching keys in a per-model .resx file is simpler."
+          },
+          {
+            "question": "What if a resource key is missing from the French file?",
+            "answer": "ASP.NET Core silently falls back to the ErrorMessage string (English). This is why resource completeness checks are essential — you won't see an error, just untranslated text."
+          },
+          {
+            "question": "Can I use a PO file instead of .resx for validation messages?",
+            "answer": "Yes. If you have AddPortableObjectLocalization() registered, DataAnnotation messages will also be looked up in PO files using the same key-matching approach."
+          },
+          {
+            "question": "How do I localize the [Display(Name = \"...\")] attribute?",
+            "answer": "Add a resource file for the model. For a Product model, create Product.resx, Product.fr.resx, Product.es.resx with keys matching the Name values. ASP.NET Core looks them up automatically when AddDataAnnotationsLocalization() is registered."
+          }
+        ]
+      }
+    }
+  ]
+}

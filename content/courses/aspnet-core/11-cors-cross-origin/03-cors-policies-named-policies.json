@@ -1,0 +1,216 @@
+{
+  "id": "lesson-asp-039",
+  "slug": "cors-policies-named-policies",
+  "moduleSlug": "cors-cross-origin",
+  "courseSlug": "aspnet-core",
+  "title": "CORS Policies and Named Policies in ASP.NET Core",
+  "description": "Define reusable CORS policies and apply them globally, per controller, or per action.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "asp.net core",
+    "cors",
+    "named policies",
+    "enablecors attribute",
+    "security"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Use Named Policies?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Inline policies work for small demos, but real applications usually need different rules for different parts of the API. A public API might allow any origin, while an admin area should only accept requests from trusted internal domains. Named policies let you define each rule once and reuse it everywhere."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep Policies Centralized",
+        "text": "Define all CORS policies in Program.cs so you can audit and update them in one place instead of hunting through controllers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Defining a Named Policy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Call AddPolicy inside AddCors to create a named policy. The name is just a string key you will reference later."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — Named Policy Definition",
+        "content": "Register a named CORS policy called 'AdminPolicy' that only allows trusted origins.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AdminPolicy\", policy =>\n    {\n        policy\n            .WithOrigins(\"https://admin.example.com\")\n            .AllowAnyHeader()\n            .AllowAnyMethod()\n            .AllowCredentials();\n    });\n\n    options.AddPolicy(\"PublicApi\", policy =>\n    {\n        policy\n            .WithOrigins(\n                \"https://app.example.com\",\n                \"https://mobile.example.com\")\n            .AllowAnyHeader()\n            .AllowAnyMethod();\n    });\n});\n\nbuilder.Services.AddControllersWithViews();\n\nvar app = builder.Build();\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\n\napp.UseCors();\n\napp.UseAuthorization();\napp.MapControllerRoute(\n    name: \"default\",\n    pattern: \"{controller=Home}/{action=Index}/{id?}\");\n\napp.Run();"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cors-policy-flow",
+        "caption": "How a named CORS policy flows from registration to request",
+        "definition": "flowchart LR\n    A[AddCors AddPolicy] --> B[Named policy stored in DI]\n    B --> C[UseCors applies middleware]\n    C --> D{Request arrives}\n    D -->|Matching controller/action| E[EnableCors attribute selects policy]\n    D -->|No attribute| F[Global UseCors policy applies]\n    E --> G[CORS headers added to response]\n    F --> G"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Applying a Policy Per Controller"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use the EnableCors attribute on a controller class. Every action in that controller inherits the same policy unless an action overrides it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Controller-Level CORS Policy",
+        "content": "Apply the 'PublicApi' policy to all actions in a controller.",
+        "language": "csharp",
+        "code": "using Microsoft.AspNetCore.Cors;\n\n[EnableCors(\"PublicApi\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    [HttpGet]\n    public IActionResult GetAll()\n    {\n        return Ok(new[] { \"Laptop\", \"Phone\", \"Tablet\" });\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Applying a Policy Per Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Place the attribute directly on an action method. The action policy overrides the controller policy for that single method."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Action-Level CORS Policy",
+        "content": "Override the controller policy for a single sensitive action.",
+        "language": "csharp",
+        "code": "using Microsoft.AspNetCore.Cors;\n\n[EnableCors(\"PublicApi\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpGet]\n    public IActionResult GetRecent()\n    {\n        return Ok(new[] { \"Order 1\", \"Order 2\" });\n    }\n\n    [HttpPost]\n    [EnableCors(\"AdminPolicy\")]\n    public IActionResult Create([FromBody] Order order)\n    {\n        // Only admin.example.com can POST to this action\n        return CreatedAtAction(nameof(GetRecent), order);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Disabling CORS for a Controller or Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use DisableCors when you want to block cross-origin access for a specific endpoint even if a global or controller-level policy exists."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Disabling CORS on an Action",
+        "content": "Block all cross-origin access to a specific action.",
+        "language": "csharp",
+        "code": "using Microsoft.AspNetCore.Cors;\n\n[EnableCors(\"PublicApi\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class SecretsController : ControllerBase\n{\n    [HttpGet(\"public\")]\n    public IActionResult GetPublic()\n    {\n        return Ok(\"This endpoint allows cross-origin requests.\");\n    }\n\n    [DisableCors]\n    [HttpGet(\"internal\")]\n    public IActionResult GetInternal()\n    {\n        // CORS headers are removed from this response\n        return Ok(\"This endpoint does not allow cross-origin requests.\");\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Important Rule: AllowCredentials and Wildcards"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If your policy calls AllowCredentials(), you cannot also call AllowAnyOrigin(). The browser will reject the response because allowing credentials from every origin is unsafe. Always pair AllowCredentials with WithOrigins and explicit domain names."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Common Mistake",
+        "text": "Calling AllowAnyOrigin() together with AllowCredentials() causes a runtime CORS error. Use WithOrigins(\"https://example.com\") instead when credentials are required."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Create a Named Policy",
+        "description": "Practice defining and applying a named CORS policy in a new ASP.NET Core Web API project.",
+        "steps": [
+          "Create a new Web API project.",
+          "Register a named policy called 'MobileApp' that allows https://mobile.example.com.",
+          "Apply 'MobileApp' to the WeatherForecastController.",
+          "Add a second policy called 'InternalTools' that allows https://tools.example.com and requires credentials.",
+          "Verify the project builds without errors."
+        ],
+        "expectedOutcome": "You should have two named CORS policies registered and applied at the controller level."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Lesson Checkpoint",
+        "items": [
+          {
+            "text": "I can define a named CORS policy with AddPolicy"
+          },
+          {
+            "text": "I know how to apply a policy at the controller level"
+          },
+          {
+            "text": "I can override the controller policy on a single action"
+          },
+          {
+            "text": "I understand why AllowCredentials and AllowAnyOrigin cannot be combined"
+          },
+          {
+            "text": "I can use DisableCors to block cross-origin access for an endpoint"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Named policies centralize CORS rules and make them reusable",
+          "Use EnableCors on controllers or actions to apply a named policy",
+          "Use DisableCors to explicitly block cross-origin access",
+          "AllowCredentials requires explicit origins, not AllowAnyOrigin"
+        ],
+        "takeaway": "Next, you will learn how CORS preflight requests work and how ASP.NET Core handles them."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}

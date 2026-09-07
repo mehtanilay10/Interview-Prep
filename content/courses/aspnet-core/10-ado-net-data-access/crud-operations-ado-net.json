@@ -1,0 +1,226 @@
+{
+  "id": "lesson-asp-044",
+  "slug": "crud-operations-ado-net",
+  "moduleSlug": "ado-net-data-access",
+  "courseSlug": "aspnet-core",
+  "title": "CRUD Operations with ADO.NET",
+  "description": "Implement Create, Read, Update, and Delete operations using SqlCommand and ExecuteNonQuery.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 45,
+  "tags": ["ado-net", "crud", "insert", "update", "delete", "sql-server", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CRUD stands for **Create, Read, Update, and Delete** — the four fundamental operations for persistent data. In ADO.NET, `SqlCommand` handles all four through its execution methods: `ExecuteReader()` for reads, and `ExecuteNonQuery()` for inserts, updates, and deletes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SqlCommand Execution Methods"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `SqlCommand` class provides three main methods for executing SQL against the database. Choosing the right one depends on what your query returns."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Method", "Use Case", "Returns"],
+        "rows": [
+          ["ExecuteReader()", "SELECT queries that return rows", "SqlDataReader"],
+          ["ExecuteNonQuery()", "INSERT, UPDATE, DELETE, or DDL statements", "int (rows affected)"],
+          ["ExecuteScalar()", "Queries that return a single value", "object (first row, first column)"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "INSERT — Creating Records"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To insert a new record, write an INSERT statement and execute it with `ExecuteNonQuery()`. The method returns the number of rows affected, which should be 1 for a successful insert."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Insert a New Inventory Item",
+        "content": "Add a new product to the Inventory table.",
+        "language": "csharp",
+        "code": "public IActionResult Create(Inventory model)\n{\n    if (!ModelState.IsValid)\n    {\n        return View(model);\n    }\n\n    string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\n    using (SqlConnection connection = new SqlConnection(connectionString))\n    {\n        string sql = @\"\n            INSERT INTO Inventory (Name, Price, Quantity, AddedOn)\n            VALUES (@Name, @Price, @Quantity, @AddedOn)\";\n\n        using (SqlCommand command = new SqlCommand(sql, connection))\n        {\n            command.Parameters.AddWithValue(\"@Name\", model.Name);\n            command.Parameters.AddWithValue(\"@Price\", model.Price);\n            command.Parameters.AddWithValue(\"@Quantity\", model.Quantity);\n            command.Parameters.AddWithValue(\"@AddedOn\", model.AddedOn);\n\n            connection.Open();\n            int rowsAffected = command.ExecuteNonQuery();\n        }\n    }\n\n    return RedirectToAction(nameof(Index));\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always use parameters",
+        "text": "Never concatenate user input into SQL strings. Always use parameterized queries (SqlParameter) to prevent SQL injection attacks. The example above uses parameters correctly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "READ — Retrieving Records"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reading data uses `ExecuteReader()` to get a `SqlDataReader`. You can also use `ExecuteScalar()` when you need a single aggregate value, such as a count or sum."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Get Total Inventory Count with ExecuteScalar",
+        "content": "Retrieve a single aggregate value efficiently.",
+        "language": "csharp",
+        "code": "public int GetTotalInventoryCount()\n{\n    string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\n    using (SqlConnection connection = new SqlConnection(connectionString))\n    {\n        string sql = \"SELECT COUNT(*) FROM Inventory\";\n        using (SqlCommand command = new SqlCommand(sql, connection))\n        {\n            connection.Open();\n            int count = (int)command.ExecuteScalar();\n            return count;\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For reading multiple rows, use `ExecuteReader()` as shown in the previous lesson. You can also combine a read with an update in a single round-trip by returning the identity of the newly inserted row."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Get Inserted Identity Value",
+        "content": "Retrieve the auto-generated Id after inserting a row.",
+        "language": "csharp",
+        "code": "string sql = @\"\n    INSERT INTO Inventory (Name, Price, Quantity, AddedOn)\n    VALUES (@Name, @Price, @Quantity, @AddedOn);\n    SELECT CAST(SCOPE_IDENTITY() AS INT);\";\n\nusing (SqlCommand command = new SqlCommand(sql, connection))\n{\n    command.Parameters.AddWithValue(\"@Name\", model.Name);\n    command.Parameters.AddWithValue(\"@Price\", model.Price);\n    command.Parameters.AddWithValue(\"@Quantity\", model.Quantity);\n    command.Parameters.AddWithValue(\"@AddedOn\", model.AddedOn);\n\n    connection.Open();\n    int newId = (int)command.ExecuteScalar();\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "UPDATE — Modifying Records"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Updating records follows the same pattern as inserting. Use an UPDATE statement with a WHERE clause to target specific rows. Always include a WHERE clause; omitting it updates every row in the table."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Update an Inventory Item",
+        "content": "Change the price and quantity of an existing product.",
+        "language": "csharp",
+        "code": "public IActionResult Edit(int id, Inventory model)\n{\n    if (!ModelState.IsValid || id != model.Id)\n    {\n        return View(model);\n    }\n\n    string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\n    using (SqlConnection connection = new SqlConnection(connectionString))\n    {\n        string sql = @\"\n            UPDATE Inventory\n            SET Name = @Name,\n                Price = @Price,\n                Quantity = @Quantity\n            WHERE Id = @Id\";\n\n        using (SqlCommand command = new SqlCommand(sql, connection))\n        {\n            command.Parameters.AddWithValue(\"@Id\", model.Id);\n            command.Parameters.AddWithValue(\"@Name\", model.Name);\n            command.Parameters.AddWithValue(\"@Price\", model.Price);\n            command.Parameters.AddWithValue(\"@Quantity\", model.Quantity);\n\n            connection.Open();\n            int rowsAffected = command.ExecuteNonQuery();\n        }\n    }\n\n    return RedirectToAction(nameof(Index));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "DELETE — Removing Records"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Deleting records is straightforward but dangerous without a WHERE clause. Always verify the row exists and confirm the intent before deleting. A soft-delete pattern (setting an IsDeleted flag) is often safer in production applications."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Delete an Inventory Item",
+        "content": "Remove a product by its Id.",
+        "language": "csharp",
+        "code": "public IActionResult Delete(int id)\n{\n    string connectionString = _configuration[\"ConnectionStrings:DefaultConnection\"];\n\n    using (SqlConnection connection = new SqlConnection(connectionString))\n    {\n        string sql = \"DELETE FROM Inventory WHERE Id = @Id\";\n\n        using (SqlCommand command = new SqlCommand(sql, connection))\n        {\n            command.Parameters.AddWithValue(\"@Id\", id);\n\n            connection.Open();\n            int rowsAffected = command.ExecuteNonQuery();\n        }\n    }\n\n    return RedirectToAction(nameof(Index));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Complete CRUD Controller Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A typical ADO.NET controller follows a consistent pattern: open a connection, create a command with parameters, execute, and close. The using statement handles disposal automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CRUD Controller Skeleton",
+        "content": "A complete controller outline showing all four operations.",
+        "language": "csharp",
+        "code": "using Microsoft.AspNetCore.Mvc;\nusing Microsoft.Extensions.Configuration;\nusing System.Data;\nusing System.Data.SqlClient;\nusing ADO.Models;\n\nnamespace ADO.Controllers\n{\n    public class InventoryController : Controller\n    {\n        private readonly IConfiguration _configuration;\n\n        public InventoryController(IConfiguration configuration)\n        {\n            _configuration = configuration;\n        }\n\n        private string ConnectionString =>\n            _configuration[\"ConnectionStrings:DefaultConnection\"];\n\n        public IActionResult Index()\n        {\n            List<Inventory> inventories = new List<Inventory>();\n\n            using (SqlConnection connection = new SqlConnection(ConnectionString))\n            {\n                string sql = \"SELECT * FROM Inventory\";\n                using (SqlCommand command = new SqlCommand(sql, connection))\n                using (SqlDataReader reader = command.ExecuteReader())\n                {\n                    while (reader.Read())\n                    {\n                        inventories.Add(new Inventory\n                        {\n                            Id = (int)reader[\"Id\"],\n                            Name = reader[\"Name\"].ToString(),\n                            Price = (decimal)reader[\"Price\"],\n                            Quantity = (int)reader[\"Quantity\"],\n                            AddedOn = (DateTime)reader[\"AddedOn\"]\n                        });\n                    }\n                }\n            }\n\n            return View(inventories);\n        }\n\n        public IActionResult Create() => View();\n\n        [HttpPost]\n        public IActionResult Create(Inventory model)\n        {\n            // INSERT code here\n            return RedirectToAction(nameof(Index));\n        }\n\n        public IActionResult Edit(int id)\n        {\n            // SELECT by Id code here\n            return View();\n        }\n\n        [HttpPost]\n        public IActionResult Edit(Inventory model)\n        {\n            // UPDATE code here\n            return RedirectToAction(nameof(Index));\n        }\n\n        public IActionResult Delete(int id)\n        {\n            // DELETE code here\n            return RedirectToAction(nameof(Index));\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "CRUD Implementation Checklist",
+        "items": [
+          {
+            "text": "INSERT uses parameters for all user-supplied values.",
+            "hint": "Use @Name, @Price, @Quantity, @AddedOn."
+          },
+          {
+            "text": "SELECT retrieves all columns needed by the view.",
+            "hint": "Use SELECT * or list columns explicitly."
+          },
+          {
+            "text": "UPDATE includes a WHERE clause targeting the primary key.",
+            "hint": "WHERE Id = @Id"
+          },
+          {
+            "text": "DELETE uses a WHERE clause and targets the primary key.",
+            "hint": "Never omit the WHERE clause in DELETE statements."
+          },
+          {
+            "text": "All connections are wrapped in using statements.",
+            "hint": "Ensures proper disposal even if an exception occurs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Full CRUD Controller",
+        "description": "Create a complete InventoryController with all four operations.",
+        "steps": [
+          "Create an InventoryController with Index, Create, Edit, and Delete actions.",
+          "Implement the Index action to read all Inventory records using SqlDataReader.",
+          "Implement the Create GET and POST actions to insert a new Inventory item.",
+          "Implement the Edit GET and POST actions to update an existing item.",
+          "Implement the Delete action to remove an item by Id.",
+          "Create simple Razor views for each action.",
+          "Test each operation by running the application."
+        ],
+        "expectedOutcome": "A working CRUD interface for the Inventory table using only ADO.NET, no ORM."
+      }
+    }
+  ],
+  "courseSlug": "aspnet-core"
+}
