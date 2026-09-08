@@ -47,6 +47,18 @@ export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
             Start Preparing
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
+          <Link
+            href="/cheatsheet"
+            className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+          >
+            Browse Cheat Sheets
+          </Link>
+          <Link
+            href="/interview-questions"
+            className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+          >
+            Practice Interview Questions
+          </Link>
         </div>
 
         {/* Stats */}

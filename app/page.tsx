@@ -1,15 +1,15 @@
 import Link from 'next/link';
-import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { ModuleCard } from '@/components/course/ModuleCard';
-import { getCourseStats, getAllModules, getAllCourses } from '@/lib/content';
+import { getCourseStats, getAllCourses } from '@/lib/content';
+import type { Course } from '@/types';
 import Head from 'next/head';
 
 export default function HomePage() {
   const stats = getCourseStats();
-  const modules = getAllModules().slice(0, 3);
-  const firstCourse = getAllCourses().find((c) => !c.isInterview);
+  const courses = getAllCourses().filter((c) => !c.isInterview);
+  const firstCourse = courses[0];
 
   const featureCards = [
     {
@@ -44,6 +44,14 @@ export default function HomePage() {
     },
   ];
 
+  const audience = [
+    { emoji: '👔', label: 'Professionals', desc: 'Prepare faster, think sharper, and stand out in interviews.' },
+    { emoji: '📚', label: 'Career Changers', desc: 'Add strong interview skills to your existing experience and make a great impression.' },
+    { emoji: '🎓', label: 'Students', desc: 'Learn proven techniques that will help you succeed in every professional field.' },
+    { emoji: '✍️', label: 'Writers & Communicators', desc: 'Sharpen your articulation and storytelling for any interview setting.' },
+    { emoji: '🤔', label: 'The Curious', desc: 'Understand what great interviews really take — not just the hype.' },
+  ];
+
   return (
     <>
       <Head>
@@ -58,7 +66,7 @@ export default function HomePage() {
       />
 
       {/* Who is this for */}
-      <section className="border-b border-border bg-canvas-subtle py-12" role="list">
+      <section className="border-b border-border bg-canvas-subtle py-12">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <SectionHeader
             eyebrow="Who this is for"
@@ -67,21 +75,21 @@ export default function HomePage() {
             align="center"
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { emoji: '👔', label: 'Professionals', desc: 'Prepare faster, think sharper, and stand out in interviews.' },
-              { emoji: '📚', label: 'Career Changers', desc: 'Add strong interview skills to your existing experience and make a great impression.' },
-              { emoji: '🎓', label: 'Students', desc: 'Learn proven techniques that will help you succeed in every professional field.' },
-              { emoji: '✍️', label: 'Writers & Communicators', desc: 'Sharpen your articulation and storytelling for any interview setting.' },
-              { emoji: '🤔', label: 'The Curious', desc: 'Understand what great interviews really take — not just the hype.' },
-            ].map((item) => (
+            {audience.map((item) => (
               <article
                 key={item.label}
-                className="flex items-start gap-3 rounded-xl border border-border bg-canvas p-4 dark:bg-canvas-subtle"
-                role="listitem"
+                className="group flex items-start gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
               >
-                <span className="text-2xl leading-none mt-0.5" aria-hidden="true">{item.emoji}</span>
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas-inset text-xl"
+                  aria-hidden="true"
+                >
+                  {item.emoji}
+                </span>
                 <div>
-                  <p className="font-semibold text-fg-default text-sm">{item.label}</p>
+                  <p className="font-semibold text-fg-default text-sm group-hover:text-accent-fg transition-colors">
+                    {item.label}
+                  </p>
                   <p className="text-sm text-fg-muted mt-0.5">{item.desc}</p>
                 </div>
               </article>
@@ -99,39 +107,101 @@ export default function HomePage() {
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {featureCards.map((card) => (
-              <div
+              <article
                 key={card.title}
-                className="rounded-xl border border-border bg-canvas p-4 dark:bg-canvas-subtle"
+                className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
               >
-                <div className="mb-3">{card.icon}</div>
-                <h3 className="mb-1 font-semibold text-fg-default text-sm">{card.title}</h3>
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas-inset"
+                  aria-hidden="true"
+                >
+                  {card.icon}
+                </span>
+                <h3 className="text-sm font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
+                  {card.title}
+                </h3>
                 <p className="text-sm text-fg-muted">{card.description}</p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA strip */}
-      <section className="py-12">
-        <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
-          <h2 className="mb-3 text-2xl font-bold text-fg-default">
-            Ready to ace your next interview?
-          </h2>
-          <p className="mb-6 text-fg-muted">
-            Start with the first module — no account needed, no cost, no coding required.
-          </p>
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+      {/* Courses preview */}
+      <section className="border-b border-border py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <SectionHeader
+            eyebrow="Learning paths"
+            title="Browse courses"
+            description="Self-contained paths built for beginners and working professionals alike."
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.slice(0, 6).map((course: Course) => (
+              <Link
+                key={course.id}
+                href={`/courses/${course.slug}`}
+                className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+              >
+                <span className="text-3xl" aria-hidden="true">{course.icon}</span>
+                <h3 className="text-sm font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
+                  {course.title}
+                </h3>
+                <p className="line-clamp-2 text-sm text-fg-muted flex-1">
+                  {course.subtitle}
+                </p>
+                <span className="flex items-center gap-1 text-xs text-fg-subtle">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  {formatCourseHours(course)} read
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center">
             <Link
-              href={firstCourse ? `/courses/${firstCourse.slug}` : '/courses'}
-              className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
+              href="/courses"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default transition-colors hover:bg-canvas-subtle hover:text-accent-fg"
             >
-              Start Preparing
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              View all courses
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA strip */}
+      <section className="py-16">
+        <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
+          <div className="mx-auto max-w-xl rounded-2xl border border-accent-subtle bg-accent-subtle/40 px-6 py-10">
+            <h2 className="mb-3 text-2xl font-bold text-fg-default">
+              Ready to ace your next interview?
+            </h2>
+            <p className="mb-6 text-fg-muted">
+              Start with the first module — no account needed, no cost, no coding required.
+            </p>
+            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href={firstCourse ? `/courses/${firstCourse.slug}` : '/courses'}
+                className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
+              >
+                Start Preparing
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <Link
+                href="/interview-questions"
+                className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+              >
+                Practice Questions
+              </Link>
+            </div>
           </div>
         </div>
       </section>
     </>
   );
+}
+
+function formatCourseHours(course: Course): string {
+  const hours = Math.max(1, Math.round((course.moduleSlugs.length || 1) * 1.5));
+  return `${hours}h`;
 }
