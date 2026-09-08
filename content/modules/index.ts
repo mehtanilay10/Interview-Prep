@@ -195,13 +195,13 @@ export function getModulesByCourse(courseSlug: string): Module[] {
     .sort((a, b) => a.order - b.order);
 }
 
-import iqModule1 from '../courses/interview-qa/01-beginner-questions/content.json';
-import iqModule2 from '../courses/interview-qa/02-intermediate-questions/content.json';
-import iqModule3 from '../courses/interview-qa/03-advanced-questions/content.json';
-import iqModule4 from '../courses/interview-qa/04-scenario-based/content.json';
-import iqModule5 from '../courses/interview-qa/05-system-design/content.json';
-import iqModule6 from '../courses/interview-qa/06-rapid-fire/content.json';
-import iqModule7 from '../courses/interview-qa/07-interview-traps/content.json';
+import iqModule1 from '../interview-qa/01-beginner-questions/content.json';
+import iqModule2 from '../interview-qa/02-intermediate-questions/content.json';
+import iqModule3 from '../interview-qa/03-advanced-questions/content.json';
+import iqModule4 from '../interview-qa/04-scenario-based/content.json';
+import iqModule5 from '../interview-qa/05-system-design/content.json';
+import iqModule6 from '../interview-qa/06-rapid-fire/content.json';
+import iqModule7 from '../interview-qa/07-interview-traps/content.json';
 
 import fsModule1 from '../courses/fullstack-security/01-cors-configuration/content.json';
 import fsModule2 from '../courses/fullstack-security/02-jwt-authentication/content.json';

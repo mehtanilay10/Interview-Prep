@@ -17,7 +17,6 @@ import cleanCodeCSharpCourse from './clean-code-csharp/content.json';
 import unitTestingDotNetCourse from './unit-testing-dotnet/content.json';
 import reactTestingCourse from './react-testing/content.json';
 import oopsCourse from './oops-concepts/content.json';
-import interviewQaCourse from './interview-qa/content.json';
 import graphQlCourse from './graphql-dotnet/content.json';
 import designPatternsCourse from './design-patterns/content.json';
 import fullstackSecurityCourse from './fullstack-security/content.json';
@@ -40,7 +39,6 @@ const rawCourses = [
   unitTestingDotNetCourse,
   reactTestingCourse,
   oopsCourse,
-  interviewQaCourse,
   graphQlCourse,
   designPatternsCourse,
   fullstackSecurityCourse
