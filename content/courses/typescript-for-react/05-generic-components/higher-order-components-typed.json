@@ -1,0 +1,232 @@
+{
+  "id": "lesson-tsr-025",
+  "slug": "higher-order-components-typed",
+  "moduleSlug": "generic-components",
+  "title": "Higher-Order Components with TypeScript",
+  "description": "Learn to type higher-order components (HOCs) properly so the wrapped component retains full prop inference.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["react", "typescript", "hoc", "generics", "patterns"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **higher-order component (HOC)** is a function that takes a component and returns a new component with additional props or behavior. Typing HOCs correctly is one of the more advanced TypeScript challenges in React — get it wrong and the wrapped component loses all its prop types."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is a Higher-Order Component?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "HOCs are functions with this signature: `(WrappedComponent: ComponentType<Props>) => ComponentType<EnhancedProps>`. The enhanced component receives everything the original component needed plus whatever the HOC adds. The trick is making sure TypeScript tracks both sides of that equation."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Higher-Order Component (HOC)",
+            "definition": "A function that accepts a component and returns a new component with enhanced capabilities."
+          },
+          {
+            "term": "ComponentType<P>",
+            "definition": "Union of FunctionComponent<P> and ComponentClass<P> — accepts any kind of React component."
+          },
+          {
+            "term": "Omit<P, K>",
+            "definition": "Constructs a type by picking all properties from P except those in K. Used to remove props the HOC provides itself."
+          },
+          {
+            "term": "InferProps",
+            "definition": "Pattern where TypeScript extracts the wrapped component's original prop types and combines them with HOC-injected props."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-hoc-022",
+        "caption": "How a HOC wraps a component and injects new props",
+        "definition": "graph TD\n    A[Original Component\n    Props: { user: User }] --> B[HOC Function\n    withUserData]\n    B --> C[Enhanced Component\n    Props: { user: User } + injected]\n    D[HOC fetches data] --> C\n    C --> E[Consumer sees full\n    typed props]\n    style B fill:#4f46e5,color:#fff\n    style C fill:#10b981,color:#fff"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Typed HOC"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest case: an HOC that injects a single prop. The consumer provides the remaining props, and TypeScript tracks which ones come from the HOC and which are left for the consumer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Typed HOC That Injects a Prop",
+        "content": "Higher-order component with proper TypeScript typing",
+        "language": "tsx",
+        "code": "import { ComponentType, ReactNode } from 'react';\n\ninterface InjectedProps {\n  loggedInUser: { id: string; name: string; email: string };\n}\n\nfunction withCurrentUser<P extends object>(\n  WrappedComponent: ComponentType<P & InjectedProps>\n) {\n  return function WithCurrentUserComponent(\n    props: Omit<P, keyof InjectedProps>\n  ) {\n    const currentUser = { id: 'u1', name: 'Alice', email: 'alice@example.com' };\n    return <WrappedComponent {...(props as P)} loggedInUser={currentUser} />;\n  };\n}\n\n// Component that needs the user prop\ninterface UserProfileProps {\n  loggedInUser: { id: string; name: string; email: string };\n  showEmail: boolean;\n}\n\nfunction UserProfile({ loggedInUser, showEmail }: UserProfileProps) {\n  return (\n    <div>\n      <h2>{loggedInUser.name}</h2>\n      {showEmail && <p>{loggedInUser.email}</p>}\n    </div>\n  );\n}\n\n// Wrap it — loggedInUser is now injected, only showEmail remains\nconst EnhancedProfile = withCurrentUser(UserProfile);\n\n// Consumer only passes showEmail\n<EnhancedProfile showEmail={true} />"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Composing Multiple HOCs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real applications compose multiple HOCs: one for authentication, one for data fetching, one for logging. Each HOC must preserve the prop types of what came before it. The `Omit` pattern ensures each HOC removes only the props it provides."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Composed HOCs with Full Type Safety",
+        "content": "Chaining multiple HOCs while preserving types",
+        "language": "tsx",
+        "code": "interface AuthProps { token: string; }\ninterface DataProps { data: Todo[]; isLoading: boolean; }\n\nfunction withAuth<P extends object>(\n  Component: ComponentType<P & AuthProps>\n) {\n  return (props: Omit<P, keyof AuthProps>) => {\n    const token = useAuthToken();\n    return <Component {...(props as P)} token={token} />;\n  };\n}\n\nfunction withData<P extends object>(\n  Component: ComponentType<P & DataProps>\n) {\n  return (props: Omit<P, keyof DataProps>) => {\n    const { data, isLoading } = useTodos();\n    return <Component {...(props as P)} data={data} isLoading={isLoading} />;\n  };\n}\n\n// Original component needs all injected props\ninterface TodoListProps {\n  token: string;\n  data: Todo[];\n  isLoading: boolean;\n  filter: 'all' | 'active' | 'done';\n}\n\nfunction TodoList({ token, data, isLoading, filter }: TodoListProps) {\n  if (isLoading) return <div>Loading...</div>;\n  return <ul>{data.filter(t => filter === 'all' || t.done === (filter === 'done')).map(...)}</ul>;\n}\n\n// Compose: each HOC removes its own injected props\nconst EnhancedTodoList = withAuth(withData(TodoList));\n\n// Consumer only passes filter — token and data are injected\n<EnhancedTodoList filter=\"active\" />"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "HOC vs Alternatives",
+        "cards": [
+          {
+            "title": "Higher-Order Component",
+            "description": "Function that wraps a component and adds props",
+            "pros": ["Works with class and function components", "Composable", "Encapsulates cross-cutting concerns"],
+            "cons": ["Complex typing with generics", "Prop name collisions possible", "Wrapper components in DevTools"],
+            "tags": ["composable", "class-compatible"]
+          },
+          {
+            "title": "Custom Hook",
+            "description": "Function that encapsulates reusable stateful logic",
+            "pros": ["Simpler typing", "No wrapper in tree", "Composable with other hooks"],
+            "cons": ["Only works in function components", "Cannot modify rendered output"],
+            "tags": ["modern", "simple"]
+          },
+          {
+            "title": "Render Props",
+            "description": "Component accepts a function that returns JSX",
+            "pros": ["Full control over rendering", "Explicit data flow", "Easy to type"],
+            "cons": ["Callback nesting (wrapper hell)", "Can cause re-render overhead"],
+            "tags": ["explicit", "flexible"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Static Properties Are Lost",
+        "text": "HOCs do not automatically copy static properties like displayName, propTypes, or defaultProps from the wrapped component. Use a utility like hoist-non-react-statics to preserve them."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Typed HOC Checklist",
+        "items": [
+          {
+            "text": "Use P extends object as the generic parameter",
+            "hint": "Ensures the wrapped component receives a proper props object"
+          },
+          {
+            "text": "Accept ComponentType<P & InjectedProps> as the wrapped component",
+            "hint": "ComponentType works with both FC and class components"
+          },
+          {
+            "text": "Return a component with Omit<P, keyof InjectedProps>",
+            "hint": "Removes injected props from what the consumer provides"
+          },
+          {
+            "text": "Cast props as P when spreading to the wrapped component",
+            "hint": "Needed because Omit changes the type shape"
+          },
+          {
+            "text": "Set a meaningful displayName on the wrapper",
+            "hint": "Helps with debugging in React DevTools"
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: withLoading HOC",
+        "description": "Build a withLoading HOC that injects an isLoading boolean prop. The HOC should accept a WrappedComponent that needs { isLoading: boolean } plus its own props. The consumer should never provide isLoading — it is computed inside the HOC from a useLoadingState hook.",
+        "steps": [
+          "Define LoadingProps interface with isLoading: boolean",
+          "Build withLoading<P> that returns a component with Omit<P, keyof LoadingProps>",
+          "Inside the HOC, use a loading state and pass isLoading to the wrapped component",
+          "Wrap a UserCard component that displays loading spinner when isLoading is true",
+          "Verify TypeScript prevents passing isLoading to the enhanced component"
+        ],
+        "expectedOutcome": "A withLoading HOC where the wrapped component receives isLoading automatically, and TypeScript shows an error if a consumer tries to pass isLoading manually."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Are HOCs still used in modern React?",
+            "answer": "Less commonly now that hooks exist, but they are still relevant for class component codebases, cross-cutting concerns in shared libraries, and certain patterns like theming providers."
+          },
+          {
+            "question": "Why not use intersection types instead of Omit?",
+            "answer": "Intersection types (P & InjectedProps) work for the wrapped component's input but don't help the consumer. Omit<P, keyof InjectedProps> is what removes injected props from the consumer-facing API."
+          },
+          {
+            "question": "Can an HOC add event handlers or refs?",
+            "answer": "Yes. Use the same pattern: define the injected props in an interface, add them inside the wrapper, and omit them from the consumer. For refs, use forwardRef in the wrapped component."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "HOCs wrap components with additional props and behavior",
+          "P extends object keeps the generic type safe",
+          "Omit<P, keyof InjectedProps> removes HOC props from consumer",
+          "ComponentType<P> accepts both function and class components",
+          "Compose HOCs by chaining — each removes its own injected props"
+        ],
+        "takeaway": "Correctly typed HOCs let you compose behaviors while keeping every prop fully inferable for the consumer."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "typescript-for-react"
+}

@@ -1,0 +1,222 @@
+{
+  "id": "lesson-tsr-027",
+  "slug": "error-boundaries-typed",
+  "moduleSlug": "react-patterns",
+  "title": "Typed Error Boundaries",
+  "description": "Type error boundaries and error handling patterns in React so you can catch, classify, and recover from errors with full type safety.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 16,
+  "tags": ["typescript", "react", "error-boundaries", "error-handling"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React error boundaries catch JavaScript errors anywhere in their component tree and display a fallback UI. Typing the errors they catch makes your error handling more intentional — you know exactly what can go wrong, and each error type gets the right recovery strategy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Boundaries in React"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Error boundaries are class components that implement `componentDidCatch` or the static `getDerivedStateFromError`. They catch render errors, lifecycle errors, and constructor errors in their children. TypeScript can classify these errors and provide typed fallback UIs."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Error Boundary",
+            "definition": "A React component that catches JavaScript errors in its children and renders a fallback UI."
+          },
+          {
+            "term": "componentDidCatch",
+            "definition": "Lifecycle method called after an error is caught, receives the error and an info object."
+          },
+          {
+            "term": "Error Classification",
+            "definition": "Using TypeScript discriminated unions to categorize errors and render appropriate fallbacks."
+          },
+          {
+            "term": "Fallback UI",
+            "definition": "The UI rendered by an error boundary when an error is caught — should be helpful, not just a blank screen."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-error-boundary-024",
+        "caption": "How error boundaries intercept and recover from component errors",
+        "definition": "graph TD\n    A[Child Component throws] --> B[Error Boundary catches]\n    B --> C{classify error}\n    C -->|NetworkError| D[Retry UI]\n    C -->|AuthError| E[Login redirect]\n    C -->|RenderError| F[Report + fallback]\n    D --> G[User clicks retry]\n    G --> H[resetErrorBoundary]\n    H --> I[Re-render children]\n    style B fill:#4f46e5,color:#fff\n    style H fill:#10b981,color:#fff"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Building a Typed Error Boundary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Define your error types as a discriminated union. The error boundary catches any error, classifies it, and renders the appropriate fallback. TypeScript ensures each error variant has the right recovery action."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Typed Error Boundary",
+        "content": "Error boundary with typed error classification",
+        "language": "tsx",
+        "code": "import { Component, ReactNode, ErrorInfo, ReactElement } from 'react';\n\n// Discriminated union of all possible error types\ntype AppError =\n  | { type: 'network'; message: string; retryable: boolean }\n  | { type: 'auth'; message: string; redirectTo: string }\n  | { type: 'not-found'; message: string; resource: string }\n  | { type: 'unknown'; message: string; stack?: string };\n\ninterface ErrorBoundaryProps {\n  children: ReactNode;\n  fallback?: (error: AppError, retry: () => void) => ReactElement;\n  onError?: (error: AppError, info: ErrorInfo) => void;\n}\n\ninterface ErrorBoundaryState {\n  error: AppError | null;\n}\n\nfunction classifyError(error: Error): AppError {\n  if (error.message.includes('fetch') || error.message.includes('network')) {\n    return { type: 'network', message: error.message, retryable: true };\n  }\n  if (error.message.includes('unauthorized') || error.message.includes('401')) {\n    return { type: 'auth', message: 'Session expired', redirectTo: '/login' };\n  }\n  if (error.message.includes('not found') || error.message.includes('404')) {\n    return { type: 'not-found', message: error.message, resource: 'page' };\n  }\n  return { type: 'unknown', message: error.message, stack: error.stack };\n}\n\nclass ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {\n  state: ErrorBoundaryState = { error: null };\n\n  static getDerivedStateFromError(error: Error): ErrorBoundaryState {\n    const classified = classifyError(error);\n    return { error: classified };\n  }\n\n  componentDidCatch(error: Error, info: ErrorInfo) {\n    if (this.state.error) {\n      this.props.onError?.(this.state.error, info);\n    }\n  }\n\n  retry = () => {\n    this.setState({ error: null });\n  };\n\n  render() {\n    if (this.state.error) {\n      if (this.props.fallback) {\n        return this.props.fallback(this.state.error, this.retry);\n      }\n      return <DefaultErrorFallback error={this.state.error} onRetry={this.retry} />;\n    }\n    return this.props.children;\n  }\n}\n\nfunction DefaultErrorFallback({ error, onRetry }: { error: AppError; onRetry: () => void }) {\n  return (\n    <div className=\"error-fallback\">\n      <h2>Something went wrong</h2>\n      <p>{error.message}</p>\n      {error.type === 'network' && (\n        <button onClick={onRetry}>Try Again</button>\n      )}\n      {error.type === 'auth' && (\n        <a href={error.redirectTo}>Go to Login</a>\n      )}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Typed Error Classes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Create typed error classes instead of throwing plain strings. This lets error boundaries classify errors precisely and enables the error to carry structured data — HTTP status codes, retry timers, or resource identifiers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Typed Error Classes",
+        "content": "Typed error classes for different failure modes",
+        "language": "tsx",
+        "code": "class ApiError extends Error {\n  constructor(\n    public status: number,\n    message: string,\n    public retryAfter?: number\n  ) {\n    super(message);\n    this.name = 'ApiError';\n  }\n}\n\nclass ValidationError extends Error {\n  constructor(\n    public fields: Record<string, string[]>\n  ) {\n    super('Validation failed');\n    this.name = 'ValidationError';\n  }\n}\n\nclass AuthError extends Error {\n  constructor(public redirectTo: string = '/login') {\n    super('Authentication required');\n    this.name = 'AuthError';\n  }\n}\n\n// In your data fetching code\nasync function fetchUser(id: string): Promise<User> {\n  const response = await fetch(`/api/users/${id}`);\n  if (response.status === 401) throw new AuthError('/login');\n  if (response.status === 404) throw new ApiError(404, 'User not found');\n  if (!response.ok) throw new ApiError(response.status, response.statusText, 60);\n  return response.json();\n}\n\n// In the error boundary\nfunction classifyError(error: Error): AppError {\n  if (error instanceof AuthError) {\n    return { type: 'auth', message: error.message, redirectTo: error.redirectTo };\n  }\n  if (error instanceof ApiError) {\n    return {\n      type: 'network',\n      message: `Server error (${error.status})`,\n      retryable: error.status >= 500,\n    };\n  }\n  if (error instanceof ValidationError) {\n    return { type: 'unknown', message: error.message };\n  }\n  return { type: 'unknown', message: error.message };\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering from Errors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A good error boundary offers recovery options. For network errors, provide a retry button. For auth errors, redirect to login. For not-found errors, suggest navigating home. TypeScript's discriminated union makes each recovery path explicit and type-safe."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Error Recovery UI",
+        "content": "Typed fallback UI with appropriate recovery actions",
+        "language": "tsx",
+        "code": "function SmartFallback({ error, onRetry }: { error: AppError; onRetry: () => void }) {\n  const styles = {\n    network: { icon: '📡', title: 'Connection Problem' },\n    auth: { icon: '🔒', title: 'Please Log In' },\n    'not-found': { icon: '🔍', title: 'Not Found' },\n    unknown: { icon: '⚠️', title: 'Unexpected Error' },\n  };\n\n  const config = styles[error.type];\n\n  return (\n    <div className=\"error-container\">\n      <span className=\"error-icon\">{config.icon}</span>\n      <h2>{config.title}</h2>\n      <p>{error.message}</p>\n      <div className=\"error-actions\">\n        {error.type === 'network' && (\n          <button onClick={onRetry}>Retry Request</button>\n        )}\n        {error.type === 'auth' && (\n          <a href={error.redirectTo} className=\"btn-primary\">Sign In</a>\n        )}\n        {error.type === 'not-found' && (\n          <a href=\"/\" className=\"btn-secondary\">Go Home</a>\n        )}\n        <button onClick={() => window.location.reload()}>Reload Page</button>\n      </div>\n    </div>\n  );\n}\n\n// Usage wrapping the app\n<ErrorBoundary\n  fallback={(error, retry) => <SmartFallback error={error} onRetry={retry} />}\n  onError={(error) => logToService(error)}\n>\n  <App />\n</ErrorBoundary>"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Error Type", "Common Cause", "Recovery Strategy", "User Message"],
+        "rows": [
+          ["Network", "API offline or slow", "Retry with backoff", "Connection lost — tap to retry"],
+          ["Auth", "Token expired or missing", "Redirect to login", "Please sign in to continue"],
+          ["Not Found", "Deleted resource", "Go to home/list", "This item is no longer available"],
+          ["Validation", "Server rejected input", "Show field errors", "Please check your input"],
+          ["Unknown", "Unexpected crash", "Reload page, log error", "Something unexpected happened"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Error Boundaries Only Catch Render Errors",
+        "text": "Error boundaries catch errors during rendering, lifecycle methods, and constructors. They do NOT catch errors in event handlers, async code, or server-side rendering. Use try/catch for those cases."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Typed Error Boundary Checklist",
+        "items": [
+          {
+            "text": "Define error types as a discriminated union",
+            "hint": "Use type: 'network' | 'auth' | ... as the discriminator"
+          },
+          {
+            "text": "Create typed error classes for your domain",
+            "hint": "ApiError, AuthError, ValidationError each carry relevant data"
+          },
+          {
+            "text": "Classify errors in getDerivedStateFromError",
+            "hint": "Use instanceof checks to identify typed error classes"
+          },
+          {
+            "text": "Provide a typed fallback prop",
+            "hint": "Consumers get AppError and a retry function with correct types"
+          },
+          {
+            "text": "Log errors to a monitoring service",
+            "hint": "Use the onError callback to send structured error data"
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Why not use try/catch everywhere instead?",
+            "answer": "try/catch works for event handlers and async code. Error boundaries are specifically for catching render-time errors that would otherwise unmount the entire component tree."
+          },
+          {
+            "question": "Do error boundaries work in Next.js App Router?",
+            "answer": "Yes — Next.js provides a client-side error boundary via the 'use client' directive and React's error boundary APIs. Use it at route segments to isolate failures."
+          },
+          {
+            "question": "Can I have nested error boundaries?",
+            "answer": "Yes. Nest them so a failure in one section only shows a fallback for that section, not the entire page. This improves resilience and user experience."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Error boundaries catch render-time errors and display fallbacks",
+          "Discriminated unions classify error types for typed recovery",
+          "Custom error classes carry structured data (status, retryAfter)",
+          "Recovery UI is typed per error variant — no guessing"
+        ],
+        "takeaway": "Typed error boundaries turn crashes into structured, recoverable events that users can act on."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "typescript-for-react"
+}

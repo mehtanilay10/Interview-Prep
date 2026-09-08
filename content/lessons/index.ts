@@ -379,22 +379,41 @@ import reactAdvLesson36 from '../courses/react-advanced-patterns/10-advanced-hoo
 import reactAdvLesson37 from '../courses/react-advanced-patterns/05-control-props/control-props-with-forms.json';
 
 import tsrLesson1 from '../courses/typescript-for-react/01-typescript-basics/basic-types.json';
-import tsrLesson2 from '../courses/typescript-for-react/01-typescript-basics/functions-types.json';
-import tsrLesson3 from '../courses/typescript-for-react/01-typescript-basics/interfaces-types.json';
-import tsrLesson4 from '../courses/typescript-for-react/01-typescript-basics/what-is-typescript.json';
-import tsrLesson5 from '../courses/typescript-for-react/02-types-in-react/typing-components.json';
-import tsrLesson6 from '../courses/typescript-for-react/02-types-in-react/typing-events.json';
-import tsrLesson7 from '../courses/typescript-for-react/02-types-in-react/typing-props.json';
-import tsrLesson8 from '../courses/typescript-for-react/02-types-in-react/typing-state.json';
-import tsrLesson9 from '../courses/typescript-for-react/03-typing-hooks/custom-hooks-types.json';
-import tsrLesson10 from '../courses/typescript-for-react/03-typing-hooks/typing-useeffect.json';
-import tsrLesson11 from '../courses/typescript-for-react/03-typing-hooks/typing-useref.json';
-import tsrLesson12 from '../courses/typescript-for-react/04-advanced-types/generics-basics.json';
-import tsrLesson13 from '../courses/typescript-for-react/04-advanced-types/type-guards.json';
-import tsrLesson14 from '../courses/typescript-for-react/04-advanced-types/utility-types.json';
-import tsrLesson15 from '../courses/typescript-for-react/05-generic-components/generic-form.json';
-import tsrLesson16 from '../courses/typescript-for-react/05-generic-components/generic-list.json';
-import tsrLesson17 from '../courses/typescript-for-react/05-generic-components/polymorphic-components.json';
+import tsrLesson2 from '../courses/typescript-for-react/01-typescript-basics/enums-and-literal-types.json';
+import tsrLesson3 from '../courses/typescript-for-react/01-typescript-basics/functions-types.json';
+import tsrLesson4 from '../courses/typescript-for-react/01-typescript-basics/interfaces-types.json';
+import tsrLesson5 from '../courses/typescript-for-react/01-typescript-basics/type-assertions-and-as.json';
+import tsrLesson6 from '../courses/typescript-for-react/01-typescript-basics/what-is-typescript.json';
+import tsrLesson7 from '../courses/typescript-for-react/02-types-in-react/typing-children-and-special-props.json';
+import tsrLesson8 from '../courses/typescript-for-react/02-types-in-react/typing-components.json';
+import tsrLesson9 from '../courses/typescript-for-react/02-types-in-react/typing-events.json';
+import tsrLesson10 from '../courses/typescript-for-react/02-types-in-react/typing-props.json';
+import tsrLesson11 from '../courses/typescript-for-react/02-types-in-react/typing-state.json';
+import tsrLesson12 from '../courses/typescript-for-react/03-typing-hooks/custom-hooks-types.json';
+import tsrLesson13 from '../courses/typescript-for-react/03-typing-hooks/typing-useeffect.json';
+import tsrLesson14 from '../courses/typescript-for-react/03-typing-hooks/typing-useref.json';
+import tsrLesson15 from '../courses/typescript-for-react/04-advanced-types/generics-basics.json';
+import tsrLesson16 from '../courses/typescript-for-react/04-advanced-types/type-guards.json';
+import tsrLesson17 from '../courses/typescript-for-react/04-advanced-types/utility-types.json';
+import tsrLesson18 from '../courses/typescript-for-react/05-generic-components/generic-form.json';
+import tsrLesson19 from '../courses/typescript-for-react/05-generic-components/generic-list.json';
+import tsrLesson20 from '../courses/typescript-for-react/05-generic-components/polymorphic-components.json';
+import tsrLesson21 from '../courses/typescript-for-react/06-react-patterns/type-safe-context.json';
+import tsrLesson22 from '../courses/typescript-for-react/06-react-patterns/typed-react-query.json';
+import tsrLesson23 from '../courses/typescript-for-react/06-react-patterns/typed-form-handlers.json';
+import tsrLesson24 from '../courses/typescript-for-react/06-react-patterns/typed-router.json';
+import tsrLesson25 from '../courses/typescript-for-react/05-generic-components/higher-order-components-typed.json';
+import tsrLesson26 from '../courses/typescript-for-react/06-react-patterns/compound-components.json';
+import tsrLesson27 from '../courses/typescript-for-react/06-react-patterns/error-boundaries-typed.json';
+import tsrLesson28 from '../courses/typescript-for-react/07-testing-best-practices/testing-typescript-react.json';
+import tsrLesson29 from '../courses/typescript-for-react/07-testing-best-practices/type-narrowing.json';
+import tsrLesson30 from '../courses/typescript-for-react/07-testing-best-practices/type-safety-patterns.json';
+import tsrLesson31 from '../courses/typescript-for-react/07-testing-best-practices/migrating-to-typescript.json';
+import tsrLesson32 from '../courses/typescript-for-react/03-typing-hooks/typing-usecontext-and-redux.json';
+import tsrLesson33 from '../courses/typescript-for-react/03-typing-hooks/typing-performance-hooks.json';
+import tsrLesson34 from '../courses/typescript-for-react/04-advanced-types/conditional-and-mapped-types.json';
+import tsrLesson35 from '../courses/typescript-for-react/04-advanced-types/template-literal-types.json';
+import tsrLesson36 from '../courses/typescript-for-react/07-testing-best-practices/mocking-and-test-utilities.json';
 
 import reduxLesson1 from '../courses/redux/01-redux-fundamentals/three-principles.json';
 import reduxLesson2 from '../courses/redux/01-redux-fundamentals/what-is-redux.json';
@@ -848,9 +867,11 @@ const rawLessons = [
   reactAdvLesson19, reactAdvLesson20, reactAdvLesson21, reactAdvLesson22, reactAdvLesson23, reactAdvLesson24,
   reactAdvLesson25, reactAdvLesson26, reactAdvLesson27, reactAdvLesson28, reactAdvLesson29, reactAdvLesson30,
    reactAdvLesson31, reactAdvLesson32, reactAdvLesson33, reactAdvLesson34, reactAdvLesson35, reactAdvLesson36, reactAdvLesson37,
-  tsrLesson1, tsrLesson2, tsrLesson3, tsrLesson4, tsrLesson5, tsrLesson6, tsrLesson7, tsrLesson8,
-  tsrLesson9, tsrLesson10, tsrLesson11, tsrLesson12, tsrLesson13, tsrLesson14, tsrLesson15, tsrLesson16,
-  tsrLesson17,
+   tsrLesson1, tsrLesson2, tsrLesson3, tsrLesson4, tsrLesson5, tsrLesson6, tsrLesson7, tsrLesson8,
+   tsrLesson9, tsrLesson10, tsrLesson11, tsrLesson12, tsrLesson13, tsrLesson14, tsrLesson15, tsrLesson16,
+   tsrLesson17, tsrLesson18, tsrLesson19, tsrLesson20, tsrLesson21, tsrLesson22, tsrLesson23, tsrLesson24,
+    tsrLesson25, tsrLesson26, tsrLesson27, tsrLesson28, tsrLesson29, tsrLesson30, tsrLesson31,
+    tsrLesson32, tsrLesson33, tsrLesson34, tsrLesson35, tsrLesson36,
   reduxLesson1, reduxLesson2, reduxLesson3, reduxLesson4, reduxLesson5, reduxLesson6, reduxLesson7,
   reduxLesson8, reduxLesson9, reduxLesson10, reduxLesson11, reduxLesson12, reduxLesson13, reduxLesson14,
   reduxLesson15, reduxLesson16, reduxLesson17, reduxLesson18, reduxLesson19, reduxLesson20, reduxLesson21,
