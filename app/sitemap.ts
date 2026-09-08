@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [
     toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
     toSitemapEntry(`${BASE_URL}/courses`, 0.9, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/cheatsheet`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
   ];
@@ -43,6 +44,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     const questions = getInterviewQuestions(tech);
     for (const q of questions) {
       entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${tech.toLowerCase()}/${q.slug}`));
+    }
+  }
+
+  const cheatsheetModules = getModulesForCourse('cheatsheet');
+  for (const mod of cheatsheetModules) {
+    entries.push(toSitemapEntry(`${BASE_URL}/cheatsheet/${mod.slug}`));
+
+    const lessons = getLessonsForCourse('cheatsheet').filter((l) => l.moduleSlug === mod.slug);
+    for (const lesson of lessons) {
+      entries.push(toSitemapEntry(`${BASE_URL}/cheatsheet/${mod.slug}/${lesson.slug}`));
     }
   }
 

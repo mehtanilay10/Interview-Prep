@@ -180,7 +180,8 @@ import oopModule7 from '../courses/oops-concepts/07-design-principles/content.js
 
 const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, sqlModule6, sqlModule7, sqlModule8, sqlModule9, sqlModule10, sqlModule11, sqlModule12, sqlModule13, sqlModule14, sqlModule15, sqlModule16, sqlModule17, sqlModule18, sqlModule19, sqlModule20, sqlModule21, aspModule1, aspModule2, aspModule3, aspModule4, aspModule5, aspModule6, aspModule7, aspModule8, aspModule9, aspModule10, aspModule11, linqModule1, linqModule2, linqModule3, linqModule4, linqModule5, linqModule6, linqModule7, linqModule8, linqModule9, linqModule10, linqModule11, efModule1, efModule2, efModule3, efModule4, efModule5, efModule6, efModule7, efModule8, efModule9, efModule10, efModule11, efModule12, reactFundModule1, reactFundModule2, reactFundModule3, reactFundModule4, reactFundModule5, reactFundModule6, reactFundModule7,   reactFundModule8, reactAdvModule1, reactAdvModule2, reactAdvModule3, reactAdvModule4, reactAdvModule5, reactAdvModule6, reactAdvModule7, reactAdvModule8, reactAdvModule9, reactAdvModule10, tsrModule1, tsrModule2, tsrModule3, tsrModule4, tsrModule5, tsrModule6, tsrModule7, reduxModule1, reduxModule2, reduxModule3, reduxModule4, reduxModule5, reduxModule6, reduxModule7, reduxModule8,   rqModule1, rqModule2, rqModule3, rqModule4, rqModule5, rqModule6, rqModule7, rqModule8, rqModule9, apolloModule1, apolloModule2, apolloModule3, apolloModule4, apolloModule5, apolloModule6, apolloModule7, apolloModule8, apolloModule9,   graphqlModule1, graphqlModule2, graphqlModule3, graphqlModule4, graphqlModule5, graphqlModule6, graphqlModule7, csharpModule1, csharpModule2, csharpModule3, csharpModule4, csharpModule5, csharpModule6, csharpModule7, webApiModule1, webApiModule2, webApiModule3, webApiModule4, webApiModule5, webApiModule6, webApiModule7, webApiModule8, authModule1, authModule2, authModule3, authModule4, cleanCodeModule1, cleanCodeModule2, cleanCodeModule3, cleanCodeModule4, cleanCodeModule5, cleanCodeModule6, designModule5, designModule6, unitTestModule1, unitTestModule2, unitTestModule3, unitTestModule4, unitTestModule5, unitTestModule6, unitTestModule7,   reactTestModule1, reactTestModule2, reactTestModule3, reactTestModule4, reactTestModule5, reactTestModule6, reactTestModule7, oopModule1, oopModule2, oopModule3, oopModule4, oopModule5, oopModule6, oopModule7,
   iqModule1, iqModule2, iqModule3, iqModule4, iqModule5, iqModule6, iqModule7,
-  fsModule1, fsModule2, fsModule3, fsModule4, fsModule5, fsModule6, fsModule7, fsModule8
+  fsModule1, fsModule2, fsModule3, fsModule4, fsModule5, fsModule6, fsModule7, fsModule8,
+  csModule1, csModule2, csModule3, csModule4, csModule5, csModule6, csModule7, csModule8, csModule9, csModule10
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];
@@ -211,3 +212,14 @@ import fsModule5 from '../courses/fullstack-security/05-secure-api-design/conten
 import fsModule6 from '../courses/fullstack-security/06-dependency-security/content.json';
 import fsModule7 from '../courses/fullstack-security/07-environment-secrets/content.json';
 import fsModule8 from '../courses/fullstack-security/08-security-testing/content.json';
+
+import csModule1 from '../cheatsheet/csharp/content.json';
+import csModule2 from '../cheatsheet/sql-server/content.json';
+import csModule3 from '../cheatsheet/react/content.json';
+import csModule4 from '../cheatsheet/redux/content.json';
+import csModule5 from '../cheatsheet/apollo/content.json';
+import csModule6 from '../cheatsheet/graphql/content.json';
+import csModule7 from '../cheatsheet/docker-compose/content.json';
+import csModule8 from '../cheatsheet/javascript/content.json';
+import csModule9 from '../cheatsheet/typescript/content.json';
+import csModule10 from '../cheatsheet/react-router/content.json';

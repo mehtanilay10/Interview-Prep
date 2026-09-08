@@ -888,6 +888,17 @@ import fsLesson23 from '../courses/fullstack-security/07-environment-secrets/cre
 import fsLesson24 from '../courses/fullstack-security/08-security-testing/security-testing-fundamentals.json';
 import fsLesson25 from '../courses/fullstack-security/08-security-testing/penetration-testing-basics.json';
 
+import csLesson1 from '../cheatsheet/csharp/cheatsheet.json';
+import csLesson2 from '../cheatsheet/sql-server/cheatsheet.json';
+import csLesson3 from '../cheatsheet/react/cheatsheet.json';
+import csLesson4 from '../cheatsheet/redux/cheatsheet.json';
+import csLesson5 from '../cheatsheet/apollo/cheatsheet.json';
+import csLesson6 from '../cheatsheet/graphql/cheatsheet.json';
+import csLesson7 from '../cheatsheet/docker-compose/cheatsheet.json';
+import csLesson8 from '../cheatsheet/javascript/cheatsheet.json';
+import csLesson9 from '../cheatsheet/typescript/cheatsheet.json';
+import csLesson10 from '../cheatsheet/react-router/cheatsheet.json';
+
 const rawLessons = [
   sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8,
   sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16,
@@ -1018,7 +1029,8 @@ const rawLessons = [
   iqLessonT01, iqLessonT02,
   fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10,
   fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19,
-  fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25
+   fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25,
+  csLesson1, csLesson2, csLesson3, csLesson4, csLesson5, csLesson6, csLesson7, csLesson8, csLesson9, csLesson10
 ];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
