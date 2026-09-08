@@ -351,30 +351,32 @@ import reactAdvLesson8 from '../courses/react-advanced-patterns/03-compound-comp
 import reactAdvLesson9 from '../courses/react-advanced-patterns/03-compound-components/compound-with-context.json';
 import reactAdvLesson10 from '../courses/react-advanced-patterns/04-state-reducers/state-reducer-basics.json';
 import reactAdvLesson11 from '../courses/react-advanced-patterns/04-state-reducers/state-reducer-examples.json';
-import reactAdvLesson12 from '../courses/react-advanced-patterns/05-control-props/control-props-basics.json';
-import reactAdvLesson13 from '../courses/react-advanced-patterns/05-control-props/control-props-examples.json';
-import reactAdvLesson14 from '../courses/react-advanced-patterns/06-performance-patterns/memoization-basics.json';
-import reactAdvLesson15 from '../courses/react-advanced-patterns/06-performance-patterns/code-splitting-lazy.json';
-import reactAdvLesson16 from '../courses/react-advanced-patterns/06-performance-patterns/virtualization-large-lists.json';
-import reactAdvLesson17 from '../courses/react-advanced-patterns/06-performance-patterns/render-optimization.json';
-import reactAdvLesson18 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-composition-patterns.json';
-import reactAdvLesson19 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/state-sharing-between-hooks.json';
-import reactAdvLesson20 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-error-handling.json';
-import reactAdvLesson21 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/building-hook-libraries.json';
-import reactAdvLesson22 from '../courses/react-advanced-patterns/08-state-machines-xstate/finite-state-machines.json';
-import reactAdvLesson23 from '../courses/react-advanced-patterns/08-state-machines-xstate/xstate-fundamentals.json';
-import reactAdvLesson24 from '../courses/react-advanced-patterns/08-state-machines-xstate/statecharts-advanced.json';
-import reactAdvLesson25 from '../courses/react-advanced-patterns/08-state-machines-xstate/integrating-xstate-react.json';
-import reactAdvLesson26 from '../courses/react-advanced-patterns/09-component-composition-strategies/slot-pattern.json';
-import reactAdvLesson27 from '../courses/react-advanced-patterns/09-component-composition-strategies/headless-components.json';
-import reactAdvLesson28 from '../courses/react-advanced-patterns/09-component-composition-strategies/polymorphic-components.json';
-import reactAdvLesson29 from '../courses/react-advanced-patterns/09-component-composition-strategies/layout-composition.json';
-import reactAdvLesson30 from '../courses/react-advanced-patterns/09-component-composition-strategies/flexible-component-apis.json';
-import reactAdvLesson31 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/reducer-hooks-patterns.json';
-import reactAdvLesson32 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/imperative-handle-patterns.json';
-import reactAdvLesson33 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/layout-effect-patterns.json';
-import reactAdvLesson34 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/custom-hook-testing.json';
-import reactAdvLesson35 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/hook-best-practices.json';
+import reactAdvLesson12 from '../courses/react-advanced-patterns/04-state-reducers/state-reducer-composition.json';
+import reactAdvLesson13 from '../courses/react-advanced-patterns/05-control-props/control-props-basics.json';
+import reactAdvLesson14 from '../courses/react-advanced-patterns/05-control-props/control-props-examples.json';
+import reactAdvLesson15 from '../courses/react-advanced-patterns/06-performance-patterns/memoization-basics.json';
+import reactAdvLesson16 from '../courses/react-advanced-patterns/06-performance-patterns/code-splitting-lazy.json';
+import reactAdvLesson17 from '../courses/react-advanced-patterns/06-performance-patterns/virtualization-large-lists.json';
+import reactAdvLesson18 from '../courses/react-advanced-patterns/06-performance-patterns/render-optimization.json';
+import reactAdvLesson19 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-composition-patterns.json';
+import reactAdvLesson20 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/state-sharing-between-hooks.json';
+import reactAdvLesson21 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-error-handling.json';
+import reactAdvLesson22 from '../courses/react-advanced-patterns/07-custom-hooks-architecture/building-hook-libraries.json';
+import reactAdvLesson23 from '../courses/react-advanced-patterns/08-state-machines-xstate/finite-state-machines.json';
+import reactAdvLesson24 from '../courses/react-advanced-patterns/08-state-machines-xstate/xstate-fundamentals.json';
+import reactAdvLesson25 from '../courses/react-advanced-patterns/08-state-machines-xstate/statecharts-advanced.json';
+import reactAdvLesson26 from '../courses/react-advanced-patterns/08-state-machines-xstate/integrating-xstate-react.json';
+import reactAdvLesson27 from '../courses/react-advanced-patterns/09-component-composition-strategies/slot-pattern.json';
+import reactAdvLesson28 from '../courses/react-advanced-patterns/09-component-composition-strategies/headless-components.json';
+import reactAdvLesson29 from '../courses/react-advanced-patterns/09-component-composition-strategies/polymorphic-components.json';
+import reactAdvLesson30 from '../courses/react-advanced-patterns/09-component-composition-strategies/layout-composition.json';
+import reactAdvLesson31 from '../courses/react-advanced-patterns/09-component-composition-strategies/flexible-component-apis.json';
+import reactAdvLesson32 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/reducer-hooks-patterns.json';
+import reactAdvLesson33 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/imperative-handle-patterns.json';
+import reactAdvLesson34 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/layout-effect-patterns.json';
+import reactAdvLesson35 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/custom-hook-testing.json';
+import reactAdvLesson36 from '../courses/react-advanced-patterns/10-advanced-hook-patterns/hook-best-practices.json';
+import reactAdvLesson37 from '../courses/react-advanced-patterns/05-control-props/control-props-with-forms.json';
 
 import tsrLesson1 from '../courses/typescript-for-react/01-typescript-basics/basic-types.json';
 import tsrLesson2 from '../courses/typescript-for-react/01-typescript-basics/functions-types.json';
@@ -622,6 +624,22 @@ import cleanCodeLesson22 from '../courses/clean-code-csharp/06-architecture-patt
 import cleanCodeLesson23 from '../courses/clean-code-csharp/06-architecture-patterns/clean-architecture.json';
 import cleanCodeLesson24 from '../courses/clean-code-csharp/06-architecture-patterns/cqrs-pattern.json';
 import cleanCodeLesson25 from '../courses/clean-code-csharp/06-architecture-patterns/dependency-injection.json';
+import designLesson1 from '../courses/design-patterns/01-creational-patterns/singleton-pattern.json';
+import designLesson2 from '../courses/design-patterns/01-creational-patterns/factory-pattern.json';
+import designLesson3 from '../courses/design-patterns/01-creational-patterns/builder-pattern.json';
+import designLesson4 from '../courses/design-patterns/01-creational-patterns/prototype-pattern.json';
+import designLesson5 from '../courses/design-patterns/02-structural-patterns/adapter-pattern.json';
+import designLesson6 from '../courses/design-patterns/02-structural-patterns/decorator-pattern.json';
+import designLesson7 from '../courses/design-patterns/02-structural-patterns/facade-pattern.json';
+import designLesson8 from '../courses/design-patterns/02-structural-patterns/proxy-pattern.json';
+import designLesson9 from '../courses/design-patterns/03-behavioral-patterns/strategy-pattern.json';
+import designLesson10 from '../courses/design-patterns/03-behavioral-patterns/observer-pattern.json';
+import designLesson11 from '../courses/design-patterns/03-behavioral-patterns/command-pattern.json';
+import designLesson12 from '../courses/design-patterns/03-behavioral-patterns/iterator-pattern.json';
+import designLesson13 from '../courses/design-patterns/04-enterprise-patterns/cqrs-basics.json';
+import designLesson14 from '../courses/design-patterns/04-enterprise-patterns/mediator-pattern.json';
+import designLesson15 from '../courses/design-patterns/04-enterprise-patterns/repository-pattern.json';
+import designLesson16 from '../courses/design-patterns/04-enterprise-patterns/unit-of-work.json';
 import designLesson17 from '../courses/design-patterns/05-concurrency-patterns/producer-consumer-pattern.json';
 import designLesson18 from '../courses/design-patterns/05-concurrency-patterns/reader-writer-locks.json';
 import designLesson19 from '../courses/design-patterns/05-concurrency-patterns/thread-pool-pattern.json';
@@ -829,7 +847,7 @@ const rawLessons = [
   reactAdvLesson13, reactAdvLesson14, reactAdvLesson15, reactAdvLesson16, reactAdvLesson17, reactAdvLesson18,
   reactAdvLesson19, reactAdvLesson20, reactAdvLesson21, reactAdvLesson22, reactAdvLesson23, reactAdvLesson24,
   reactAdvLesson25, reactAdvLesson26, reactAdvLesson27, reactAdvLesson28, reactAdvLesson29, reactAdvLesson30,
-  reactAdvLesson31, reactAdvLesson32, reactAdvLesson33, reactAdvLesson34, reactAdvLesson35,
+   reactAdvLesson31, reactAdvLesson32, reactAdvLesson33, reactAdvLesson34, reactAdvLesson35, reactAdvLesson36, reactAdvLesson37,
   tsrLesson1, tsrLesson2, tsrLesson3, tsrLesson4, tsrLesson5, tsrLesson6, tsrLesson7, tsrLesson8,
   tsrLesson9, tsrLesson10, tsrLesson11, tsrLesson12, tsrLesson13, tsrLesson14, tsrLesson15, tsrLesson16,
   tsrLesson17,
@@ -864,6 +882,11 @@ const rawLessons = [
   cleanCodeLesson13, cleanCodeLesson14, cleanCodeLesson15, cleanCodeLesson16, cleanCodeLesson17, cleanCodeLesson18,
   cleanCodeLesson19, cleanCodeLesson20, cleanCodeLesson21, cleanCodeLesson22, cleanCodeLesson23, cleanCodeLesson24,
   cleanCodeLesson25,
+  designLesson1, designLesson2, designLesson3, designLesson4, designLesson5, designLesson6,
+  designLesson7, designLesson8, designLesson9, designLesson10, designLesson11, designLesson12,
+  designLesson13, designLesson14, designLesson15, designLesson16, designLesson17, designLesson18,
+  designLesson19, designLesson20, designLesson21, designLesson22, designLesson23, designLesson24,
+  designLesson25,
   unitTestLesson1, unitTestLesson2, unitTestLesson3, unitTestLesson4, unitTestLesson5, unitTestLesson6,
   unitTestLesson7, unitTestLesson8, unitTestLesson9, unitTestLesson10, unitTestLesson11, unitTestLesson12,
   unitTestLesson13, unitTestLesson14, unitTestLesson15, unitTestLesson16, unitTestLesson17, unitTestLesson18,

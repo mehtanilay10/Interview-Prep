@@ -16,10 +16,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [
     toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
     toSitemapEntry(`${BASE_URL}/courses`, 0.9, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/interview-questions`, 0.9, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/search`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/safety`, 0.8, 'monthly'),
-    toSitemapEntry(`${BASE_URL}/advanced`, 0.8, 'monthly'),
+    toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
   ];
 
   const courses = getAllCourses().filter((c) => !c.isInterview);

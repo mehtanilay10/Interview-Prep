@@ -1,0 +1,285 @@
+{
+  "id": "lesson-react-ap-015",
+  "slug": "control-props-with-forms",
+  "moduleSlug": "control-props",
+  "courseSlug": "react-advanced-patterns",
+  "title": "Control Props with Forms",
+  "description": "Integrate control props patterns with form libraries for robust form handling.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["control-props", "forms", "react-hook-form", "zod", "validation"],
+  "prerequisites": ["control-props-examples"],
+  "relatedLessons": ["control-props-examples", "reducer-hooks-patterns"],
+  "furtherReading": [
+    {
+      "title": "React Hook Form Documentation",
+      "url": "https://react-hook-form.com",
+      "type": "article",
+      "author": "React Hook Form Team",
+      "description": "Official docs for form state management with minimal re-renders."
+    },
+    {
+      "title": "Zod Documentation",
+      "url": "https://zod.dev",
+      "type": "article",
+      "author": "Colin McDonnell",
+      "description": "TypeScript-first schema declaration and validation library."
+    },
+    {
+      "title": "Controlled vs Uncontrolled Components",
+      "url": "https://react.dev/reference/react-dom/components/input#controlled-versus-uncontrolled-input",
+      "type": "article",
+      "author": "React Team",
+      "description": "Official React guidance on controlled and uncontrolled form inputs."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Forms are where the control props pattern truly shines. Whether you're building a simple contact form or a complex multi-step signup flow, you need components that can work both as controlled inputs (managed by a form library like React Hook Form) and as standalone inputs (managing their own state). In this lesson, we'll build reusable form components that integrate seamlessly with React Hook Form and Zod validation, while maintaining full flexibility through control props."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Control Props Matter for Forms"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Reusable form components can be used inside or outside a form library context",
+          "Controlled mode lets the form library own the state for validation and submission",
+          "Uncontrolled mode lets the component manage its own state for simpler or isolated use cases",
+          "The same component works in Storybook stories, unit tests, and production forms without modification"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Building Controlled Form Components"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dual-Mode Input Component",
+        "content": "An Input component that detects controlled vs uncontrolled mode and works in both.",
+        "language": "tsx",
+        "code": "import { useState, useCallback, ChangeEvent } from 'react';\n\ninterface InputProps {\n  value?: string;\n  defaultValue?: string;\n  onChange?: (value: string) => void;\n  placeholder?: string;\n  id?: string;\n  type?: string;\n}\n\nexport function Input({\n  value,\n  defaultValue = '',\n  onChange,\n  placeholder = '',\n  id,\n  type = 'text',\n}: InputProps) {\n  const isControlled = value !== undefined;\n  const [internalValue, setInternalValue] = useState(defaultValue);\n  const currentValue = isControlled ? value : internalValue;\n\n  const handleChange = useCallback(\n    (e: ChangeEvent<HTMLInputElement>) => {\n      const newValue = e.target.value;\n      if (!isControlled) {\n        setInternalValue(newValue);\n      }\n      onChange?.(newValue);\n    },\n    [isControlled, onChange],\n  );\n\n  return (\n    <input\n      id={id}\n      type={type}\n      value={currentValue}\n      onChange={handleChange}\n      placeholder={placeholder}\n    />\n  );\n}\n\n// Uncontrolled usage\n<Input defaultValue=\"hello\" />\n\n// Controlled usage\n// const [name, setName] = useState('');\n// <Input value={name} onChange={setName} />"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Pro Tip",
+        "text": "Always accept a value/defaultValue pair in your reusable input components. This single convention makes every component work in both modes without extra configuration."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Integrating with React Hook Form"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Signup Form with React Hook Form and Zod",
+        "content": "A complete form that uses Zod for schema validation, RHF's Controller for dual-mode inputs, and handles submission states.",
+        "language": "tsx",
+        "code": "import { useState } from 'react';\nimport { useForm, Controller } from 'react-hook-form';\nimport { zodResolver } from '@hookform/resolvers/zod';\nimport { z } from 'zod';\n\nconst schema = z.object({\n  email: z.string().email('Invalid email address'),\n  password: z\n    .string()\n    .min(6, 'Password must be at least 6 characters'),\n  terms: z\n    .boolean()\n    .refine((val) => val === true, {\n      message: 'You must accept the terms and conditions',\n    }),\n});\n\ntype FormData = z.infer<typeof schema>;\n\nexport function SignupForm() {\n  const [serverError, setServerError] = useState('');\n\n  const {\n    register,\n    handleSubmit,\n    control,\n    formState: {\n      errors,\n      isSubmitting,\n      isSubmitted,\n    },\n  } = useForm<FormData>({\n    resolver: zodResolver(schema),\n  });\n\n  const onSubmit = async (data: FormData) => {\n    try {\n      // Simulate an API request\n      await new Promise(\n        (resolve) => setTimeout(resolve, 1000),\n      );\n      console.log('Submitted:', data);\n      setServerError('');\n    } catch (error) {\n      setServerError('Something went wrong. Please try again.');\n    }\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)} noValidate>\n      <div>\n        <label htmlFor=\"email\">Email</label>\n        <input\n          id=\"email\"\n          type=\"email\"\n          {...register('email')}\n          aria-invalid={!!errors.email}\n        />\n        {errors.email && (\n          <span role=\"alert\">{errors.email.message}</span>\n        )}\n      </div>\n\n      <div>\n        <label htmlFor=\"password\">Password</label>\n        <input\n          id=\"password\"\n          type=\"password\"\n          {...register('password')}\n          aria-invalid={!!errors.password}\n        />\n        {errors.password && (\n          <span role=\"alert\">{errors.password.message}</span>\n        )}\n      </div>\n\n      <Controller\n        name=\"terms\"\n        control={control}\n        render={({ field }) => (\n          <label>\n            <input\n              type=\"checkbox\"\n              checked={field.value}\n              onChange={field.onChange}\n            />\n            Accept terms and conditions\n          </label>\n        )}\n      />\n      {errors.terms && (\n        <span role=\"alert\">{errors.terms.message}</span>\n      )}\n\n      <button type=\"submit\" disabled={isSubmitting}>\n        {isSubmitting ? 'Submitting...' : 'Sign Up'}\n      </button>\n\n      {serverError && <p role=\"alert\">{serverError}</p>}\n      {isSubmitted && !isSubmitting && !serverError && (\n        <p>Form submitted successfully!</p>\n      )}\n    </form>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling and Submission States"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["State", "What the User Sees", "Key Prop(s)"],
+        "rows": [
+          [
+            "Idle",
+            "Submit button is enabled, no messages shown",
+            "isSubmitting = false, isSubmitted = false"
+          ],
+          [
+            "Validating",
+            "Submit button is disabled, form is locked",
+            "isSubmitting = true (during resolver)"
+          ],
+          [
+            "Errors",
+            "Error messages appear next to each field",
+            "errors.email, errors.password, etc."
+          ],
+          [
+            "Submitting",
+            "Button shows 'Submitting...', form is locked",
+            "isSubmitting = true"
+          ],
+          [
+            "Error (server)",
+            "A server error message appears above the form",
+            "serverError string"
+          ],
+          [
+            "Success",
+            "A success confirmation appears, button resets",
+            "isSubmitted = true, serverError = ''"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "form-submission-flow",
+        "caption": "The lifecycle of a form submission from user interaction to success or error.",
+        "definition": "flowchart TD\n    A[User fills form] --> B[Zod schema validates]\n    B --> C{All valid?}\n    C -- No --> D[Show field errors]\n    C -- Yes --> E[Submit to API]\n    E --> F{isSubmitting}\n    F --> G{Server error?}\n    G -- Yes --> H[Show server error]\n    G -- No --> I[Show success message]\n    D --> J[User fixes input]\n    J --> A"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Controlled component",
+            "definition": "A component whose value is controlled by its parent via props, typically with an onChange callback."
+          },
+          {
+            "term": "Uncontrolled component",
+            "definition": "A component that manages its own internal state and is not driven by parent props."
+          },
+          {
+            "term": "React Hook Form",
+            "definition": "A React library for form state management that minimizes re-renders by using refs and a built-in field registry."
+          },
+          {
+            "term": "Zod",
+            "definition": "A TypeScript-first schema declaration and validation library with zero dependencies."
+          },
+          {
+            "term": "Controller",
+            "definition": "A React Hook Form component that bridges uncontrolled or custom components into the form state system."
+          },
+          {
+            "term": "register",
+            "definition": "A React Hook Form function that wires a native input into the form state using refs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Register vs Controller"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "register vs Controller in React Hook Form",
+        "cards": [
+          {
+            "title": "register()",
+            "description": "Attaches a native HTML input to React Hook Form using refs. Best for simple inputs.",
+            "pros": [
+              "Minimal boilerplate",
+              "No extra re-renders",
+              "Works with all native inputs"
+            ],
+            "cons": [
+              "Cannot be used with custom components",
+              "No imperative get/set access"
+            ],
+            "tags": ["simple", "native"]
+          },
+          {
+            "title": "Controller",
+            "description": "Wraps a controlled or custom component so it integrates with React Hook Form's state.",
+            "pros": [
+              "Works with any component",
+              "Full control over rendering",
+              "Supports valueAsNumber, valueAsDate, etc."
+            ],
+            "cons": [
+              "More verbose",
+              "Slight performance overhead"
+            ],
+            "tags": ["flexible", "custom"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise: Build a Controlled Form"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Create a Multi-Field Form",
+        "description": "Using the dual-mode Input component and React Hook Form, build a form with email, password, and a custom toggle for newsletter subscription.",
+        "steps": [
+          "Create a controlled Input component that accepts value/defaultValue",
+          "Set up useForm with a Zod schema for email and password validation",
+          "Use register() for the native inputs and Controller for the Toggle component",
+          "Implement error display with aria-live for accessibility",
+          "Add isSubmitting and isSubmitted states to the submit button"
+        ],
+        "expectedOutcome": "A fully functional, accessible form component that works in both controlled and uncontrolled modes."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "When should I use Controller instead of register?",
+            "answer": "Use Controller when your input is a custom component (like a date picker, select, or your own Toggle) that doesn't forward a ref to a native input. For standard inputs like text, email, and password, register() is simpler and more performant."
+          },
+          {
+            "question": "How does Zod provide type safety?",
+            "answer": "Zod schemas are declared first, and you derive TypeScript types from them using z.infer<typeof schema>. This means your validation and types always stay in sync — no need to maintain separate interfaces."
+          },
+          {
+            "question": "Can I use the same Input component in Storybook and in a real form?",
+            "answer": "Yes! Because the component supports both controlled and uncontrolled modes, you can render it in Storybook with defaultValue (no parent state needed) and in a real form with value/onChange wired to React Hook Form."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Control props let form components work with form libraries AND standalone",
+          "React Hook Form's register() is for native inputs; Controller is for custom components",
+          "Zod schemas provide both runtime validation and TypeScript types via z.infer",
+          "Always expose isSubmitting, isSubmitted, and errors to the user with accessible markup",
+          "The same dual-mode component can be used in Storybook, tests, and production"
+        ],
+        "takeaway": "Control props bridge the gap between reusable components and form libraries, giving you flexibility without sacrificing functionality."
+      }
+    }
+  ]
+}

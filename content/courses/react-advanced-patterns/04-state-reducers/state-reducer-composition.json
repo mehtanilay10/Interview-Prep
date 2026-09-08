@@ -1,0 +1,327 @@
+{
+  "id": "lesson-react-ap-013",
+  "slug": "state-reducer-composition",
+  "moduleSlug": "state-reducers",
+  "courseSlug": "react-advanced-patterns",
+  "title": "State Reducer Composition",
+  "description": "Learn how to compose multiple reducers together and build reusable reducer patterns.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["state-reducer", "composition", "enhancer", "middleware", "testing"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In the previous lessons we saw how a **state reducer** lets a consumer override a single piece of state logic. But real applications rarely have just one piece of state to manage. A form has fields, errors, and a loading spinner; a dashboard has filters, a counter, and a toggle. Rather than stuffing every transition into one giant reducer, you can split the logic into small, focused reducers and **compose** them together. This lesson walks through composing reducers, wrapping them with enhancers, adding middleware-like cross-cutting concerns, and testing the result in isolation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Composing Multiple Reducers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reducer **composition** means running several reducers one after another over the same state, where each reducer is responsible for a slice of behavior. The simplest approach is a `composeReducers` helper that threads the state through a list of reducers using `Array.reduce`. Every reducer receives the output of the previous one, so as long as each returns a new object that **spreads the existing state** and only touches its own field, the pieces compose cleanly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "composeReducers Utility",
+        "content": "A generic helper that runs a chain of reducers over the same state, threading the output of each one into the next.",
+        "language": "tsx",
+        "code": "type Action = { type: string };\n\nfunction composeReducers<S, A extends Action>(\n  ...reducers: Array<(state: S, action: A) => S>\n) {\n  return (state: S, action: A): S =>\n    reducers.reduce(\n      (currentState, reducer) => reducer(currentState, action),\n      state\n    );\n}\n\nconst combinedReducer = composeReducers(counterReducer, toggleReducer);"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "reducer-composition-flow",
+        "caption": "State flows through composed reducers; each reducer updates only the field it owns.",
+        "definition": "flowchart LR\n    StateIn[\"State { count, on }\"] --> CounterReducer\n    CounterReducer --> AfterCount[\"{ count: count+1, on }\"]\n    AfterCount --> ToggleReducer\n    ToggleReducer --> StateOut[\"State { count, on: !on }\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Real-World Example: Counter Plus Toggle"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Let's build a single hook that manages both a **counter** and a **toggle** at the same time. We define two independent reducers, give them a shared action union, and compose them with `composeReducers`. Because each reducer spreads `...state` and only updates its own field, the combined state `{ count, on }` stays correct."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Combining a Counter and Toggle Reducer",
+        "content": "Two focused reducers combined into one that manages both count and on/off state.",
+        "language": "tsx",
+        "code": "import { useReducer } from 'react';\n\ntype State = { count: number; on: boolean };\n\ntype CounterAction = { type: 'INCREMENT' } | { type: 'DECREMENT' };\ntype ToggleAction = { type: 'TOGGLE' } | { type: 'RESET' };\ntype Action = CounterAction | ToggleAction;\n\nconst counterReducer = (state: State, action: Action): State => {\n  switch (action.type) {\n    case 'INCREMENT':\n      return { ...state, count: state.count + 1 };\n    case 'DECREMENT':\n      return { ...state, count: state.count - 1 };\n    default:\n      return state;\n  }\n};\n\nconst toggleReducer = (state: State, action: Action): State => {\n  switch (action.type) {\n    case 'TOGGLE':\n      return { ...state, on: !state.on };\n    case 'RESET':\n      return { ...state, on: false, count: 0 };\n    default:\n      return state;\n  }\n};\n\nfunction composeReducers<S, A>(\n  ...reducers: Array<(state: S, action: A) => S>\n) {\n  return (state: S, action: A): S =>\n    reducers.reduce((s, r) => r(s, action), state);\n}\n\nexport function useCounterToggle(initial = { count: 0, on: false }) {\n  const reducer = composeReducers(counterReducer, toggleReducer);\n  const [state, dispatch] = useReducer(reducer, initial);\n\n  return {\n    on: state.on,\n    count: state.count,\n    toggle: () => dispatch({ type: 'TOGGLE' }),\n    increment: () => dispatch({ type: 'INCREMENT' }),\n    decrement: () => dispatch({ type: 'DECREMENT' }),\n    reset: () => dispatch({ type: 'RESET' }),\n  };\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Order Matters",
+        "text": "Reducers run in the order you pass them. Put more specific reducers first and shared fallbacks (like RESET) last so earlier logic has the final say on its own slice."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reducer Enhancers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An **enhancer** wraps a reducer to add behavior without changing the reducer itself. The pattern mirrors Redux's store enhancers: you take a reducer as input and return a new reducer. Common enhancers add logging, persist state to `localStorage`, or batch updates. Enhancers keep cross-cutting concerns separate from your core business logic, which makes them easy to swap in and out."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Logging Enhancer",
+        "content": "Wraps a reducer to print the action type and resulting state change to the console.",
+        "language": "tsx",
+        "code": "type Action = { type: string };\n\ntype Enhancer<S, A extends Action> = (reducer: (state: S, action: A) => S) => (state: S, action: A) => S;\n\nfunction withLogging<S, A extends Action>(reducer: (state: S, action: A) => S): (state: S, action: A) => S {\n  return (state, action) => {\n    const next = reducer(state, action);\n    console.log(`[${String(action.type)}] ->`, next);\n    return next;\n  };\n}\n\n// Apply enhancers right-to-left, like function composition\nfunction enhanceReducer<S, A extends Action>(\n  reducer: (state: S, action: A) => S,\n  ...enhancers: Enhancer<S, A>[]\n) {\n  return enhancers.reduce((acc, enh) => enh(acc), reducer);\n}\n\nconst enhanced = enhanceReducer(combinedReducer, withLogging);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Middleware-Like Patterns for Reducers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes you need richer access around an action — for example, the ability to **cancel or transform** an action before it reaches a reducer, or to read the *current* state from inside the middleware. That's where a **middleware** abstraction comes in. A middleware receives the state, the action, a `getState` helper, and a `next` function. It can inspect, log, short-circuit, or forward the action, giving you Redux-style middleware power inside a local reducer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reducer with Middleware",
+        "content": "A small middleware pipeline that can log, inspect, or short-circuit actions before they reach the base reducer.",
+        "language": "tsx",
+        "code": "type Action = { type: string };\n\ntype Middleware<S, A extends Action> = (\n  ctx: { getState: () => S },\n  action: A,\n  next: (a: A) => S\n) => S;\n\nfunction withMiddleware<S, A extends Action>(\n  reducer: (state: S, action: A) => S,\n  middlewares: Middleware<S, A>[]\n) {\n  return (state: S, action: A): S => {\n    let index = 0;\n    const ctx = { getState: () => state };\n    const next = (a: A): S => {\n      if (index < middlewares.length) {\n        const mw = middlewares[index++];\n        return mw(ctx, a, next);\n      }\n      return reducer(state, a);\n    };\n    return next(action);\n  };\n}\n\n// A middleware that blocks actions while state is locked\nconst lockMiddleware: Middleware<{ count: number; locked: boolean }, Action> = (\n  ctx,\n  action,\n  next\n) => {\n  if (ctx.getState().locked && action.type !== 'UNLOCK') {\n    return ctx.getState();\n  }\n  return next(action);\n};"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Pattern", "Wraps", "Can Modify Action", "Best For"],
+        "rows": [
+          ["Enhancer", "A single reducer", "No — sees the resulting state", "Logging, persistence, batching"],
+          ["Middleware", "The dispatch pipeline", "Yes — can intercept or cancel", "Cross-cutting concerns, guards, async side effects"],
+          ["Composition", "Multiple reducers", "No — passes actions through", "Splitting a large reducer into focused slices"]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Reducer Composition",
+            "definition": "Running several reducers over the same state so each one owns a slice of the logic or the state shape."
+          },
+          {
+            "term": "Enhancer",
+            "definition": "A higher-order function that takes a reducer and returns a new reducer with added behavior."
+          },
+          {
+            "term": "Middleware",
+            "definition": "A function that sits between dispatching an action and the reducer running, with the ability to inspect, transform, or cancel actions."
+          },
+          {
+            "term": "Pure Reducer",
+            "definition": "A reducer with no side effects: the same (state, action) always yields the same next state."
+          },
+          {
+            "term": "Action Union",
+            "definition": "A discriminated TypeScript union of action types that narrows payloads at compile time."
+          }
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Enhancer vs Middleware",
+        "cards": [
+          {
+            "title": "Enhancer",
+            "description": "Wraps a reducer function to add behavior such as logging or persistence.",
+            "pros": ["Simple function composition", "No shared context object needed", "Easy to stack and reuse"],
+            "cons": ["Cannot cancel an action", "Only sees state before/after"],
+            "tags": ["simple", "wrapping"]
+          },
+          {
+            "title": "Middleware",
+            "description": "Sits in the dispatch pipeline with access to getState and a next function.",
+            "pros": ["Can intercept or cancel actions", "Async-compatible patterns", "Rich context (getState, dispatch)"],
+            "cons": ["More boilerplate", "Easier to introduce subtle bugs"],
+            "tags": ["powerful", "pipeline"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Testing Reducers in Isolation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because reducers are **pure functions** — the same `(state, action)` always returns the same `nextState` with no side effects — they are trivial to test. You do not need a component, a DOM, or even React. Just import the reducer, feed it a starting state and an action, and assert on the returned state. For unknown actions the reducer should return the **same** state reference, which is a good sanity check for immutability."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Testing checklist",
+        "items": [
+          "Call the reducer with a known state and one action at a time.",
+          "Assert on the returned state, not on mutations to the input.",
+          "Verify unknown actions return the exact same state reference.",
+          "Test edge cases like reaching min/max bounds or reset behavior.",
+          "For enhanced reducers, confirm the enhancer calls the underlying reducer."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Testing a Reducer with Vitest",
+        "content": "Pure-function tests that dispatch actions and assert on the returned state.",
+        "language": "tsx",
+        "code": "import { describe, it, expect } from 'vitest';\n\nconst counterReducer = (state: { count: number }, action: { type: string }) => {\n  switch (action.type) {\n    case 'INCREMENT':\n      return { ...state, count: state.count + 1 };\n    case 'DECREMENT':\n      return { ...state, count: state.count - 1 };\n    default:\n      return state;\n  }\n};\n\ndescribe('counterReducer', () => {\n  it('increments the count', () => {\n    const next = counterReducer({ count: 0 }, { type: 'INCREMENT' });\n    expect(next.count).toBe(1);\n  });\n\n  it('decrements the count', () => {\n    const next = counterReducer({ count: 5 }, { type: 'DECREMENT' });\n    expect(next.count).toBe(4);\n  });\n\n  it('returns the same reference for unknown actions', () => {\n    const state = { count: 0 };\n    const next = counterReducer(state, { type: 'UNKNOWN' });\n    expect(next).toBe(state);\n  });\n});"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Before shipping a reducer",
+        "items": [
+          {
+            "text": "Reducer returns a new state object, never a mutation.",
+            "hint": "Spread the previous state first."
+          },
+          {
+            "text": "Default case returns the existing state reference unchanged.",
+            "hint": "This lets consumers safely compare by reference."
+          },
+          {
+            "text": "Each action type is represented in a TypeScript union.",
+            "hint": "Avoid stringly-typed actions."
+          },
+          {
+            "text": "Tests cover happy path, edge cases, and the default branch.",
+            "hint": "Three assertions is usually the minimum."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Composed Reducer",
+        "description": "Extend the counter-and-toggle example by adding a third reducer that tracks a list of items with ADD and REMOVE actions, then compose all three together.",
+        "steps": [
+          "Define an ItemState slice with items: string[] and matching actions.",
+          "Write an itemsReducer that only returns items it knows about.",
+          "Compose all three reducers with composeReducers.",
+          "Add a withLogging enhancer and verify it logs each dispatched action."
+        ],
+        "expectedOutcome": "A single hook managing count, on/off, and a list, all fully typed and tested."
+      }
+    },
+    {
+      "type": "quote",
+      "data": {
+        "text": "Reducer composition lets you think in small pieces that snap together like LEGO bricks.",
+        "attribution": "State reducers make reusable logic obvious."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What's the difference between composeReducers and combineReducers?",
+            "answer": "combineReducers (from Redux) splits state into named slices, each handled by its own reducer, and recombines them into one object. composeReducers runs a sequence of reducers over the *same* state and passes the result along, which is simpler for local state but requires each reducer to manage its own field via spread."
+          },
+          {
+            "question": "When should I use an enhancer instead of a middleware?",
+            "answer": "Use an enhancer when you only need to observe or transform the resulting state (logging, persistence). Use middleware when you need to inspect, cancel, or redirect the action in flight, or when you need shared context like getState."
+          },
+          {
+            "question": "Do composed reducers slow down my app?",
+            "answer": "Each reducer is a pure function, so they are cheap and cache-friendly. The extra reduce loop is negligible unless you have dozens of reducers over a hot path, in which case profile before optimizing."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Compose small, focused reducers over a shared state object so each owns only its slice.",
+          "Enhancers wrap a reducer to add behavior like logging or persistence without changing core logic.",
+          "Middleware sits in the dispatch pipeline and can inspect, transform, or cancel actions.",
+          "Pure reducers are easy to test — assert on the returned state and check reference equality for unknown actions.",
+          "Type your actions as a discriminated union so TypeScript narrows payloads across composed and enhanced reducers."
+        ],
+        "takeaway": "Build reusable, testable state logic by composing small reducers and layering cross-cutting concerns through enhancers or middleware."
+      }
+    }
+  ],
+  "relatedLessons": ["state-reducer-examples", "reducer-hooks-patterns"],
+  "furtherReading": [
+    {
+      "title": "React Docs: You Might Not Need a Reducer",
+      "url": "https://react.dev/learn/you-might-not-need-a-reducer",
+      "type": "article",
+      "author": "React Team",
+      "description": "Guidance on when useReducer is the right tool versus simpler useState patterns."
+    },
+    {
+      "title": "Redux Essentials: Using Reducers",
+      "url": "https://redux-toolkit.js.org/tutorials/essentials/part-2-app-structure",
+      "type": "article",
+      "author": "Redux Team",
+      "description": "Covers reducer composition, slicing, and testing patterns that translate directly to local reducers."
+    },
+    {
+      "title": "Epic React: Advanced useReducer Patterns",
+      "url": "https://www.epicreact.dev/courses/advanced-react-patterns-workshop",
+      "type": "course",
+      "author": "Kent C. Dodds",
+      "description": "Interactive workshop on reducer factories, enhancers, and the state reducer pattern."
+    }
+  ],
+  "prerequisites": ["state-reducer-examples"]
+}
