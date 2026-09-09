@@ -1,0 +1,135 @@
+{
+  "id": "lesson-azure-integrating-ai-services-into-azure-applications",
+  "slug": "integrating-ai-services-into-azure-applications",
+  "moduleSlug": "13-ai-services-for-azure-developers",
+  "courseSlug": "azure",
+  "title": "Integrating AI Services into Azure Applications",
+  "description": "Combine multiple Azure AI services into a complete, production-ready application with error handling and monitoring.",
+  "order": 10,
+  "difficulty": "beginner",
+  "estimatedMinutes": 15,
+  "tags": [
+    "azure",
+    "ai",
+    "openai",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Building a production AI application means combining multiple services: a web app (App Service), an AI model (Azure OpenAI), a knowledge base (AI Search), and monitoring (Application Insights). This lesson ties everything together."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Application Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "m13-arch",
+        "caption": "Full-stack AI application architecture on Azure",
+        "definition": "flowchart TD\n    U[User] -->|HTTPS| FE[Frontend / Web App]\n    FE -->|API Calls| API[App Service API]\n    API -->|Chat| OAI[Azure OpenAI]\n    API -->|Search| AIS[Azure AI Search]\n    API -->|Embeddings| OAI\n    AIS -->|Vector Results| API\n    API -->|Logs| AI[Application Insights]\n    API -->|Secrets| KV[Key Vault]\n    API -->|Auth| MI[Managed Identity]\n    style API fill:#e3f2fd,stroke:#333\n    style OAI fill:#c8e6c9,stroke:#333\n    style AIS fill:#fff9c4,stroke:#333\n    style KV fill:#ffcdd2,stroke:#333"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling and Retry Logic"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "AI service APIs can fail due to rate limiting, model capacity, or transient errors. Always implement retry logic with exponential backoff and circuit breaker patterns."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# - Retry Logic for Azure OpenAI",
+        "content": "Implement retry logic when calling Azure OpenAI.",
+        "language": "csharp",
+        "code": "using Azure;\nusing Azure.AI.OpenAI;\nusing Azure.Identity;\nusing Polly;\nusing Polly.Retry;\n\nvar credential = new DefaultAzureCredential();\nvar client = new OpenAIClient(\n    new Uri(\"https://my-openai.openai.azure.com/\"),\n    credential);\n\n// Define retry policy: 3 retries with exponential backoff\nRetryPolicy retryPolicy = Policy\n    .Handle<RequestFailedException>(ex => ex.Status == 429 || ex.Status >= 500)\n    .WaitAndRetryAsync(3, retryAttempt =>\n        TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));\n\nvar chatOptions = new ChatCompletionsOptions\n{\n    DeploymentName = \"gpt4o\",\n    Messages = { new ChatMessage(ChatRole.User, \"Explain Azure Functions.\") }\n};\n\n// Execute with retry\nvar response = await retryPolicy.ExecuteAsync(async () =>\n{\n    var result = await client.GetChatCompletionsAsync(chatOptions);\n    return result.Value;\n});\n\nConsole.WriteLine(response.Choices[0].Message.Content);"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "YAML - Deploy AI Application Infrastructure with Bicep",
+        "content": "Deploy the complete AI application stack using Bicep.",
+        "language": "bicep",
+        "code": "targetScope = 'resourceGroup'\n\nparam location string = resourceGroup().location\nparam appName string\n\n// App Service Plan\nresource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {\n  name: '${appName}-plan'\n  location: location\n  sku: { name: 'S1', capacity: 1 }\n  kind: 'app'\n}\n\n// Web App with Managed Identity\nresource webApp 'Microsoft.Web/sites@2023-12-01' = {\n  name: appName\n  location: location\n  identity: { type: 'SystemAssigned' }\n  properties: { serverFarmId: appServicePlan.id }\n}\n\n// Key Vault for secrets\nresource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {\n  name: 'kv-${uniqueString(resourceGroup().id)}'\n  location: location\n  properties: {\n    tenantId: subscription().tenantId\n    sku: { name: 'standard' }\n    enableRbacAuthorization: true\n  }\n}\n\n// Grant web app access to Key Vault secrets\nresource kvAccessPolicy 'Microsoft.Authorization/roleAssignments@2022-04-01' = {\n  name: '${webApp.name}-kv-access'\n  scope: keyVault\n  properties: {\n    roleDefinitionId: '${subscription().subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6'\n    principalId: webApp.identity.principalId\n    principalType: 'ServicePrincipal'\n  }\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Application Insights",
+            "definition": "Azure's Application Performance Management (APM) service. It monitors live applications, detects anomalies, and helps diagnose issues."
+          },
+          {
+            "term": "Polly",
+            "definition": "A .NET resilience library that implements retry, circuit breaker, timeout, and fallback policies for handling transient failures."
+          },
+          {
+            "term": "Transient Error",
+            "definition": "A temporary failure that is likely to succeed if retried (e.g., network blip, rate limiting, temporary service unavailability)."
+          }
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Production AI App Checklist",
+        "items": [
+          "Use managed identities instead of API keys",
+          "Implement retry logic with exponential backoff",
+          "Log all AI calls to Application Insights for debugging",
+          "Set up alerts for high error rates or latency spikes",
+          "Use Key Vault for any remaining secrets",
+          "Implement rate limiting to control costs"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build a Production-Ready AI App",
+        "description": "Deploy a complete AI application to Azure with monitoring.",
+        "steps": [
+          "Create a Bicep template for the full AI app stack",
+          "Deploy the infrastructure to a resource group",
+          "Deploy an ASP.NET Core web app with an AI chat endpoint",
+          "Configure Application Insights monitoring",
+          "Add retry logic to the AI service calls",
+          "Test the deployed app and verify logs appear in Application Insights"
+        ],
+        "expectedOutcome": "A deployed web app with AI capabilities, monitoring, and production-ready error handling."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Production AI apps need the same reliability patterns as any other app",
+          "Use Polly or similar libraries for retry logic",
+          "Application Insights is essential for monitoring AI service calls",
+          "Managed identity and Key Vault keep your app secure"
+        ],
+        "takeaway": "A great AI demo is just the beginning. Production AI applications need monitoring, retry logic, and enterprise-grade security."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

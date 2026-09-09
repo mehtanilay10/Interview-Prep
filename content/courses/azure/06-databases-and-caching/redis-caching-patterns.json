@@ -1,0 +1,137 @@
+{
+  "id": "lesson-azure-redis-caching-patterns",
+  "slug": "redis-caching-patterns",
+  "moduleSlug": "06-databases-and-caching",
+  "courseSlug": "azure",
+  "title": "Redis Caching Patterns",
+  "description": "Apply common caching patterns like cache-aside, write-through, and TTL-based expiration with Redis.",
+  "order": 15,
+  "difficulty": "beginner",
+  "estimatedMinutes": 13,
+  "tags": ["azure", "database", "cache", "redis"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Caching is not just 'put data in Redis'. Different patterns suit different consistency, complexity, and performance requirements. The most common patterns are **Cache Aside**, **Write Through**, **Write Behind**, and **Refresh Ahead**. Choosing the right one affects data freshness, code complexity, and failure behavior."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Aside (Lazy Loading)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The application checks Redis first. On a miss, it queries the database, writes the result to Redis, and returns it. This is the simplest pattern and works for most read-heavy workloads. The downside is that cache misses are slightly slower and data can become stale until it expires."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Write Through"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every write goes to both the database and the cache simultaneously. The cache always reflects the latest data, but every write now touches two systems. This is best when data freshness is critical and write volume is manageable."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache Aside with C#",
+        "content": "Implement lazy loading with StackExchange.Redis",
+        "language": "csharp",
+        "code": "public async Task<User?> GetUserAsync(int id)\n{\n  string key = $\"user:{id}\";\n\n  // Try cache first\n  var cached = await _db.StringGetAsync(key);\n  if (cached.HasValue)\n  {\n    return JsonSerializer.Deserialize<User>(cached);\n  }\n\n  // Cache miss — load from database\n  var user = await _dbContext.Users.FindAsync(id);\n  if (user != null)\n  {\n    await _db.StringSetAsync(key, JsonSerializer.Serialize(user), TimeSpan.FromMinutes(10));\n  }\n  return user;\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Write Through with C#",
+        "content": "Update both database and cache on every write",
+        "language": "csharp",
+        "code": "public async Task UpdateUserAsync(User user)\n{\n  await _dbContext.Users.UpdateAsync(user);\n  await _dbContext.SaveChangesAsync();\n\n  string key = $\"user:{user.Id}\";\n  await _db.StringSetAsync(key, JsonSerializer.Serialize(user), TimeSpan.FromMinutes(10));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Expiration Strategies"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Strategy", "Description"],
+        "rows": [
+          ["Absolute TTL", "Item expires after a fixed time regardless of access."],
+          ["Sliding TTL", "TTL resets on every read; active items stay in cache longer."],
+          ["Never expire", "Items stay until explicitly deleted. Risk of stale data."]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Aside",
+            "definition": "A pattern where the application manages the cache independently from the database."
+          },
+          {
+            "term": "Write Through",
+            "definition": "A pattern where writes update both the cache and database simultaneously."
+          },
+          {
+            "term": "TTL",
+            "definition": "Time-to-live: the duration after which a cached item is automatically evicted."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Watch for Stale Data",
+        "text": "No caching pattern eliminates staleness. Always define a TTL that your application can tolerate. For highly dynamic data, use shorter TTLs or write-through."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Implement Two Caching Patterns",
+        "description": "Add cache-aside and write-through to an existing service.",
+        "steps": [
+          "Create a simple product service backed by an in-memory database.",
+          "Implement cache-aside for the GetById method.",
+          "Implement write-through for the UpdateAsync method.",
+          "Verify that after an update, the cache returns the new value without a TTL expiry.",
+          "Measure the time for repeated reads with and without the cache."
+        ],
+        "expectedOutcome": "A working service demonstrating both caching patterns with measurable performance improvement."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache Aside is simple and works for most read-heavy apps.",
+          "Write Through keeps the cache fresh at the cost of extra writes.",
+          "TTLs prevent stale data from lingering forever.",
+          "Choose patterns based on consistency requirements, not just performance."
+        ],
+        "takeaway": "Caching patterns are a tradeoff between complexity, freshness, and performance. Start simple and evolve as needed."
+      }
+    }
+  ]
+}

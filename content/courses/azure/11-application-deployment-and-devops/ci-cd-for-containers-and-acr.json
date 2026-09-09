@@ -1,0 +1,125 @@
+{
+  "id": "lesson-azure-ci-cd-for-containers-and-acr",
+  "slug": "ci-cd-for-containers-and-acr",
+  "moduleSlug": "11-application-deployment-and-devops",
+  "courseSlug": "azure",
+  "title": "CI/CD for Containers and ACR",
+  "description": "Build container images, push to Azure Container Registry, and deploy to Azure Container Apps or AKS.",
+  "order": 11,
+  "difficulty": "beginner",
+  "estimatedMinutes": 15,
+  "tags": [
+    "azure",
+    "devops",
+    "deployment",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Container-based deployments require a slightly different CI/CD flow. Instead of deploying code directly, you build a container image, push it to a registry, and then update the running service to use the new image."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Container CI/CD Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "m11-container-cicd",
+        "caption": "Container CI/CD pipeline flow",
+        "definition": "flowchart LR\n    C[Code Commit] --> B[Build Image]\n    B --> P[Push to ACR]\n    P --> D[Deploy to Container Apps / AKS]\n    D --> V[Verify Health]\n    V -->|Fail| R[Rollback]\n    style B fill:#e3f2fd,stroke:#333\n    style D fill:#c8e6c9,stroke:#333\n    style R fill:#ffcdd2,stroke:#333"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dockerfile - .NET Web App Container",
+        "content": "Multi-stage Dockerfile for a .NET app.",
+        "language": "dockerfile",
+        "code": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY [\"MyApp.csproj\", \"./\"]\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o /app/publish\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime\nWORKDIR /app\nCOPY --from=build /app/publish .\nEXPOSE 8080\nENV ASPNETCORE_URLS=http://+:8080\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "YAML - GitHub Actions: Build and Push to ACR",
+        "content": "Build a container image and push to Azure Container Registry.",
+        "language": "yaml",
+        "code": "name: Build and Push to ACR\n\non:\n  push:\n    branches: [ main ]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n      - uses: actions/checkout@v4\n      - name: Login to Azure\n        uses: azure/login@v2\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n          federated-credential-parameters: |\n            audience: api://AzureADTokenExchange\n            issuer: https://token.actions.githubusercontent.com/${{ github.repository_id }}\n            subject: repo:myorg/myapp:ref:refs/heads/main\n      - name: Login to ACR\n        uses: azure/docker-login@v2\n        with:\n          login-server: myregistry.azurecr.io\n      - name: Build and push\n        run: |\n          docker build -t myregistry.azurecr.io/myapp:${{ github.sha }} .\n          docker push myregistry.azurecr.io/myapp:${{ github.sha }}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Azure CLI - Deploy Container to Container Apps",
+        "content": "Deploy a new revision of a Container App from ACR.",
+        "language": "azurecli",
+        "code": "az acr login --name myregistry\ndocker build -t myregistry.azurecr.io/myapp:latest .\ndocker push myregistry.azurecr.io/myapp:latest\naz containerapp update --name my-container-app --resource-group MyResourceGroup --image myregistry.azurecr.io/myapp:latest\n\n# Or create from scratch\naz containerapp create --name my-container-app --resource-group MyResourceGroup --image myregistry.azurecr.io/myapp:latest --environment my-env --ingress external --target-port 8080 --cpu 0.5 --memory 1.0Gi"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use Git Tags for Versions",
+        "text": "Tag your container images with the Git commit SHA (github.sha) so you can always trace a deployed image back to the exact code version. Use semantic version tags for release branches."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Azure Container Registry (ACR)",
+            "definition": "A managed Docker registry service for storing and managing container images. Supports geo-replication, content trust, and Helm charts."
+          },
+          {
+            "term": "Container Revision",
+            "definition": "A specific version of a Container App container image and configuration. Container Apps support multiple revisions for safe rollouts."
+          },
+          {
+            "term": "Docker Login Action",
+            "definition": "The azure/docker-login GitHub Action that authenticates Docker to an Azure Container Registry using a managed identity."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Build and Deploy a Container",
+        "description": "Create a CI/CD pipeline for a containerized app.",
+        "steps": [
+          "Create a simple web app with a Dockerfile",
+          "Create an Azure Container Registry",
+          "Add a GitHub Actions workflow that builds and pushes the image",
+          "Create an Azure Container App environment",
+          "Deploy the Container App using the image from ACR",
+          "Browse to the Container App URL and confirm it works"
+        ],
+        "expectedOutcome": "A containerized web app deployed to Azure Container Apps, built and pushed via CI/CD."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Container CI/CD builds an image, pushes to a registry, then deploys",
+          "Use ACR as your private container registry in Azure",
+          "Tag images with the Git SHA for traceability",
+          "Azure Container Apps and AKS both support rolling updates from new images"
+        ],
+        "takeaway": "Container deployments require a registry (ACR) and a runtime (Container Apps or AKS). Automate the full image build-and-deploy cycle."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}
