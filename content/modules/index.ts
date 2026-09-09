@@ -162,13 +162,19 @@ import unitTestModule5 from '../courses/unit-testing-dotnet/05-tdd/content.json'
 import unitTestModule6 from '../courses/unit-testing-dotnet/06-testing-patterns/content.json';
 import unitTestModule7 from '../courses/unit-testing-dotnet/07-code-coverage/content.json';
 
-import azureModule1 from '../courses/azure/01-azure-fundamentals/content.json';
-import azureModule2 from '../courses/azure/02-compute-services/content.json';
-import azureModule3 from '../courses/azure/03-storage-services/content.json';
-import azureModule4 from '../courses/azure/04-networking-services/content.json';
-import azureModule5 from '../courses/azure/05-database-services/content.json';
-import azureModule6 from '../courses/azure/06-security-identity/content.json';
-import azureModule7 from '../courses/azure/07-ai-ml-services/content.json';
+import azureModule1 from '../courses/azure/01-azure-developer-foundations/content.json';
+import azureModule2 from '../courses/azure/02-compute-and-app-hosting/content.json';
+import azureModule3 from '../courses/azure/03-serverless-and-azure-functions/content.json';
+import azureModule4 from '../courses/azure/04-containers-and-container-platforms/content.json';
+import azureModule5 from '../courses/azure/05-storage-and-data-services/content.json';
+import azureModule6 from '../courses/azure/06-databases-and-caching/content.json';
+import azureModule7 from '../courses/azure/07-identity-security-and-configuration/content.json';
+import azureModule8 from '../courses/azure/08-networking-and-api-platforms/content.json';
+import azureModule9 from '../courses/azure/09-messaging-and-event-driven-architecture/content.json';
+import azureModule10 from '../courses/azure/10-observability-and-application-monitoring/content.json';
+import azureModule11 from '../courses/azure/11-application-deployment-and-devops/content.json';
+import azureModule12 from '../courses/azure/12-infrastructure-as-code-and-automation/content.json';
+import azureModule13 from '../courses/azure/13-ai-services-for-azure-developers/content.json';
 
 import awsModule1 from '../courses/aws/01-aws-fundamentals-cloud-concepts/content.json';
 import awsModule2 from '../courses/aws/02-identity-access-governance/content.json';
@@ -212,7 +218,7 @@ const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, 
   iqModule1, iqModule2, iqModule3, iqModule4, iqModule5, iqModule6, iqModule7,
   fsModule1, fsModule2, fsModule3, fsModule4, fsModule5, fsModule6, fsModule7, fsModule8,
   csModule1, csModule2, csModule3, csModule4, csModule5, csModule6, csModule7, csModule8, csModule9, csModule10,
-  azureModule1, azureModule2, azureModule3, azureModule4, azureModule5, awsModule6, awsModule7,
+  azureModule1, azureModule2, azureModule3, azureModule4, azureModule5, azureModule6, azureModule7, azureModule8, azureModule9, azureModule10, azureModule11, azureModule12, azureModule13,
   awsModule1, awsModule2, awsModule3, awsModule4, awsModule5, awsModule6, awsModule7, awsModule8, awsModule9, awsModule10, awsModule11, awsModule12, awsModule13, awsModule14, awsModule15,
   awsModule16, awsModule17, awsModule18, awsModule19, awsModule20
 ];

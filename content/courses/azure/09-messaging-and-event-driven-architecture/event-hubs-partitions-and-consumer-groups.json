@@ -1,0 +1,104 @@
+{
+  "id": "lesson-azure-event-hubs-partitions-and-consumer-groups",
+  "slug": "event-hubs-partitions-and-consumer-groups",
+  "moduleSlug": "09-messaging-and-event-driven-architecture",
+  "courseSlug": "azure",
+  "title": "Event Hubs Partitions and Consumer Groups",
+  "description": "Understand how partitions enable parallel processing and how consumer groups isolate read views.",
+  "order": 12,
+  "difficulty": "beginner",
+  "estimatedMinutes": 13,
+  "tags": [
+    "azure",
+    "azure",
+    "messaging",
+    "events",
+    "event-hubs",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Partitions Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Partitions are the fundamental scale unit in Event Hubs. Each partition is an ordered log of events. When you send an event, a partition key determines which partition it goes to. Events with the same partition key are guaranteed to be in the same partition and in order."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Partition Key",
+            "definition": "A value used to assign an event to a partition. Same key = same partition."
+          },
+          {
+            "term": "Consumer Group",
+            "definition": "A view of an Event Hub. Each consumer group maintains its own offset, so multiple apps can read independently."
+          },
+          {
+            "term": "Offset",
+            "definition": "A position in a partition stream. Consumers track their offset to know where to resume."
+          },
+          {
+            "term": "Epoch",
+            "definition": "An exclusive ownership mechanism for a partition, ensuring only one consumer reads at a time in a given group."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Send Events with a Partition Key (JavaScript)",
+        "content": "Use a device ID as the partition key to keep events from the same device in order:",
+        "code": "const { EventHubProducerClient } = require(\"@azure/event-hubs\");\n\nconst producer = new EventHubProducerClient(connectionString, eventHubName);\n\nconst batch = await producer.createBatch();\n\nfor (const device of devices) {\n  const event = {\n    body: JSON.stringify({ temperature: device.temp, timestamp: Date.now() }),\n    partitionKey: device.id  // Same device = same partition\n  };\n  batch.tryAdd(event);\n}\n\nawait producer.sendBatch(batch);\nawait producer.close();",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Receive Events from a Consumer Group (JavaScript)",
+        "content": "Read events from a specific consumer group:",
+        "code": "const { EventHubConsumerClient } = require(\"@azure/event-hubs\");\n\nconst consumer = new EventHubConsumerClient(\n  \"$Default\", // consumer group\n  connectionString,\n  eventHubName\n);\n\nconst subscription = consumer.subscribe({\n  async processEvents(events, context) {\n    for (const event of events) {\n      console.log(`Partition: ${context.partitionId}, Offset: ${event.offset}`);\n      console.log(`Body: ${event.body}`);\n    }\n  },\n  async processError(context, error) {\n    console.error(\"Error:\", error);\n  }\n});",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "m9-lesson12-consumer-groups",
+        "caption": "Consumer groups isolating read views",
+        "definition": "graph TD\n    P[Producers] --> EH[Event Hub]\n    EH --> P0[Partition 0]\n    EH --> P1[Partition 1]\n    P0 --> CG1[Consumer Group: $Default]\n    P0 --> CG2[Consumer Group: analytics]\n    P1 --> CG1\n    P1 --> CG2\n    CG1 --> App1[Real-time App]\n    CG2 --> App2[Archive / Spark Job]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Consumer Groups Are Independent",
+        "text": "Each consumer group tracks its own offset. If one consumer group falls behind, it does not affect other groups. Plan consumer groups carefully -- each one increases storage and resource usage."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design Consumer Groups for an IoT Solution",
+        "description": "A smart-city IoT platform ingests sensor data into Event Hubs. Plan the consumer groups.",
+        "steps": [
+          "Identify two independent applications that need to read the data.",
+          "Name each consumer group and explain why they should be separate.",
+          "Decide on a partition key strategy for sensor data."
+        ],
+        "expectedOutcome": "Two consumer groups (for example, $Default for real-time dashboards and archive for long-term storage) with a device-ID-based partition key."
+      }
+    }
+  ]
+}

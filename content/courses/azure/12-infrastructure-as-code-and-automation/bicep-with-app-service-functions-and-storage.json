@@ -1,0 +1,114 @@
+{
+  "id": "lesson-azure-bicep-with-app-service-functions-and-storage",
+  "slug": "bicep-with-app-service-functions-and-storage",
+  "moduleSlug": "12-infrastructure-as-code-and-automation",
+  "courseSlug": "azure",
+  "title": "Bicep with App Service, Functions, and Storage",
+  "description": "Deploy App Service, Azure Functions, and Storage accounts together in a single Bicep template.",
+  "order": 9,
+  "difficulty": "beginner",
+  "estimatedMinutes": 12,
+  "tags": [
+    "azure",
+    "bicep",
+    "iac",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A common pattern is deploying an App Service (or Functions app) together with the supporting resources it needs: an App Service plan, a storage account, and optionally a Key Vault for secrets."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deploying a Complete Web App Stack"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In this lesson, we will create a Bicep template that deploys a complete web application stack: a resource group, App Service plan, web app, storage account, and Key Vault."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bicep - Complete Web App Stack",
+        "content": "Deploy a resource group, App Service plan, web app, and storage account.",
+        "language": "bicep",
+        "code": "targetScope = 'resourceGroup'\n\nparam location string = resourceGroup().location\nparam appName string\nparam environment string = 'dev'\n\n// App Service Plan\nresource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {\n  name: '${appName}-plan'\n  location: location\n  sku: {\n    name: environment == 'production' ? 'P1v3' : 'S1'\n    capacity: environment == 'production' ? 3 : 1\n  }\n  kind: 'app'\n  properties: {\n    reserved: false\n  }\n}\n\n// Web App\nresource webApp 'Microsoft.Web/sites@2023-12-01' = {\n  name: appName\n  location: location\n  properties: {\n    serverFarmId: appServicePlan.id\n    httpsOnly: true\n    siteConfig: {\n      netFrameworkVersion: 'v8.0'\n      minTlsVersion: '1.2'\n    }\n  }\n  tags: {\n    environment: environment\n  }\n}\n\n// Storage Account for Functions / Blobs\nresource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {\n  name: 'st${uniqueString(resourceGroup().id)}'\n  location: location\n  sku: { name: 'Standard_LRS' }\n  kind: 'StorageV2'\n  properties: {\n    accessTier: 'Hot'\n    minimumTlsVersion: 'TLS1_2'\n  }\n}\n\noutput webAppUrl string = webApp.properties.defaultHostName\noutput storageAccountId string = storageAccount.id"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bicep - Azure Functions with Consumption Plan",
+        "content": "Deploy a Function app on the Consumption plan.",
+        "language": "bicep",
+        "code": "resource functionApp 'Microsoft.Web/sites@2023-12-01' = {\n  name: '${appName}-func'\n  location: location\n  kind: 'functionapp'\n  identity: {\n    type: 'SystemAssigned'\n  }\n  properties: {\n    serverFarmId: consumptionPlan.id\n    httpsOnly: true\n    storageAccountName: storageAccount.name\n    storageAccountKey: storageAccount.listKeys().keys[0].value\n  }\n}\n\nresource consumptionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {\n  name: '${appName}-func-plan'\n  location: location\n  sku: {\n    name: 'Y1'\n    tier: 'Dynamic'\n  }\n  kind: 'functionapp'\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Deploy as a Unit",
+        "text": "Keep related resources in the same template. A web app, its plan, and its storage account are usually deployed together and should not be split across templates."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "listKeys()",
+            "definition": "A Bicep function that returns the access keys for a storage account. Use it to pass the storage key to the Function app."
+          },
+          {
+            "term": "Consumption Plan",
+            "definition": "A serverless hosting plan for Azure Functions where you pay only for execution time. SKU name is Y1."
+          },
+          {
+            "term": "App Service Plan",
+            "definition": "A set of compute resources (VMs) that host one or more App Service apps. SKU determines the size and features."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Deploy a Web App Stack",
+        "description": "Deploy a complete web application infrastructure with Bicep.",
+        "steps": [
+          "Create a Bicep template with targetScope = 'resourceGroup'",
+          "Add an App Service plan with S1 sku",
+          "Add a web app linked to the plan",
+          "Add a storage account for diagnostics",
+          "Deploy to a test resource group",
+          "Browse to the web app URL"
+        ],
+        "expectedOutcome": "A deployed web application stack with App Service plan, web app, and storage account."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Group related resources in the same Bicep template",
+          "Use listKeys() to get storage account keys for Function apps",
+          "targetScope = 'resourceGroup' is the most common scope for application infrastructure",
+          "Output the web app URL for easy access after deployment"
+        ],
+        "takeaway": "A single Bicep template can deploy an entire application stack. Keep it organized by grouping related resources."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

@@ -1,0 +1,138 @@
+{
+  "id": "lesson-azure-service-bus-dead-lettering-and-retries",
+  "slug": "service-bus-dead-lettering-and-retries",
+  "moduleSlug": "09-messaging-and-event-driven-architecture",
+  "courseSlug": "azure",
+  "title": "Dead-Lettering and Retries in Service Bus",
+  "description": "Handle failed messages safely using dead-letter queues and retry policies so no data is lost.",
+  "order": 5,
+  "difficulty": "beginner",
+  "estimatedMinutes": 14,
+  "tags": [
+    "azure",
+    "azure",
+    "messaging",
+    "service-bus",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Messages Fail"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Messages can fail for many reasons: a temporary database outage, invalid data in the message, or a bug in the receiver code. Service Bus provides dead-lettering to capture these failed messages so they can be inspected and reprocessed later."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Dead-Letter Queue (DLQ)",
+            "definition": "A sub-queue where failed messages are moved after repeated delivery failures."
+          },
+          {
+            "term": "Max Delivery Count",
+            "definition": "The number of times Service Bus will attempt to deliver a message before moving it to the DLQ."
+          },
+          {
+            "term": "Retry Policy",
+            "definition": "Rules for how the SDK retries failed operations, including backoff intervals."
+          },
+          {
+            "term": "Idempotency",
+            "definition": "The ability to process the same message multiple times without changing the result."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configure Dead-Lettering (Azure CLI)",
+        "content": "Set the max delivery count so messages go to the DLQ after 5 failed attempts:",
+        "code": "az servicebus queue update \\\n  --resource-group myResourceGroup \\\n  --namespace-name myNamespace \\\n  --name orders \\\n  --max-delivery-count 5",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry Policies in the SDK"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Azure Service Bus SDK includes built-in retry logic. You can configure the number of retries, the maximum retry delay, and the delay increment between retries. This helps handle transient errors like network blips without moving messages to the DLQ."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configure Retry Options (JavaScript)",
+        "content": "Customize retry behavior when creating the Service Bus client:",
+        "code": "import { ServiceBusClient, ServiceBusRetryOptions } from \"@azure/service-bus\";\n\nconst retryOptions: ServiceBusRetryOptions = {\n  maxRetries: 3,\n  maxRetryDelayInMs: 30000,\n  delayInMs: 1000\n};\n\nconst client = new ServiceBusClient(connectionString, {\n  retryOptions\n});",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading from the Dead-Letter Queue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Messages in the DLQ are not lost. You can read them, fix the underlying issue, and resubmit them. The DLQ path is always the queue or subscription name followed by /$DeadLetterQueue."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Receive Dead-Lettered Messages (JavaScript)",
+        "content": "Read messages from the DLQ to investigate and fix issues:",
+        "code": "const dlqPath = \"orders/$DeadLetterQueue\";\nconst dlqReceiver = client.createReceiver(dlqPath);\n\nconst dlqMessages = await dlqReceiver.receiveMessages(10);\n\nfor (const msg of dlqMessages) {\n  console.log(\"Dead-lettered reason:\", msg.deadLetterErrorDescription);\n  console.log(\"Original message:\", msg.body);\n  // Fix the issue, then resend\n}\n\nawait dlqReceiver.close();",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "m9-lesson5-dlq",
+        "caption": "Message lifecycle including dead-lettering",
+        "definition": "graph TD\n    A[Send message] --> B[Queue]\n    B --> C[Deliver to receiver]\n    C --> D{Processing succeeds?}\n    D -->|Yes| E[Complete]\n    D -->|No| F[Abandon: lock released]\n    F --> B\n    B --> G{Max deliveries reached?}\n    G -->|Yes| H[Dead-Letter Queue]\n    G -->|No| C\n    H --> I[Manual inspection & resubmit]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Monitor Your DLQ",
+        "text": "A growing DLQ is a sign that your application has a problem. Set up alerts on the dead-letter message count to catch issues before they pile up."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix a Dead-Lettered Message",
+        "description": "A payment-processing queue has messages in its DLQ. Investigate and fix the issue.",
+        "steps": [
+          "Connect to the DLQ and inspect the error descriptions on failed messages.",
+          "Identify whether failures are caused by data errors or transient outages.",
+          "Resubmit the fixed messages to the main queue."
+        ],
+        "expectedOutcome": "You have identified the root cause and resubmitted the messages."
+      }
+    }
+  ]
+}

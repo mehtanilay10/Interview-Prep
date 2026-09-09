@@ -618,27 +618,122 @@ import authLesson12 from '../courses/authentication-authorization/04-oauth/exter
 import authLesson13 from '../courses/authentication-authorization/04-oauth/oauth-overview.json';
 import authLesson14 from '../courses/authentication-authorization/04-oauth/openid-connect.json';
 
-import azureFundamentalsLesson1 from '../courses/azure/01-azure-fundamentals/what-is-azure.json';
-import azureFundamentalsLesson2 from '../courses/azure/01-azure-fundamentals/azure-subscriptions-resource-groups.json';
-import azureFundamentalsLesson3 from '../courses/azure/01-azure-fundamentals/azure-portal-navigation.json';
-import azureFundamentalsLesson4 from '../courses/azure/01-azure-fundamentals/azure-regions-availability-zones.json';
-import azureNetworkingLesson1 from '../courses/azure/04-networking-services/virtual-networks-subnets.json';
-import azureNetworkingLesson2 from '../courses/azure/04-networking-services/network-security-groups.json';
-import azureNetworkingLesson3 from '../courses/azure/04-networking-services/load-balancers-application-gateway.json';
-import azureNetworkingLesson4 from '../courses/azure/04-networking-services/vpn-gateway-cdn.json';
-import azureLesson1 from '../courses/azure/06-security-identity/entra-id-basics.json';
-import azureLesson2 from '../courses/azure/06-security-identity/rbac-permissions.json';
-import azureLesson3 from '../courses/azure/06-security-identity/key-vault-secrets.json';
-import azureLesson4 from '../courses/azure/06-security-identity/microsoft-defender-sentinel.json';
-import azureAiLesson1 from '../courses/azure/07-ai-ml-services/cognitive-services-overview.json';
-import azureAiLesson2 from '../courses/azure/07-ai-ml-services/azure-openai-service.json';
-import azureAiLesson3 from '../courses/azure/07-ai-ml-services/machine-learning-studio.json';
-import azureAiLesson4 from '../courses/azure/07-ai-ml-services/ai-search-vector-search.json';
+import azureComputeHostingLesson1 from '../courses/azure/02-compute-and-app-hosting/compute-options-for-developers.json';
+import azureComputeHostingLesson2 from '../courses/azure/02-compute-and-app-hosting/virtual-machines-overview.json';
+import azureComputeHostingLesson3 from '../courses/azure/02-compute-and-app-hosting/app-service-overview.json';
+import azureComputeHostingLesson4 from '../courses/azure/02-compute-and-app-hosting/app-service-app-configuration.json';
+import azureComputeHostingLesson5 from '../courses/azure/02-compute-and-app-hosting/app-service-deployment.json';
+import azureComputeHostingLesson6 from '../courses/azure/02-compute-and-app-hosting/app-service-deployment-slots.json';
+import azureComputeHostingLesson7 from '../courses/azure/02-compute-and-app-hosting/app-service-scaling-and-autoscale.json';
+import azureComputeHostingLesson8 from '../courses/azure/02-compute-and-app-hosting/app-service-vs-functions-vs-container-apps.json';
+import azureComputeHostingLesson9 from '../courses/azure/02-compute-and-app-hosting/choosing-an-azure-hosting-model.json';
+import azureIdentityLesson1 from '../courses/azure/07-identity-security-and-configuration/microsoft-entra-id-overview.json';
+import azureIdentityLesson2 from '../courses/azure/07-identity-security-and-configuration/application-authentication-and-oauth.json';
+import azureIdentityLesson3 from '../courses/azure/07-identity-security-and-configuration/app-registrations-and-service-principals.json';
+import azureIdentityLesson4 from '../courses/azure/07-identity-security-and-configuration/rbac-overview.json';
+import azureIdentityLesson5 from '../courses/azure/07-identity-security-and-configuration/azure-rbac-scopes-and-roles.json';
+import azureIdentityLesson6 from '../courses/azure/07-identity-security-and-configuration/managed-identities.json';
+import azureIdentityLesson7 from '../courses/azure/07-identity-security-and-configuration/managed-identity-vs-service-principals.json';
+import azureIdentityLesson8 from '../courses/azure/07-identity-security-and-configuration/managed-identity-with-key-vault.json';
+import azureIdentityLesson9 from '../courses/azure/07-identity-security-and-configuration/managed-identity-with-storage.json';
+import azureIdentityLesson10 from '../courses/azure/07-identity-security-and-configuration/managed-identity-with-azure-sql.json';
+import azureIdentityLesson11 from '../courses/azure/07-identity-security-and-configuration/azure-key-vault-overview.json';
+import azureIdentityLesson12 from '../courses/azure/07-identity-security-and-configuration/key-vault-secrets-keys-and-certificates.json';
+import azureIdentityLesson13 from '../courses/azure/07-identity-security-and-configuration/azure-app-configuration-overview.json';
+import azureIdentityLesson14 from '../courses/azure/07-identity-security-and-configuration/app-configuration-feature-flags-and-labels.json';
+import azureIdentityLesson15 from '../courses/azure/07-identity-security-and-configuration/key-vault-vs-app-configuration.json';
+import azureIdentityLesson16 from '../courses/azure/07-identity-security-and-configuration/application-secrets-and-configuration-patterns.json';
+import azureNetApiLesson1 from '../courses/azure/08-networking-and-api-platforms/virtual-networks-and-subnets.json';
+import azureNetApiLesson2 from '../courses/azure/08-networking-and-api-platforms/private-ip-and-public-ip-addressing.json';
+import azureNetApiLesson3 from '../courses/azure/08-networking-and-api-platforms/network-security-groups.json';
+import azureNetApiLesson4 from '../courses/azure/08-networking-and-api-platforms/private-endpoints-and-private-link.json';
+import azureNetApiLesson5 from '../courses/azure/08-networking-and-api-platforms/private-dns-and-private-endpoint-connectivity.json';
+import azureNetApiLesson6 from '../courses/azure/08-networking-and-api-platforms/public-endpoints-vs-private-endpoints.json';
+import azureNetApiLesson7 from '../courses/azure/08-networking-and-api-platforms/load-balancer-overview.json';
+import azureNetApiLesson8 from '../courses/azure/08-networking-and-api-platforms/application-gateway-overview.json';
+import azureNetApiLesson9 from '../courses/azure/08-networking-and-api-platforms/application-gateway-waf-and-routing.json';
+import azureNetApiLesson10 from '../courses/azure/08-networking-and-api-platforms/azure-front-door-overview.json';
+import azureNetApiLesson11 from '../courses/azure/08-networking-and-api-platforms/front-door-vs-application-gateway-vs-load-balancer.json';
+import azureNetApiLesson12 from '../courses/azure/08-networking-and-api-platforms/api-management-overview.json';
+import azureNetApiLesson13 from '../courses/azure/08-networking-and-api-platforms/api-management-apis-products-and-subscriptions.json';
+import azureNetApiLesson14 from '../courses/azure/08-networking-and-api-platforms/api-management-policies.json';
+import azureNetApiLesson15 from '../courses/azure/08-networking-and-api-platforms/api-management-authentication-and-security.json';
+import azureNetApiLesson16 from '../courses/azure/08-networking-and-api-platforms/api-management-versioning-and-revisions.json';
+import azureNetApiLesson17 from '../courses/azure/08-networking-and-api-platforms/vpn-and-hybrid-connectivity-for-developers.json';
 
-import azureStorageLesson1 from '../courses/azure/03-storage-services/blob-storage-basics.json';
-import azureStorageLesson2 from '../courses/azure/03-storage-services/azure-files-shares.json';
-import azureStorageLesson3 from '../courses/azure/03-storage-services/queues-tables-disk-storage.json';
-import azureStorageLesson4 from '../courses/azure/03-storage-services/storage-security-redundancy.json';
+import azureMessagingLesson1 from '../courses/azure/09-messaging-and-event-driven-architecture/messaging-and-event-driven-architecture.json';
+import azureMessagingLesson2 from '../courses/azure/09-messaging-and-event-driven-architecture/azure-service-bus-overview.json';
+import azureMessagingLesson3 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-queues.json';
+import azureMessagingLesson4 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-topics-and-subscriptions.json';
+import azureMessagingLesson5 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-dead-lettering-and-retries.json';
+import azureMessagingLesson6 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-sessions-and-message-processing.json';
+import azureMessagingLesson7 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-from-azure-functions.json';
+import azureMessagingLesson8 from '../courses/azure/09-messaging-and-event-driven-architecture/azure-event-grid-overview.json';
+import azureMessagingLesson9 from '../courses/azure/09-messaging-and-event-driven-architecture/event-grid-topics-events-and-event-subscriptions.json';
+import azureMessagingLesson10 from '../courses/azure/09-messaging-and-event-driven-architecture/event-grid-with-azure-functions.json';
+import azureMessagingLesson11 from '../courses/azure/09-messaging-and-event-driven-architecture/azure-event-hubs-overview.json';
+import azureMessagingLesson12 from '../courses/azure/09-messaging-and-event-driven-architecture/event-hubs-partitions-and-consumer-groups.json';
+import azureMessagingLesson13 from '../courses/azure/09-messaging-and-event-driven-architecture/event-hubs-stream-processing.json';
+import azureMessagingLesson14 from '../courses/azure/09-messaging-and-event-driven-architecture/service-bus-vs-event-grid-vs-event-hubs.json';
+import azureMessagingLesson15 from '../courses/azure/09-messaging-and-event-driven-architecture/messaging-reliability-idempotency-and-retries.json';
+import azureMessagingLesson16 from '../courses/azure/09-messaging-and-event-driven-architecture/event-driven-application-patterns.json';
+
+import azureObservabilityLesson1 from '../courses/azure/10-observability-and-application-monitoring/observability-logging-metrics-and-tracing.json';
+import azureObservabilityLesson2 from '../courses/azure/10-observability-and-application-monitoring/azure-monitor-overview.json';
+import azureObservabilityLesson3 from '../courses/azure/10-observability-and-application-monitoring/application-insights-overview.json';
+import azureObservabilityLesson4 from '../courses/azure/10-observability-and-application-monitoring/application-insights-instrumentation.json';
+import azureObservabilityLesson5 from '../courses/azure/10-observability-and-application-monitoring/application-insights-requests-dependencies-and-failures.json';
+import azureObservabilityLesson6 from '../courses/azure/10-observability-and-application-monitoring/distributed-tracing-and-open-telemetry.json';
+import azureObservabilityLesson7 from '../courses/azure/10-observability-and-application-monitoring/log-analytics-workspaces.json';
+import azureObservabilityLesson8 from '../courses/azure/10-observability-and-application-monitoring/kusto-query-language-for-developers.json';
+import azureObservabilityLesson9 from '../courses/azure/10-observability-and-application-monitoring/azure-monitor-logs-and-kql.json';
+import azureObservabilityLesson10 from '../courses/azure/10-observability-and-application-monitoring/metrics-alerts-and-action-groups.json';
+import azureObservabilityLesson11 from '../courses/azure/10-observability-and-application-monitoring/application-insights-vs-azure-monitor-vs-log-analytics.json';
+import azureObservabilityLesson12 from '../courses/azure/10-observability-and-application-monitoring/monitoring-functions-and-app-service.json';
+import azureObservabilityLesson13 from '../courses/azure/10-observability-and-application-monitoring/monitoring-containers-and-aks.json';
+import azureObservabilityLesson14 from '../courses/azure/10-observability-and-application-monitoring/application-health-diagnostics.json';
+
+
+import azureDevFoundationLesson1 from '../courses/azure/01-azure-developer-foundations/what-is-azure.json';
+import azureDevFoundationLesson2 from '../courses/azure/01-azure-developer-foundations/azure-resource-hierarchy.json';
+import azureDevFoundationLesson3 from '../courses/azure/01-azure-developer-foundations/subscriptions-resource-groups-resources.json';
+import azureDevFoundationLesson4 from '../courses/azure/01-azure-developer-foundations/azure-portal-and-cloud-shell.json';
+import azureDevFoundationLesson5 from '../courses/azure/01-azure-developer-foundations/azure-regions-availability-zones.json';
+import azureDevFoundationLesson6 from '../courses/azure/01-azure-developer-foundations/azure-resource-manager.json';
+import azureDevFoundationLesson7 from '../courses/azure/01-azure-developer-foundations/azure-cli-developer-tooling.json';
+import azureDevFoundationLesson8 from '../courses/azure/01-azure-developer-foundations/azure-cloud-shell.json';
+import azureDevFoundationLesson9 from '../courses/azure/01-azure-developer-foundations/azure-developer-workflows.json';
+
+import azureStorageDataLesson1 from '../courses/azure/05-storage-and-data-services/azure-storage-overview.json';
+import azureStorageDataLesson2 from '../courses/azure/05-storage-and-data-services/blob-storage-basics.json';
+import azureStorageDataLesson3 from '../courses/azure/05-storage-and-data-services/blob-containers-objects-and-metadata.json';
+import azureStorageDataLesson4 from '../courses/azure/05-storage-and-data-services/blob-storage-access-tiers-and-lifecycle.json';
+import azureStorageDataLesson5 from '../courses/azure/05-storage-and-data-services/blob-sas-and-user-delegation-sas.json';
+import azureStorageDataLesson6 from '../courses/azure/05-storage-and-data-services/blob-storage-from-applications.json';
+import azureStorageDataLesson7 from '../courses/azure/05-storage-and-data-services/azure-files.json';
+import azureStorageDataLesson8 from '../courses/azure/05-storage-and-data-services/storage-queues.json';
+import azureStorageDataLesson9 from '../courses/azure/05-storage-and-data-services/table-storage.json';
+import azureStorageDataLesson10 from '../courses/azure/05-storage-and-data-services/managed-disks-and-application-storage.json';
+import azureStorageDataLesson11 from '../courses/azure/05-storage-and-data-services/storage-security-and-encryption.json';
+import azureStorageDataLesson12 from '../courses/azure/05-storage-and-data-services/storage-redundancy-and-replication.json';
+import azureStorageDataLesson13 from '../courses/azure/05-storage-and-data-services/storage-private-endpoints.json';
+
+import azureDbCacheLesson1 from '../courses/azure/06-databases-and-caching/azure-sql-database-overview.json';
+import azureDbCacheLesson2 from '../courses/azure/06-databases-and-caching/azure-sql-database-connectivity.json';
+import azureDbCacheLesson3 from '../courses/azure/06-databases-and-caching/azure-sql-authentication-and-authorization.json';
+import azureDbCacheLesson4 from '../courses/azure/06-databases-and-caching/managed-identity-with-azure-sql.json';
+import azureDbCacheLesson5 from '../courses/azure/06-databases-and-caching/azure-sql-query-performance-and-scaling.json';
+import azureDbCacheLesson6 from '../courses/azure/06-databases-and-caching/azure-sql-backup-high-availability-and-resilience.json';
+import azureDbCacheLesson7 from '../courses/azure/06-databases-and-caching/cosmos-db-overview.json';
+import azureDbCacheLesson8 from '../courses/azure/06-databases-and-caching/cosmos-db-data-modeling.json';
+import azureDbCacheLesson9 from '../courses/azure/06-databases-and-caching/cosmos-db-partition-keys.json';
+import azureDbCacheLesson10 from '../courses/azure/06-databases-and-caching/cosmos-db-request-units-and-performance.json';
+import azureDbCacheLesson11 from '../courses/azure/06-databases-and-caching/cosmos-db-consistency-and-distribution.json';
+import azureDbCacheLesson12 from '../courses/azure/06-databases-and-caching/cosmos-db-sdk-and-developer-patterns.json';
+import azureDbCacheLesson13 from '../courses/azure/06-databases-and-caching/azure-sql-vs-cosmos-db.json';
+import azureDbCacheLesson14 from '../courses/azure/06-databases-and-caching/azure-cache-for-redis-overview.json';
+import azureDbCacheLesson15 from '../courses/azure/06-databases-and-caching/redis-caching-patterns.json';
+import azureDbCacheLesson16 from '../courses/azure/06-databases-and-caching/database-migration-and-data-movement.json';
 
 import awsFundamentalsLesson1 from '../courses/aws/01-aws-fundamentals-cloud-concepts/what-is-cloud-computing.json';
 import awsFundamentalsLesson2 from '../courses/aws/01-aws-fundamentals-cloud-concepts/aws-global-infrastructure.json';
@@ -1004,10 +1099,66 @@ import awsLesson18 from '../courses/aws/20-aws-architecture-design-patterns/02-d
 import awsLesson19 from '../courses/aws/20-aws-architecture-design-patterns/03-well-architected-deep-dive.json';
 import awsLesson20 from '../courses/aws/20-aws-architecture-design-patterns/04-aws-solutions-architect-patterns.json';
 
-import azureComputeLesson1 from '../courses/azure/02-compute-services/virtual-machines-overview.json';
-import azureComputeLesson2 from '../courses/azure/02-compute-services/app-service-intro.json';
-import azureComputeLesson3 from '../courses/azure/02-compute-services/azure-functions-serverless.json';
-import azureComputeLesson4 from '../courses/azure/02-compute-services/containers-aks-container-apps.json';
+import azureFuncLesson1 from "../courses/azure/03-serverless-and-azure-functions/azure-functions-overview.json";
+import azureFuncLesson2 from "../courses/azure/03-serverless-and-azure-functions/functions-programming-models.json";
+import azureFuncLesson3 from "../courses/azure/03-serverless-and-azure-functions/functions-triggers.json";
+import azureFuncLesson4 from "../courses/azure/03-serverless-and-azure-functions/functions-bindings.json";
+import azureFuncLesson5 from "../courses/azure/03-serverless-and-azure-functions/functions-http-apis.json";
+import azureFuncLesson6 from "../courses/azure/03-serverless-and-azure-functions/functions-storage-queues-and-timers.json";
+import azureFuncLesson7 from "../courses/azure/03-serverless-and-azure-functions/functions-event-driven-development.json";
+import azureFuncLesson8 from "../courses/azure/03-serverless-and-azure-functions/functions-dependency-injection-and-configuration.json";
+import azureFuncLesson9 from "../courses/azure/03-serverless-and-azure-functions/functions-scaling-and-hosting-plans.json";
+import azureFuncLesson10 from "../courses/azure/03-serverless-and-azure-functions/functions-durable-workflows.json";
+import azureFuncLesson11 from "../courses/azure/03-serverless-and-azure-functions/functions-local-development-and-debugging.json";
+import azureContLesson1 from "../courses/azure/04-containers-and-container-platforms/containers-and-container-images.json";
+import azureContLesson2 from "../courses/azure/04-containers-and-container-platforms/dockerfiles-and-container-development.json";
+import azureContLesson3 from "../courses/azure/04-containers-and-container-platforms/azure-container-registry-overview.json";
+import azureContLesson4 from "../courses/azure/04-containers-and-container-platforms/acr-images-tags-and-repositories.json";
+import azureContLesson5 from "../courses/azure/04-containers-and-container-platforms/acr-authentication-and-managed-identity.json";
+import azureContLesson6 from "../courses/azure/04-containers-and-container-platforms/container-apps-overview.json";
+import azureContLesson7 from "../courses/azure/04-containers-and-container-platforms/container-apps-revisions-and-ingress.json";
+import azureContLesson8 from "../courses/azure/04-containers-and-container-platforms/container-apps-scaling-and-dapr.json";
+import azureContLesson9 from "../courses/azure/04-containers-and-container-platforms/container-apps-vs-aks.json";
+import azureContLesson10 from "../courses/azure/04-containers-and-container-platforms/aks-overview-for-developers.json";
+import azureContLesson11 from "../courses/azure/04-containers-and-container-platforms/aks-deployments-services-and-ingress.json";
+import azureContLesson12 from "../courses/azure/04-containers-and-container-platforms/aks-configuration-and-secrets.json";
+import azureContLesson13 from "../courses/azure/04-containers-and-container-platforms/aks-scaling-and-operations.json";
+import azureContLesson14 from "../courses/azure/04-containers-and-container-platforms/aks-vs-container-apps-vs-app-service.json";
+import azureDeployLesson1 from '../courses/azure/11-application-deployment-and-devops/application-deployment-strategies.json';
+import azureDeployLesson2 from '../courses/azure/11-application-deployment-and-devops/deployment-slots-and-slot-swapping.json';
+import azureDeployLesson3 from '../courses/azure/11-application-deployment-and-devops/blue-green-canary-and-rolling-deployments.json';
+import azureDeployLesson4 from '../courses/azure/11-application-deployment-and-devops/azure-devops-overview.json';
+import azureDeployLesson5 from '../courses/azure/11-application-deployment-and-devops/azure-repos-and-azure-pipelines.json';
+import azureDeployLesson6 from '../courses/azure/11-application-deployment-and-devops/azure-pipelines-ci-cd.json';
+import azureDeployLesson7 from '../courses/azure/11-application-deployment-and-devops/github-actions-for-azure.json';
+import azureDeployLesson8 from '../courses/azure/11-application-deployment-and-devops/github-actions-azure-authentication.json';
+import azureDeployLesson9 from '../courses/azure/11-application-deployment-and-devops/ci-cd-for-app-service.json';
+import azureDeployLesson10 from '../courses/azure/11-application-deployment-and-devops/ci-cd-for-functions.json';
+import azureDeployLesson11 from '../courses/azure/11-application-deployment-and-devops/ci-cd-for-containers-and-acr.json';
+import azureDeployLesson12 from '../courses/azure/11-application-deployment-and-devops/deployment-secrets-and-environment-configuration.json';
+import azureDeployLesson13 from '../courses/azure/11-application-deployment-and-devops/release-validation-and-rollback.json';
+import azureBicepLesson1 from '../courses/azure/12-infrastructure-as-code-and-automation/infrastructure-as-code-concepts.json';
+import azureBicepLesson2 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-overview.json';
+import azureBicepLesson3 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-resources-and-properties.json';
+import azureBicepLesson4 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-parameters-variables-and-outputs.json';
+import azureBicepLesson5 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-modules-and-reusable-infrastructure.json';
+import azureBicepLesson6 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-dependencies-and-resource-references.json';
+import azureBicepLesson7 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-deployment-and-validation.json';
+import azureBicepLesson8 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-with-managed-identities-and-rbac.json';
+import azureBicepLesson9 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-with-app-service-functions-and-storage.json';
+import azureBicepLesson10 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-with-networking-and-private-endpoints.json';
+import azureBicepLesson11 from '../courses/azure/12-infrastructure-as-code-and-automation/bicep-with-databases-and-messaging.json';
+import azureBicepLesson12 from '../courses/azure/12-infrastructure-as-code-and-automation/infrastructure-automation-with-ci-cd.json';
+import azureAiServiceLesson1 from '../courses/azure/13-ai-services-for-azure-developers/azure-ai-services-overview.json';
+import azureAiServiceLesson2 from '../courses/azure/13-ai-services-for-azure-developers/azure-ai-foundry-and-model-based-development.json';
+import azureAiServiceLesson3 from '../courses/azure/13-ai-services-for-azure-developers/azure-openai-service-overview.json';
+import azureAiServiceLesson4 from '../courses/azure/13-ai-services-for-azure-developers/azure-openai-chat-and-completions.json';
+import azureAiServiceLesson5 from '../courses/azure/13-ai-services-for-azure-developers/azure-openai-embeddings-and-grounding.json';
+import azureAiServiceLesson6 from '../courses/azure/13-ai-services-for-azure-developers/azure-ai-search-overview.json';
+import azureAiServiceLesson7 from '../courses/azure/13-ai-services-for-azure-developers/ai-search-indexes-and-vector-search.json';
+import azureAiServiceLesson8 from '../courses/azure/13-ai-services-for-azure-developers/azure-ai-services-vision-language-and-speech.json';
+import azureAiServiceLesson9 from '../courses/azure/13-ai-services-for-azure-developers/securing-ai-services-with-managed-identity.json';
+import azureAiServiceLesson10 from '../courses/azure/13-ai-services-for-azure-developers/integrating-ai-services-into-azure-applications.json';
 
 const rawLessons = [
   sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8,
@@ -1091,12 +1242,28 @@ const rawLessons = [
   webApiLesson22, webApiLesson23, webApiLesson24, webApiLesson25,
   authLesson1, authLesson2, authLesson3, authLesson4, authLesson5, authLesson6, authLesson7, authLesson8,
   authLesson9, authLesson10, authLesson11, authLesson12, authLesson13, authLesson14,
-  azureFundamentalsLesson1, azureFundamentalsLesson2, azureFundamentalsLesson3, azureFundamentalsLesson4,
-  azureLesson1, azureLesson2, azureLesson3, azureLesson4,
-  azureAiLesson1, azureAiLesson2, azureAiLesson3, azureAiLesson4,
-  azureStorageLesson1, azureStorageLesson2, azureStorageLesson3, azureStorageLesson4,
-  azureComputeLesson1, azureComputeLesson2, azureComputeLesson3, azureComputeLesson4,
-  azureNetworkingLesson1, azureNetworkingLesson2, azureNetworkingLesson3, azureNetworkingLesson4,
+  azureFuncLesson1, azureFuncLesson2, azureFuncLesson3, azureFuncLesson4, azureFuncLesson5, azureFuncLesson6, azureFuncLesson7, azureFuncLesson8, azureFuncLesson9, azureFuncLesson10, azureFuncLesson11,
+  azureContLesson1, azureContLesson2, azureContLesson3, azureContLesson4, azureContLesson5, azureContLesson6, azureContLesson7, azureContLesson8, azureContLesson9, azureContLesson10, azureContLesson11, azureContLesson12, azureContLesson13, azureContLesson14,
+  azureDevFoundationLesson1, azureDevFoundationLesson2, azureDevFoundationLesson3,
+  azureDevFoundationLesson4, azureDevFoundationLesson5, azureDevFoundationLesson6,
+  azureDevFoundationLesson7, azureDevFoundationLesson8, azureDevFoundationLesson9,
+  azureComputeHostingLesson1, azureComputeHostingLesson2, azureComputeHostingLesson3,
+  azureComputeHostingLesson4, azureComputeHostingLesson5, azureComputeHostingLesson6,
+  azureComputeHostingLesson7, azureComputeHostingLesson8, azureComputeHostingLesson9,
+  azureIdentityLesson1, azureIdentityLesson2, azureIdentityLesson3, azureIdentityLesson4, azureIdentityLesson5, azureIdentityLesson6, azureIdentityLesson7, azureIdentityLesson8, azureIdentityLesson9, azureIdentityLesson10, azureIdentityLesson11, azureIdentityLesson12, azureIdentityLesson13, azureIdentityLesson14, azureIdentityLesson15, azureIdentityLesson16,
+  azureNetApiLesson1, azureNetApiLesson2, azureNetApiLesson3, azureNetApiLesson4, azureNetApiLesson5, azureNetApiLesson6, azureNetApiLesson7, azureNetApiLesson8, azureNetApiLesson9, azureNetApiLesson10, azureNetApiLesson11, azureNetApiLesson12, azureNetApiLesson13, azureNetApiLesson14, azureNetApiLesson15, azureNetApiLesson16, azureNetApiLesson17,
+    azureMessagingLesson1, azureMessagingLesson2, azureMessagingLesson3, azureMessagingLesson4, azureMessagingLesson5, azureMessagingLesson6, azureMessagingLesson7, azureMessagingLesson8, azureMessagingLesson9, azureMessagingLesson10, azureMessagingLesson11, azureMessagingLesson12, azureMessagingLesson13, azureMessagingLesson14, azureMessagingLesson15, azureMessagingLesson16,
+    azureObservabilityLesson1, azureObservabilityLesson2, azureObservabilityLesson3, azureObservabilityLesson4, azureObservabilityLesson5, azureObservabilityLesson6, azureObservabilityLesson7, azureObservabilityLesson8, azureObservabilityLesson9, azureObservabilityLesson10, azureObservabilityLesson11, azureObservabilityLesson12, azureObservabilityLesson13, azureObservabilityLesson14,
+  azureDeployLesson1, azureDeployLesson2, azureDeployLesson3, azureDeployLesson4, azureDeployLesson5,
+  azureDeployLesson6, azureDeployLesson7, azureDeployLesson8, azureDeployLesson9, azureDeployLesson10,
+  azureDeployLesson11, azureDeployLesson12, azureDeployLesson13,
+  azureBicepLesson1, azureBicepLesson2, azureBicepLesson3, azureBicepLesson4, azureBicepLesson5,
+  azureBicepLesson6, azureBicepLesson7, azureBicepLesson8, azureBicepLesson9, azureBicepLesson10,
+  azureBicepLesson11, azureBicepLesson12,
+  azureAiServiceLesson1, azureAiServiceLesson2, azureAiServiceLesson3, azureAiServiceLesson4,
+  azureAiServiceLesson5, azureAiServiceLesson6, azureAiServiceLesson7, azureAiServiceLesson8,
+  azureAiServiceLesson9, azureAiServiceLesson10,
+
   cleanCodeLesson1, cleanCodeLesson2, cleanCodeLesson3, cleanCodeLesson4, cleanCodeLesson5, cleanCodeLesson6,
   cleanCodeLesson7, cleanCodeLesson8, cleanCodeLesson9, cleanCodeLesson10, cleanCodeLesson11, cleanCodeLesson12,
   cleanCodeLesson13, cleanCodeLesson14, cleanCodeLesson15, cleanCodeLesson16, cleanCodeLesson17, cleanCodeLesson18,
@@ -1164,7 +1331,16 @@ const rawLessons = [
      awsLesson12_1, awsLesson12_2, awsLesson12_3, awsLesson12_4,
      awsLesson13_1, awsLesson13_2, awsLesson13_3, awsLesson13_4,
      awsLesson14_1, awsLesson14_2, awsLesson14_3, awsLesson14_4,
-     awsLesson15_1, awsLesson15_2, awsLesson15_3, awsLesson15_4
+     awsLesson15_1, awsLesson15_2, awsLesson15_3, awsLesson15_4,
+    azureStorageDataLesson1, azureStorageDataLesson2, azureStorageDataLesson3,
+    azureStorageDataLesson4, azureStorageDataLesson5, azureStorageDataLesson6,
+    azureStorageDataLesson7, azureStorageDataLesson8, azureStorageDataLesson9,
+    azureStorageDataLesson10, azureStorageDataLesson11, azureStorageDataLesson12,
+    azureStorageDataLesson13,
+    azureDbCacheLesson1, azureDbCacheLesson2, azureDbCacheLesson3, azureDbCacheLesson4,
+    azureDbCacheLesson5, azureDbCacheLesson6, azureDbCacheLesson7, azureDbCacheLesson8,
+    azureDbCacheLesson9, azureDbCacheLesson10, azureDbCacheLesson11, azureDbCacheLesson12,
+    azureDbCacheLesson13, azureDbCacheLesson14, azureDbCacheLesson15, azureDbCacheLesson16
   ];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];

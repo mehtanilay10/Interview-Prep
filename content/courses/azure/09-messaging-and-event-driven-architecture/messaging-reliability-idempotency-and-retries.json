@@ -1,0 +1,137 @@
+{
+  "id": "lesson-azure-messaging-reliability-idempotency-and-retries",
+  "slug": "messaging-reliability-idempotency-and-retries",
+  "moduleSlug": "09-messaging-and-event-driven-architecture",
+  "courseSlug": "azure",
+  "title": "Messaging Reliability, Idempotency, and Retries",
+  "description": "Learn how to make your messaging systems reliable using idempotency, retries, and dead-letter patterns.",
+  "order": 15,
+  "difficulty": "beginner",
+  "estimatedMinutes": 14,
+  "tags": [
+    "azure",
+    "azure",
+    "messaging",
+    "events",
+    "reliability",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Reliability Challenge"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In distributed systems, networks fail, services restart, and messages can be delivered more than once. Reliable messaging means your application handles these situations gracefully without duplicating work or losing data."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Idempotency",
+            "definition": "Processing the same message multiple times produces the same result as processing it once."
+          },
+          {
+            "term": "At-Least-Once Delivery",
+            "definition": "Azure guarantees messages are delivered at least once, but possibly more than once."
+          },
+          {
+            "term": "Exactly-Once Delivery",
+            "definition": "A guarantee that each message is processed exactly one time. Azure Service Bus Premium tier offers this for queues."
+          },
+          {
+            "term": "Retry Storm",
+            "definition": "When many clients retry failed operations simultaneously, overwhelming the server."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Making Operations Idempotent"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The best way to handle duplicate messages is to make your handlers idempotent. Store the message ID in a database and check if it has already been processed before performing the action."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent Message Handler (JavaScript)",
+        "content": "Track processed message IDs to avoid duplicate processing:",
+        "code": "const processedIds = new Set(); // In production, use a database\n\nasync function processMessage(message) {\n  if (processedIds.has(message.messageId)) {\n    console.log(\"Duplicate message, skipping:\", message.messageId);\n    return;\n  }\n\n  const order = JSON.parse(message.body);\n  await chargeCustomer(order.customerId, order.total);\n  processedIds.add(message.messageId);\n  console.log(\"Processed:\", message.messageId);\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry Strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Retry Patterns",
+        "items": [
+          "Fixed Interval: Retry after a constant delay (for example, 5 seconds).",
+          "Exponential Backoff: Double the delay after each failure (1s, 2s, 4s, 8s...).",
+          "Exponential Backoff with Jitter: Add randomness to prevent synchronized retries across clients.",
+          "Circuit Breaker: Stop retrying after too many failures and wait before trying again."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Exponential Backoff with Jitter (JavaScript)",
+        "content": "A simple retry helper using exponential backoff:",
+        "code": "async function retryWithBackoff(fn, maxRetries = 3) {\n  for (let attempt = 0; attempt < maxRetries; attempt++) {\n    try {\n      return await fn();\n    } catch (error) {\n      const delay = Math.min(1000 * 2 ** attempt + Math.random() * 1000, 30000);\n      console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms`);\n      await new Promise(resolve => setTimeout(resolve, delay));\n    }\n  }\n  throw new Error(\"Max retries exceeded\");\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "m9-lesson15-retry",
+        "caption": "Retry with exponential backoff and jitter",
+        "definition": "graph LR\n    A[Send] --> B{Fail?}\n    B -->|No| C[Success]\n    B -->|Yes| D[Wait: 1s + jitter]\n    D --> E{Fail?}\n    E -->|No| C\n    E -->|Yes| F[Wait: 2s + jitter]\n    F --> G{Fail?}\n    G -->|No| C\n    G -->|Yes| H[Dead-Letter Queue]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Idempotency Is Key",
+        "text": "No retry strategy is perfect. Combine retries with idempotent operations so that even if a message is processed twice, your data stays consistent."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add Idempotency to an Order Processor",
+        "description": "Refactor an order-processing function to handle duplicate messages safely.",
+        "steps": [
+          "Add a messageId check using a database table.",
+          "Wrap the processing logic in a try/catch with exponential backoff.",
+          "Move messages to the DLQ after 5 failed attempts.",
+          "Log each retry attempt with the delay used."
+        ],
+        "expectedOutcome": "A robust order processor that handles duplicates and transient failures gracefully."
+      }
+    }
+  ]
+}
