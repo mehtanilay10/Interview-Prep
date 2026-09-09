@@ -53,6 +53,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function CourseLessonDetailPage({ params }: Params) {
   const { courseSlug, moduleSlug, lessonSlug } = await params;
+  console.log('DEBUG page render', { courseSlug, moduleSlug, lessonSlug });
   const course = getCourseBySlug(courseSlug);
   const lesson = getLessonBySlug(lessonSlug);
   const mod = getModuleBySlug(moduleSlug);
@@ -60,8 +61,11 @@ export default async function CourseLessonDetailPage({ params }: Params) {
   if (!course || !lesson || !mod) notFound();
 
   const courseModules = getModulesForCourse(courseSlug);
+  console.log('DEBUG courseModules', courseModules.map(m => m.slug));
   const moduleLessons = getLessonsForModule(moduleSlug, courseSlug);
+  console.log('DEBUG moduleLessons', moduleLessons.map(l => l.slug));
   const toc = extractTOC(lesson.blocks);
+  console.log('DEBUG toc', toc.length);
 
   // Adjacent lessons within the course
   const courseLessons = getLessonsForCourse(courseSlug);
