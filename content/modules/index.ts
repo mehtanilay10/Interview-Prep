@@ -170,6 +170,28 @@ import azureModule5 from '../courses/azure/05-database-services/content.json';
 import azureModule6 from '../courses/azure/06-security-identity/content.json';
 import azureModule7 from '../courses/azure/07-ai-ml-services/content.json';
 
+import awsModule1 from '../courses/aws/01-aws-fundamentals-cloud-concepts/content.json';
+import awsModule2 from '../courses/aws/02-identity-access-governance/content.json';
+import awsModule3 from '../courses/aws/03-compute-services/content.json';
+import awsModule4 from '../courses/aws/04-networking/content.json';
+import awsModule5 from '../courses/aws/05-storage-services/content.json';
+import awsModule6 from '../courses/aws/06-databases/content.json';
+import awsModule7 from '../courses/aws/07-load-balancing-application-integration/content.json';
+import awsModule8 from '../courses/aws/08-serverless/content.json';
+import awsModule9 from '../courses/aws/09-containers-kubernetes/content.json';
+import awsModule10 from '../courses/aws/10-devops-cicd/content.json';
+import awsModule11 from '../courses/aws/11-monitoring-logging-observability/content.json';
+import awsModule12 from '../courses/aws/12-security-services/content.json';
+import awsModule13 from '../courses/aws/13-analytics-big-data/content.json';
+import awsModule14 from '../courses/aws/14-ai-machine-learning/content.json';
+import awsModule15 from '../courses/aws/15-developer-tools-application-services/content.json';
+
+import awsModule16 from '../courses/aws/16-identity-for-applications/content.json';
+import awsModule17 from '../courses/aws/17-migration-hybrid-cloud/content.json';
+import awsModule18 from '../courses/aws/18-infrastructure-automation/content.json';
+import awsModule19 from '../courses/aws/19-high-availability-disaster-recovery/content.json';
+import awsModule20 from '../courses/aws/20-aws-architecture-design-patterns/content.json';
+
 import reactTestModule1 from '../courses/react-testing/01-testing-fundamentals/content.json';
 import reactTestModule2 from '../courses/react-testing/02-jest-basics/content.json';
 import reactTestModule3 from '../courses/react-testing/03-react-testing-library/content.json';
@@ -190,7 +212,9 @@ const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, 
   iqModule1, iqModule2, iqModule3, iqModule4, iqModule5, iqModule6, iqModule7,
   fsModule1, fsModule2, fsModule3, fsModule4, fsModule5, fsModule6, fsModule7, fsModule8,
   csModule1, csModule2, csModule3, csModule4, csModule5, csModule6, csModule7, csModule8, csModule9, csModule10,
-  azureModule1, azureModule2, azureModule3, azureModule4, azureModule5, azureModule6, azureModule7
+  azureModule1, azureModule2, azureModule3, azureModule4, azureModule5, awsModule6, awsModule7,
+  awsModule1, awsModule2, awsModule3, awsModule4, awsModule5, awsModule6, awsModule7, awsModule8, awsModule9, awsModule10, awsModule11, awsModule12, awsModule13, awsModule14, awsModule15,
+  awsModule16, awsModule17, awsModule18, awsModule19, awsModule20
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];

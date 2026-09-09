@@ -21,6 +21,7 @@ import graphQlCourse from './graphql-dotnet/content.json';
 import designPatternsCourse from './design-patterns/content.json';
 import fullstackSecurityCourse from './fullstack-security/content.json';
 import azureCourse from './azure/content.json';
+import awsCourse from './aws/content.json';
 
 const rawCourses = [
   sqlServerCourse,
@@ -43,7 +44,8 @@ const rawCourses = [
   graphQlCourse,
   designPatternsCourse,
   fullstackSecurityCourse,
-  azureCourse
+  azureCourse,
+  awsCourse
 ];
 
 export const courses: Course[] = rawCourses as unknown as Course[];

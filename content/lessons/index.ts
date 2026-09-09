@@ -640,6 +640,68 @@ import azureStorageLesson2 from '../courses/azure/03-storage-services/azure-file
 import azureStorageLesson3 from '../courses/azure/03-storage-services/queues-tables-disk-storage.json';
 import azureStorageLesson4 from '../courses/azure/03-storage-services/storage-security-redundancy.json';
 
+import awsFundamentalsLesson1 from '../courses/aws/01-aws-fundamentals-cloud-concepts/what-is-cloud-computing.json';
+import awsFundamentalsLesson2 from '../courses/aws/01-aws-fundamentals-cloud-concepts/aws-global-infrastructure.json';
+import awsFundamentalsLesson3 from '../courses/aws/01-aws-fundamentals-cloud-concepts/aws-management-tools.json';
+import awsFundamentalsLesson4 from '../courses/aws/01-aws-fundamentals-cloud-concepts/aws-well-architected-framework.json';
+import awsIamLesson1 from '../courses/aws/02-identity-access-governance/iam-fundamentals.json';
+import awsIamLesson2 from '../courses/aws/02-identity-access-governance/iam-policies-permissions.json';
+import awsIamLesson3 from '../courses/aws/02-identity-access-governance/aws-organizations.json';
+import awsIamLesson4 from '../courses/aws/02-identity-access-governance/governance-cost-management.json';
+import awsComputeLesson1 from '../courses/aws/03-compute-services/ec2-fundamentals.json';
+import awsComputeLesson2 from '../courses/aws/03-compute-services/ec2-instances-storage.json';
+import awsComputeLesson3 from '../courses/aws/03-compute-services/ec2-auto-scaling.json';
+import awsComputeLesson4 from '../courses/aws/03-compute-services/other-compute-services.json';
+import awsNetworkingLesson1 from '../courses/aws/04-networking/amazon-vpc.json';
+import awsNetworkingLesson2 from '../courses/aws/04-networking/vpc-connectivity.json';
+import awsNetworkingLesson3 from '../courses/aws/04-networking/route53-dns.json';
+import awsNetworkingLesson4 from '../courses/aws/04-networking/cloudfront-cdn.json';
+import awsStorageLesson1 from '../courses/aws/05-storage-services/amazon-s3-basics.json';
+import awsStorageLesson2 from '../courses/aws/05-storage-services/s3-advanced-features.json';
+import awsStorageLesson3 from '../courses/aws/05-storage-services/block-file-storage.json';
+import awsStorageLesson4 from '../courses/aws/05-storage-services/backup-archiving.json';
+
+import awsLesson6_1 from '../courses/aws/06-databases/amazon-rds.json';
+import awsLesson6_2 from '../courses/aws/06-databases/amazon-aurora.json';
+import awsLesson6_3 from '../courses/aws/06-databases/dynamodb-nosql.json';
+import awsLesson6_4 from '../courses/aws/06-databases/other-database-services.json';
+import awsLesson7_1 from '../courses/aws/07-load-balancing-application-integration/elastic-load-balancing.json';
+import awsLesson7_2 from '../courses/aws/07-load-balancing-application-integration/amazon-sqs.json';
+import awsLesson7_3 from '../courses/aws/07-load-balancing-application-integration/amazon-sns-eventbridge.json';
+import awsLesson7_4 from '../courses/aws/07-load-balancing-application-integration/amazon-mq.json';
+import awsLesson8_1 from '../courses/aws/08-serverless/aws-lambda.json';
+import awsLesson8_2 from '../courses/aws/08-serverless/api-gateway.json';
+import awsLesson8_3 from '../courses/aws/08-serverless/step-functions.json';
+import awsLesson8_4 from '../courses/aws/08-serverless/serverless-architecture-patterns.json';
+import awsLesson9_1 from '../courses/aws/09-containers-kubernetes/docker-ecr.json';
+import awsLesson9_2 from '../courses/aws/09-containers-kubernetes/amazon-ecs.json';
+import awsLesson9_3 from '../courses/aws/09-containers-kubernetes/amazon-eks.json';
+import awsLesson9_4 from '../courses/aws/09-containers-kubernetes/app-runner.json';
+import awsLesson10_1 from '../courses/aws/10-devops-cicd/aws-code-tools.json';
+import awsLesson10_2 from '../courses/aws/10-devops-cicd/cloudformation-iac.json';
+import awsLesson10_3 from '../courses/aws/10-devops-cicd/aws-cdk.json';
+import awsLesson10_4 from '../courses/aws/10-devops-cicd/modern-devops-practices.json';
+import awsLesson11_1 from '../courses/aws/11-monitoring-logging-observability/amazon-cloudwatch.json';
+import awsLesson11_2 from '../courses/aws/11-monitoring-logging-observability/aws-cloudtrail.json';
+import awsLesson11_3 from '../courses/aws/11-monitoring-logging-observability/aws-x-ray.json';
+import awsLesson11_4 from '../courses/aws/11-monitoring-logging-observability/observability-architecture.json';
+import awsLesson12_1 from '../courses/aws/12-security-services/aws-kms-secrets-manager.json';
+import awsLesson12_2 from '../courses/aws/12-security-services/systems-manager.json';
+import awsLesson12_3 from '../courses/aws/12-security-services/waf-shield.json';
+import awsLesson12_4 from '../courses/aws/12-security-services/threat-detection-compliance.json';
+import awsLesson13_1 from '../courses/aws/13-analytics-big-data/amazon-redshift.json';
+import awsLesson13_2 from '../courses/aws/13-analytics-big-data/aws-glue-etl.json';
+import awsLesson13_3 from '../courses/aws/13-analytics-big-data/athena-emr.json';
+import awsLesson13_4 from '../courses/aws/13-analytics-big-data/opensearch-quicksight.json';
+import awsLesson14_1 from '../courses/aws/14-ai-machine-learning/amazon-bedrock.json';
+import awsLesson14_2 from '../courses/aws/14-ai-machine-learning/amazon-sagemaker.json';
+import awsLesson14_3 from '../courses/aws/14-ai-machine-learning/aws-ai-services.json';
+import awsLesson14_4 from '../courses/aws/14-ai-machine-learning/generative-ai-architecture.json';
+import awsLesson15_1 from '../courses/aws/15-developer-tools-application-services/aws-sdk-appconfig.json';
+import awsLesson15_2 from '../courses/aws/15-developer-tools-application-services/email-communication.json';
+import awsLesson15_3 from '../courses/aws/15-developer-tools-application-services/api-integration.json';
+import awsLesson15_4 from '../courses/aws/15-developer-tools-application-services/web-mobile-amplify.json';
+
 import cleanCodeLesson1 from '../courses/clean-code-csharp/01-solid-principles/single-responsibility.json';
 import cleanCodeLesson2 from '../courses/clean-code-csharp/01-solid-principles/open-closed.json';
 import cleanCodeLesson3 from '../courses/clean-code-csharp/01-solid-principles/liskov-substitution.json';
@@ -921,6 +983,27 @@ import csLesson8 from '../cheatsheet/javascript/cheatsheet.json';
 import csLesson9 from '../cheatsheet/typescript/cheatsheet.json';
 import csLesson10 from '../cheatsheet/react-router/cheatsheet.json';
 
+import awsLesson1 from '../courses/aws/16-identity-for-applications/01-amazon-cognito-user-pools.json';
+import awsLesson2 from '../courses/aws/16-identity-for-applications/02-cognito-identity-pools.json';
+import awsLesson3 from '../courses/aws/16-identity-for-applications/03-application-authentication.json';
+import awsLesson4 from '../courses/aws/16-identity-for-applications/04-application-authentication-architecture.json';
+import awsLesson5 from '../courses/aws/17-migration-hybrid-cloud/01-migration-services.json';
+import awsLesson6 from '../courses/aws/17-migration-hybrid-cloud/02-6-rs-migration-strategy.json';
+import awsLesson7 from '../courses/aws/17-migration-hybrid-cloud/03-hybrid-cloud-options.json';
+import awsLesson8 from '../courses/aws/17-migration-hybrid-cloud/04-datasync-snow-family.json';
+import awsLesson9 from '../courses/aws/18-infrastructure-automation/01-cloudformation-advanced.json';
+import awsLesson10 from '../courses/aws/18-infrastructure-automation/02-aws-cdk-advanced.json';
+import awsLesson11 from '../courses/aws/18-infrastructure-automation/03-terraform-aws.json';
+import awsLesson12 from '../courses/aws/18-infrastructure-automation/04-iac-best-practices.json';
+import awsLesson13 from '../courses/aws/19-high-availability-disaster-recovery/01-high-availability-patterns.json';
+import awsLesson14 from '../courses/aws/19-high-availability-disaster-recovery/02-disaster-recovery-strategies.json';
+import awsLesson15 from '../courses/aws/19-high-availability-disaster-recovery/03-multi-region-architecture.json';
+import awsLesson16 from '../courses/aws/19-high-availability-disaster-recovery/04-rto-rpo-planning.json';
+import awsLesson17 from '../courses/aws/20-aws-architecture-design-patterns/01-architecture-patterns.json';
+import awsLesson18 from '../courses/aws/20-aws-architecture-design-patterns/02-design-principles.json';
+import awsLesson19 from '../courses/aws/20-aws-architecture-design-patterns/03-well-architected-deep-dive.json';
+import awsLesson20 from '../courses/aws/20-aws-architecture-design-patterns/04-aws-solutions-architect-patterns.json';
+
 import azureComputeLesson1 from '../courses/azure/02-compute-services/virtual-machines-overview.json';
 import azureComputeLesson2 from '../courses/azure/02-compute-services/app-service-intro.json';
 import azureComputeLesson3 from '../courses/azure/02-compute-services/azure-functions-serverless.json';
@@ -1060,11 +1143,29 @@ const rawLessons = [
   iqLessonSystemQ15,
   iqLessonR01, iqLessonR02, iqLessonR03,
   iqLessonT01, iqLessonT02,
-  fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10,
-  fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19,
-   fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25,
-  csLesson1, csLesson2, csLesson3, csLesson4, csLesson5, csLesson6, csLesson7, csLesson8, csLesson9, csLesson10
-];
+   fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10,
+   fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19,
+    fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25,
+    csLesson1, csLesson2, csLesson3, csLesson4, csLesson5, csLesson6, csLesson7, csLesson8, csLesson9, csLesson10,
+    awsLesson1, awsLesson2, awsLesson3, awsLesson4, awsLesson5, awsLesson6, awsLesson7, awsLesson8,
+    awsLesson9, awsLesson10, awsLesson11, awsLesson12, awsLesson13, awsLesson14, awsLesson15, awsLesson16,
+     awsLesson17, awsLesson18, awsLesson19, awsLesson20,
+     awsFundamentalsLesson1, awsFundamentalsLesson2, awsFundamentalsLesson3, awsFundamentalsLesson4,
+     awsIamLesson1, awsIamLesson2, awsIamLesson3, awsIamLesson4,
+     awsComputeLesson1, awsComputeLesson2, awsComputeLesson3, awsComputeLesson4,
+     awsNetworkingLesson1, awsNetworkingLesson2, awsNetworkingLesson3, awsNetworkingLesson4,
+     awsStorageLesson1, awsStorageLesson2, awsStorageLesson3, awsStorageLesson4,
+     awsLesson6_1, awsLesson6_2, awsLesson6_3, awsLesson6_4,
+    awsLesson7_1, awsLesson7_2, awsLesson7_3, awsLesson7_4,
+    awsLesson8_1, awsLesson8_2, awsLesson8_3, awsLesson8_4,
+    awsLesson9_1, awsLesson9_2, awsLesson9_3, awsLesson9_4,
+     awsLesson10_1, awsLesson10_2, awsLesson10_3, awsLesson10_4,
+     awsLesson11_1, awsLesson11_2, awsLesson11_3, awsLesson11_4,
+     awsLesson12_1, awsLesson12_2, awsLesson12_3, awsLesson12_4,
+     awsLesson13_1, awsLesson13_2, awsLesson13_3, awsLesson13_4,
+     awsLesson14_1, awsLesson14_2, awsLesson14_3, awsLesson14_4,
+     awsLesson15_1, awsLesson15_2, awsLesson15_3, awsLesson15_4
+  ];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 
