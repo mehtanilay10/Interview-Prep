@@ -1,0 +1,301 @@
+{
+  "id": "lesson-devops-010",
+  "slug": "helm-charts",
+  "moduleSlug": "kubernetes-advanced",
+  "title": "Packaging Apps with Helm Charts",
+  "description": "Package and deploy complex applications using Helm, the Kubernetes package manager.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": [
+    "kubernetes",
+    "helm",
+    "charts",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Helm?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Helm** is the package manager for Kubernetes. It lets you define, install, and upgrade even the most complex Kubernetes applications using **charts** — packages of pre-configured Kubernetes resources. Think of Helm as `apt` or `npm`, but for Kubernetes."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Chart",
+            "definition": "A Helm package containing all the Kubernetes manifests and configuration for an application."
+          },
+          {
+            "term": "Release",
+            "definition": "An instance of a chart running in a cluster — like running a package."
+          },
+          {
+            "term": "Values",
+            "definition": "A YAML file that customizes a chart's templates during installation."
+          },
+          {
+            "term": "Repository",
+            "definition": "A collection of charts that can be shared and used by others."
+          },
+          {
+            "term": "Template",
+            "definition": "A Go-template-based manifest file that gets rendered with values."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Helm vs YAML Manifests"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Managing raw YAML files for every environment quickly becomes unwieldy. You end up with dozens of files and manual find-and-replace. Helm solves this by parameterizing your manifests with values, so a single chart can work across development, staging, and production."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Helm vs raw manifests",
+        "cards": [
+          {
+            "title": "Raw YAML",
+            "description": "Static manifests applied with kubectl.",
+            "tags": [
+              "Simple",
+              "No extra tooling"
+            ],
+            "pros": [
+              "No learning curve",
+              "Direct inspection"
+            ],
+            "cons": [
+              "Duplicated files per environment",
+              "Manual updates"
+            ]
+          },
+          {
+            "title": "Helm",
+            "description": "Parameterized charts with values files.",
+            "tags": [
+              "Reusable",
+              "Versioned"
+            ],
+            "pros": [
+              "One chart, many environments",
+              "Versioning and rollbacks",
+              "Dependency management"
+            ],
+            "cons": [
+              "Additional tooling to learn",
+              "Debugging template rendering"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-helm-lifecycle",
+        "caption": "Helm release lifecycle from install to rollback.",
+        "definition": "graph LR\n    A[helm install] --> B[Release created]\n    B --> C[helm upgrade]\n    C --> D[New revision]\n    D --> E[helm rollback]\n    E --> B\n    F[helm uninstall] --> G[Release removed]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating Your First Chart"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scaffolding a Helm chart",
+        "content": "Create a new chart and inspect its directory structure.",
+        "code": "helm create myapp\n\nmyapp/\n  Chart.yaml\n  values.yaml\n  templates/\n    deployment.yaml\n    service.yaml\n    _helpers.tpl",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `Chart.yaml` file contains metadata about the chart. The `values.yaml` file holds default configuration. The `templates/` directory contains the Kubernetes manifest templates."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Chart.yaml"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Chart metadata",
+        "content": "The Chart.yaml describes the chart and its dependencies.",
+        "code": "apiVersion: v2\nname: myapp\nversion: 0.1.0\nappVersion: \"1.0\"\ndescription: A Helm chart for MyApp\nkeywords:\n  - web\n  - api\ndependencies:\n  - name: postgresql\n    version: 15.x.x\n    repository: https://charts.bitnami.com/bitnami",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "values.yaml"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Default chart values",
+        "content": "Define configurable parameters that templates reference.",
+        "code": "replicaCount: 3\nimage:\n  repository: myapp\n  tag: \"1.0\"\n  pullPolicy: IfNotPresent\nservice:\n  type: ClusterIP\n  port: 80\nresources:\n  limits:\n    cpu: 500m\n    memory: 512Mi\n  requests:\n    cpu: 100m\n    memory: 256Mi",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Templates"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deployment template",
+        "content": "Use Go-style template variables to make manifests configurable.",
+        "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  selector:\n    matchLabels:\n      app: {{ .Release.Name }}\n  template:\n    metadata:\n      labels:\n        app: {{ .Release.Name }}\n    spec:\n      containers:\n      - name: {{ .Release.Name }}\n        image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n        ports:\n        - containerPort: 80",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Installing and Managing Releases"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Helm lifecycle commands",
+        "content": "Install, upgrade, and roll back Helm releases.",
+        "code": "# Install (or upgrade)\nhelm install myapp ./myapp\nhelm upgrade myapp ./myapp\nhelm upgrade --install myapp ./myapp\n\n# Upgrade with custom values\nhelm upgrade --install myapp ./myapp -f values-prod.yaml\n\n# Rollback\nhelm rollback myapp 1\n\n# List and uninstall\nhelm list\nhelm uninstall myapp",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Command",
+          "Purpose"
+        ],
+        "rows": [
+          [
+            "helm install",
+            "Deploy a new release"
+          ],
+          [
+            "helm upgrade",
+            "Update an existing release"
+          ],
+          [
+            "helm upgrade --install",
+            "Install or upgrade idempotently"
+          ],
+          [
+            "helm rollback",
+            "Rollback to a previous revision"
+          ],
+          [
+            "helm list",
+            "List all releases in the namespace"
+          ],
+          [
+            "helm uninstall",
+            "Delete a release"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Helm repos",
+        "text": "You can also install charts from existing repositories, e.g., `helm install my-redis bitnami/redis`. Use `helm repo add` to register new repos and `helm search` to find charts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Chart dependencies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Charts can declare dependencies on other charts, listed in `Chart.yaml`. Helm resolves and downloads them automatically, making it easy to compose complex applications like a web app with a database."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Package and deploy with Helm",
+        "description": "Create, customize, and deploy a Helm chart.",
+        "steps": [
+          "Run `helm create myblog` to scaffold a chart.",
+          "Customize `values.yaml` with your own image and replica count.",
+          "Run `helm install myblog ./myblog`.",
+          "Check the release: `helm list` and `kubectl get pods`.",
+          "Modify a value in `values.yaml` and run `helm upgrade`.",
+          "Verify the rolling update completed.",
+          "Run `helm uninstall myblog` to clean up."
+        ],
+        "expectedOutcome": "You've deployed a chart with Helm, customized its values, and performed a rolling upgrade."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Helm is the package manager for Kubernetes — charts package manifests and configuration together.",
+          "A chart has Chart.yaml metadata, values.yaml defaults, and template manifests.",
+          "Use `helm install` to deploy and `helm upgrade` to update with rolling changes.",
+          "Helm supports rollbacks, dependencies, and reusable repositories."
+        ],
+        "takeaway": "Helm turns complex Kubernetes deployments into versioned, shareable packages."
+      }
+    }
+  ],
+  "courseSlug": "devops"
+}

@@ -749,6 +749,24 @@ import oopLesson24 from '../courses/oops-concepts/06-interfaces-abstract-classes
 import oopLesson25 from '../courses/oops-concepts/07-design-principles/solid-principles.json';
 import oopLesson26 from '../courses/oops-concepts/07-design-principles/dry-principle.json';
 
+import devOpsLesson1 from '../courses/devops/01-docker-fundamentals/01-what-is-docker.json';
+import devOpsLesson2 from '../courses/devops/01-docker-fundamentals/02-docker-images-containers.json';
+import devOpsLesson3 from '../courses/devops/01-docker-fundamentals/03-dockerfile-basics.json';
+import devOpsLesson4 from '../courses/devops/02-docker-advanced/01-docker-compose-multi-container.json';
+import devOpsLesson5 from '../courses/devops/02-docker-advanced/02-docker-volumes-networks.json';
+import devOpsLesson6 from '../courses/devops/03-kubernetes-fundamentals/01-what-is-kubernetes.json';
+import devOpsLesson7 from '../courses/devops/03-kubernetes-fundamentals/02-pods-deployments-services.json';
+import devOpsLesson8 from '../courses/devops/03-kubernetes-fundamentals/03-kubectl-commands.json';
+import devOpsLesson9 from '../courses/devops/04-kubernetes-advanced/01-configmaps-secrets-ingress.json';
+import devOpsLesson10 from '../courses/devops/04-kubernetes-advanced/02-helm-charts.json';
+import devOpsLesson11 from '../courses/devops/05-ci-cd-fundamentals/01-ci-cd-concepts.json';
+import devOpsLesson12 from '../courses/devops/05-ci-cd-fundamentals/02-jenkins-basics.json';
+import devOpsLesson13 from '../courses/devops/05-ci-cd-fundamentals/03-jenkins-pipelines.json';
+import devOpsLesson14 from '../courses/devops/06-ci-cd-modern-tools/01-github-actions-workflows.json';
+import devOpsLesson15 from '../courses/devops/06-ci-cd-modern-tools/02-gitlab-ci-pipelines.json';
+import devOpsLesson16 from '../courses/devops/02-docker-advanced/03-docker-security.json';
+import devOpsLesson17 from '../courses/devops/04-kubernetes-advanced/03-k8s-monitoring-observability.json';
+
 import iqLessonB01 from '../interview-qa/01-beginner-questions/beginner-q1.json';
 import iqLessonB02 from '../interview-qa/01-beginner-questions/beginner-q2.json';
 import iqLessonB03 from '../interview-qa/01-beginner-questions/beginner-q3.json';
@@ -1030,7 +1048,11 @@ const rawLessons = [
   fsLesson1, fsLesson2, fsLesson3, fsLesson4, fsLesson5, fsLesson6, fsLesson7, fsLesson8, fsLesson9, fsLesson10,
   fsLesson11, fsLesson12, fsLesson13, fsLesson14, fsLesson15, fsLesson16, fsLesson17, fsLesson18, fsLesson19,
    fsLesson20, fsLesson21, fsLesson22, fsLesson23, fsLesson24, fsLesson25,
-  csLesson1, csLesson2, csLesson3, csLesson4, csLesson5, csLesson6, csLesson7, csLesson8, csLesson9, csLesson10
+  csLesson1, csLesson2, csLesson3, csLesson4, csLesson5, csLesson6, csLesson7, csLesson8, csLesson9, csLesson10,
+  devOpsLesson1, devOpsLesson2, devOpsLesson3, devOpsLesson4, devOpsLesson5,
+  devOpsLesson6, devOpsLesson7, devOpsLesson8, devOpsLesson9, devOpsLesson10,
+  devOpsLesson11, devOpsLesson12, devOpsLesson13, devOpsLesson14, devOpsLesson15,
+  devOpsLesson16, devOpsLesson17
 ];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];

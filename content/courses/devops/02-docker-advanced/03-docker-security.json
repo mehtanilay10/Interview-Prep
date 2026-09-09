@@ -1,0 +1,212 @@
+{
+  "id": "lesson-devops-016",
+  "slug": "docker-security",
+  "moduleSlug": "docker-advanced",
+  "title": "Docker Security Best Practices",
+  "description": "Harden container images with security scanning, least privilege, and image signing.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "docker-security",
+    "container-security",
+    "supply-chain",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Container Security Matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Containers share the host kernel, which means a vulnerability in one container can potentially affect the entire host and other containers running on it. Securing containers involves multiple layers: the image content, the build pipeline, the runtime environment, and the supply chain that delivers images."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Image scanning",
+            "definition": "The process of analyzing container images for known vulnerabilities (CVEs) in the base image and installed packages."
+          },
+          {
+            "term": "Least privilege",
+            "definition": "Running containers with the minimum permissions necessary, avoiding root or privileged mode."
+          },
+          {
+            "term": "Content trust",
+            "definition": "A Docker feature that ensures images are signed by trusted publishers before they can be pulled."
+          },
+          {
+            "term": "CVE",
+            "definition": "Common Vulnerabilities and Exposures — a shared list of publicly disclosed cybersecurity vulnerabilities."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Security in the Dockerfile"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Secure Dockerfile practices",
+        "content": "A Dockerfile that follows security best practices: minimal base, specific user, small attack surface.",
+        "code": "FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled-alpine\n\nWORKDIR /app\n\nCOPY --chown=appuser:appgroup app/ .\n\nUSER appuser\n\nEXPOSE 80\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]",
+        "language": "dockerfile"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use distroless or alpine images",
+        "text": "Distroless and Alpine-based images contain only your application and its dependencies — no package manager, shell, or other binaries. This dramatically reduces the attack surface."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Base image security",
+        "cards": [
+          {
+            "title": "Full OS image (e.g., ubuntu)",
+            "description": "Contains a full Linux distribution with package manager and many binaries.",
+            "tags": ["Large", "Familiar"],
+            "pros": ["Easy to debug", "Familiar tools available"],
+            "cons": ["Large attack surface", "More CVEs to fix"]
+          },
+          {
+            "title": "Distroless (e.g., gcr.io/distroless)",
+            "description": "Contains only your application — no shell, package manager, or OS tools.",
+            "tags": ["Minimal", "Secure"],
+            "pros": ["Smallest attack surface", "Hard to compromise"],
+            "cons": ["Cannot debug inside container", "Requires advanced troubleshooting"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Image Scanning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Image scanners check your container images against databases of known vulnerabilities. They scan every layer of the image — including the base image, installed packages, and application dependencies."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Tool", "Integration", "Best For"],
+        "rows": [
+          ["Trivy", "CLI, CI/CD, Docker Scout", "Open-source, comprehensive"],
+          ["Clair", "CI/CD, API", "Container-native, API-driven"],
+          ["Anchore", "CI/CD, Enterprise", "Policy enforcement, SBOM"],
+          ["Docker Scout", "Docker Hub, CLI", "Integrated with Docker ecosystem"],
+          ["Aqua Trivy", "CI/CD, Kubernetes", "Kubernetes-native, runtime protection"]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scanning with Trivy",
+        "content": "Install Trivy and scan a container image for vulnerabilities.",
+        "code": "# Install Trivy\nbrew install aquasecurity/trivy/trivy\n\n# Scan a local image\ntrive image --severity HIGH,CRITICAL myapp:latest\n\n# Scan in CI (GitHub Actions)\n- name: Scan image\n  uses: aquasecurity/trivy-action@master\n  with:\n    image-ref: 'myapp:${{ github.sha }}'\n    severity: 'HIGH,CRITICAL'\n    exit-code: '1'",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Supply Chain Security"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Docker Content Trust** (DCT) uses Notary to sign and verify image publishers. When enabled, you can only pull images that have been signed by trusted authorities. Similarly, you should pin images to specific digests rather than tags to guarantee the exact image you tested is what runs in production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enabling Docker Content Trust",
+        "content": "Set the environment variable to enable image signing verification.",
+        "code": "# Enable content trust\nexport DOCKER_CONTENT_TRUST=1\n\n# Sign an image during push\ndocker trust sign myapp:latest\n\n# Verify signatures\n docker trust inspect myapp:latest",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Pin by digest, not tag",
+        "text": "Tags can be overwritten after you've tested them. Always reference production images by their digest (e.g., `myapp@sha256:abc123...`) to ensure immutability."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-docker-security-lifecycle",
+        "caption": "The container security lifecycle: build securely, scan early, sign, and verify at runtime.",
+        "definition": "graph LR\n    A[Build with secure Dockerfile] --> B[Scan for CVEs]\n    B --> C[Sign image]\n    C --> D[Push to registry]\n    D --> E[Deploy to cluster]\n    E --> F[Runtime monitoring]\n    style A fill:#4D90DD,stroke:#333\n    style F fill:#F44336,stroke:#333,color:#fff"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Harden a container image",
+        "description": "Apply security best practices to an existing image.",
+        "steps": [
+          "Review your Dockerfile: is it using a minimal base image?",
+          "Add a non-root USER to the Dockerfile.",
+          "Create a .dockerignore file to exclude sensitive files.",
+          "Scan the image with Trivy: `trivy image myapp:latest`.",
+          "Fix any HIGH or CRITICAL findings.",
+          "Re-build and re-scan until clean."
+        ],
+        "expectedOutcome": "A hardened container image with no critical vulnerabilities and a non-root user."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Start from minimal base images (distroless, Alpine) to reduce attack surface.",
+          "Never run containers as root — always create and use a non-root user.",
+          "Scan images for CVEs in CI before pushing to a registry.",
+          "Pin images by digest and enable Docker Content Trust for supply chain security.",
+          "Security is a lifecycle — secure the build, scan during CI, and monitor at runtime."
+        ],
+        "takeaway": "Container security is not optional — bake it into your build pipeline from day one."
+      }
+    }
+  ],
+  "courseSlug": "devops"
+}

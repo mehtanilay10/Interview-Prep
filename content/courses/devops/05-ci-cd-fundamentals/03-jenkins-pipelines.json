@@ -1,0 +1,279 @@
+{
+  "id": "lesson-devops-013",
+  "slug": "jenkins-pipelines",
+  "moduleSlug": "ci-cd-fundamentals",
+  "title": "Jenkins Declarative Pipelines",
+  "description": "Write robust Jenkins pipelines using the declarative syntax with stages, steps, and environment management.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": [
+    "jenkins",
+    "pipeline",
+    "jenkinsfile",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is a Jenkins Pipeline?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **Jenkins Pipeline** is a code-based representation of your CI/CD workflow. Pipelines are defined in a `Jenkinsfile` that lives alongside your application code in version control. This approach — Infrastructure as Code for your build process — makes your pipeline reviewable, versioned, and consistent across environments."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There are two syntaxes: **Declarative Pipeline** (recommended, structured) and **Scripted Pipeline** (older, Groovy-based). This lesson focuses on Declarative Pipeline."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Declarative Pipeline Structure"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A complete Jenkinsfile",
+        "content": "This pipeline builds, tests, and deploys a Node.js application.",
+        "code": "pipeline {\n    agent any\n\n    environment {\n        NODE_ENV = 'production'\n        DOCKER_IMAGE = 'myapp:${BUILD_NUMBER}'\n    }\n\n    stages {\n        stage('Checkout') {\n            steps {\n                checkout scm\n            }\n        }\n        stage('Build') {\n            steps {\n                sh 'npm install'\n                sh 'npm run build'\n            }\n        }\n        stage('Test') {\n            steps {\n                sh 'npm test'\n            }\n            post {\n                always {\n                    junit '**/test-results.xml'\n                    archiveArtifacts artifacts: 'dist/**', fingerprint: true\n                }\n            }\n        }\n        stage('Build Image') {\n            steps {\n                script {\n                    docker.build(DOCKER_IMAGE)\n                }\n            }\n        }\n        stage('Push to Registry') {\n            steps {\n                script {\n                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub')\n                    docker.image(DOCKER_IMAGE).push()\n                }\n            }\n        }\n        stage('Deploy') {\n            steps {\n                sh './deploy.sh'\n            }\n        }\n    }\n\n    post {\n        always {\n            cleanWs()\n        }\n        success {\n            echo 'Pipeline succeeded!'\n        }\n        failure {\n            echo 'Pipeline failed!'\n            mail to: 'team@example.com', subject: 'Build Failed', body: 'See ${BUILD_URL}'\n        }\n    }\n}",
+        "language": "groovy"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Key sections"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Section",
+          "Purpose"
+        ],
+        "rows": [
+          [
+            "pipeline { }",
+            "Root block; wraps the entire pipeline"
+          ],
+          [
+            "agent any",
+            "Specifies where to run stages (any available agent)"
+          ],
+          [
+            "environment { }",
+            "Defines environment variables available to all stages"
+          ],
+          [
+            "stages { }",
+            "Container for the sequence of build stages"
+          ],
+          [
+            "stage('Name') { }",
+            "A named phase of the pipeline with its own steps"
+          ],
+          [
+            "steps { }",
+            "The actual commands/scripts to execute"
+          ],
+          [
+            "post { }",
+            "Actions to run after pipeline completion (success, failure, always)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Stage",
+            "definition": "A named phase of the pipeline (e.g., build, test, deploy) containing one or more steps."
+          },
+          {
+            "term": "Step",
+            "definition": "The smallest unit of work — a single command, action, or script invocation."
+          },
+          {
+            "term": "Agent",
+            "definition": "Specifies where (which node or container) the pipeline or stage executes."
+          },
+          {
+            "term": "Post",
+            "definition": "Actions that run after the pipeline completes, based on success, failure, or always."
+          },
+          {
+            "term": "When",
+            "definition": "A conditional directive that controls whether a stage executes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Agent Directives"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `agent` directive tells Jenkins where to run the pipeline. `agent any` runs on any available node. You can also use `agent none` at the top level and specify agents per-stage, or target specific labeled agents."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Agent per stage",
+        "content": "Run some stages on a specific node label and others anywhere.",
+        "code": "pipeline {\n    agent none\n\n    stages {\n        stage('Build') {\n            agent any\n            steps { sh 'npm run build' }\n        }\n        stage('Docker Build') {\n            agent { label 'docker' }\n            steps { sh 'docker build -t myapp .' }\n        }\n    }\n}",
+        "language": "groovy"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-jenkins-pipeline-flow",
+        "caption": "Declarative pipeline stages flow from build through test to deploy and post-actions.",
+        "definition": "graph TD\n    A[Pipeline] --> B[Agent]\n    A --> C[Environment]\n    A --> D[Stages]\n    D --> E[Stage: Build]\n    D --> F[Stage: Test]\n    D --> G[Stage: Deploy]\n    G --> H[Post Actions]\n    style D fill:#4D90DD,stroke:#333"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Conditionals and Parallel Stages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can make stages conditional with `when` directives and run them in parallel to speed up builds."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Parallel and conditional stages",
+        "content": "Run tests in parallel and deploy only on the main branch.",
+        "code": "stage('Test') {\n    parallel {\n        stage('Unit Tests') { steps { sh 'npm run test:unit' } }\n        stage('Integration') { steps { sh 'npm run test:integration' } }\n    }\n}\n\nstage('Deploy to Prod') {\n    when {\n        branch 'main'\n        environment name: 'DEPLOY_PROD', value: 'true'\n    }\n    steps {\n        sh './deploy.sh'\n    }\n}",
+        "language": "groovy"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Post-build actions",
+        "text": "Always define a post-build section with cleanup steps. Use `always { cleanWs() }` to clean the workspace, and notify the team on `success` or `failure`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Environment variables"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "`BUILD_NUMBER` — Unique number for this pipeline run.",
+          "`BUILD_URL` — Full URL to the build results.",
+          "`GIT_COMMIT` — The commit hash the build is based on.",
+          "`JOB_NAME` — Full name of the Jenkins job.",
+          "`WORKSPACE` — Path to the workspace directory."
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Declarative vs Scripted Pipeline",
+        "cards": [
+          {
+            "title": "Declarative",
+            "description": "Structured syntax with clear sections; recommended for most teams.",
+            "tags": ["Structured", "Recommended"],
+            "pros": ["Easier to read", "Built-in error checking", "Faster to write"],
+            "cons": ["Less flexible", "Opinionated structure"]
+          },
+          {
+            "title": "Scripted",
+            "description": "Full Groovy-based syntax for complex custom logic.",
+            "tags": ["Flexible", "Groovy"],
+            "pros": ["Maximum control", "Fine-grained logic"],
+            "cons": ["Steep learning curve", "Harder to maintain"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Multibranch Pipeline Project"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For Git projects, use a **Multibranch Pipeline** job. Jenkins scans the repository, finds branches with a `Jenkinsfile`, and creates a separate pipeline job for each one. This lets you run different pipelines for feature branches, staging, and main."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Write a multistage pipeline",
+        "description": "Create a Jenkinsfile for a simple application.",
+        "steps": [
+          "Choose a simple app (e.g., a Node.js or Python project).",
+          "Write a `Jenkinsfile` with Checkout, Build, Test, and Deploy stages.",
+          "Add environment variables for version and image name.",
+          "Add a post section that sends a notification on failure.",
+          "Set up a Multibranch Pipeline job in Jenkins pointing at your repo.",
+          "Push a change and watch the pipeline execute."
+        ],
+        "expectedOutcome": "A working multistage pipeline that builds, tests, and deploys your app."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Pipelines as code (Jenkinsfile) are versioned, reviewable, and consistent.",
+          "Structure pipelines with agent, environment, stages, and post sections.",
+          "Use `when` for conditionals and `parallel` for faster test runs.",
+          "Multibranch Pipeline jobs automatically discover and build branches.",
+          "Always clean up workspaces and notify the team on pipeline status."
+        ],
+        "takeaway": "Declarative pipelines give you a readable, maintainable way to automate your entire CI/CD workflow."
+      }
+    }
+  ],
+  "courseSlug": "devops"
+}
