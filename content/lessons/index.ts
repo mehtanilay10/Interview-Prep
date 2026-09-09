@@ -1094,6 +1094,8 @@ import csLesson7 from "../cheatsheet/docker-compose/cheatsheet.json";
 import csLesson8 from "../cheatsheet/javascript/cheatsheet.json";
 import csLesson9 from "../cheatsheet/typescript/cheatsheet.json";
 import csLesson10 from "../cheatsheet/react-router/cheatsheet.json";
+import csLesson11 from '../cheatsheet/aws/cheatsheet.json';
+import csLesson12 from '../cheatsheet/azure/cheatsheet.json';
 
 import awsLesson1 from "../courses/aws/16-identity-for-applications/01-amazon-cognito-user-pools.json";
 import awsLesson2 from "../courses/aws/16-identity-for-applications/02-cognito-identity-pools.json";
@@ -2199,6 +2201,7 @@ const rawLessons = [
 	csLesson8,
 	csLesson9,
 	csLesson10,
+	csLesson11, csLesson12,
 	awsLesson1,
 	awsLesson2,
 	awsLesson3,
@@ -2318,6 +2321,7 @@ const rawLessons = [
 	csLesson8,
 	csLesson9,
 	csLesson10,
+	csLesson11, csLesson12,
 	devOpsLesson1,
 	devOpsLesson2,
 	devOpsLesson3,

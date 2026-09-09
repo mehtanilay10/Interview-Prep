@@ -408,6 +408,7 @@ const rawModules = [
 	csModule8,
 	csModule9,
 	csModule10,
+	csModule11, csModule12,
 	devOpsModule1,
 	devOpsModule2,
 	devOpsModule3,
@@ -486,3 +487,5 @@ import csModule7 from "../cheatsheet/docker-compose/content.json";
 import csModule8 from "../cheatsheet/javascript/content.json";
 import csModule9 from "../cheatsheet/typescript/content.json";
 import csModule10 from "../cheatsheet/react-router/content.json";
+import csModule11 from '../cheatsheet/aws/content.json';
+import csModule12 from '../cheatsheet/azure/content.json';
