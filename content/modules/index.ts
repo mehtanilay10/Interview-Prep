@@ -212,6 +212,7 @@ const rawModules = [sqlModule1, sqlModule2, sqlModule3, sqlModule4, sqlModule5, 
   iqModule1, iqModule2, iqModule3, iqModule4, iqModule5, iqModule6, iqModule7,
   fsModule1, fsModule2, fsModule3, fsModule4, fsModule5, fsModule6, fsModule7, fsModule8,
   csModule1, csModule2, csModule3, csModule4, csModule5, csModule6, csModule7, csModule8, csModule9, csModule10,
+  csModule11, csModule12,
   azureModule1, azureModule2, azureModule3, azureModule4, azureModule5, awsModule6, awsModule7,
   awsModule1, awsModule2, awsModule3, awsModule4, awsModule5, awsModule6, awsModule7, awsModule8, awsModule9, awsModule10, awsModule11, awsModule12, awsModule13, awsModule14, awsModule15,
   awsModule16, awsModule17, awsModule18, awsModule19, awsModule20
@@ -256,3 +257,5 @@ import csModule7 from '../cheatsheet/docker-compose/content.json';
 import csModule8 from '../cheatsheet/javascript/content.json';
 import csModule9 from '../cheatsheet/typescript/content.json';
 import csModule10 from '../cheatsheet/react-router/content.json';
+import csModule11 from '../cheatsheet/aws/content.json';
+import csModule12 from '../cheatsheet/azure/content.json';
