@@ -618,6 +618,28 @@ import authLesson12 from '../courses/authentication-authorization/04-oauth/exter
 import authLesson13 from '../courses/authentication-authorization/04-oauth/oauth-overview.json';
 import authLesson14 from '../courses/authentication-authorization/04-oauth/openid-connect.json';
 
+import azureFundamentalsLesson1 from '../courses/azure/01-azure-fundamentals/what-is-azure.json';
+import azureFundamentalsLesson2 from '../courses/azure/01-azure-fundamentals/azure-subscriptions-resource-groups.json';
+import azureFundamentalsLesson3 from '../courses/azure/01-azure-fundamentals/azure-portal-navigation.json';
+import azureFundamentalsLesson4 from '../courses/azure/01-azure-fundamentals/azure-regions-availability-zones.json';
+import azureNetworkingLesson1 from '../courses/azure/04-networking-services/virtual-networks-subnets.json';
+import azureNetworkingLesson2 from '../courses/azure/04-networking-services/network-security-groups.json';
+import azureNetworkingLesson3 from '../courses/azure/04-networking-services/load-balancers-application-gateway.json';
+import azureNetworkingLesson4 from '../courses/azure/04-networking-services/vpn-gateway-cdn.json';
+import azureLesson1 from '../courses/azure/06-security-identity/entra-id-basics.json';
+import azureLesson2 from '../courses/azure/06-security-identity/rbac-permissions.json';
+import azureLesson3 from '../courses/azure/06-security-identity/key-vault-secrets.json';
+import azureLesson4 from '../courses/azure/06-security-identity/microsoft-defender-sentinel.json';
+import azureAiLesson1 from '../courses/azure/07-ai-ml-services/cognitive-services-overview.json';
+import azureAiLesson2 from '../courses/azure/07-ai-ml-services/azure-openai-service.json';
+import azureAiLesson3 from '../courses/azure/07-ai-ml-services/machine-learning-studio.json';
+import azureAiLesson4 from '../courses/azure/07-ai-ml-services/ai-search-vector-search.json';
+
+import azureStorageLesson1 from '../courses/azure/03-storage-services/blob-storage-basics.json';
+import azureStorageLesson2 from '../courses/azure/03-storage-services/azure-files-shares.json';
+import azureStorageLesson3 from '../courses/azure/03-storage-services/queues-tables-disk-storage.json';
+import azureStorageLesson4 from '../courses/azure/03-storage-services/storage-security-redundancy.json';
+
 import cleanCodeLesson1 from '../courses/clean-code-csharp/01-solid-principles/single-responsibility.json';
 import cleanCodeLesson2 from '../courses/clean-code-csharp/01-solid-principles/open-closed.json';
 import cleanCodeLesson3 from '../courses/clean-code-csharp/01-solid-principles/liskov-substitution.json';
@@ -899,6 +921,11 @@ import csLesson8 from '../cheatsheet/javascript/cheatsheet.json';
 import csLesson9 from '../cheatsheet/typescript/cheatsheet.json';
 import csLesson10 from '../cheatsheet/react-router/cheatsheet.json';
 
+import azureComputeLesson1 from '../courses/azure/02-compute-services/virtual-machines-overview.json';
+import azureComputeLesson2 from '../courses/azure/02-compute-services/app-service-intro.json';
+import azureComputeLesson3 from '../courses/azure/02-compute-services/azure-functions-serverless.json';
+import azureComputeLesson4 from '../courses/azure/02-compute-services/containers-aks-container-apps.json';
+
 const rawLessons = [
   sqlLesson1, sqlLesson2, sqlLesson3, sqlLesson4, sqlLesson5, sqlLesson6, sqlLesson7, sqlLesson8,
   sqlLesson9, sqlLesson10, sqlLesson11, sqlLesson12, sqlLesson13, sqlLesson14, sqlLesson15, sqlLesson16,
@@ -981,6 +1008,12 @@ const rawLessons = [
   webApiLesson22, webApiLesson23, webApiLesson24, webApiLesson25,
   authLesson1, authLesson2, authLesson3, authLesson4, authLesson5, authLesson6, authLesson7, authLesson8,
   authLesson9, authLesson10, authLesson11, authLesson12, authLesson13, authLesson14,
+  azureFundamentalsLesson1, azureFundamentalsLesson2, azureFundamentalsLesson3, azureFundamentalsLesson4,
+  azureLesson1, azureLesson2, azureLesson3, azureLesson4,
+  azureAiLesson1, azureAiLesson2, azureAiLesson3, azureAiLesson4,
+  azureStorageLesson1, azureStorageLesson2, azureStorageLesson3, azureStorageLesson4,
+  azureComputeLesson1, azureComputeLesson2, azureComputeLesson3, azureComputeLesson4,
+  azureNetworkingLesson1, azureNetworkingLesson2, azureNetworkingLesson3, azureNetworkingLesson4,
   cleanCodeLesson1, cleanCodeLesson2, cleanCodeLesson3, cleanCodeLesson4, cleanCodeLesson5, cleanCodeLesson6,
   cleanCodeLesson7, cleanCodeLesson8, cleanCodeLesson9, cleanCodeLesson10, cleanCodeLesson11, cleanCodeLesson12,
   cleanCodeLesson13, cleanCodeLesson14, cleanCodeLesson15, cleanCodeLesson16, cleanCodeLesson17, cleanCodeLesson18,
