@@ -23,7 +23,8 @@ const FOOTER_LINKS: FooterColumn[] = [
     links: [
       { href: '/courses', label: 'All Courses' },
       { href: '/cheatsheet', label: 'Cheat Sheets' },
-      { href: '/problems', label: 'Problems' },
+      { href: '/problems', label: 'C# Problems' },
+      { href: '/sql-problems', label: 'SQL Problems' },
       { href: '/interview-questions', label: 'Interview Questions' },
       { href: '/search', label: 'Search' },
     ],
@@ -32,7 +33,8 @@ const FOOTER_LINKS: FooterColumn[] = [
     heading: 'Resources',
     links: [
       { href: '/courses', label: 'Learning Paths' },
-      { href: '/problems', label: 'Coding Problems' },
+      { href: '/problems', label: 'C# Coding Problems' },
+      { href: '/sql-problems', label: 'SQL Server Problems' },
       { href: '/interview-questions', label: 'Interview Q&A' },
       { href: '/cheatsheet', label: 'Quick References' },
     ],

@@ -415,6 +415,9 @@ const rawModules = [
 	problemModule4,
 	problemModule5,
 	problemModule6,
+	sqlProblemsModule1,
+	sqlProblemsModule2,
+	sqlProblemsModule3,
 	devOpsModule1,
 	devOpsModule2,
 	devOpsModule3,
@@ -502,3 +505,7 @@ import problemModule3 from "../problems/03-linked-list-problems/content.json";
 import problemModule4 from "../problems/04-tree-graph-problems/content.json";
 import problemModule5 from "../problems/05-dynamic-programming-problems/content.json";
 import problemModule6 from "../problems/06-sorting-searching-problems/content.json";
+
+import sqlProblemsModule1 from "../sql-problems/01-sql-basics/content.json";
+import sqlProblemsModule2 from "../sql-problems/02-sql-intermediate/content.json";
+import sqlProblemsModule3 from "../sql-problems/03-sql-advanced/content.json";

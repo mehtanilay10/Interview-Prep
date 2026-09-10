@@ -8,10 +8,10 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { getModuleBySlug, getLessonBySlug, getModulesForCourse, getLessonsForModule } from '@/lib/content';
 
 export async function generateStaticParams() {
-  const modules = getModulesForCourse('problems');
+  const modules = getModulesForCourse('csharp-problems');
   const params: { moduleSlug: string; lessonSlug: string }[] = [];
   for (const mod of modules) {
-    const lessons = getLessonsForModule(mod.slug, 'problems');
+    const lessons = getLessonsForModule(mod.slug, 'csharp-problems');
     for (const lesson of lessons) {
       params.push({ moduleSlug: mod.slug, lessonSlug: lesson.slug });
     }
@@ -35,7 +35,7 @@ export default async function ProblemDetailPage({ params }: { params: Promise<{ 
   const mod = getModuleBySlug(moduleSlug);
   const lesson = getLessonBySlug(lessonSlug);
 
-  if (!mod || !lesson || mod.courseSlug !== 'problems' || lesson.courseSlug !== 'problems') {
+  if (!mod || !lesson || mod.courseSlug !== 'csharp-problems' || lesson.courseSlug !== 'csharp-problems') {
     notFound();
   }
 
@@ -43,7 +43,7 @@ export default async function ProblemDetailPage({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <Breadcrumbs
         items={[
-          { label: 'Coding Problems', href: '/problems' },
+          { label: 'C# Problems', href: '/problems' },
           { label: mod.title, href: `/problems/${moduleSlug}` },
           { label: lesson.title },
         ]}
