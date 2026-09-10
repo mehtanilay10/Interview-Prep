@@ -8,7 +8,8 @@ import { getModuleBySlug, getLessonsForModule, getModulesForCourse } from '@/lib
 import { formatHours } from '@/lib/utils';
 
 const PROBLEM_ICONS: Record<string, string> = {
-  'array-string-problems': '📊',
+  'array-problems': '📊',
+  'string-problems': '📝',
   'linked-list-problems': '🔗',
   'tree-graph-problems': '🌳',
   'dynamic-programming-problems': '📈',
