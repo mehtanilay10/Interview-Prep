@@ -1097,6 +1097,15 @@ import csLesson10 from "../cheatsheet/react-router/cheatsheet.json";
 import csLesson11 from '../cheatsheet/aws/cheatsheet.json';
 import csLesson12 from '../cheatsheet/azure/cheatsheet.json';
 
+import problemLesson1 from "../problems/01-array-string-problems/two-sum.json";
+import problemLesson2 from "../problems/01-array-string-problems/reverse-string.json";
+import problemLesson3 from "../problems/01-array-string-problems/valid-anagram.json";
+import problemLesson4 from "../problems/02-linked-list-problems/reverse-linked-list.json";
+import problemLesson5 from "../problems/02-linked-list-problems/merge-two-sorted-lists.json";
+import problemLesson6 from "../problems/03-tree-graph-problems/maximum-depth-of-binary-tree.json";
+import problemLesson7 from "../problems/04-dynamic-programming-problems/climbing-stairs.json";
+import problemLesson8 from "../problems/05-sorting-searching-problems/binary-search.json";
+
 import awsLesson1 from "../courses/aws/16-identity-for-applications/01-amazon-cognito-user-pools.json";
 import awsLesson2 from "../courses/aws/16-identity-for-applications/02-cognito-identity-pools.json";
 import awsLesson3 from "../courses/aws/16-identity-for-applications/03-application-authentication.json";
@@ -2202,6 +2211,14 @@ const rawLessons = [
 	csLesson9,
 	csLesson10,
 	csLesson11, csLesson12,
+	problemLesson1,
+	problemLesson2,
+	problemLesson3,
+	problemLesson4,
+	problemLesson5,
+	problemLesson6,
+	problemLesson7,
+	problemLesson8,
 	awsLesson1,
 	awsLesson2,
 	awsLesson3,
