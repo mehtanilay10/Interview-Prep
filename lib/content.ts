@@ -6,7 +6,7 @@
 
 import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
-import { courses, getCourseBySlug } from '@/content/courses';
+import { courses } from '@/content/courses';
 import type {
   Module,
   Lesson,
@@ -23,10 +23,20 @@ export { modules, lessons, courses };
 // ── Course helpers ────────────────────────────────────────────────────────────
 
 export function getAllCourses(): Course[] {
-  return [...courses].sort((a, b) => a.order - b.order);
+  return [...courses]
+    .filter((c) => c.category !== 'problems')
+    .sort((a, b) => a.order - b.order);
 }
 
-export { getCourseBySlug };
+export function getCourseBySlug(slug: string): Course | undefined {
+  return courses.find((c) => c.slug === slug);
+}
+
+export function getProblemCourses(): Course[] {
+  return courses
+    .filter((c) => c.category === 'problems')
+    .sort((a, b) => a.order - b.order);
+}
 
 export function getModulesForCourse(courseSlug: string): Module[] {
   return getModulesByCourse(courseSlug);

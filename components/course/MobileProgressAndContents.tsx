@@ -11,6 +11,7 @@ interface MobileProgressAndContentsProps {
   lessonSlug: string;
   moduleSlug: string;
   courseSlug: string;
+  basePrefix?: string;
   allModuleLessonSlugs: string[];
   modules: Module[];
   lessonsByModule: Record<string, Lesson[]>;
@@ -21,6 +22,7 @@ export function MobileProgressAndContents({
   lessonSlug,
   moduleSlug,
   courseSlug,
+  basePrefix = 'courses',
   allModuleLessonSlugs,
   modules,
   lessonsByModule,
@@ -62,6 +64,7 @@ export function MobileProgressAndContents({
               currentModuleSlug={moduleSlug}
               currentLessonSlug={lessonSlug}
               courseSlug={courseSlug}
+              basePrefix={basePrefix}
               modules={modules}
               lessonsByModule={lessonsByModule}
             />

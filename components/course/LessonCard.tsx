@@ -9,6 +9,7 @@ interface LessonCardProps {
   lesson: Lesson;
   moduleSlug: string;
   courseSlug?: string;
+  basePrefix?: string;
   isCompleted?: boolean;
   isCurrent?: boolean;
   className?: string;
@@ -19,14 +20,15 @@ export function LessonCard({
   lesson,
   moduleSlug,
   courseSlug,
+  basePrefix = 'courses',
   isCompleted = false,
   isCurrent = false,
   className,
-  variant = 'default',
+  variant = 'list',
 }: LessonCardProps) {
   const lessonHref = courseSlug
-    ? `/courses/${courseSlug}/${moduleSlug}/${lesson.slug}`
-    : `/modules/${moduleSlug}/${lesson.slug}`;
+    ? `/${basePrefix}/${courseSlug}/${moduleSlug}/${lesson.slug}`
+    : `/${basePrefix}/${moduleSlug}/${lesson.slug}`;
   if (variant === 'list') {
     return (
       <Link

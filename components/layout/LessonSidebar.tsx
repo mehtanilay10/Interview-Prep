@@ -11,6 +11,7 @@ interface LessonSidebarProps {
   currentModuleSlug: string;
   currentLessonSlug: string;
   courseSlug?: string;
+  basePrefix?: string;
   modules: Module[];
   lessonsByModule: Record<string, Lesson[]>;
 }
@@ -19,6 +20,7 @@ export function LessonSidebar({
   currentModuleSlug,
   currentLessonSlug,
   courseSlug,
+  basePrefix = 'courses',
   modules,
   lessonsByModule,
 }: LessonSidebarProps) {
@@ -45,8 +47,8 @@ export function LessonSidebar({
 
   const lessonHref = (modSlug: string, lessonSlug: string) =>
     courseSlug
-      ? `/courses/${courseSlug}/${modSlug}/${lessonSlug}`
-      : `/modules/${modSlug}/${lessonSlug}`;
+      ? `/${basePrefix}/${courseSlug}/${modSlug}/${lessonSlug}`
+      : `/${basePrefix}/${modSlug}/${lessonSlug}`;
 
   return (
     <nav

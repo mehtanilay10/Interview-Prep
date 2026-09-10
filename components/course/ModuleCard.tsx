@@ -7,6 +7,7 @@ import type { Module } from '@/types';
 interface ModuleCardProps {
   module: Module;
   courseSlug?: string;
+  basePrefix?: string;
   lessonCount?: number;
   completedCount?: number;
   className?: string;
@@ -16,14 +17,15 @@ interface ModuleCardProps {
 export function ModuleCard({
   module,
   courseSlug,
+  basePrefix = 'courses',
   lessonCount,
   completedCount,
   className,
   variant = 'default',
 }: ModuleCardProps) {
   const moduleHref = courseSlug
-    ? `/courses/${courseSlug}/${module.slug}`
-    : `/modules/${module.slug}`;
+    ? `/${basePrefix}/${courseSlug}/${module.slug}`
+    : `/${basePrefix}/${module.slug}`;
   const hasProgress = completedCount !== undefined && lessonCount && lessonCount > 0;
   const progressPercent = hasProgress
     ? Math.round((completedCount! / lessonCount!) * 100)
@@ -81,7 +83,7 @@ export function ModuleCard({
       <h3 className="mb-1 font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
         {module.title}
       </h3>
-      <p className="mb-4 flex-1 text-sm leading-relaxed text-fg-muted">{module.description}</p>
+      <p className="mb-4 flex-1 text-sm leading-relaxed text-fg-muted line-clamp-4">{module.description}</p>
 
       <div className="mt-auto">
         {/* Tags */}

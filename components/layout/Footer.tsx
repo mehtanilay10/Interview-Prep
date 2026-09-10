@@ -25,22 +25,14 @@ const FOOTER_LINKS: FooterColumn[] = [
       { href: '/cheatsheet', label: 'Cheat Sheets' },
       { href: '/problems', label: 'Problems' },
       { href: '/interview-questions', label: 'Interview Questions' },
-      { href: '/search', label: 'Search' },
     ],
   },
   {
-    heading: 'Resources',
-    links: [
-      { href: '/courses', label: 'Learning Paths' },
-      { href: '/problems', label: 'Coding Problems' },
-      { href: '/interview-questions', label: 'Interview Q&A' },
-      { href: '/cheatsheet', label: 'Quick References' },
-    ],
-  },
-  {
-    heading: 'Company',
+    heading: 'About',
     links: [
       { href: 'https://github.com/mehtanilay10/Interview-Prep/', label: 'GitHub', external: true },
+      { href: 'https://mnilay.com/', label: 'Author', external: true },
+      { href: 'https://www.youtube.com/c/TutorialsTeam', label: 'YouTube', external: true },
     ],
   },
 ];
@@ -93,7 +85,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-canvas-subtle transition-theme">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <Link
@@ -109,8 +101,8 @@ export function Footer() {
           </div>
 
           {/* Link columns */}
-          <div className="sm:col-span-2 lg:col-span-3">
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12 lg:grid-cols-3">
+          <div className="sm:col-span-2 lg:col-span-2">
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12 lg:grid-cols-2">
               {FOOTER_LINKS.map((col) => (
                 <FooterLinkGroup key={col.heading} col={col} />
               ))}
