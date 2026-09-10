@@ -409,6 +409,12 @@ const rawModules = [
 	csModule9,
 	csModule10,
 	csModule11, csModule12,
+	problemModule1,
+	problemModule2,
+	problemModule3,
+	problemModule4,
+	problemModule5,
+	problemModule6,
 	devOpsModule1,
 	devOpsModule2,
 	devOpsModule3,
@@ -489,3 +495,10 @@ import csModule9 from "../cheatsheet/typescript/content.json";
 import csModule10 from "../cheatsheet/react-router/content.json";
 import csModule11 from '../cheatsheet/aws/content.json';
 import csModule12 from '../cheatsheet/azure/content.json';
+
+import problemModule1 from "../problems/01-array-problems/content.json";
+import problemModule2 from "../problems/02-string-problems/content.json";
+import problemModule3 from "../problems/03-linked-list-problems/content.json";
+import problemModule4 from "../problems/04-tree-graph-problems/content.json";
+import problemModule5 from "../problems/05-dynamic-programming-problems/content.json";
+import problemModule6 from "../problems/06-sorting-searching-problems/content.json";

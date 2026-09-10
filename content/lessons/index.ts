@@ -1097,6 +1097,63 @@ import csLesson10 from "../cheatsheet/react-router/cheatsheet.json";
 import csLesson11 from '../cheatsheet/aws/cheatsheet.json';
 import csLesson12 from '../cheatsheet/azure/cheatsheet.json';
 
+import problemLesson1 from "../problems/02-string-problems/reverse-string.json";
+import problemLesson2 from "../problems/01-array-problems/trapping-rain-water.json";
+import problemLesson3 from "../problems/01-array-problems/two-sum.json";
+import problemLesson4 from "../problems/02-string-problems/valid-anagram.json";
+import problemLesson5 from "../problems/03-linked-list-problems/merge-two-sorted-lists.json";
+import problemLesson6 from "../problems/03-linked-list-problems/reverse-linked-list.json";
+import problemLesson7 from "../problems/04-tree-graph-problems/alien-dictionary.json";
+import problemLesson8 from "../problems/04-tree-graph-problems/all-nodes-distance-k-in-binary-tree.json";
+import problemLesson9 from "../problems/04-tree-graph-problems/binary-tree-level-order-traversal.json";
+import problemLesson10 from "../problems/04-tree-graph-problems/binary-tree-maximum-path-sum.json";
+import problemLesson11 from "../problems/04-tree-graph-problems/binary-tree-right-side-view.json";
+import problemLesson12 from "../problems/04-tree-graph-problems/binary-tree-zigzag-level-order-traversal.json";
+import problemLesson13 from "../problems/04-tree-graph-problems/clone-graph.json";
+import problemLesson14 from "../problems/04-tree-graph-problems/construct-binary-tree-from-preorder-and-inorder.json";
+import problemLesson15 from "../problems/04-tree-graph-problems/count-complete-tree-nodes.json";
+import problemLesson16 from "../problems/04-tree-graph-problems/course-schedule.json";
+import problemLesson17 from "../problems/04-tree-graph-problems/graph-valid-tree.json";
+import problemLesson18 from "../problems/04-tree-graph-problems/lowest-common-ancestor-of-bst.json";
+import problemLesson19 from "../problems/04-tree-graph-problems/maximum-depth-of-binary-tree.json";
+import problemLesson20 from "../problems/04-tree-graph-problems/number-of-connected-components.json";
+import problemLesson21 from "../problems/04-tree-graph-problems/number-of-islands.json";
+import problemLesson22 from "../problems/04-tree-graph-problems/pacific-atlantic-water-flow.json";
+import problemLesson23 from "../problems/04-tree-graph-problems/path-sum-ii.json";
+import problemLesson24 from "../problems/04-tree-graph-problems/path-sum-iii.json";
+import problemLesson25 from "../problems/04-tree-graph-problems/path-sum.json";
+import problemLesson26 from "../problems/04-tree-graph-problems/recover-binary-search-tree.json";
+import problemLesson27 from "../problems/04-tree-graph-problems/same-tree.json";
+import problemLesson28 from "../problems/04-tree-graph-problems/surrounded-regions.json";
+import problemLesson29 from "../problems/04-tree-graph-problems/symmetric-tree.json";
+import problemLesson30 from "../problems/04-tree-graph-problems/validate-binary-search-tree.json";
+import problemLesson31 from "../problems/04-tree-graph-problems/word-ladder.json";
+import problemLesson32 from "../problems/05-dynamic-programming-problems/0-1-knapsack.json";
+import problemLesson33 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock-ii.json";
+import problemLesson34 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock.json";
+import problemLesson35 from "../problems/05-dynamic-programming-problems/burst-balloons.json";
+import problemLesson36 from "../problems/05-dynamic-programming-problems/climbing-stairs.json";
+import problemLesson37 from "../problems/05-dynamic-programming-problems/coin-change.json";
+import problemLesson38 from "../problems/05-dynamic-programming-problems/combination-sum-iv.json";
+import problemLesson39 from "../problems/05-dynamic-programming-problems/counting-bits.json";
+import problemLesson40 from "../problems/05-dynamic-programming-problems/decode-ways.json";
+import problemLesson41 from "../problems/05-dynamic-programming-problems/edit-distance.json";
+import problemLesson42 from "../problems/05-dynamic-programming-problems/fibonacci-number.json";
+import problemLesson43 from "../problems/05-dynamic-programming-problems/house-robber-ii.json";
+import problemLesson44 from "../problems/05-dynamic-programming-problems/house-robber.json";
+import problemLesson45 from "../problems/05-dynamic-programming-problems/longest-common-subsequence.json";
+import problemLesson46 from "../problems/05-dynamic-programming-problems/longest-increasing-subsequence.json";
+import problemLesson47 from "../problems/05-dynamic-programming-problems/maximum-product-subarray.json";
+import problemLesson48 from "../problems/05-dynamic-programming-problems/maximum-subarray.json";
+import problemLesson49 from "../problems/05-dynamic-programming-problems/minimum-path-sum.json";
+import problemLesson50 from "../problems/05-dynamic-programming-problems/palindrome-partitioning.json";
+import problemLesson51 from "../problems/05-dynamic-programming-problems/regular-expression-matching.json";
+import problemLesson52 from "../problems/05-dynamic-programming-problems/unique-paths-ii.json";
+import problemLesson53 from "../problems/05-dynamic-programming-problems/unique-paths.json";
+import problemLesson54 from "../problems/05-dynamic-programming-problems/word-break.json";
+import problemLesson55 from "../problems/06-sorting-searching-problems/binary-search.json";
+import problemLesson56 from "../problems/06-sorting-searching-problems/powx-n.json";
+
 import awsLesson1 from "../courses/aws/16-identity-for-applications/01-amazon-cognito-user-pools.json";
 import awsLesson2 from "../courses/aws/16-identity-for-applications/02-cognito-identity-pools.json";
 import awsLesson3 from "../courses/aws/16-identity-for-applications/03-application-authentication.json";
@@ -1179,7 +1236,7 @@ import azureAiServiceLesson8 from "../courses/azure/13-ai-services-for-azure-dev
 import azureAiServiceLesson9 from "../courses/azure/13-ai-services-for-azure-developers/securing-ai-services-with-managed-identity.json";
 import azureAiServiceLesson10 from "../courses/azure/13-ai-services-for-azure-developers/integrating-ai-services-into-azure-applications.json";
 
-const rawLessons = [
+const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
 	sqlLesson3,
@@ -1847,6 +1904,9 @@ const rawLessons = [
 	azureNetApiLesson1,
 	azureNetApiLesson2,
 	azureNetApiLesson3,
+];
+
+const rawLessonsPart2: any[] = [
 	azureNetApiLesson4,
 	azureNetApiLesson5,
 	azureNetApiLesson6,
@@ -2202,6 +2262,62 @@ const rawLessons = [
 	csLesson9,
 	csLesson10,
 	csLesson11, csLesson12,
+	problemLesson1,
+	problemLesson2,
+	problemLesson3,
+	problemLesson4,
+	problemLesson5,
+	problemLesson6,
+	problemLesson7,
+	problemLesson8,
+	problemLesson9,
+	problemLesson10,
+	problemLesson11,
+	problemLesson12,
+	problemLesson13,
+	problemLesson14,
+	problemLesson15,
+	problemLesson16,
+	problemLesson17,
+	problemLesson18,
+	problemLesson19,
+	problemLesson20,
+	problemLesson21,
+	problemLesson22,
+	problemLesson23,
+	problemLesson24,
+	problemLesson25,
+	problemLesson26,
+	problemLesson27,
+	problemLesson28,
+	problemLesson29,
+	problemLesson30,
+	problemLesson31,
+	problemLesson32,
+	problemLesson33,
+	problemLesson34,
+	problemLesson35,
+	problemLesson36,
+	problemLesson37,
+	problemLesson38,
+	problemLesson39,
+	problemLesson40,
+	problemLesson41,
+	problemLesson42,
+	problemLesson43,
+	problemLesson44,
+	problemLesson45,
+	problemLesson46,
+	problemLesson47,
+	problemLesson48,
+	problemLesson49,
+	problemLesson50,
+	problemLesson51,
+	problemLesson52,
+	problemLesson53,
+	problemLesson54,
+	problemLesson55,
+	problemLesson56,
 	awsLesson1,
 	awsLesson2,
 	awsLesson3,
@@ -2340,6 +2456,9 @@ const rawLessons = [
 	devOpsLesson16,
 	devOpsLesson17,
 ];
+
+const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];
+
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 
