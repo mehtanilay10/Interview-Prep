@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { getModuleBySlug, getLessonBySlug } from '@/lib/content';
+import { getModuleBySlug, getLessonBySlug, getModulesForCourse, getLessonsForModule } from '@/lib/content';
 
 export async function generateStaticParams() {
   const modules = getModulesForCourse('problems');
