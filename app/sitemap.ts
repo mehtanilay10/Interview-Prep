@@ -58,23 +58,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  const problemModules = getModulesForCourse('csharp-problems');
-  for (const mod of problemModules) {
-    entries.push(toSitemapEntry(`${BASE_URL}/problems/${mod.slug}`));
+  const problemCourses = [
+    { slug: 'csharp-problems', label: 'C# Problems' },
+    { slug: 'sql-problems', label: 'SQL Problems' },
+  ];
 
-    const lessons = getLessonsForCourse('csharp-problems').filter((l) => l.moduleSlug === mod.slug);
-    for (const lesson of lessons) {
-      entries.push(toSitemapEntry(`${BASE_URL}/problems/${mod.slug}/${lesson.slug}`));
-    }
-  }
+  for (const course of problemCourses) {
+    entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}`, 0.8, 'weekly'));
 
-  const sqlModules = getModulesForCourse('sql-problems');
-  for (const mod of sqlModules) {
-    entries.push(toSitemapEntry(`${BASE_URL}/sql-problems/${mod.slug}`));
+    const modules = getModulesForCourse(course.slug);
+    for (const mod of modules) {
+      entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}/${mod.slug}`));
 
-    const lessons = getLessonsForCourse('sql-problems').filter((l) => l.moduleSlug === mod.slug);
-    for (const lesson of lessons) {
-      entries.push(toSitemapEntry(`${BASE_URL}/sql-problems/${mod.slug}/${lesson.slug}`));
+      const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
+      for (const lesson of lessons) {
+        entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}/${mod.slug}/${lesson.slug}`));
+      }
     }
   }
 

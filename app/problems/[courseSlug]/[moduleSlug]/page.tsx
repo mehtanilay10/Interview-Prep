@@ -7,40 +7,56 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { getModuleBySlug, getLessonsForModule, getModulesForCourse } from '@/lib/content';
 import { formatHours } from '@/lib/utils';
 
-const SQL_ICONS: Record<string, string> = {
+const PROBLEM_ICONS: Record<string, string> = {
+  'array-problems': '📊',
+  'string-problems': '📝',
+  'linked-list-problems': '🔗',
+  'tree-graph-problems': '🌳',
+  'dynamic-programming-problems': '📈',
+  'sorting-searching-problems': '🔍',
   'sql-basics': '🟢',
   'sql-intermediate': '🟡',
   'sql-advanced': '🔴',
 };
 
 export async function generateStaticParams() {
-  const modules = getModulesForCourse('sql-problems');
-  return modules.map((mod) => ({ moduleSlug: mod.slug }));
+  const courses = ['csharp-problems', 'sql-problems'];
+  const params: { courseSlug: string; moduleSlug: string }[] = [];
+  for (const courseSlug of courses) {
+    const modules = getModulesForCourse(courseSlug);
+    for (const mod of modules) {
+      params.push({ courseSlug, moduleSlug: mod.slug });
+    }
+  }
+  return params;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ moduleSlug: string }> }): Promise<Metadata> {
-  const { moduleSlug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ courseSlug: string; moduleSlug: string }> }): Promise<Metadata> {
+  const { courseSlug, moduleSlug } = await params;
   const mod = getModuleBySlug(moduleSlug);
-  if (!mod) return {};
+  if (!mod || mod.courseSlug !== courseSlug) return {};
+  const course = getCourseBySlug(courseSlug);
   return {
-    title: `${mod.title} — SQL Problems`,
+    title: `${mod.title} — ${course?.title ?? 'Problems'}`,
     description: mod.description,
   };
 }
 
-export default async function SqlProblemsModulePage({ params }: { params: Promise<{ moduleSlug: string }> }) {
-  const { moduleSlug } = await params;
+export default async function ProblemsModulePage({ params }: { params: Promise<{ courseSlug: string; moduleSlug: string }> }) {
+  const { courseSlug, moduleSlug } = await params;
   const mod = getModuleBySlug(moduleSlug);
-  if (!mod || mod.courseSlug !== 'sql-problems') notFound();
+  if (!mod || mod.courseSlug !== courseSlug) notFound();
 
-  const lessons = getLessonsForModule(moduleSlug, 'sql-problems');
-  const icon = SQL_ICONS[mod.slug] ?? '🗄️';
+  const lessons = getLessonsForModule(moduleSlug, courseSlug);
+  const icon = PROBLEM_ICONS[mod.slug] ?? '🧩';
+  const course = getCourseBySlug(courseSlug);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <Breadcrumbs
         items={[
-          { label: 'SQL Problems', href: '/sql-problems' },
+          { label: 'Problems', href: '/problems' },
+          { label: course?.title ?? 'Problems', href: `/problems/${courseSlug}` },
           { label: mod.title },
         ]}
         className="mb-4"
@@ -48,16 +64,16 @@ export default async function SqlProblemsModulePage({ params }: { params: Promis
 
       <div className="mb-8">
         <Link
-          href="/sql-problems"
+          href={`/problems/${courseSlug}`}
           className="inline-flex items-center gap-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to all SQL problems
+          Back to {course?.title ?? 'problems'}
         </Link>
       </div>
 
       <SectionHeader
-        eyebrow="🗄️ Practice"
+        eyebrow={`${icon} Practice`}
         title={mod.title}
         description={mod.description}
         titleAs="h1"
@@ -75,7 +91,7 @@ export default async function SqlProblemsModulePage({ params }: { params: Promis
         {lessons.map((lesson) => (
           <Link
             key={lesson.id}
-            href={`/sql-problems/${moduleSlug}/${lesson.slug}`}
+            href={`/problems/${courseSlug}/${moduleSlug}/${lesson.slug}`}
             className="group flex items-center gap-4 rounded-lg border border-border bg-canvas p-4 transition-all hover:border-accent-fg hover:shadow-sm"
           >
             <div className="flex-1 min-w-0">
