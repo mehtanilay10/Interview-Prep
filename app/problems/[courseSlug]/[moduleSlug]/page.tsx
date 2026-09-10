@@ -4,7 +4,7 @@ import { ArrowLeft, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { getModuleBySlug, getLessonsForModule, getModulesForCourse } from '@/lib/content';
+import { getModuleBySlug, getLessonsForModule, getModulesForCourse, getCourseBySlug } from '@/lib/content';
 import { formatHours } from '@/lib/utils';
 
 const PROBLEM_ICONS: Record<string, string> = {

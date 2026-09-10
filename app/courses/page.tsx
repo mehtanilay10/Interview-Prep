@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
+  cloud: 'Cloud',
   database: 'Database',
   frontend: 'Frontend',
   backend: 'Backend',
@@ -28,7 +29,7 @@ export default function CoursesPage() {
   }
 
   const sortedCategories = Object.keys(grouped).sort((a, b) => {
-    const order = ['backend', 'frontend', 'database', 'architecture', 'interview', 'other'];
+    const order = ['backend', 'frontend', 'database', 'architecture', 'cloud', 'other'];
     return order.indexOf(a) - order.indexOf(b);
   });
 
