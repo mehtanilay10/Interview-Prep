@@ -17,7 +17,7 @@ const PROBLEM_ICONS: Record<string, string> = {
 };
 
 export async function generateStaticParams() {
-  const modules = getModulesForCourse('problems');
+  const modules = getModulesForCourse('csharp-problems');
   return modules.map((mod) => ({ moduleSlug: mod.slug }));
 }
 
@@ -34,9 +34,9 @@ export async function generateMetadata({ params }: { params: Promise<{ moduleSlu
 export default async function ProblemsModulePage({ params }: { params: Promise<{ moduleSlug: string }> }) {
   const { moduleSlug } = await params;
   const mod = getModuleBySlug(moduleSlug);
-  if (!mod || mod.courseSlug !== 'problems') notFound();
+  if (!mod || mod.courseSlug !== 'csharp-problems') notFound();
 
-  const lessons = getLessonsForModule(moduleSlug, 'problems');
+  const lessons = getLessonsForModule(moduleSlug, 'csharp-problems');
   const icon = PROBLEM_ICONS[mod.slug] ?? '🧩';
 
   return (

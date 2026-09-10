@@ -1097,62 +1097,113 @@ import csLesson10 from "../cheatsheet/react-router/cheatsheet.json";
 import csLesson11 from '../cheatsheet/aws/cheatsheet.json';
 import csLesson12 from '../cheatsheet/azure/cheatsheet.json';
 
-import problemLesson1 from "../problems/02-string-problems/reverse-string.json";
-import problemLesson2 from "../problems/01-array-problems/trapping-rain-water.json";
-import problemLesson3 from "../problems/01-array-problems/two-sum.json";
-import problemLesson4 from "../problems/02-string-problems/valid-anagram.json";
-import problemLesson5 from "../problems/03-linked-list-problems/merge-two-sorted-lists.json";
-import problemLesson6 from "../problems/03-linked-list-problems/reverse-linked-list.json";
-import problemLesson7 from "../problems/04-tree-graph-problems/alien-dictionary.json";
-import problemLesson8 from "../problems/04-tree-graph-problems/all-nodes-distance-k-in-binary-tree.json";
-import problemLesson9 from "../problems/04-tree-graph-problems/binary-tree-level-order-traversal.json";
-import problemLesson10 from "../problems/04-tree-graph-problems/binary-tree-maximum-path-sum.json";
-import problemLesson11 from "../problems/04-tree-graph-problems/binary-tree-right-side-view.json";
-import problemLesson12 from "../problems/04-tree-graph-problems/binary-tree-zigzag-level-order-traversal.json";
-import problemLesson13 from "../problems/04-tree-graph-problems/clone-graph.json";
-import problemLesson14 from "../problems/04-tree-graph-problems/construct-binary-tree-from-preorder-and-inorder.json";
-import problemLesson15 from "../problems/04-tree-graph-problems/count-complete-tree-nodes.json";
-import problemLesson16 from "../problems/04-tree-graph-problems/course-schedule.json";
-import problemLesson17 from "../problems/04-tree-graph-problems/graph-valid-tree.json";
-import problemLesson18 from "../problems/04-tree-graph-problems/lowest-common-ancestor-of-bst.json";
-import problemLesson19 from "../problems/04-tree-graph-problems/maximum-depth-of-binary-tree.json";
-import problemLesson20 from "../problems/04-tree-graph-problems/number-of-connected-components.json";
-import problemLesson21 from "../problems/04-tree-graph-problems/number-of-islands.json";
-import problemLesson22 from "../problems/04-tree-graph-problems/pacific-atlantic-water-flow.json";
-import problemLesson23 from "../problems/04-tree-graph-problems/path-sum-ii.json";
-import problemLesson24 from "../problems/04-tree-graph-problems/path-sum-iii.json";
-import problemLesson25 from "../problems/04-tree-graph-problems/path-sum.json";
-import problemLesson26 from "../problems/04-tree-graph-problems/recover-binary-search-tree.json";
-import problemLesson27 from "../problems/04-tree-graph-problems/same-tree.json";
-import problemLesson28 from "../problems/04-tree-graph-problems/surrounded-regions.json";
-import problemLesson29 from "../problems/04-tree-graph-problems/symmetric-tree.json";
-import problemLesson30 from "../problems/04-tree-graph-problems/validate-binary-search-tree.json";
-import problemLesson31 from "../problems/04-tree-graph-problems/word-ladder.json";
-import problemLesson32 from "../problems/05-dynamic-programming-problems/0-1-knapsack.json";
-import problemLesson33 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock-ii.json";
-import problemLesson34 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock.json";
-import problemLesson35 from "../problems/05-dynamic-programming-problems/burst-balloons.json";
-import problemLesson36 from "../problems/05-dynamic-programming-problems/climbing-stairs.json";
-import problemLesson37 from "../problems/05-dynamic-programming-problems/coin-change.json";
-import problemLesson38 from "../problems/05-dynamic-programming-problems/combination-sum-iv.json";
-import problemLesson39 from "../problems/05-dynamic-programming-problems/counting-bits.json";
-import problemLesson40 from "../problems/05-dynamic-programming-problems/decode-ways.json";
-import problemLesson41 from "../problems/05-dynamic-programming-problems/edit-distance.json";
-import problemLesson42 from "../problems/05-dynamic-programming-problems/fibonacci-number.json";
-import problemLesson43 from "../problems/05-dynamic-programming-problems/house-robber-ii.json";
-import problemLesson44 from "../problems/05-dynamic-programming-problems/house-robber.json";
-import problemLesson45 from "../problems/05-dynamic-programming-problems/longest-common-subsequence.json";
-import problemLesson46 from "../problems/05-dynamic-programming-problems/longest-increasing-subsequence.json";
-import problemLesson47 from "../problems/05-dynamic-programming-problems/maximum-product-subarray.json";
-import problemLesson48 from "../problems/05-dynamic-programming-problems/maximum-subarray.json";
-import problemLesson49 from "../problems/05-dynamic-programming-problems/minimum-path-sum.json";
-import problemLesson50 from "../problems/05-dynamic-programming-problems/palindrome-partitioning.json";
-import problemLesson51 from "../problems/05-dynamic-programming-problems/regular-expression-matching.json";
-import problemLesson52 from "../problems/05-dynamic-programming-problems/unique-paths-ii.json";
-import problemLesson53 from "../problems/05-dynamic-programming-problems/unique-paths.json";
-import problemLesson54 from "../problems/05-dynamic-programming-problems/word-break.json";
-import problemLesson55 from "../problems/06-sorting-searching-problems/binary-search.json";
-import problemLesson56 from "../problems/06-sorting-searching-problems/powx-n.json";
+import problemLesson1 from "../problems/01-array-problems/3sum.json";
+import problemLesson2 from "../problems/01-array-problems/best-time-to-buy-and-sell-stock.json";
+import problemLesson3 from "../problems/01-array-problems/container-with-most-water.json";
+import problemLesson4 from "../problems/01-array-problems/contains-duplicate.json";
+import problemLesson5 from "../problems/01-array-problems/find-minimum-in-rotated-sorted-array.json";
+import problemLesson6 from "../problems/01-array-problems/insert-interval.json";
+import problemLesson7 from "../problems/01-array-problems/jump-game.json";
+import problemLesson8 from "../problems/01-array-problems/longest-consecutive-sequence.json";
+import problemLesson9 from "../problems/01-array-problems/majority-element.json";
+import problemLesson10 from "../problems/01-array-problems/maximum-product-subarray.json";
+import problemLesson11 from "../problems/01-array-problems/maximum-subarray.json";
+import problemLesson12 from "../problems/01-array-problems/merge-intervals.json";
+import problemLesson13 from "../problems/01-array-problems/minimum-size-subarray-sum.json";
+import problemLesson14 from "../problems/01-array-problems/move-zeroes.json";
+import problemLesson15 from "../problems/01-array-problems/product-of-array-except-self.json";
+import problemLesson16 from "../problems/01-array-problems/rotate-array.json";
+import problemLesson17 from "../problems/01-array-problems/search-in-rotated-sorted-array.json";
+import problemLesson18 from "../problems/01-array-problems/set-matrix-zeroes.json";
+import problemLesson19 from "../problems/01-array-problems/sort-colors.json";
+import problemLesson20 from "../problems/01-array-problems/spiral-matrix.json";
+import problemLesson21 from "../problems/01-array-problems/subarray-sum-equals-k.json";
+import problemLesson22 from "../problems/01-array-problems/trapping-rain-water.json";
+import problemLesson23 from "../problems/01-array-problems/two-sum.json";
+import problemLesson24 from "../problems/02-string-problems/add-strings.json";
+import problemLesson25 from "../problems/02-string-problems/count-and-say.json";
+import problemLesson26 from "../problems/02-string-problems/decode-ways.json";
+import problemLesson27 from "../problems/02-string-problems/first-unique-char.json";
+import problemLesson28 from "../problems/02-string-problems/group-anagrams.json";
+import problemLesson29 from "../problems/02-string-problems/implement-strstr.json";
+import problemLesson30 from "../problems/02-string-problems/isomorphic-strings.json";
+import problemLesson31 from "../problems/02-string-problems/longest-common-prefix.json";
+import problemLesson32 from "../problems/02-string-problems/longest-palindromic-substring.json";
+import problemLesson33 from "../problems/02-string-problems/longest-repeating-char-replacement.json";
+import problemLesson34 from "../problems/02-string-problems/longest-substring-k-distinct.json";
+import problemLesson35 from "../problems/02-string-problems/longest-substring-two-distinct.json";
+import problemLesson36 from "../problems/02-string-problems/longest-substring.json";
+import problemLesson37 from "../problems/02-string-problems/multiply-strings.json";
+import problemLesson38 from "../problems/02-string-problems/palindromic-substrings.json";
+import problemLesson39 from "../problems/02-string-problems/ransom-note.json";
+import problemLesson40 from "../problems/02-string-problems/reverse-string.json";
+import problemLesson41 from "../problems/02-string-problems/reverse-words.json";
+import problemLesson42 from "../problems/02-string-problems/simplify-path.json";
+import problemLesson43 from "../problems/02-string-problems/string-compression.json";
+import problemLesson44 from "../problems/02-string-problems/valid-anagram.json";
+import problemLesson45 from "../problems/02-string-problems/valid-palindrome.json";
+import problemLesson46 from "../problems/02-string-problems/word-pattern.json";
+import problemLesson47 from "../problems/03-linked-list-problems/intersection-of-two-linked-lists.json";
+import problemLesson48 from "../problems/03-linked-list-problems/linked-list-cycle.json";
+import problemLesson49 from "../problems/03-linked-list-problems/merge-two-sorted-lists.json";
+import problemLesson50 from "../problems/03-linked-list-problems/middle-of-linked-list.json";
+import problemLesson51 from "../problems/03-linked-list-problems/odd-even-linked-list.json";
+import problemLesson52 from "../problems/03-linked-list-problems/palindrome-linked-list.json";
+import problemLesson53 from "../problems/03-linked-list-problems/remove-duplicates-from-sorted-list.json";
+import problemLesson54 from "../problems/03-linked-list-problems/remove-linked-list-elements.json";
+import problemLesson55 from "../problems/03-linked-list-problems/remove-nth-node-from-end.json";
+import problemLesson56 from "../problems/03-linked-list-problems/reverse-linked-list.json";
+import problemLesson57 from "../problems/03-linked-list-problems/swap-nodes-in-pairs.json";
+import problemLesson58 from "../problems/04-tree-graph-problems/alien-dictionary.json";
+import problemLesson59 from "../problems/04-tree-graph-problems/all-nodes-distance-k-in-binary-tree.json";
+import problemLesson60 from "../problems/04-tree-graph-problems/binary-tree-level-order-traversal.json";
+import problemLesson61 from "../problems/04-tree-graph-problems/binary-tree-maximum-path-sum.json";
+import problemLesson62 from "../problems/04-tree-graph-problems/binary-tree-right-side-view.json";
+import problemLesson63 from "../problems/04-tree-graph-problems/binary-tree-zigzag-level-order-traversal.json";
+import problemLesson64 from "../problems/04-tree-graph-problems/clone-graph.json";
+import problemLesson65 from "../problems/04-tree-graph-problems/construct-binary-tree-from-preorder-and-inorder.json";
+import problemLesson66 from "../problems/04-tree-graph-problems/count-complete-tree-nodes.json";
+import problemLesson67 from "../problems/04-tree-graph-problems/course-schedule.json";
+import problemLesson68 from "../problems/04-tree-graph-problems/graph-valid-tree.json";
+import problemLesson69 from "../problems/04-tree-graph-problems/lowest-common-ancestor-of-bst.json";
+import problemLesson70 from "../problems/04-tree-graph-problems/maximum-depth-of-binary-tree.json";
+import problemLesson71 from "../problems/04-tree-graph-problems/number-of-connected-components.json";
+import problemLesson72 from "../problems/04-tree-graph-problems/number-of-islands.json";
+import problemLesson73 from "../problems/04-tree-graph-problems/pacific-atlantic-water-flow.json";
+import problemLesson74 from "../problems/04-tree-graph-problems/path-sum-ii.json";
+import problemLesson75 from "../problems/04-tree-graph-problems/path-sum-iii.json";
+import problemLesson76 from "../problems/04-tree-graph-problems/path-sum.json";
+import problemLesson77 from "../problems/04-tree-graph-problems/recover-binary-search-tree.json";
+import problemLesson78 from "../problems/04-tree-graph-problems/same-tree.json";
+import problemLesson79 from "../problems/04-tree-graph-problems/surrounded-regions.json";
+import problemLesson80 from "../problems/04-tree-graph-problems/symmetric-tree.json";
+import problemLesson81 from "../problems/04-tree-graph-problems/validate-binary-search-tree.json";
+import problemLesson82 from "../problems/04-tree-graph-problems/word-ladder.json";
+import problemLesson83 from "../problems/05-dynamic-programming-problems/0-1-knapsack.json";
+import problemLesson84 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock-ii.json";
+import problemLesson85 from "../problems/05-dynamic-programming-problems/best-time-to-buy-and-sell-stock.json";
+import problemLesson86 from "../problems/05-dynamic-programming-problems/burst-balloons.json";
+import problemLesson87 from "../problems/05-dynamic-programming-problems/climbing-stairs.json";
+import problemLesson88 from "../problems/05-dynamic-programming-problems/coin-change.json";
+import problemLesson89 from "../problems/05-dynamic-programming-problems/combination-sum-iv.json";
+import problemLesson90 from "../problems/05-dynamic-programming-problems/counting-bits.json";
+import problemLesson91 from "../problems/05-dynamic-programming-problems/decode-ways.json";
+import problemLesson92 from "../problems/05-dynamic-programming-problems/edit-distance.json";
+import problemLesson93 from "../problems/05-dynamic-programming-problems/fibonacci-number.json";
+import problemLesson94 from "../problems/05-dynamic-programming-problems/house-robber-ii.json";
+import problemLesson95 from "../problems/05-dynamic-programming-problems/house-robber.json";
+import problemLesson96 from "../problems/05-dynamic-programming-problems/longest-common-subsequence.json";
+import problemLesson97 from "../problems/05-dynamic-programming-problems/longest-increasing-subsequence.json";
+import problemLesson98 from "../problems/05-dynamic-programming-problems/maximum-product-subarray.json";
+import problemLesson99 from "../problems/05-dynamic-programming-problems/maximum-subarray.json";
+import problemLesson100 from "../problems/05-dynamic-programming-problems/minimum-path-sum.json";
+import problemLesson101 from "../problems/05-dynamic-programming-problems/palindrome-partitioning.json";
+import problemLesson102 from "../problems/05-dynamic-programming-problems/regular-expression-matching.json";
+import problemLesson103 from "../problems/05-dynamic-programming-problems/unique-paths-ii.json";
+import problemLesson104 from "../problems/05-dynamic-programming-problems/unique-paths.json";
+import problemLesson105 from "../problems/05-dynamic-programming-problems/word-break.json";
+import problemLesson106 from "../problems/06-sorting-searching-problems/binary-search.json";
+import problemLesson107 from "../problems/06-sorting-searching-problems/powx-n.json";
 
 import awsLesson1 from "../courses/aws/16-identity-for-applications/01-amazon-cognito-user-pools.json";
 import awsLesson2 from "../courses/aws/16-identity-for-applications/02-cognito-identity-pools.json";
@@ -1235,6 +1286,57 @@ import azureAiServiceLesson7 from "../courses/azure/13-ai-services-for-azure-dev
 import azureAiServiceLesson8 from "../courses/azure/13-ai-services-for-azure-developers/azure-ai-services-vision-language-and-speech.json";
 import azureAiServiceLesson9 from "../courses/azure/13-ai-services-for-azure-developers/securing-ai-services-with-managed-identity.json";
 import azureAiServiceLesson10 from "../courses/azure/13-ai-services-for-azure-developers/integrating-ai-services-into-azure-applications.json";
+
+import sqlProblemsLesson1 from "../sql-problems/01-sql-basics/01-select-all-employees.json";
+import sqlProblemsLesson2 from "../sql-problems/01-sql-basics/02-filter-employees-by-department.json";
+import sqlProblemsLesson3 from "../sql-problems/01-sql-basics/03-sort-products-by-price.json";
+import sqlProblemsLesson4 from "../sql-problems/01-sql-basics/04-count-employees-per-department.json";
+import sqlProblemsLesson5 from "../sql-problems/01-sql-basics/05-filter-groups-with-having.json";
+import sqlProblemsLesson6 from "../sql-problems/01-sql-basics/06-inner-join-orders-customers.json";
+import sqlProblemsLesson7 from "../sql-problems/01-sql-basics/07-left-join-customers-orders.json";
+import sqlProblemsLesson8 from "../sql-problems/01-sql-basics/08-right-join-suppliers-products.json";
+import sqlProblemsLesson9 from "../sql-problems/01-sql-basics/09-full-outer-join-employees-departments.json";
+import sqlProblemsLesson10 from "../sql-problems/01-sql-basics/10-select-distinct-cities.json";
+import sqlProblemsLesson11 from "../sql-problems/01-sql-basics/11-between-salary-range.json";
+import sqlProblemsLesson12 from "../sql-problems/01-sql-basics/12-in-operator-departments.json";
+import sqlProblemsLesson13 from "../sql-problems/01-sql-basics/13-like-pattern-matching.json";
+import sqlProblemsLesson14 from "../sql-problems/01-sql-basics/14-aggregate-functions-basics.json";
+import sqlProblemsLesson15 from "../sql-problems/01-sql-basics/15-null-handling-isnull.json";
+import sqlProblemsLesson16 from "../sql-problems/01-sql-basics/16-string-concatenation.json";
+import sqlProblemsLesson17 from "../sql-problems/01-sql-basics/17-date-functions-current-date.json";
+import sqlProblemsLesson18 from "../sql-problems/01-sql-basics/18-union-order-customers-suppliers.json";
+import sqlProblemsLesson19 from "../sql-problems/01-sql-basics/19-exists-department-employees.json";
+import sqlProblemsLesson20 from "../sql-problems/01-sql-basics/20-top-n-per-group.json";
+import sqlProblemsLesson21 from "../sql-problems/02-sql-intermediate/01-subquery-in-where-clause.json";
+import sqlProblemsLesson22 from "../sql-problems/02-sql-intermediate/02-cte-department-salary-stats.json";
+import sqlProblemsLesson23 from "../sql-problems/02-sql-intermediate/03-window-function-rank.json";
+import sqlProblemsLesson24 from "../sql-problems/02-sql-intermediate/04-lead-lag-salary-comparison.json";
+import sqlProblemsLesson25 from "../sql-problems/02-sql-intermediate/05-correlated-subquery-department-average.json";
+import sqlProblemsLesson26 from "../sql-problems/02-sql-intermediate/06-cte-running-total-sales.json";
+import sqlProblemsLesson27 from "../sql-problems/02-sql-intermediate/07-self-join-employee-manager.json";
+import sqlProblemsLesson28 from "../sql-problems/02-sql-intermediate/08-intersect-common-products-orders.json";
+import sqlProblemsLesson29 from "../sql-problems/02-sql-intermediate/09-except-products-never-ordered.json";
+import sqlProblemsLesson30 from "../sql-problems/02-sql-intermediate/10-recursive-cte-employee-hierarchy.json";
+import sqlProblemsLesson31 from "../sql-problems/02-sql-intermediate/11-multiple-joins-order-details.json";
+import sqlProblemsLesson32 from "../sql-problems/02-sql-intermediate/12-all-operator-salary-check.json";
+import sqlProblemsLesson33 from "../sql-problems/02-sql-intermediate/13-dense-rank-vs-rank.json";
+import sqlProblemsLesson34 from "../sql-problems/02-sql-intermediate/14-string-functions-uppercase-email.json";
+import sqlProblemsLesson35 from "../sql-problems/02-sql-intermediate/15-case-expression-salary-band.json";
+import sqlProblemsLesson36 from "../sql-problems/02-sql-intermediate/16-cross-apply-product-categories.json";
+import sqlProblemsLesson37 from "../sql-problems/02-sql-intermediate/17-union-all-combined-customer-orders.json";
+import sqlProblemsLesson38 from "../sql-problems/02-sql-intermediate/18-row-number-duplicate-removal.json";
+import sqlProblemsLesson39 from "../sql-problems/02-sql-intermediate/19-pivot-sales-by-quarter.json";
+import sqlProblemsLesson40 from "../sql-problems/02-sql-intermediate/20-coalesce-display-preferred-name.json";
+import sqlProblemsLesson41 from "../sql-problems/03-sql-advanced/01-stored-procedure-get-employees-by-dept.json";
+import sqlProblemsLesson42 from "../sql-problems/03-sql-advanced/02-after-update-trigger-log-salary-change.json";
+import sqlProblemsLesson43 from "../sql-problems/03-sql-advanced/03-create-nonclustered-index.json";
+import sqlProblemsLesson44 from "../sql-problems/03-sql-advanced/04-transaction-with-rollback.json";
+import sqlProblemsLesson45 from "../sql-problems/03-sql-advanced/05-isolation-level-serializable.json";
+import sqlProblemsLesson46 from "../sql-problems/03-sql-advanced/06-try-catch-error-handling.json";
+import sqlProblemsLesson47 from "../sql-problems/03-sql-advanced/07-dynamic-sql-search.json";
+import sqlProblemsLesson48 from "../sql-problems/03-sql-advanced/08-clustered-columnstore-index.json";
+import sqlProblemsLesson49 from "../sql-problems/03-sql-advanced/09-snapshot-isolation.json";
+import sqlProblemsLesson50 from "../sql-problems/03-sql-advanced/10-instead-of-trigger-insert-view.json";
 
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
@@ -2318,6 +2420,57 @@ const rawLessonsPart2: any[] = [
 	problemLesson54,
 	problemLesson55,
 	problemLesson56,
+	problemLesson57,
+	problemLesson58,
+	problemLesson59,
+	problemLesson60,
+	problemLesson61,
+	problemLesson62,
+	problemLesson63,
+	problemLesson64,
+	problemLesson65,
+	problemLesson66,
+	problemLesson67,
+	problemLesson68,
+	problemLesson69,
+	problemLesson70,
+	problemLesson71,
+	problemLesson72,
+	problemLesson73,
+	problemLesson74,
+	problemLesson75,
+	problemLesson76,
+	problemLesson77,
+	problemLesson78,
+	problemLesson79,
+	problemLesson80,
+	problemLesson81,
+	problemLesson82,
+	problemLesson83,
+	problemLesson84,
+	problemLesson85,
+	problemLesson86,
+	problemLesson87,
+	problemLesson88,
+	problemLesson89,
+	problemLesson90,
+	problemLesson91,
+	problemLesson92,
+	problemLesson93,
+	problemLesson94,
+	problemLesson95,
+	problemLesson96,
+	problemLesson97,
+	problemLesson98,
+	problemLesson99,
+	problemLesson100,
+	problemLesson101,
+	problemLesson102,
+	problemLesson103,
+	problemLesson104,
+	problemLesson105,
+	problemLesson106,
+	problemLesson107,
 	awsLesson1,
 	awsLesson2,
 	awsLesson3,
@@ -2455,6 +2608,56 @@ const rawLessonsPart2: any[] = [
 	devOpsLesson15,
 	devOpsLesson16,
 	devOpsLesson17,
+	sqlProblemsLesson1,
+	sqlProblemsLesson2,
+	sqlProblemsLesson3,
+	sqlProblemsLesson4,
+	sqlProblemsLesson5,
+	sqlProblemsLesson6,
+	sqlProblemsLesson7,
+	sqlProblemsLesson8,
+	sqlProblemsLesson9,
+	sqlProblemsLesson10,
+	sqlProblemsLesson11,
+	sqlProblemsLesson12,
+	sqlProblemsLesson13,
+	sqlProblemsLesson14,
+	sqlProblemsLesson15,
+	sqlProblemsLesson16,
+	sqlProblemsLesson17,
+	sqlProblemsLesson18,
+	sqlProblemsLesson19,
+	sqlProblemsLesson20,
+	sqlProblemsLesson21,
+	sqlProblemsLesson22,
+	sqlProblemsLesson23,
+	sqlProblemsLesson24,
+	sqlProblemsLesson25,
+	sqlProblemsLesson26,
+	sqlProblemsLesson27,
+	sqlProblemsLesson28,
+	sqlProblemsLesson29,
+	sqlProblemsLesson30,
+	sqlProblemsLesson31,
+	sqlProblemsLesson32,
+	sqlProblemsLesson33,
+	sqlProblemsLesson34,
+	sqlProblemsLesson35,
+	sqlProblemsLesson36,
+	sqlProblemsLesson37,
+	sqlProblemsLesson38,
+	sqlProblemsLesson39,
+	sqlProblemsLesson40,
+	sqlProblemsLesson41,
+	sqlProblemsLesson42,
+	sqlProblemsLesson43,
+	sqlProblemsLesson44,
+	sqlProblemsLesson45,
+	sqlProblemsLesson46,
+	sqlProblemsLesson47,
+	sqlProblemsLesson48,
+	sqlProblemsLesson49,
+	sqlProblemsLesson50,
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];

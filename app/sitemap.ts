@@ -58,13 +58,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  const problemModules = getModulesForCourse('problems');
+  const problemModules = getModulesForCourse('csharp-problems');
   for (const mod of problemModules) {
     entries.push(toSitemapEntry(`${BASE_URL}/problems/${mod.slug}`));
 
-    const lessons = getLessonsForCourse('problems').filter((l) => l.moduleSlug === mod.slug);
+    const lessons = getLessonsForCourse('csharp-problems').filter((l) => l.moduleSlug === mod.slug);
     for (const lesson of lessons) {
       entries.push(toSitemapEntry(`${BASE_URL}/problems/${mod.slug}/${lesson.slug}`));
+    }
+  }
+
+  const sqlModules = getModulesForCourse('sql-problems');
+  for (const mod of sqlModules) {
+    entries.push(toSitemapEntry(`${BASE_URL}/sql-problems/${mod.slug}`));
+
+    const lessons = getLessonsForCourse('sql-problems').filter((l) => l.moduleSlug === mod.slug);
+    for (const lesson of lessons) {
+      entries.push(toSitemapEntry(`${BASE_URL}/sql-problems/${mod.slug}/${lesson.slug}`));
     }
   }
 
