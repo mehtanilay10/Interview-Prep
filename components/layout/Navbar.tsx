@@ -12,8 +12,7 @@ import { cn } from "@/lib/utils";
 const NAV_LINKS = [
   { href: "/courses", label: "Courses" },
   { href: "/cheatsheet", label: "Cheat Sheets" },
-  { href: "/problems", label: "C# Problems" },
-  { href: "/sql-problems", label: "SQL Problems" },
+  { href: "/problems", label: "Problems" },
   { href: "/interview-questions", label: "Interview Questions" },
 ];
 
