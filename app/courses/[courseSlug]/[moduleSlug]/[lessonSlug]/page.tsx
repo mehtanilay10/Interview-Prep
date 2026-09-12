@@ -23,7 +23,7 @@ import { ProgressTracker } from '@/components/course/ProgressTracker';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
-import { PrintButton } from '@/components/ui/PrintButton';
+import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -123,7 +123,11 @@ export default async function CourseLessonDetailPage({ params }: Params) {
                   Optional
                 </span>
               )}
-              <PrintButton label="Print / PDF" />
+              <PdfDownloadButton
+                targetId="lesson-content"
+                filename={`${lesson.slug}.pdf`}
+                label="Download PDF"
+              />
             </div>
             <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
               {lesson.title}
@@ -157,7 +161,9 @@ export default async function CourseLessonDetailPage({ params }: Params) {
           </div>
 
           {/* Content blocks */}
-          <ContentBlockRenderer blocks={lesson.blocks} />
+          <div id="lesson-content" className="prose prose-slate dark:prose-invert max-w-none">
+            <ContentBlockRenderer blocks={lesson.blocks} />
+          </div>
 
           {/* Further reading */}
           {lesson.furtherReading && lesson.furtherReading.length > 0 && (

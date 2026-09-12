@@ -12,7 +12,7 @@ import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
-import { PrintButton } from '@/components/ui/PrintButton';
+import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -107,7 +107,11 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <DifficultyBadge difficulty={lesson.difficulty} size="md" />
           <ReadingTimeBadge minutes={lesson.estimatedMinutes} />
-          <PrintButton label="Print / PDF" />
+          <PdfDownloadButton
+            targetId="question-content"
+            filename={`${lesson.slug}.pdf`}
+            label="Download PDF"
+          />
         </div>
         <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
           {lesson.title}
@@ -115,7 +119,9 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         <p className="text-base text-fg-muted">{lesson.description}</p>
       </header>
 
-      <ContentBlockRenderer blocks={lesson.blocks} />
+      <div id="question-content" className="prose prose-slate dark:prose-invert max-w-none">
+        <ContentBlockRenderer blocks={lesson.blocks} />
+      </div>
 
       <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
         {prev ? (
