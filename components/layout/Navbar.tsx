@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Menu, X, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { cn } from "@/lib/utils";
+import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 
 const NAV_LINKS = [
   { href: "/courses", label: "Courses" },
@@ -22,6 +23,7 @@ export function Navbar() {
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [scrolled, setScrolled] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -37,6 +39,13 @@ export function Navbar() {
 		onScroll();
 		window.addEventListener("scroll", onScroll, { passive: true });
 		return () => window.removeEventListener("scroll", onScroll);
+	}, []);
+
+	useEffect(() => {
+		registerShortcut('/', 'Focus search', () => {
+			searchInputRef.current?.focus();
+			searchInputRef.current?.select();
+		});
 	}, []);
 
 	return (
@@ -68,6 +77,7 @@ export function Navbar() {
 					<form onSubmit={handleSearch} className="relative ml-2">
 						<Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
 						<input
+							ref={searchInputRef}
 							type="search"
 							name="q"
 							value={searchQuery}

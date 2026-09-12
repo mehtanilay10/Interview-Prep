@@ -322,6 +322,26 @@ export interface CourseProgress {
   startedAt?: string;
 }
 
+export interface ProgressState {
+  lessons: CourseProgress;
+  problems: CourseProgress;
+  interviewQuestions: CourseProgress;
+}
+
+export interface BookmarkState {
+  items: BookmarkItem[];
+}
+
+export interface BookmarkItem {
+  id: string;
+  type: 'lesson' | 'problem' | 'interview' | 'cheatsheet';
+  slug: string;
+  title: string;
+  courseSlug: string;
+  moduleSlug: string;
+  addedAt: string;
+}
+
 // ── Search ───────────────────────────────────────────────────────────────────
 
 export interface SearchResult {

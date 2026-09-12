@@ -22,7 +22,7 @@ import { ProgressTracker } from '@/components/course/ProgressTracker';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
-import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
+import { LessonActions } from '@/components/progress/LessonActions';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -113,20 +113,7 @@ export default async function ProblemDetailPage({ params }: Params) {
 
           {/* Lesson header */}
           <header className="mb-8">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <DifficultyBadge difficulty={lesson.difficulty} size="md" />
-              <ReadingTimeBadge minutes={lesson.estimatedMinutes} />
-              {lesson.isOptional && (
-                <span className="rounded-full border border-border px-2 py-0.5 text-xs text-fg-subtle">
-                  Optional
-                </span>
-              )}
-              <PdfDownloadButton
-                targetId="problem-content"
-                filename={`${lesson.slug}.pdf`}
-                label="Download PDF"
-              />
-            </div>
+            <LessonActions lesson={lesson} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems" />
             <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
               {lesson.title}
             </h1>

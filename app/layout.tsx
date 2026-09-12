@@ -5,6 +5,8 @@ import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { SkipLink } from '@/components/ui/SkipLink';
+import { ProgressBookmarksToolbar } from '@/components/progress/ProgressBookmarksToolbar';
+import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -59,6 +61,8 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <ProgressBookmarksToolbar />
+          <OfflineIndicator />
         </ThemeProvider>
       </body>
     </html>

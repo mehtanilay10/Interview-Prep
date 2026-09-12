@@ -12,7 +12,7 @@ import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
-import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
+import { LessonActions } from '@/components/progress/LessonActions';
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -104,15 +104,19 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
       />
 
       <header className="mb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <DifficultyBadge difficulty={lesson.difficulty} size="md" />
-          <ReadingTimeBadge minutes={lesson.estimatedMinutes} />
-          <PdfDownloadButton
-            targetId="question-content"
-            filename={`${lesson.slug}.pdf`}
-            label="Download PDF"
-          />
-        </div>
+        <LessonActions
+          lesson={{
+            slug: lesson.slug,
+            title: lesson.title,
+            difficulty: lesson.difficulty,
+            estimatedMinutes: lesson.estimatedMinutes,
+            isOptional: lesson.isOptional,
+            tags: lesson.tags,
+          }}
+          courseSlug="interview-qa"
+          moduleSlug={technology}
+          category="interviewQuestions"
+        />
         <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
           {lesson.title}
         </h1>

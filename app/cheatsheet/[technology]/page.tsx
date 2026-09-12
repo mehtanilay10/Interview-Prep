@@ -7,7 +7,7 @@ import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { getModuleBySlug, getLessonsForModule } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
-import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
+import { LessonActions } from '@/components/progress/LessonActions';
 
 const TECH_ICONS: Record<string, string> = {
   'csharp': '💻',
@@ -91,13 +91,19 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ tec
         titleAs="h1"
       />
 
-      <div className="mb-6 flex justify-end">
-        <PdfDownloadButton
-          targetId="cheatsheet-content"
-          filename={`${technology}-cheatsheet.pdf`}
-          label="Download PDF"
-        />
-      </div>
+      <LessonActions
+        lesson={{
+          slug: lesson.slug,
+          title: lesson.title,
+          difficulty: lesson.difficulty,
+          estimatedMinutes: lesson.estimatedMinutes,
+          isOptional: lesson.isOptional,
+          tags: lesson.tags,
+        }}
+        courseSlug="cheatsheet"
+        moduleSlug={technology}
+        category="lessons"
+      />
 
       <div id="cheatsheet-content" className="prose prose-slate dark:prose-invert max-w-none">
         <ContentBlockRenderer blocks={lesson.blocks} />
