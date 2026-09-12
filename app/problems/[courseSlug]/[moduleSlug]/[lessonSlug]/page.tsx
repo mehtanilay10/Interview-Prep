@@ -22,6 +22,7 @@ import { ProgressTracker } from '@/components/course/ProgressTracker';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
+import { PrintButton } from '@/components/ui/PrintButton';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -120,6 +121,7 @@ export default async function ProblemDetailPage({ params }: Params) {
                   Optional
                 </span>
               )}
+              <PrintButton label="Print / PDF" />
             </div>
             <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
               {lesson.title}

@@ -12,6 +12,7 @@ import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
+import { PrintButton } from '@/components/ui/PrintButton';
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -106,6 +107,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <DifficultyBadge difficulty={lesson.difficulty} size="md" />
           <ReadingTimeBadge minutes={lesson.estimatedMinutes} />
+          <PrintButton label="Print / PDF" />
         </div>
         <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
           {lesson.title}

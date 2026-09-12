@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { ModuleCard } from '@/components/course/ModuleCard';
+import { ProblemFilters } from '@/components/problems/ProblemFilters';
 import { getCourseBySlug, getModulesForCourse, getLessonsForCourse, getProblemCourses } from '@/lib/content';
 
 interface Params {
@@ -28,6 +28,7 @@ export default async function ProblemsCoursePage({ params }: Params) {
   if (!course || course.category !== 'problems') notFound();
 
   const allModules = getModulesForCourse(courseSlug);
+  const allLessons = getLessonsForCourse(courseSlug);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -38,17 +39,7 @@ export default async function ProblemsCoursePage({ params }: Params) {
         titleAs="h1"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {allModules.map((mod) => (
-          <ModuleCard
-            key={mod.id}
-            module={mod}
-            courseSlug={courseSlug}
-            basePrefix="problems"
-            lessonCount={mod.lessonSlugs.length}
-          />
-        ))}
-      </div>
+      <ProblemFilters modules={allModules} lessons={allLessons} courseSlug={courseSlug} />
     </div>
   );
 }

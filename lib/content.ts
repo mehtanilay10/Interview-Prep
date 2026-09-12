@@ -160,9 +160,11 @@ export function searchAll(query: string): SearchResult[] {
         slug: lesson.slug,
         title: lesson.title,
         description: lesson.description,
+        courseSlug: lesson.courseSlug,
         moduleSlug: lesson.moduleSlug,
         difficulty: lesson.difficulty,
         tags: lesson.tags,
+        technology: lesson.technology,
       });
     }
   }
@@ -179,6 +181,7 @@ export function searchAll(query: string): SearchResult[] {
         slug: mod.slug,
         title: mod.title,
         description: mod.description,
+        courseSlug: mod.courseSlug,
         difficulty: mod.difficulty,
         tags: mod.tags,
       });

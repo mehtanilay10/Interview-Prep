@@ -100,6 +100,11 @@ export type ContentBlock =
       data: { title?: string; content: string; code?: string; language?: string };
     }
   | {
+      type: 'solution';
+      id?: string;
+      data: { title?: string; content: string; code: string; language?: string };
+    }
+  | {
       type: 'exercise';
       id?: string;
       data: ExerciseData;
@@ -324,9 +329,11 @@ export interface SearchResult {
   slug: string;
   title: string;
   description: string;
+  courseSlug?: string;
   moduleSlug?: string;
   difficulty?: Difficulty;
   tags?: string[];
+  technology?: string;
 }
 
 // ── Roadmap node ─────────────────────────────────────────────────────────────

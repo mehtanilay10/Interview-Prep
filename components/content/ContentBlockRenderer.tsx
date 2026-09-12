@@ -303,6 +303,30 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       );
     }
 
+    case 'solution': {
+      const { title, content, code, language } = block.data;
+      return (
+        <div
+          key={idx}
+          className="my-3 rounded-xl border border-success-muted bg-success-subtle/50 overflow-hidden"
+        >
+          <div className="border-b border-success-muted bg-success-subtle px-4 py-2">
+            <span className="text-xs font-semibold text-success-fg">
+              ✅ {title ?? 'Solution'}
+            </span>
+          </div>
+          <div className="p-3">
+            {content && (
+              <p className="mb-3 text-sm text-fg-default leading-relaxed">{content}</p>
+            )}
+            {code && (
+              <CustomCodeBlock code={code} language={language} />
+            )}
+          </div>
+        </div>
+      );
+    }
+
     case 'exercise':
       return (
         <div
@@ -552,6 +576,17 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
           title: legacy.title as string | undefined,
           content: legacy.content as string,
           code: legacy.code as string | undefined,
+          language: legacy.language as string | undefined,
+        },
+      };
+    case 'solution':
+      return {
+        ...common,
+        type: 'solution',
+        data: {
+          title: legacy.title as string | undefined,
+          content: legacy.content as string,
+          code: legacy.code as string,
           language: legacy.language as string | undefined,
         },
       };

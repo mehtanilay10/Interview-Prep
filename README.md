@@ -1,6 +1,6 @@
 # Interview Prep
 
-A production-ready educational web app for learning AI — tools, prompting, automation, agents, RAG, and modern AI workflows. Built for beginners to intermediate users who want practical AI literacy.
+A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, and SQL problem sets. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
 ---
 
@@ -23,18 +23,18 @@ A production-ready educational web app for learning AI — tools, prompting, aut
 ### Prerequisites
 
 - Node.js 18+
-- Yarn (required — do not use npm)
+- npm (included with Node.js)
 
 ### Install
 
 ```bash
-yarn install
+npm install
 ```
 
 ### Develop
 
 ```bash
-yarn dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -44,7 +44,7 @@ Open [http://localhost:3000](http://localhost:3000).
 By default, PWA registration is disabled in development. To test installability intentionally, start the app with:
 
 ```bash
-NEXT_PUBLIC_ENABLE_PWA_DEV=true yarn dev
+NEXT_PUBLIC_ENABLE_PWA_DEV=true npm run dev
 ```
 
 Mobile browsers still require a secure context for service workers. `localhost` is allowed, but a phone opening `http://192.168.x.x:3000` will not be installable unless you serve the site over HTTPS.
@@ -52,20 +52,20 @@ Mobile browsers still require a secure context for service workers. `localhost` 
 ### Build
 
 ```bash
-yarn build
-yarn start
+npm run build
+npm run start
 ```
 
 ### Type check
 
 ```bash
-yarn typecheck
+npm run typecheck
 ```
 
 ### Lint
 
 ```bash
-yarn lint
+npm run lint
 ```
 
 ---
@@ -79,14 +79,35 @@ interview-prep/
 │   ├── page.tsx                  # Home page
 │   ├── globals.css               # Global styles + CSS custom properties
 │   ├── sitemap.ts                # Auto-generated sitemap
-│   ├── modules/
-│   │   ├── page.tsx              # All modules listing
-│   │   └── [moduleSlug]/
-│   │       ├── page.tsx          # Module detail
-│   │       └── [lessonSlug]/
-│   │           └── page.tsx      # Lesson detail (main learning page)
+│   ├── courses/
+│   │   ├── page.tsx              # Course listing
+│   │   └── [courseSlug]/
+│   │       ├── page.tsx          # Course overview
+│   │       └── [moduleSlug]/
+│   │           ├── page.tsx      # Module overview
+│   │           └── [lessonSlug]/
+│   │               └── page.tsx  # Lesson detail
+│   ├── problems/
+│   │   ├── page.tsx              # Problems listing
+│   │   └── [courseSlug]/
+│   │       ├── page.tsx          # Problem course overview
+│   │       └── [moduleSlug]/
+│   │           ├── page.tsx      # Problem module overview
+│   │           └── [lessonSlug]/
+│   │               └── page.tsx  # Problem lesson
+│   ├── interview-questions/
+│   │   ├── page.tsx              # Interview question listing
+│   │   └── [technology]/
+│   │       ├── page.tsx          # Technology-specific questions
+│   │       └── [slug]/
+│   │           └── page.tsx      # Individual question
+│   ├── cheatsheet/
+│   │   ├── page.tsx              # Cheat sheet listing
+│   │   └── [technology]/
+│   │       └── page.tsx          # Individual cheat sheet
+│   ├── search/page.tsx           # Search page
 │   ├── roadmap/page.tsx          # Visual roadmap + module table
-│   ├── glossary/page.tsx         # Searchable AI glossary
+│   ├── glossary/page.tsx         # Searchable glossary
 │   ├── tools/page.tsx            # Tool comparisons
 │   ├── plan/page.tsx             # 90-day learning plan
 │   ├── projects/page.tsx         # Mini projects
@@ -129,16 +150,15 @@ interview-prep/
 │       ├── HeroSection.tsx       # Home page hero
 │       └── SectionHeader.tsx     # Reusable eyebrow+title+description
 │
-├── content/                      # All course content (TypeScript files)
-│   ├── phases/index.ts           # Phase definitions (2 phases)
-│   ├── modules/index.ts          # Module definitions (6 modules)
+├── content/                      # All course content (JSON/TypeScript files)
+│   ├── courses/                  # Structured courses
+│   ├── problems/                 # Coding problems (C#, SQL)
+│   ├── sql-problems/             # SQL problem sets
+│   ├── interview-qa/             # Interview Q&A by technology
+│   ├── cheatsheet/               # Cheat sheets by technology
+│   ├── modules/index.ts          # Module definitions
 │   ├── lessons/index.ts          # Lesson definitions + content blocks
-│   ├── glossary/index.ts         # Glossary terms (10 terms)
-│   ├── tool-comparisons/index.ts # Tool entries (5 tools)
-│   ├── weekly-plan/index.ts      # 90-day plan weeks
-│   ├── projects/index.ts         # Mini projects (3)
-│   ├── faqs/index.ts             # FAQ items (5)
-│   └── prompts/index.ts          # Prompt templates (5)
+│   └── ...
 │
 ├── hooks/
 │   ├── useProgress.ts            # Lesson completion tracking (localStorage)
@@ -153,9 +173,7 @@ interview-prep/
 │   └── index.ts                  # All TypeScript interfaces
 │
 ├── public/                       # Static assets
-├── styles/                       # (globals.css lives in app/)
 ├── README.md
-├── AGENTS.md
 ├── AGENTS.md
 ├── next.config.ts
 ├── tailwind.config.ts
@@ -167,26 +185,44 @@ interview-prep/
 
 ## Content System
 
-All content is stored in TypeScript files under `/content/`. This gives you:
+All content is stored in JSON/TypeScript files under `/content/`. This gives you:
 
 - **Type safety**: TypeScript validates all content structure
 - **IDE support**: Autocomplete and error highlighting when adding content
 - **No parsing**: Content is imported directly, no YAML/MDX parsing needed
 - **Easy to search**: grep works across all content
 
+### Content areas
+
+| Area | Path | Purpose |
+|---|---|---|
+| Courses | `content/courses/` | Structured learning modules |
+| Problems | `content/problems/` | Coding problems with multiple solutions |
+| SQL Problems | `content/sql-problems/` | SQL problem sets |
+| Interview Q&A | `content/interview-qa/` | Technology-grouped interview questions |
+| Cheat sheets | `content/cheatsheet/` | Quick-reference code examples |
+
 ### Adding a new lesson
 
-1. Open `content/lessons/index.ts`
-2. Create a new `Lesson` object following the existing structure
-3. Add it to the `lessons` array
-4. Add the lesson slug to the module's `lessonSlugs` in `content/modules/index.ts`
+1. Create the lesson JSON file in the appropriate module folder
+2. Import it in `content/lessons/index.ts`
+3. Add the lesson slug to the module's `lessonSlugs` array in the module's `content.json`
 
 ### Adding a new module
 
-1. Open `content/modules/index.ts`
-2. Create a new `Module` object
-3. Add it to the `modules` array
-4. Add the module slug to the phase's `moduleSlug` in `content/phases/index.ts`
+1. Create `content/[area]/[courseSlug]/[moduleSlug]/content.json`
+2. Create lesson JSON files in the module folder
+3. Import the module in `content/modules/index.ts`
+4. Add the module slug to the course's `moduleSlugs` array
+
+### Adding a new course
+
+1. Create `content/[area]/[courseSlug]/content.json`
+2. Add module folders with `content.json` and lesson JSON files
+3. Import course in `content/courses/index.ts` (if it's a regular course)
+4. Add module imports to `content/modules/index.ts`
+5. Add lesson imports to `content/lessons/index.ts`
+6. Update `app/sitemap.ts` if needed
 
 ### Content blocks
 
@@ -203,6 +239,7 @@ Lessons are composed of typed `ContentBlock[]`. Available block types:
 | `key-terms` | Definition lists with terms |
 | `table` | Data tables |
 | `example` | Code or content examples |
+| `solution` | Final answer/solution blocks (green accent) |
 | `exercise` | Hands-on practice exercises |
 | `checklist` | Interactive-style checklists |
 | `mermaid` | Mermaid diagram definitions |
@@ -290,6 +327,6 @@ See `AGENTS.md` for detailed guidelines for AI coding agents and content contrib
 Key rules:
 1. Keep content in `/content/` — never hardcode lesson text in page components
 2. All content must use the defined `ContentBlock` types
-3. Run `yarn typecheck && yarn lint` before committing
+3. Run `npm run typecheck && npm run lint` before committing
 4. Update navigation and indexes when adding pages
 5. Keep difficulty labels accurate and honest

@@ -42,7 +42,7 @@ export function Navbar() {
 	return (
 		<header
 			className={cn(
-				"sticky top-0 z-50 transition-all duration-250",
+				"sticky top-0 z-50 transition-all duration-200",
 				scrolled
 					? "border-b border-border bg-canvas/75 backdrop-blur-xl shadow-md"
 					: "border-b border-border bg-canvas/95 shadow-sm"

@@ -69,10 +69,19 @@ export default function SearchPage() {
       ) : (
         <div className="space-y-4">
           {results.map((result) => {
-            const href =
-              result.type === 'lesson'
-                ? `/courses/${result.moduleSlug}/${result.slug}`
-                : `/courses/${result.moduleSlug}`;
+            let href: string;
+            if (result.type === 'lesson') {
+              if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems') {
+                href = `/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+              } else if (result.courseSlug === 'interview-qa' && result.technology) {
+                const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
+                href = `/interview-questions/${techSlug}/${result.slug}`;
+              } else {
+                href = `/courses/${result.moduleSlug}/${result.slug}`;
+              }
+            } else {
+              href = `/courses/${result.moduleSlug}`;
+            }
 
             return (
               <Link

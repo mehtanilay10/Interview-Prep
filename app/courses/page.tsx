@@ -4,11 +4,13 @@ import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getAllCourses, getModulesForCourse, getLessonsForCourse } from '@/lib/content';
 import type { Course } from '@/types';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: 'All Courses',
   description: 'Browse all available courses on Interview Prep.',
-};
+  path: '/courses',
+});
 
 const CATEGORY_LABELS: Record<string, string> = {
   cloud: 'Cloud',

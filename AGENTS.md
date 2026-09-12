@@ -8,14 +8,12 @@ Read this before making any changes.
 
 ## Project overview
 
-Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching AI-powered interview preparation to everyday users. It uses:
-- App Router (server components by default)
-- Tailwind CSS with GitHub-inspired design tokens
-- Structured content in `/content/` TypeScript/JSON files
-- `localStorage` for progress tracking (no backend)
-- Mermaid for diagrams (rendered client-side)
-- `next-themes` for dark/light mode
-- `react-shiki` for syntax highlighting
+Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching software engineering interview preparation. It includes:
+- Structured courses (C#, SQL, React, ASP.NET Core, OOP, etc.)
+- Coding problems with multiple solutions (`content/problems/`)
+- Interview Q&A organized by technology (`content/interview-qa/`)
+- Cheat sheets for quick reference (`content/cheatsheet/`)
+- SQL problem sets (`content/sql-problems/`)
 
 ---
 
@@ -53,8 +51,8 @@ This course is for non-technical users. When modifying lesson pages:
 
 ### 6. Always label difficulty accurately
 Use the `Difficulty` type: `'beginner' | 'intermediate' | 'advanced'`
-- `beginner`: No AI or technical background needed
-- `intermediate`: Comfortable with basic AI tools, ready for more depth
+- `beginner`: No prior programming or technical background needed
+- `intermediate`: Comfortable with basic programming concepts, ready for more depth
 - `advanced`: Technical concepts that require understanding of preceding modules
 
 ---
@@ -70,6 +68,16 @@ content/
       [moduleSlug]/
         content.json        # Module metadata + lessonSlugs[]
         [lessonSlug].json   # Lesson metadata + blocks[]
+  problems/                 # Coding problems (courseSlug: "csharp-problems" / "sql-problems")
+    [courseSlug]/
+      content.json          # "Course" metadata
+      [moduleSlug]/
+        content.json        # Module metadata + lessonSlugs[]
+        [lessonSlug].json   # Problem lesson
+  sql-problems/             # SQL problem sets (courseSlug: "sql-problems")
+    [moduleSlug]/
+      content.json
+      [lessonSlug].json
   interview-qa/             # Interview questions (not a course)
     content.json            # "Course" metadata (isInterview: true)
     [moduleSlug]/
@@ -80,9 +88,9 @@ content/
     [technology]/
       content.json          # Module metadata (one module per technology)
       cheatsheet.json       # Lesson file (slug: "cheatsheet"), code-only examples
-  courses/index.ts          # Exports all courses (does NOT include cheatsheet/interview-qa)
-  modules/index.ts          # Exports all modules (courses + cheatsheet + interview-qa)
-  lessons/index.ts          # Exports all lessons (courses + cheatsheet + interview-qa)
+  courses/index.ts          # Exports all courses (does NOT include cheatsheet/interview-qa/problems)
+  modules/index.ts          # Exports all modules (courses + problems + cheatsheet + interview-qa)
+  lessons/index.ts          # Exports all lessons (courses + problems + cheatsheet + interview-qa)
 ```
 
 ### Adding a course
@@ -107,6 +115,14 @@ content/
 4. Ensure `courseSlug` and `moduleSlug` match the parent directories
 
 ### Special content areas
+
+**Problems** live under `content/problems/` and reuse the course/module/lesson model.
+Each problem set is a course (e.g. `courseSlug: "csharp-problems"`). Modules group problems
+by topic (arrays, strings, recursion, bitwise, etc.). Problem lessons carry `difficulty`
+and `estimatedMinutes` and typically include multiple solution approaches using
+`example` blocks. They are served at `/problems/[courseSlug]/[moduleSlug]/[lessonSlug]`.
+
+**SQL problem sets** live under `content/sql-problems/` with `courseSlug: "sql-problems"`.
 
 **Cheat sheets** live under `content/cheatsheet/` and reuse the course/module/lesson model
 with `courseSlug: "cheatsheet"`. Each technology is one module whose lesson file is named
@@ -145,7 +161,7 @@ so they are treated as a separate section, not a course). Their lesson JSON carr
 See `types/index.ts` for the full list. Current types:
 - `paragraph`, `heading`, `bullet-list`, `numbered-list`
 - `callout`, `quote`, `key-terms`, `table`
-- `example`, `exercise`, `checklist`
+- `example`, `solution`, `exercise`, `checklist`
 - `mermaid`, `comparison-cards`, `summary-box`, `faq-block`
 - `divider`, `image`
 
@@ -158,6 +174,10 @@ See `types/index.ts` for the full list. Current types:
 - `/courses/[courseSlug]` — Course overview
 - `/courses/[courseSlug]/[moduleSlug]` — Module overview
 - `/courses/[courseSlug]/[moduleSlug]/[lessonSlug]` — Lesson page
+- `/problems` — Problems listing
+- `/problems/[courseSlug]` — Problem course overview
+- `/problems/[courseSlug]/[moduleSlug]` — Problem module overview
+- `/problems/[courseSlug]/[moduleSlug]/[lessonSlug]` — Problem lesson page
 - `/cheatsheet` — Cheat sheet listing
 - `/cheatsheet/[technology]` — Individual cheat sheet
 - `/interview-questions` — Interview question listing

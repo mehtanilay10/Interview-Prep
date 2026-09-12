@@ -4,11 +4,13 @@ import { BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getInterviewTechnologies, getInterviewQuestionCount } from '@/lib/content';
 import { formatHours } from '@/lib/utils';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: 'Interview Questions',
   description: 'Browse technical interview questions and answers organized by technology and level.',
-};
+  path: '/interview-questions',
+});
 
 const TECH_ICONS: Record<string, string> = {
   'C#': '💻',

@@ -3,17 +3,20 @@ import Link from 'next/link';
 import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getCourseBySlug, getModulesForCourse, getLessonsForCourse } from '@/lib/content';
+import type { Course, Lesson } from '@/types';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: 'Problems',
   description: 'Practice C# and SQL Server problems with multiple approaches and detailed explanations.',
-};
+  path: '/problems',
+});
 
 export default function ProblemsPage() {
   const csharpCourse = getCourseBySlug('csharp-problems');
   const sqlCourse = getCourseBySlug('sql-problems');
 
-  const courses = [csharpCourse, sqlCourse].filter(Boolean);
+  const courses = [csharpCourse, sqlCourse].filter(Boolean) as Course[];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -25,10 +28,10 @@ export default function ProblemsPage() {
       />
 
       <div className="grid gap-6 sm:grid-cols-2">
-        {courses.map((course: any) => {
+        {courses.map((course) => {
           const modules = getModulesForCourse(course.slug);
           const lessons = getLessonsForCourse(course.slug);
-          const totalMinutes = lessons.reduce((sum: number, l: any) => sum + l.estimatedMinutes, 0);
+          const totalMinutes = lessons.reduce((sum: number, l: Lesson) => sum + l.estimatedMinutes, 0);
 
           return (
             <Link
