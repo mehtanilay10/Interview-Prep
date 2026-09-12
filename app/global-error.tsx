@@ -33,24 +33,23 @@ export default function GlobalError({
     <html lang="en">
       <body>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-16 text-center">
-          <AlertTriangle className="mb-6 h-12 w-12 text-attention-fg" aria-hidden="true" />
           <h1 className="mb-2 text-2xl font-bold text-fg-default sm:text-3xl">Something went wrong</h1>
           <p className="mb-8 text-sm text-fg-muted sm:text-base">
             The application encountered an unexpected error. You can try again or go back to the home page.
           </p>
 
-          <div className="mb-6 w-full rounded-lg border border-border bg-canvas p-4 text-left">
+          <div className="mb-6 w-full text-left">
             <button
               type="button"
               onClick={() => setShowDetails(!showDetails)}
-              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-fg-default transition-colors hover:bg-canvas-subtle"
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent-fg underline underline-offset-2 transition-colors hover:text-accent-emphasis"
               aria-expanded={showDetails}
             >
-              <span>Show error details</span>
+              Show error details
               {showDetails ? (
-                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
               ) : (
-                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
 

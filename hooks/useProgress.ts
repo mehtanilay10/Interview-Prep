@@ -130,20 +130,24 @@ export function useProgress() {
   );
 
   const stats = useMemo(() => {
+    const lessons = progress.lessons ?? DEFAULT_PROGRESS.lessons;
+    const problems = progress.problems ?? DEFAULT_PROGRESS.problems;
+    const interviewQuestions = progress.interviewQuestions ?? DEFAULT_PROGRESS.interviewQuestions;
+
     const lessonStats = {
-      totalCompleted: progress.lessons.completedLessons.length,
-      lastVisited: progress.lessons.lastVisitedLesson,
-      startedAt: progress.lessons.startedAt,
+      totalCompleted: lessons.completedLessons.length,
+      lastVisited: lessons.lastVisitedLesson,
+      startedAt: lessons.startedAt,
     };
     const problemStats = {
-      totalCompleted: progress.problems.completedLessons.length,
-      lastVisited: progress.problems.lastVisitedLesson,
-      startedAt: progress.problems.startedAt,
+      totalCompleted: problems.completedLessons.length,
+      lastVisited: problems.lastVisitedLesson,
+      startedAt: problems.startedAt,
     };
     const interviewStats = {
-      totalCompleted: progress.interviewQuestions.completedLessons.length,
-      lastVisited: progress.interviewQuestions.lastVisitedLesson,
-      startedAt: progress.interviewQuestions.startedAt,
+      totalCompleted: interviewQuestions.completedLessons.length,
+      lastVisited: interviewQuestions.lastVisitedLesson,
+      startedAt: interviewQuestions.startedAt,
     };
 
     return {
