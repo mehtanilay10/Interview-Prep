@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Upload, Bookmark, CheckCircle, Keyboard } from 'lucide-react';
 import { useProgress } from '@/hooks/useProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
@@ -12,9 +12,9 @@ export function ProgressBookmarksToolbar() {
   const { exportBookmarks, importBookmarks, stats: bookmarkStats } = useBookmarks();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     registerShortcut('?', 'Show keyboard shortcuts', () => setShowShortcuts((prev) => !prev));
-  });
+  }, []);
 
   return (
     <>
