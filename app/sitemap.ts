@@ -19,7 +19,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     toSitemapEntry(`${BASE_URL}/cheatsheet`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/problems`, 0.8, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/progress`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/login`, 0.5, 'monthly'),
   ];
 
   const courses = getAllCourses().filter((c) => !c.isInterview);

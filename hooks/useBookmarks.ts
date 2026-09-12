@@ -1,29 +1,84 @@
 'use client';
 
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { useLocalStorage } from './useLocalStorage';
 import type { BookmarkState, BookmarkItem } from '@/types';
 
 const STORAGE_KEY = 'interview_prep_bookmarks';
 
-const DEFAULT_BOOKMARKS: BookmarkState = {
-  items: [],
-};
+const DEFAULT_BOOKMARKS: BookmarkState = { items: [] };
+
+async function fetchBookmarksFromServer(): Promise<BookmarkState | null> {
+  try {
+    const res = await fetch('/api/bookmarks');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { items: data.items || [] };
+  } catch {
+    return null;
+  }
+}
+
+async function syncBookmarksToServer(bookmarks: BookmarkState): Promise<void> {
+  try {
+    await fetch('/api/bookmarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: bookmarks.items }),
+    });
+  } catch (err) {
+    console.warn('[useBookmarks] Failed to sync to server', err);
+  }
+}
 
 export function useBookmarks() {
-  const [bookmarks, setBookmarks, resetBookmarks] = useLocalStorage<BookmarkState>(
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === 'authenticated';
+  const isLoggedOut = status === 'unauthenticated';
+
+  const [localBookmarks, setLocalBookmarks, resetLocal] = useLocalStorage<BookmarkState>(
     STORAGE_KEY,
     DEFAULT_BOOKMARKS
   );
+  const [serverBookmarks, setServerBookmarks] = useState<BookmarkState | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const activeBookmarks = isLoggedIn && serverBookmarks ? serverBookmarks : localBookmarks;
+  const setActiveBookmarks = isLoggedIn
+    ? (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
+        const next = typeof updater === 'function' ? updater(activeBookmarks) : updater;
+        setServerBookmarks(next);
+        syncBookmarksToServer(next);
+      }
+    : setLocalBookmarks;
+
+  useEffect(() => {
+    if (isLoggedIn && !serverBookmarks) {
+      fetchBookmarksFromServer().then((data) => {
+        if (data) {
+          setServerBookmarks(data);
+        }
+      });
+    }
+  }, [isLoggedIn, serverBookmarks]);
+
+  useEffect(() => {
+    if (isLoggedIn && localBookmarks !== DEFAULT_BOOKMARKS) {
+      const hasLocalData = localBookmarks.items.length > 0;
+      if (hasLocalData) {
+        syncBookmarksToServer(localBookmarks);
+      }
+    }
+  }, [isLoggedIn, localBookmarks]);
+
   const addBookmark = useCallback(
     (item: Omit<BookmarkItem, 'id' | 'addedAt'>) => {
-      setBookmarks((prev) => {
+      setActiveBookmarks((prev) => {
         const exists = prev.items.some((b) => b.slug === item.slug && b.type === item.type);
         if (exists) return prev;
         const newItem: BookmarkItem = {
@@ -31,30 +86,27 @@ export function useBookmarks() {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           addedAt: new Date().toISOString(),
         };
-        return {
-          ...prev,
-          items: [...prev.items, newItem],
-        };
+        return { ...prev, items: [...prev.items, newItem] };
       });
     },
-    [setBookmarks]
+    [setActiveBookmarks]
   );
 
   const removeBookmark = useCallback(
     (id: string) => {
-      setBookmarks((prev) => ({
+      setActiveBookmarks((prev) => ({
         ...prev,
         items: prev.items.filter((b) => b.id !== id),
       }));
     },
-    [setBookmarks]
+    [setActiveBookmarks]
   );
 
   const toggleBookmark = useCallback(
     (item: Omit<BookmarkItem, 'id' | 'addedAt'>) => {
-      const exists = bookmarks.items.some((b) => b.slug === item.slug && b.type === item.type);
+      const exists = activeBookmarks.items.some((b) => b.slug === item.slug && b.type === item.type);
       if (exists) {
-        const existing = bookmarks.items.find((b) => b.slug === item.slug && b.type === item.type);
+        const existing = activeBookmarks.items.find((b) => b.slug === item.slug && b.type === item.type);
         if (existing) {
           removeBookmark(existing.id);
         }
@@ -62,75 +114,44 @@ export function useBookmarks() {
         addBookmark(item);
       }
     },
-    [bookmarks, addBookmark, removeBookmark]
+    [activeBookmarks, addBookmark, removeBookmark]
   );
 
   const isBookmarked = useCallback(
     (slug: string, type: BookmarkItem['type']): boolean => {
-      return bookmarks.items.some((b) => b.slug === slug && b.type === type);
+      return activeBookmarks.items.some((b) => b.slug === slug && b.type === type);
     },
-    [bookmarks]
+    [activeBookmarks]
   );
 
   const getBookmarksByType = useCallback(
     (type: BookmarkItem['type']): BookmarkItem[] => {
-      return bookmarks.items.filter((b) => b.type === type);
+      return activeBookmarks.items.filter((b) => b.type === type);
     },
-    [bookmarks]
+    [activeBookmarks]
   );
 
   const stats = useMemo(() => {
     return {
-      total: bookmarks.items.length,
-      lessons: bookmarks.items.filter((b) => b.type === 'lesson').length,
-      problems: bookmarks.items.filter((b) => b.type === 'problem').length,
-      interview: bookmarks.items.filter((b) => b.type === 'interview').length,
-      cheatsheet: bookmarks.items.filter((b) => b.type === 'cheatsheet').length,
+      total: activeBookmarks.items.length,
+      lessons: activeBookmarks.items.filter((b) => b.type === 'lesson').length,
+      problems: activeBookmarks.items.filter((b) => b.type === 'problem').length,
+      interview: activeBookmarks.items.filter((b) => b.type === 'interview').length,
+      cheatsheet: activeBookmarks.items.filter((b) => b.type === 'cheatsheet').length,
     };
-  }, [bookmarks]);
+  }, [activeBookmarks]);
 
-  const exportBookmarks = useCallback(() => {
-    const data = JSON.stringify(bookmarks, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `interview-prep-bookmarks-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [bookmarks]);
-
-  const importBookmarks = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const imported = JSON.parse(event.target?.result as string) as BookmarkState;
-          if (imported && Array.isArray(imported.items)) {
-            setBookmarks(imported);
-            alert('Bookmarks imported successfully!');
-          } else {
-            alert('Invalid bookmarks file.');
-          }
-        } catch {
-          alert('Failed to parse bookmarks file.');
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  }, [setBookmarks]);
+  const resetBookmarks = useCallback(() => {
+    setLocalBookmarks(DEFAULT_BOOKMARKS);
+    if (isLoggedIn) {
+      setServerBookmarks(DEFAULT_BOOKMARKS);
+      syncBookmarksToServer(DEFAULT_BOOKMARKS);
+    }
+  }, [setLocalBookmarks, isLoggedIn]);
 
   return {
-    bookmarks,
-    setBookmarks,
+    bookmarks: activeBookmarks,
+    setBookmarks: setActiveBookmarks,
     resetBookmarks,
     addBookmark,
     removeBookmark,
@@ -139,7 +160,7 @@ export function useBookmarks() {
     getBookmarksByType,
     stats,
     mounted,
-    exportBookmarks,
-    importBookmarks,
+    isLoggedIn: isLoggedIn,
+    isLoggedOut,
   };
 }

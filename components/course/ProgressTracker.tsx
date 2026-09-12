@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { CheckCircle2, RotateCcw } from 'lucide-react';
 import { cn, safePercent } from '@/lib/utils';
 import { useProgress } from '@/hooks/useProgress';
+import { SignInPrompt } from '@/components/auth/SignInPrompt';
 
 interface ProgressTrackerProps {
   lessonSlug: string;
@@ -17,16 +19,24 @@ export function ProgressTracker({
   allModuleLessonSlugs,
   className,
 }: ProgressTrackerProps) {
-  const { isCompleted, toggleComplete } = useProgress();
+  const { isCompleted, toggleComplete, isLoggedOut } = useProgress();
+  const [showSignIn, setShowSignIn] = useState(false);
   const done = isCompleted(lessonSlug);
 
   const completed = allModuleLessonSlugs.filter((s) => isCompleted(s)).length;
   const total = allModuleLessonSlugs.length;
   const percent = safePercent(completed, total);
 
+  const handleToggle = () => {
+    if (isLoggedOut) {
+      setShowSignIn(true);
+      return;
+    }
+    toggleComplete(lessonSlug, moduleSlug);
+  };
+
   return (
     <div className={cn('rounded-xl border border-border bg-canvas-subtle p-4', className)}>
-      {/* Module progress */}
       {total > 0 && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-center justify-between text-xs text-fg-muted">
@@ -47,10 +57,9 @@ export function ProgressTracker({
         </div>
       )}
 
-      {/* Mark complete button */}
       <button
         type="button"
-        onClick={() => toggleComplete(lessonSlug, moduleSlug)}
+        onClick={handleToggle}
         className={cn(
           'flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all',
           done
@@ -72,6 +81,7 @@ export function ProgressTracker({
           </>
         )}
       </button>
+      {showSignIn && <SignInPrompt onDismiss={() => setShowSignIn(false)} />}
     </div>
   );
 }

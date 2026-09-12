@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BookmarkButton } from '@/components/ui/BookmarkButton';
 import { useProgress } from '@/hooks/useProgress';
 import { PdfDownloadButton } from '@/components/ui/PdfDownloadButton';
+import { SignInPrompt } from '@/components/auth/SignInPrompt';
 
 export function LessonActions({
   lesson,
@@ -23,7 +24,8 @@ export function LessonActions({
   moduleSlug: string;
   category?: 'lessons' | 'problems' | 'interviewQuestions';
 }) {
-  const { markComplete, isCompleted, trackVisit } = useProgress();
+  const { markComplete, isCompleted, trackVisit, isLoggedOut } = useProgress();
+  const [showSignIn, setShowSignIn] = useState(false);
 
   useEffect(() => {
     trackVisit(lesson.slug, category);
@@ -31,13 +33,21 @@ export function LessonActions({
 
   const completed = isCompleted(lesson.slug, category);
 
+  const handleMarkComplete = () => {
+    if (isLoggedOut) {
+      setShowSignIn(true);
+      return;
+    }
+    markComplete(lesson.slug, moduleSlug, category);
+  };
+
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <span className="rounded-full border border-border bg-canvas-subtle px-2 py-0.5 text-xs text-fg-subtle capitalize">
         {category === 'interviewQuestions' ? 'Interview' : category.slice(0, -1)}
       </span>
       <button
-        onClick={() => markComplete(lesson.slug, moduleSlug, category)}
+        onClick={handleMarkComplete}
         className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
           completed
             ? 'border-success-emphasis bg-success-subtle text-success-fg'
@@ -61,6 +71,7 @@ export function LessonActions({
         filename={`${lesson.slug}.pdf`}
         label="Download PDF"
       />
+      {showSignIn && <SignInPrompt onDismiss={() => setShowSignIn(false)} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { X, Play } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 const STORAGE_KEY = 'interview_prep_last_path';
 const PROMPT_SHOWN_KEY = 'interview_prep_prompt_shown';
@@ -10,34 +11,59 @@ const PROMPT_SHOWN_KEY = 'interview_prep_prompt_shown';
 export function ContinuePrompt() {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [lastPath, setLastPath] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const isLoggedIn = status === 'authenticated';
 
   useEffect(() => {
     if (!pathname) return;
 
-    // Check if we just loaded the app and there's a stored path
-    const stored = localStorage.getItem(STORAGE_KEY);
-    
-    // We only want to prompt if we are at home or a different major section,
-    // and we have a stored path that is a lesson or course.
-    if (stored && stored !== pathname && stored !== '/' && !pathname.startsWith(stored)) {
-      // Show prompt if the user hasn't seen it in this session
-      const promptShown = sessionStorage.getItem(PROMPT_SHOWN_KEY);
-      if (!promptShown) {
-        setLastPath(stored);
-        setShowPrompt(true);
-        sessionStorage.setItem(PROMPT_SHOWN_KEY, 'true');
-      }
-    }
+    const checkAndShowPrompt = async () => {
+      let stored: string | null = null;
 
-    // Always update the stored path to the current one
-    // Only store significant pages, not simple static pages if possible, 
-    // but storing all is fine for now.
-    if (pathname !== '/') {
-      localStorage.setItem(STORAGE_KEY, pathname);
-    }
-  }, [pathname]);
+      if (isLoggedIn) {
+        try {
+          const res = await fetch('/api/last-path');
+          if (res.ok) {
+            const data = await res.json();
+            stored = data.path;
+          }
+        } catch {
+          // ignore
+        }
+      } else {
+        stored = localStorage.getItem(STORAGE_KEY);
+      }
+
+      if (stored && stored !== pathname && stored !== '/' && !pathname.startsWith(stored)) {
+        const promptShown = sessionStorage.getItem(PROMPT_SHOWN_KEY);
+        if (!promptShown) {
+          setLastPath(stored);
+          setShowPrompt(true);
+          sessionStorage.setItem(PROMPT_SHOWN_KEY, 'true');
+        }
+      }
+
+      if (pathname !== '/') {
+        if (isLoggedIn) {
+          try {
+            await fetch('/api/last-path', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path: pathname }),
+            });
+          } catch {
+            // ignore
+          }
+        } else {
+          localStorage.setItem(STORAGE_KEY, pathname);
+        }
+      }
+    };
+
+    checkAndShowPrompt();
+  }, [pathname, isLoggedIn]);
 
   if (!showPrompt || !lastPath) return null;
 

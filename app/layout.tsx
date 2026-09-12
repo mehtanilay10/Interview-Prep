@@ -5,8 +5,8 @@ import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { SkipLink } from '@/components/ui/SkipLink';
-import { ProgressBookmarksToolbar } from '@/components/progress/ProgressBookmarksToolbar';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -53,17 +53,18 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-screen flex-col bg-canvas text-fg-default antialiased transition-theme" style={{ fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' }}>
         <SkipLink />
-        <PWARegistration />
-        <ContinuePrompt />
-        <ThemeProvider>
-          <Navbar />
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
-          <Footer />
-          <ProgressBookmarksToolbar />
-          <OfflineIndicator />
-        </ThemeProvider>
+        <AuthProvider>
+          <PWARegistration />
+          <ContinuePrompt />
+          <ThemeProvider>
+            <Navbar />
+            <main id="main-content" className="flex-1">
+              {children}
+            </main>
+            <Footer />
+            <OfflineIndicator />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
