@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Bookmark, CheckCircle2, LogOut, TrendingUp, Award, Target } from 'lucide-react';
+import { Bookmark, CheckCircle2, LogOut, TrendingUp, Award, Target, BookOpen } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
 interface LessonProgress {
@@ -28,19 +28,29 @@ interface BookmarkItem {
   addedAt: string;
 }
 
+interface LessonNote {
+  courseSlug: string;
+  moduleSlug: string;
+  lessonSlug: string;
+  content: string;
+  updatedAt: string;
+}
+
 export function ProgressDashboardClient({ user }: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } }) {
   const router = useRouter();
   const { data: session } = useSession();
   const [progress, setProgress] = useState<Record<string, CategoryProgress>>({});
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
+  const [notes, setNotes] = useState<LessonNote[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [progressRes, bookmarksRes] = await Promise.all([
+        const [progressRes, bookmarksRes, notesRes] = await Promise.all([
           fetch('/api/progress'),
           fetch('/api/bookmarks'),
+          fetch('/api/user/notes'),
         ]);
 
         if (progressRes.ok) {
@@ -63,6 +73,11 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
         if (bookmarksRes.ok) {
           const bookmarksData = await bookmarksRes.json();
           setBookmarks(bookmarksData.items || []);
+        }
+
+        if (notesRes.ok) {
+          const notesData = await notesRes.json();
+          setNotes(notesData.notes || []);
         }
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
@@ -188,6 +203,27 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
           )}
         </div>
       </div>
+
+      {notes.length > 0 && (
+        <div className="mt-8 rounded-xl border border-border bg-canvas p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="h-5 w-5 text-accent-fg" aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-fg-default">Your Recent Notes</h2>
+          </div>
+          <ul className="space-y-2">
+            {notes.slice(0, 10).map((note, idx) => (
+              <li
+                key={`${note.courseSlug}-${note.moduleSlug}-${note.lessonSlug}-${idx}`}
+                className="rounded-lg border border-border bg-canvas-subtle px-3 py-2"
+              >
+                <p className="text-sm font-medium text-fg-default">{note.lessonSlug.replace(/-/g, ' ')}</p>
+                <p className="text-xs text-fg-muted line-clamp-2">{note.content}</p>
+                <span className="text-xs text-fg-subtle">{formatRelativeTime(note.updatedAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

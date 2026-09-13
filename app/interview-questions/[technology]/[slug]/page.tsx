@@ -13,6 +13,8 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonActions } from '@/components/progress/LessonActions';
+import { LessonNotes } from '@/components/lesson/LessonNotes';
+import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 const TECH_NAME_MAP: Record<string, string> = {
   'csharp': 'C#',
@@ -125,6 +127,16 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
 
       <div id="question-content" className="prose prose-slate dark:prose-invert max-w-none">
         <ContentBlockRenderer blocks={lesson.blocks} />
+      </div>
+
+      {/* Lesson notes */}
+      <div className="mt-8">
+        <LessonNotes courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} />
+      </div>
+
+      {/* Offline save */}
+      <div className="mt-4">
+        <OfflineSaveButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
       </div>
 
       <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">

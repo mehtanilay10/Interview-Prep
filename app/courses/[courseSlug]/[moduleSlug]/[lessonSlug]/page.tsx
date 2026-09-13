@@ -24,6 +24,8 @@ import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
 import { LessonActions } from '@/components/progress/LessonActions';
+import { LessonNotes } from '@/components/lesson/LessonNotes';
+import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -150,6 +152,16 @@ export default async function CourseLessonDetailPage({ params }: Params) {
           {/* Content blocks */}
           <div id="lesson-content" className="prose prose-slate dark:prose-invert max-w-none">
             <ContentBlockRenderer blocks={lesson.blocks} />
+          </div>
+
+          {/* Lesson notes */}
+          <div className="mt-8">
+            <LessonNotes courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
+          </div>
+
+          {/* Offline save */}
+          <div className="mt-4">
+            <OfflineSaveButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} title={lesson.title} />
           </div>
 
           {/* Further reading */}

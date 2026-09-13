@@ -7,6 +7,7 @@ import { Footer } from '@/components/layout/Footer';
 import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ErrorBoundaryWrapper } from '@/components/app/ErrorBoundaryWrapper';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -59,7 +60,9 @@ export default function RootLayout({
           <ThemeProvider>
             <Navbar />
             <main id="main-content" className="flex-1">
-              {children}
+              <ErrorBoundaryWrapper>
+                {children}
+              </ErrorBoundaryWrapper>
             </main>
             <Footer />
             <OfflineIndicator />
