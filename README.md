@@ -13,7 +13,9 @@ A production-ready educational web app for software engineering interview prepar
 | Styling | Tailwind CSS with GitHub-inspired design |
 | Dark Mode | next-themes (`class` strategy) |
 | Diagrams | Mermaid (client-side dynamic import) |
-| Progress | localStorage (no backend required) |
+| Auth | NextAuth v5 (Google OAuth) |
+| Database | Neon PostgreSQL |
+| Progress | Hybrid: localStorage (logged out) + Neon DB (logged in) |
 | Content | TypeScript structured files in `/content/` |
 
 ---
@@ -75,10 +77,19 @@ npm run lint
 ```
 interview-prep/
 ├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout (ThemeProvider, Navbar, Footer)
+│   ├── layout.tsx                # Root layout (AuthProvider, ThemeProvider, Navbar, Footer)
 │   ├── page.tsx                  # Home page
 │   ├── globals.css               # Global styles + CSS custom properties
 │   ├── sitemap.ts                # Auto-generated sitemap
+│   ├── login/page.tsx            # Google sign-in page
+│   ├── progress/
+│   │   ├── page.tsx              # Progress dashboard (server)
+│   │   └── ProgressDashboardClient.tsx  # Progress dashboard (client)
+│   ├── api/
+│   │   ├── auth/[...nextauth]/route.ts  # NextAuth API route
+│   │   ├── progress/route.ts     # Progress CRUD API
+│   │   ├── bookmarks/route.ts    # Bookmarks CRUD API
+│   │   └── last-path/route.ts    # Last-visited path API
 │   ├── courses/
 │   │   ├── page.tsx              # Course listing
 │   │   └── [courseSlug]/
@@ -119,7 +130,7 @@ interview-prep/
 │
 ├── components/
 │   ├── layout/
-│   │   ├── Navbar.tsx            # Sticky top nav with mobile menu
+│   │   ├── Navbar.tsx            # Sticky top nav with mobile menu + auth user menu
 │   │   ├── Footer.tsx            # Site footer with link columns
 │   │   ├── Breadcrumbs.tsx       # Breadcrumb navigation
 │   │   └── LessonSidebar.tsx     # Course/module/lesson sidebar
@@ -131,7 +142,11 @@ interview-prep/
 │   │   ├── FilterBar.tsx         # Pill-style filter buttons
 │   │   ├── EmptyState.tsx        # Empty list / no results state
 │   │   ├── ThemeToggle.tsx       # Dark/light mode button
+│   │   ├── BookmarkButton.tsx    # Bookmark toggle with sign-in gating
 │   │   └── ThemeProvider.tsx     # next-themes wrapper
+│   ├── auth/
+│   │   ├── AuthProvider.tsx      # SessionProvider wrapper for NextAuth
+│   │   └── SignInPrompt.tsx      # Inline sign-in modal for gated actions
 │   ├── course/
 │   │   ├── ModuleCard.tsx        # Module card (grid or compact)
 │   │   ├── LessonCard.tsx        # Lesson card (grid or list)
@@ -161,17 +176,24 @@ interview-prep/
 │   └── ...
 │
 ├── hooks/
-│   ├── useProgress.ts            # Lesson completion tracking (localStorage)
+│   ├── useProgress.ts            # Hybrid progress tracking (localStorage + Neon DB)
+│   ├── useBookmarks.ts           # Hybrid bookmark tracking (localStorage + Neon DB)
 │   └── useLocalStorage.ts        # Generic typesafe localStorage hook
 │
 ├── lib/
 │   ├── content.ts                # Content loading helpers + search
 │   ├── utils.ts                  # General utilities (cn, slugify, etc.)
-│   └── seo.ts                    # Metadata builders for pages
+│   ├── seo.ts                    # Metadata builders for pages
+│   ├── neon.ts                   # Neon PostgreSQL connection
+│   └── auth.ts                   # NextAuth server helpers
 │
 ├── types/
 │   └── index.ts                  # All TypeScript interfaces
 │
+├── scripts/
+│   └── schema.sql                # Neon database schema
+│
+├── auth.ts                       # NextAuth v5 configuration
 ├── public/                       # Static assets
 ├── README.md
 ├── AGENTS.md
@@ -270,21 +292,18 @@ Dark mode is applied via `.dark` class on `<html>` (controlled by `next-themes`)
 
 ## Progress Tracking
 
-User progress is stored in `localStorage` under the key `interview_prep_progress`. No backend, no account required.
+Progress and bookmarks use a **hybrid storage** approach:
+- **Logged out:** Stored in `localStorage` — no account required.
+- **Logged in:** Stored in Neon PostgreSQL and synced across devices.
+- On first login, local data is automatically migrated to the server.
 
-Structure:
-```typescript
-{
-  completedLessons: [{ lessonSlug, moduleSlug, completedAt }],
-  lastVisitedLesson: string,
-  startedAt: string
-}
-```
-
-Use the `useProgress()` hook in any client component:
+Use the `useProgress()` and `useBookmarks()` hooks in any client component:
 ```typescript
 const { isCompleted, markComplete, getModuleProgress } = useProgress();
+const { toggleBookmark, isBookmarked } = useBookmarks();
 ```
+
+When a logged-out user clicks **Bookmark** or **Mark Complete**, an inline `SignInPrompt` is shown. They can dismiss it or sign in with Google to save their data.
 
 ---
 
@@ -312,10 +331,18 @@ Or use `<MermaidRenderer>` directly in any client component.
 | Variable | Default | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_SITE_URL` | `https://interview-prep.dev` | Used for SEO metadata and sitemap |
+| `AUTH_SECRET` | *(required for auth)* | NextAuth secret for signing JWTs |
+| `AUTH_GOOGLE_ID` | *(required for auth)* | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | *(required for auth)* | Google OAuth client secret |
+| `DATABASE_URL` | *(required for auth)* | Neon PostgreSQL connection string |
 
-Create `.env.local` for local overrides:
+Create `.env` for local overrides:
 ```
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+AUTH_SECRET=openssl-rand-base64-32
+AUTH_GOOGLE_ID=your-google-client-id
+AUTH_GOOGLE_SECRET=your-google-client-secret
+DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/neondb?sslmode=require
 ```
 
 ---

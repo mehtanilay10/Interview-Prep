@@ -14,6 +14,8 @@ Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching
 - Interview Q&A organized by technology (`content/interview-qa/`)
 - Cheat sheets for quick reference (`content/cheatsheet/`)
 - SQL problem sets (`content/sql-problems/`)
+- User authentication via **NextAuth v5** with **Google OAuth**
+- Per-user progress and bookmarks stored in **Neon PostgreSQL**
 
 ---
 
@@ -170,6 +172,7 @@ See `types/index.ts` for the full list. Current types:
 ## Routes
 
 - `/` — Home page
+- `/login` — Google sign-in page
 - `/courses` — Course listing
 - `/courses/[courseSlug]` — Course overview
 - `/courses/[courseSlug]/[moduleSlug]` — Module overview
@@ -183,6 +186,7 @@ See `types/index.ts` for the full list. Current types:
 - `/interview-questions` — Interview question listing
 - `/interview-questions/[technology]` — Technology-specific questions
 - `/interview-questions/[technology]/[slug]` — Individual question
+- `/progress` — Progress dashboard (requires login)
 - `/search` — Search page
 - `/internal/article-compare` — Internal side-by-side article comparison tool (noindex)
 
@@ -194,6 +198,22 @@ Whenever you add a new top-level page:
 1. Add it to `NAV_LINKS` in `components/layout/Navbar.tsx`
 2. Add it to `FOOTER_LINKS` in `components/layout/Footer.tsx`
 3. Add it to `app/sitemap.ts` in the static routes array
+
+## Authentication and user data
+
+- Login is optional. Content browsing is public.
+- Progress, bookmarks, and last-visited path require login to persist to the server.
+- Logged-out users fall back to `localStorage` for these features.
+- When a logged-out user tries to bookmark or mark complete, show the inline `SignInPrompt` component — do not redirect automatically.
+- The `useProgress()` and `useBookmarks()` hooks are hybrid: they read/write `localStorage` when logged out, and sync with Neon via `/api/progress` and `/api/bookmarks` when logged in.
+- `ContinuePrompt` uses the DB for logged-in users and `localStorage` for logged-out users.
+- Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** provider.
+- User-specific data lives in **Neon PostgreSQL** (`lib/neon.ts`). The schema is in `scripts/schema.sql`.
+- API routes for user data:
+  - `app/api/progress/route.ts` — GET/POST/DELETE progress
+  - `app/api/bookmarks/route.ts` — GET/POST/DELETE bookmarks
+  - `app/api/last-path/route.ts` — GET/POST last visited path
+- The progress dashboard at `/progress` is a protected route that redirects unauthenticated users to `/login`.
 
 ---
 
@@ -268,12 +288,14 @@ Utility scripts in `scripts/` help keep content consistent:
 
 ## What to watch out for
 
-- **Hydration mismatches**: Any component that reads from `localStorage` or uses `window` must have `'use client'` and handle SSR gracefully (see `hooks/useLocalStorage.ts` for the pattern)
+- **Hydration mismatches**: Any component that reads from `localStorage` or uses `window` must have `'use client'` and handle SSR gracefully (see `hooks/useLocalStorage.ts` for the pattern). The `ContinuePrompt` component additionally branches between DB and `localStorage` based on the NextAuth session status.
 - **Mermaid SSR**: `mermaid` package cannot be imported server-side — always use the dynamic import pattern in `MermaidRenderer.tsx`
 - **`next/link` vs `<a>`**: Use `next/link` for internal links; `<a target="_blank" rel="noopener noreferrer">` for external
 - **Image optimization**: Prefer `next/image` for static/optimized images. The `image` ContentBlock renders content images with a plain `<img>` element (with an `@next/next/no-img-element` eslint-disable comment) because the `src` comes from lesson content and is opened in a modal; follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
 - **Generate static params**: When adding a new dynamic route, implement `generateStaticParams()` for build-time generation
 - **Content indexing**: When adding lessons/modules, always update the corresponding `index.ts` files in `content/`. The build will not automatically discover new content files.
+- **Auth-aware hooks**: `useProgress` and `useBookmarks` are hybrid hooks. When logged in, they fetch from and write to `/api/progress` and `/api/bookmarks`. When logged out, they read/write `localStorage` only. Do not bypass these hooks with direct DB calls in client components.
+- **Sign-in gating**: Do not redirect unauthenticated users away from the app. Show the inline `SignInPrompt` component when they try to use bookmark/progress features.
 
 ---
 
@@ -284,3 +306,6 @@ Utility scripts in `scripts/` help keep content consistent:
 - The cheatsheet and interview-qa "courses" (`content/cheatsheet/content.json`, `content/interview-qa/content.json`) are **not** imported into `content/courses/index.ts`. Their modules/lessons are registered directly in `content/modules/index.ts` and `content/lessons/index.ts`.
 - Interview questions use a `technology` field on lessons to group them. See `lib/content.ts` helpers like `getInterviewTechnologies()` and `getInterviewQuestions()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
+- Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
+- The Neon DB connection is in `lib/neon.ts`. The schema is in `scripts/schema.sql`. Run it against your Neon database before using auth-dependent features.
+- Environment variables: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `DATABASE_URL` are required for auth and database features. See `.env` for placeholders.
