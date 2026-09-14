@@ -28,12 +28,6 @@ const FOOTER_LINKS: FooterColumn[] = [
     ],
   },
   {
-    heading: 'Your Account',
-    links: [
-      { href: '/progress', label: 'Progress Dashboard' },
-    ],
-  },
-  {
     heading: 'About',
     links: [
       { href: 'https://github.com/mehtanilay10/Interview-Prep/', label: 'GitHub', external: true },

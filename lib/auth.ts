@@ -3,7 +3,10 @@ import { redirect } from 'next/navigation';
 
 export async function getCurrentUser() {
   const session = await auth();
-  return session?.user ?? null;
+  if (!session?.user?.id) {
+    return null;
+  }
+  return session.user;
 }
 
 export async function requireAuth() {

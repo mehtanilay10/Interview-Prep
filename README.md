@@ -13,7 +13,7 @@ A production-ready educational web app for software engineering interview prepar
 | Styling | Tailwind CSS with GitHub-inspired design |
 | Dark Mode | next-themes (`class` strategy) |
 | Diagrams | Mermaid (client-side dynamic import) |
-| Auth | NextAuth v5 (Google OAuth) |
+| Auth | NextAuth v5 / Auth.js (Google OAuth, Prisma Adapter) |
 | Database | Neon PostgreSQL |
 | Progress | Hybrid: localStorage (logged out) + Neon DB (logged in) |
 | Content | TypeScript structured files in `/content/` |
@@ -25,18 +25,18 @@ A production-ready educational web app for software engineering interview prepar
 ### Prerequisites
 
 - Node.js 18+
-- npm (included with Node.js)
+- Yarn 1.22+
 
 ### Install
 
 ```bash
-npm install
+yarn install
 ```
 
 ### Develop
 
 ```bash
-npm run dev
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -46,7 +46,7 @@ Open [http://localhost:3000](http://localhost:3000).
 By default, PWA registration is disabled in development. To test installability intentionally, start the app with:
 
 ```bash
-NEXT_PUBLIC_ENABLE_PWA_DEV=true npm run dev
+NEXT_PUBLIC_ENABLE_PWA_DEV=true yarn dev
 ```
 
 Mobile browsers still require a secure context for service workers. `localhost` is allowed, but a phone opening `http://192.168.x.x:3000` will not be installable unless you serve the site over HTTPS.
@@ -54,20 +54,20 @@ Mobile browsers still require a secure context for service workers. `localhost` 
 ### Build
 
 ```bash
-npm run build
-npm run start
+yarn build
+yarn start
 ```
 
 ### Type check
 
 ```bash
-npm run typecheck
+yarn typecheck
 ```
 
 ### Lint
 
 ```bash
-npm run lint
+yarn lint
 ```
 
 ---
@@ -184,14 +184,18 @@ interview-prep/
 │   ├── content.ts                # Content loading helpers + search
 │   ├── utils.ts                  # General utilities (cn, slugify, etc.)
 │   ├── seo.ts                    # Metadata builders for pages
-│   ├── neon.ts                   # Neon PostgreSQL connection
+│   ├── prisma.ts                 # Singleton Prisma PostgreSQL client
 │   └── auth.ts                   # NextAuth server helpers
 │
 ├── types/
 │   └── index.ts                  # All TypeScript interfaces
 │
+├── prisma/
+│   ├── schema.prisma             # Prisma data model
+│   └── migrations/               # Versioned database migrations
+│
 ├── scripts/
-│   └── schema.sql                # Neon database schema
+│   └── schema.sql                # Idempotent PostgreSQL schema equivalent
 │
 ├── auth.ts                       # NextAuth v5 configuration
 ├── public/                       # Static assets
@@ -334,14 +338,18 @@ Or use `<MermaidRenderer>` directly in any client component.
 | `AUTH_SECRET` | *(required for auth)* | NextAuth secret for signing JWTs |
 | `AUTH_GOOGLE_ID` | *(required for auth)* | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | *(required for auth)* | Google OAuth client secret |
+| `AUTH_URL` | *(required for production)* | Canonical app URL, e.g. `https://interview.mnilay.com` |
+| `AUTH_TRUST_HOST` | `true` behind a proxy | Allows Auth.js to trust the request host |
 | `DATABASE_URL` | *(required for auth)* | Neon PostgreSQL connection string |
 
-Create `.env` for local overrides:
+Create a local `.env` file for overrides. Environment files are ignored by Git and must not be committed:
 ```
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 AUTH_SECRET=openssl-rand-base64-32
 AUTH_GOOGLE_ID=your-google-client-id
 AUTH_GOOGLE_SECRET=your-google-client-secret
+AUTH_URL=http://localhost:3000
+AUTH_TRUST_HOST=true
 DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/neondb?sslmode=require
 ```
 
@@ -354,6 +362,6 @@ See `AGENTS.md` for detailed guidelines for AI coding agents and content contrib
 Key rules:
 1. Keep content in `/content/` — never hardcode lesson text in page components
 2. All content must use the defined `ContentBlock` types
-3. Run `npm run typecheck && npm run lint` before committing
+3. Run `yarn typecheck && yarn lint` before committing
 4. Update navigation and indexes when adding pages
 5. Keep difficulty labels accurate and honest

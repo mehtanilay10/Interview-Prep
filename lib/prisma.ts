@@ -17,7 +17,7 @@ export type AuthUser = {
 
 export async function getOrCreateUser(user: AuthUser) {
   if (!user.email) {
-    return null;
+    return user.id ? prisma.user.findUnique({ where: { id: user.id } }) : null;
   }
 
   const id = user.id ?? user.email;

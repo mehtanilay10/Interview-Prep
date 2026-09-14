@@ -207,8 +207,8 @@ Whenever you add a new top-level page:
 - When a logged-out user tries to bookmark or mark complete, show the inline `SignInPrompt` component — do not redirect automatically.
 - The `useProgress()` and `useBookmarks()` hooks are hybrid: they read/write `localStorage` when logged out, and sync with Prisma-backed APIs when logged in.
 - `ContinuePrompt` uses the DB for logged-in users and `localStorage` for logged-out users.
-- Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** provider.
-- User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; the initial migration is in `prisma/migrations/`, and `scripts/schema.sql` is an idempotent SQL equivalent.
+- Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** and the **Prisma Adapter**.
+- User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; migrations are in `prisma/migrations/`, and `scripts/schema.sql` is an idempotent SQL equivalent. The Auth.js adapter tables are `accounts`, `sessions`, `verification_tokens`, and `authenticators`.
 - API routes for user data:
   - `app/api/progress/route.ts` — GET/POST/DELETE progress
   - `app/api/bookmarks/route.ts` — GET/POST/DELETE bookmarks
@@ -221,7 +221,7 @@ Whenever you add a new top-level page:
 
 - All content files must be fully type-safe — no `as any` or `// @ts-ignore`
 - Use the existing types from `types/index.ts` — extend them don't bypass them
-- Run `npm run typecheck` before finalizing any change
+- Run `yarn typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
 - SEO metadata helpers (`buildMetadata`, `buildLessonMetadata`, `buildModuleMetadata`) live in `lib/seo.ts`
 
@@ -268,9 +268,9 @@ to repair duplicate code/content in example blocks and ensure language tags are 
 
 Run these in order:
 ```bash
-npm run typecheck
-npm run lint
-npm run build   # optional but recommended for major changes
+yarn typecheck
+yarn lint
+yarn build   # optional but recommended for major changes
 ```
 
 Fix all errors before calling the task complete. Do not suppress TypeScript errors to make them pass.
@@ -280,11 +280,11 @@ Fix all errors before calling the task complete. Do not suppress TypeScript erro
 ## Maintenance scripts
 
 Utility scripts in `scripts/` help keep content consistent:
-- `npm run db:generate` — generates the Prisma Client from `prisma/schema.prisma`
-- `npm run db:push` — pushes the Prisma schema to the configured database without migration history
-- `npm run db:studio` — opens Prisma Studio
-- `npm run db:migrate` — creates/applies Prisma migrations during development
-- `npm run vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
+- `yarn db:generate` — generates the Prisma Client from `prisma/schema.prisma`
+- `yarn db:push` — pushes the Prisma schema to the configured database without migration history
+- `yarn db:studio` — opens Prisma Studio
+- `yarn db:migrate` — creates/applies Prisma migrations during development
+- `yarn vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
 - `node scripts/fix-cheatsheet-examples.js` — repairs duplicate code/content in cheatsheet `example` blocks and ensures language tags are present
 - `node scripts/audit-cheatsheets.js` — audits cheatsheets for example-block correctness
 - `node scripts/fix-content.js`, `fix-indices.js`, `fix-content-recalc.js`, `fix-module-slugs.js`, `fix-lesson-module-slugs.js`, `fix-course-slugs.js`, `fix-callout-variants.js` — repair content slugs, indices, and callout variants
@@ -306,11 +306,11 @@ Utility scripts in `scripts/` help keep content consistent:
 
 ## Important notes
 
-- This project uses **npm**, not yarn. Use `npm run <script>` not `yarn <script>`.
+- This project uses **Yarn 1.22+**. Use `yarn <script>` for project commands and `yarn prisma ...` for Prisma CLI commands.
 - The `content/modules/index.ts` and `content/lessons/index.ts` files are auto-generated in spirit but must be manually updated when adding content. Always verify new imports are included in the `rawModules`/`rawLessons` arrays.
 - The cheatsheet and interview-qa "courses" (`content/cheatsheet/content.json`, `content/interview-qa/content.json`) are **not** imported into `content/courses/index.ts`. Their modules/lessons are registered directly in `content/modules/index.ts` and `content/lessons/index.ts`.
 - Interview questions use a `technology` field on lessons to group them. See `lib/content.ts` helpers like `getInterviewTechnologies()` and `getInterviewQuestions()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
-- Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
-- The Prisma PostgreSQL connection is configured in `lib/prisma.ts` from `DATABASE_URL`. The schema is in `prisma/schema.prisma`, with the initial migration in `prisma/migrations/`; run `npm run vercel-build` or `npx prisma migrate deploy` against your Neon database before using auth-dependent features.
-- Environment variables: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `DATABASE_URL` are required for auth and database features. For Auth.js v5, set `AUTH_URL` to the canonical application URL and set `AUTH_TRUST_HOST=true` when the application is behind a trusted reverse proxy; see `.env` for placeholders.
+- Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth and `PrismaAdapter`. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
+- The Prisma PostgreSQL connection is configured in `lib/prisma.ts` from `DATABASE_URL`. The schema is in `prisma/schema.prisma`, with migrations in `prisma/migrations/`; run `yarn vercel-build` or `yarn prisma migrate deploy` against your Neon database before using auth-dependent features.
+- Environment variables: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `DATABASE_URL` are required for auth and database features. For Auth.js v5, set `AUTH_URL` to the canonical application URL and set `AUTH_TRUST_HOST=true` when the application is behind a trusted reverse proxy. Keep `.env` and lockfiles generated by other package managers out of Git.
