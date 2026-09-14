@@ -104,7 +104,7 @@ export function useProgress() {
   useEffect(() => {
     if (isLoggedIn && localProgress !== DEFAULT_PROGRESS) {
       const hasLocalData = Object.values(localProgress).some(
-        (cp) => cp.completedLessons.length > 0
+        (cp) => (cp.completedLessons?.length ?? 0) > 0
       );
       if (hasLocalData) {
         syncProgressToServer(localProgress);
