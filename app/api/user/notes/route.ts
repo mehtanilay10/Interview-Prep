@@ -1,71 +1,110 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { sql } from '@/lib/neon';
+import { getOrCreateUser, prisma } from '@/lib/prisma';
 
-export async function GET() {
+async function getDatabaseUser() {
   const user = await getCurrentUser();
   if (!user) {
+    return null;
+  }
+
+  return getOrCreateUser(user);
+}
+
+export async function GET() {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rows = await sql`
-    SELECT course_slug, module_slug, lesson_slug, content, updated_at
-    FROM user_lesson_notes
-    WHERE user_id = ${user.id}
-    ORDER BY updated_at DESC
-  `;
+  const rows = await prisma.userLessonNote.findMany({
+    where: { userId: databaseUser.id },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      courseSlug: true,
+      moduleSlug: true,
+      lessonSlug: true,
+      content: true,
+      updatedAt: true,
+    },
+  });
 
   const notes = rows.map((row) => ({
-    courseSlug: row.course_slug,
-    moduleSlug: row.module_slug,
-    lessonSlug: row.lesson_slug,
+    courseSlug: row.courseSlug,
+    moduleSlug: row.moduleSlug,
+    lessonSlug: row.lessonSlug,
     content: row.content,
-    updatedAt: row.updated_at,
+    updatedAt: row.updatedAt.toISOString(),
   }));
 
   return NextResponse.json({ notes });
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { courseSlug, moduleSlug, lessonSlug, content } = await request.json();
+  const body = await request.json().catch(() => null);
+  if (
+    !body ||
+    typeof body.courseSlug !== 'string' ||
+    typeof body.moduleSlug !== 'string' ||
+    typeof body.lessonSlug !== 'string' ||
+    typeof body.content !== 'string'
+  ) {
+    return NextResponse.json({ error: 'Invalid note payload' }, { status: 400 });
+  }
 
-  await sql`
-    INSERT INTO user_lesson_notes (user_id, course_slug, module_slug, lesson_slug, content)
-    VALUES (${user.id}, ${courseSlug}, ${moduleSlug}, ${lessonSlug}, ${content})
-    ON CONFLICT (user_id, course_slug, module_slug, lesson_slug)
-    DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()
-  `;
+  await prisma.userLessonNote.upsert({
+    where: {
+      userId_courseSlug_moduleSlug_lessonSlug: {
+        userId: databaseUser.id,
+        courseSlug: body.courseSlug,
+        moduleSlug: body.moduleSlug,
+        lessonSlug: body.lessonSlug,
+      },
+    },
+    create: {
+      userId: databaseUser.id,
+      courseSlug: body.courseSlug,
+      moduleSlug: body.moduleSlug,
+      lessonSlug: body.lessonSlug,
+      content: body.content,
+    },
+    update: {
+      content: body.content,
+      updatedAt: new Date(),
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { courseSlug, moduleSlug, lessonSlug } = await request.json().catch(() => ({
-    courseSlug: null,
-    moduleSlug: null,
-    lessonSlug: null,
-  }));
-
-  if (courseSlug && moduleSlug && lessonSlug) {
-    await sql`
-      DELETE FROM user_lesson_notes
-      WHERE user_id = ${user.id}
-        AND course_slug = ${courseSlug}
-        AND module_slug = ${moduleSlug}
-        AND lesson_slug = ${lessonSlug}
-    `;
+  const body = await request.json().catch(() => null);
+  if (
+    body &&
+    typeof body.courseSlug === 'string' &&
+    typeof body.moduleSlug === 'string' &&
+    typeof body.lessonSlug === 'string'
+  ) {
+    await prisma.userLessonNote.deleteMany({
+      where: {
+        userId: databaseUser.id,
+        courseSlug: body.courseSlug,
+        moduleSlug: body.moduleSlug,
+        lessonSlug: body.lessonSlug,
+      },
+    });
   } else {
-    await sql`DELETE FROM user_lesson_notes WHERE user_id = ${user.id}`;
+    await prisma.userLessonNote.deleteMany({ where: { userId: databaseUser.id } });
   }
 
   return NextResponse.json({ ok: true });

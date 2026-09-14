@@ -1,34 +1,57 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { sql } from '@/lib/neon';
+import { getOrCreateUser, prisma } from '@/lib/prisma';
+import type { UserTheme } from '@prisma/client';
 
-export async function GET() {
+function isUserTheme(value: unknown): value is UserTheme {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+async function getDatabaseUser() {
   const user = await getCurrentUser();
   if (!user) {
+    return null;
+  }
+
+  return getOrCreateUser(user);
+}
+
+export async function GET() {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rows = await sql`
-    SELECT theme FROM user_theme_preferences WHERE user_id = ${user.id}
-  `;
+  const row = await prisma.userThemePreference.findUnique({
+    where: { userId: databaseUser.id },
+    select: { theme: true },
+  });
 
-  const theme = rows[0]?.theme ?? 'system';
-  return NextResponse.json({ theme });
+  return NextResponse.json({ theme: row?.theme ?? 'system' });
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { theme } = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || !isUserTheme(body.theme)) {
+    return NextResponse.json({ error: 'Invalid theme payload' }, { status: 400 });
+  }
 
-  await sql`
-    INSERT INTO user_theme_preferences (user_id, theme)
-    VALUES (${user.id}, ${theme})
-    ON CONFLICT (user_id) DO UPDATE SET theme = EXCLUDED.theme, updated_at = NOW()
-  `;
+  await prisma.userThemePreference.upsert({
+    where: { userId: databaseUser.id },
+    create: {
+      userId: databaseUser.id,
+      theme: body.theme,
+    },
+    update: {
+      theme: body.theme,
+      updatedAt: new Date(),
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

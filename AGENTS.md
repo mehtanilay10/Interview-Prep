@@ -205,10 +205,10 @@ Whenever you add a new top-level page:
 - Progress, bookmarks, and last-visited path require login to persist to the server.
 - Logged-out users fall back to `localStorage` for these features.
 - When a logged-out user tries to bookmark or mark complete, show the inline `SignInPrompt` component — do not redirect automatically.
-- The `useProgress()` and `useBookmarks()` hooks are hybrid: they read/write `localStorage` when logged out, and sync with Neon via `/api/progress` and `/api/bookmarks` when logged in.
+- The `useProgress()` and `useBookmarks()` hooks are hybrid: they read/write `localStorage` when logged out, and sync with Prisma-backed APIs when logged in.
 - `ContinuePrompt` uses the DB for logged-in users and `localStorage` for logged-out users.
 - Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** provider.
-- User-specific data lives in **Neon PostgreSQL** (`lib/neon.ts`). The schema is in `scripts/schema.sql`.
+- User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; the initial migration is in `prisma/migrations/`, and `scripts/schema.sql` is an idempotent SQL equivalent.
 - API routes for user data:
   - `app/api/progress/route.ts` — GET/POST/DELETE progress
   - `app/api/bookmarks/route.ts` — GET/POST/DELETE bookmarks
@@ -280,6 +280,11 @@ Fix all errors before calling the task complete. Do not suppress TypeScript erro
 ## Maintenance scripts
 
 Utility scripts in `scripts/` help keep content consistent:
+- `npm run db:generate` — generates the Prisma Client from `prisma/schema.prisma`
+- `npm run db:push` — pushes the Prisma schema to the configured database without migration history
+- `npm run db:studio` — opens Prisma Studio
+- `npm run db:migrate` — creates/applies Prisma migrations during development
+- `npm run vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
 - `node scripts/fix-cheatsheet-examples.js` — repairs duplicate code/content in cheatsheet `example` blocks and ensures language tags are present
 - `node scripts/audit-cheatsheets.js` — audits cheatsheets for example-block correctness
 - `node scripts/fix-content.js`, `fix-indices.js`, `fix-content-recalc.js`, `fix-module-slugs.js`, `fix-lesson-module-slugs.js`, `fix-course-slugs.js`, `fix-callout-variants.js` — repair content slugs, indices, and callout variants
@@ -307,5 +312,5 @@ Utility scripts in `scripts/` help keep content consistent:
 - Interview questions use a `technology` field on lessons to group them. See `lib/content.ts` helpers like `getInterviewTechnologies()` and `getInterviewQuestions()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
 - Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
-- The Neon DB connection is in `lib/neon.ts`. The schema is in `scripts/schema.sql`. Run it against your Neon database before using auth-dependent features.
+- The Prisma PostgreSQL connection is configured in `lib/prisma.ts` from `DATABASE_URL`. The schema is in `prisma/schema.prisma`, with the initial migration in `prisma/migrations/`; run `npm run vercel-build` or `npx prisma migrate deploy` against your Neon database before using auth-dependent features.
 - Environment variables: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `DATABASE_URL` are required for auth and database features. See `.env` for placeholders.

@@ -106,7 +106,7 @@ export function Navbar() {
                 aria-expanded={userMenuOpen}
               >
                 {session.user.image ? (
-                  <img src={session.user.image} alt="" className="h-7 w-7 rounded-full" />
+                  <Image src={session.user.image} alt="" className="h-7 w-7 rounded-full" />
                 ) : (
                   <User className="h-5 w-5" aria-hidden="true" />
                 )}

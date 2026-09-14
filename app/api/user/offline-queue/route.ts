@@ -1,70 +1,99 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { sql } from '@/lib/neon';
+import { getOrCreateUser, prisma } from '@/lib/prisma';
 
-export async function GET() {
+async function getDatabaseUser() {
   const user = await getCurrentUser();
   if (!user) {
+    return null;
+  }
+
+  return getOrCreateUser(user);
+}
+
+export async function GET() {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rows = await sql`
-    SELECT course_slug, module_slug, lesson_slug, title, queued_at
-    FROM offline_reading_queue
-    WHERE user_id = ${user.id}
-    ORDER BY queued_at DESC
-  `;
+  const rows = await prisma.offlineReadingQueue.findMany({
+    where: { userId: databaseUser.id },
+    orderBy: { queuedAt: 'desc' },
+    select: {
+      courseSlug: true,
+      moduleSlug: true,
+      lessonSlug: true,
+      title: true,
+      queuedAt: true,
+    },
+  });
 
   const queue = rows.map((row) => ({
-    courseSlug: row.course_slug,
-    moduleSlug: row.module_slug,
-    lessonSlug: row.lesson_slug,
+    courseSlug: row.courseSlug,
+    moduleSlug: row.moduleSlug,
+    lessonSlug: row.lessonSlug,
     title: row.title,
-    queuedAt: row.queued_at,
+    queuedAt: row.queuedAt.toISOString(),
   }));
 
   return NextResponse.json({ queue });
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { courseSlug, moduleSlug, lessonSlug, title } = await request.json();
+  const body = await request.json().catch(() => null);
+  if (
+    !body ||
+    typeof body.courseSlug !== 'string' ||
+    typeof body.moduleSlug !== 'string' ||
+    typeof body.lessonSlug !== 'string' ||
+    typeof body.title !== 'string'
+  ) {
+    return NextResponse.json({ error: 'Invalid offline queue payload' }, { status: 400 });
+  }
 
-  await sql`
-    INSERT INTO offline_reading_queue (user_id, course_slug, module_slug, lesson_slug, title)
-    VALUES (${user.id}, ${courseSlug}, ${moduleSlug}, ${lessonSlug}, ${title})
-    ON CONFLICT (user_id, course_slug, module_slug, lesson_slug) DO NOTHING
-  `;
+  await prisma.offlineReadingQueue.createMany({
+    data: {
+      userId: databaseUser.id,
+      courseSlug: body.courseSlug,
+      moduleSlug: body.moduleSlug,
+      lessonSlug: body.lessonSlug,
+      title: body.title,
+    },
+    skipDuplicates: true,
+  });
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { courseSlug, moduleSlug, lessonSlug } = await request.json().catch(() => ({
-    courseSlug: null,
-    moduleSlug: null,
-    lessonSlug: null,
-  }));
-
-  if (courseSlug && moduleSlug && lessonSlug) {
-    await sql`
-      DELETE FROM offline_reading_queue
-      WHERE user_id = ${user.id}
-        AND course_slug = ${courseSlug}
-        AND module_slug = ${moduleSlug}
-        AND lesson_slug = ${lessonSlug}
-    `;
+  const body = await request.json().catch(() => null);
+  if (
+    body &&
+    typeof body.courseSlug === 'string' &&
+    typeof body.moduleSlug === 'string' &&
+    typeof body.lessonSlug === 'string'
+  ) {
+    await prisma.offlineReadingQueue.deleteMany({
+      where: {
+        userId: databaseUser.id,
+        courseSlug: body.courseSlug,
+        moduleSlug: body.moduleSlug,
+        lessonSlug: body.lessonSlug,
+      },
+    });
   } else {
-    await sql`DELETE FROM offline_reading_queue WHERE user_id = ${user.id}`;
+    await prisma.offlineReadingQueue.deleteMany({ where: { userId: databaseUser.id } });
   }
 
   return NextResponse.json({ ok: true });

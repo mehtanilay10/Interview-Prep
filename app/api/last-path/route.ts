@@ -1,34 +1,52 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { sql } from '@/lib/neon';
+import { getOrCreateUser, prisma } from '@/lib/prisma';
 
-export async function GET() {
+async function getDatabaseUser() {
   const user = await getCurrentUser();
   if (!user) {
+    return null;
+  }
+
+  return getOrCreateUser(user);
+}
+
+export async function GET() {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rows = await sql`
-    SELECT path FROM user_last_path WHERE user_id = ${user.id}
-  `;
+  const row = await prisma.userLastPath.findUnique({
+    where: { userId: databaseUser.id },
+    select: { path: true },
+  });
 
-  const path = rows[0]?.path ?? null;
-  return NextResponse.json({ path });
+  return NextResponse.json({ path: row?.path ?? null });
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const databaseUser = await getDatabaseUser();
+  if (!databaseUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { path } = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.path !== 'string' || body.path.length === 0) {
+    return NextResponse.json({ error: 'Invalid path payload' }, { status: 400 });
+  }
 
-  await sql`
-    INSERT INTO user_last_path (user_id, path)
-    VALUES (${user.id}, ${path})
-    ON CONFLICT (user_id) DO UPDATE SET path = EXCLUDED.path, updated_at = NOW()
-  `;
+  await prisma.userLastPath.upsert({
+    where: { userId: databaseUser.id },
+    create: {
+      userId: databaseUser.id,
+      path: body.path,
+    },
+    update: {
+      path: body.path,
+      updatedAt: new Date(),
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }
