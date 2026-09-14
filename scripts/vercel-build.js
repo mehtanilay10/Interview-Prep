@@ -2,13 +2,8 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const run = (cmd, options = {}) => {
-  try {
-    execSync(cmd, { stdio: 'inherit', ...options });
-  } catch (e) {
-    console.error(`Command failed: ${cmd}`);
-    throw e;
-  }
+const run = (cmd) => {
+  execSync(cmd, { stdio: 'inherit' });
 };
 
 try {
@@ -17,15 +12,14 @@ try {
   try {
     run('prisma migrate deploy');
   } catch (e) {
-    const output = (e.message || '') + (e.stdout || '') + (e.stderr || '');
-    if (output.includes('P3005') || output.includes('schema is not empty')) {
-      console.log('Database schema already exists. Baselines migrations...');
-
+    const output = (e.message || '') + ' ' + (e.stdout || '') + ' ' + (e.stderr || '');
+    if (/P3005|schema is not empty|database schema/i.test(output)) {
+      console.log('Database schema already exists. Marking migrations as applied...');
       const migrationsDir = path.join(__dirname, '..', 'prisma', 'migrations');
       const migrations = fs.readdirSync(migrationsDir)
         .filter((f) => {
-          const fullPath = path.join(migrationsDir, f);
-          return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'migration.sql'));
+          const full = path.join(migrationsDir, f);
+          return fs.statSync(full).isDirectory() && fs.existsSync(path.join(full, 'migration.sql'));
         })
         .sort();
 
@@ -34,13 +28,14 @@ try {
         try {
           execSync(`prisma migrate resolve --applied ${migration}`, { stdio: 'inherit' });
         } catch (resolveError) {
-          console.error(`Failed to resolve ${migration}:`, resolveError.message);
+          console.error(`Failed to resolve ${migration}: ${resolveError.message}`);
         }
       }
 
       run('prisma migrate deploy');
     } else {
-      throw e;
+      console.error('Migration failed:', e.message);
+      process.exit(1);
     }
   }
 
