@@ -54,7 +54,13 @@ export function useBookmarks() {
   const setActiveBookmarks = useCallback(
     (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
       if (isLoggedIn) {
-        setServerBookmarks(updater);
+        setServerBookmarks((prev) => {
+          const current = prev ?? DEFAULT_BOOKMARKS;
+          if (typeof updater === 'function') {
+            return (updater as (prev: BookmarkState) => BookmarkState)(current);
+          }
+          return updater;
+        });
       } else {
         setLocalBookmarks(updater);
       }

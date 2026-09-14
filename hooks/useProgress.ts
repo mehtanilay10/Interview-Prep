@@ -88,7 +88,13 @@ export function useProgress() {
   const setActiveProgress = useCallback(
     (updater: ProgressState | ((prev: ProgressState) => ProgressState)) => {
       if (isLoggedIn) {
-        setServerProgress(updater);
+        setServerProgress((prev) => {
+          const current = prev ?? DEFAULT_PROGRESS;
+          if (typeof updater === 'function') {
+            return (updater as (prev: ProgressState) => ProgressState)(current);
+          }
+          return updater;
+        });
       } else {
         setLocalProgress(updater);
       }
