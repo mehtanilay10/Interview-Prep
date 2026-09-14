@@ -24,6 +24,7 @@ import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotes } from '@/components/lesson/LessonNotes';
+import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 interface Params {
@@ -42,8 +43,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const { moduleSlug, lessonSlug } = await params;
-  const lesson = getLessonBySlug(lessonSlug);
+  const { moduleSlug, lessonSlug, courseSlug } = await params;
+  const lesson = getLessonBySlug(lessonSlug, courseSlug);
   if (!lesson) return {};
   return {
     title: `${lesson.title} — Problems`,
@@ -54,7 +55,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function ProblemDetailPage({ params }: Params) {
   const { courseSlug, moduleSlug, lessonSlug } = await params;
   const course = getCourseBySlug(courseSlug);
-  const lesson = getLessonBySlug(lessonSlug);
+  const lesson = getLessonBySlug(lessonSlug, courseSlug);
   const mod = getModuleBySlug(moduleSlug);
 
   if (!course || !lesson || !mod || course.category !== 'problems') notFound();
@@ -77,7 +78,7 @@ export default async function ProblemDetailPage({ params }: Params) {
 
   // Related lessons
   const relatedLessons = (lesson.relatedLessons ?? [])
-    .map((slug) => getLessonBySlug(slug))
+    .map((slug) => getLessonBySlug(slug, courseSlug))
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
 
   return (
@@ -115,7 +116,9 @@ export default async function ProblemDetailPage({ params }: Params) {
 
           {/* Lesson header */}
           <header className="mb-8">
-            <LessonActions lesson={lesson} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems" />
+            <LessonActions lesson={lesson} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems">
+              <LessonNotesButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
+            </LessonActions>
             <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
               {lesson.title}
             </h1>
@@ -154,7 +157,7 @@ export default async function ProblemDetailPage({ params }: Params) {
           </div>
 
           {/* Lesson notes */}
-          <div className="mt-8">
+          <div className="mt-8" id="lesson-notes">
             <LessonNotes courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
           </div>
 

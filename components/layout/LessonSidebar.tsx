@@ -26,7 +26,6 @@ export function LessonSidebar({
 }: LessonSidebarProps) {
   const { isCompleted } = useProgress();
 
-  // Track which modules are open
   const [openModules, setOpenModules] = useState<Set<string>>(() => {
     const s = new Set<string>();
     s.add(currentModuleSlug);
@@ -51,14 +50,7 @@ export function LessonSidebar({
       : `/${basePrefix}/${modSlug}/${lessonSlug}`;
 
   return (
-    <nav
-      aria-label="Course navigation"
-      className="w-full text-sm"
-    >
-      <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-        Course Content
-      </p>
-
+    <nav aria-label="Course navigation" className="w-full text-sm">
       <ul className="space-y-1">
         {modules.map((mod) => {
           const isOpen = openModules.has(mod.slug);
@@ -107,7 +99,7 @@ export function LessonSidebar({
                           href={lessonHref(mod.slug, lesson.slug)}
                           aria-current={isCurrent ? 'page' : undefined}
                           className={cn(
-                            'flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors',
+                            'flex items-start gap-2 rounded-md px-2 py-2 transition-colors',
                             isCurrent
                               ? 'bg-accent-subtle text-accent-fg font-medium'
                               : 'text-fg-muted hover:bg-canvas-subtle hover:text-fg-default'

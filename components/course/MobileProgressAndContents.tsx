@@ -31,45 +31,46 @@ export function MobileProgressAndContents({
   const [contentsOpen, setContentsOpen] = useState(false);
 
   return (
-    <div className={cn('rounded-xl border border-border bg-canvas-subtle', className)}>
-      <ProgressTracker
-        lessonSlug={lessonSlug}
-        moduleSlug={moduleSlug}
-        allModuleLessonSlugs={allModuleLessonSlugs}
-        className="border-0 bg-transparent rounded-none rounded-t-xl"
-      />
+    <div className={cn('space-y-3', className)}>
+      <div className="rounded-xl border border-border bg-canvas-subtle">
+        <ProgressTracker
+          lessonSlug={lessonSlug}
+          moduleSlug={moduleSlug}
+          allModuleLessonSlugs={allModuleLessonSlugs}
+          className="border-0 bg-transparent rounded-none"
+        />
 
-      {/* Course Contents toggle */}
-      <div className="border-t border-border px-4 pb-1">
-        <button
-          type="button"
-          onClick={() => setContentsOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between py-3 text-sm font-medium text-fg-default transition-colors hover:text-accent-fg"
-          aria-expanded={contentsOpen}
-        >
-          <span className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-accent-fg" aria-hidden="true" />
-            Course Contents
-          </span>
-          {contentsOpen ? (
-            <ChevronUp className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+        <div className="border-t border-border">
+          <button
+            type="button"
+            onClick={() => setContentsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-fg-default transition-colors hover:text-accent-fg"
+            aria-expanded={contentsOpen}
+          >
+            <span className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-accent-fg" aria-hidden="true" />
+              Course Contents
+            </span>
+            {contentsOpen ? (
+              <ChevronUp className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+            )}
+          </button>
+
+          {contentsOpen && (
+            <div className="px-4 pb-4">
+              <LessonSidebar
+                currentModuleSlug={moduleSlug}
+                currentLessonSlug={lessonSlug}
+                courseSlug={courseSlug}
+                basePrefix={basePrefix}
+                modules={modules}
+                lessonsByModule={lessonsByModule}
+              />
+            </div>
           )}
-        </button>
-
-        {contentsOpen && (
-          <div className="pb-3">
-            <LessonSidebar
-              currentModuleSlug={moduleSlug}
-              currentLessonSlug={lessonSlug}
-              courseSlug={courseSlug}
-              basePrefix={basePrefix}
-              modules={modules}
-              lessonsByModule={lessonsByModule}
-            />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

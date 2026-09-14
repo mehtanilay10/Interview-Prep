@@ -9,6 +9,7 @@ import { getModuleBySlug, getLessonsForModule } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotes } from '@/components/lesson/LessonNotes';
+import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 const TECH_ICONS: Record<string, string> = {
@@ -105,14 +106,16 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ tec
         courseSlug="cheatsheet"
         moduleSlug={technology}
         category="lessons"
-      />
+      >
+        <LessonNotesButton courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} />
+      </LessonActions>
 
       <div id="cheatsheet-content" className="prose prose-slate dark:prose-invert max-w-none">
         <ContentBlockRenderer blocks={lesson.blocks} />
       </div>
 
       {/* Lesson notes */}
-      <div className="mt-8">
+      <div className="mt-8" id="lesson-notes">
         <LessonNotes courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} />
       </div>
 

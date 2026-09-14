@@ -82,8 +82,9 @@ export function getAllLessons(): Lesson[] {
   return [...lessons].sort((a, b) => a.order - b.order);
 }
 
-export function getLessonBySlug(slug: string): Lesson | undefined {
-  return lessons.find((l) => l.slug === slug);
+export function getLessonBySlug(slug: string, courseSlug?: string): Lesson | undefined {
+  const candidates = courseSlug ? lessons.filter((l) => l.courseSlug === courseSlug) : lessons;
+  return candidates.find((l) => l.slug === slug);
 }
 
 export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Lesson[] {

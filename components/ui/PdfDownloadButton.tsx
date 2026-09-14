@@ -27,9 +27,11 @@ export function PdfDownloadButton({
       }
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         backgroundColor: '#ffffff',
+        logging: false,
+        removeContainer: true,
       });
 
       const imgData = canvas.toDataURL('image/png');

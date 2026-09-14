@@ -14,6 +14,7 @@ import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotes } from '@/components/lesson/LessonNotes';
+import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 const TECH_NAME_MAP: Record<string, string> = {
@@ -72,7 +73,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ technology: string; slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const lesson = getLessonBySlug(slug);
+  const lesson = getLessonBySlug(slug, 'interview-qa');
   if (!lesson) return {};
   return buildLessonMetadata({
     title: lesson.title,
@@ -86,7 +87,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
   const { technology, slug } = await params;
   const tech = TECH_NAME_MAP[technology] ?? technology;
 
-  const lesson = getLessonBySlug(slug);
+  const lesson = getLessonBySlug(slug, 'interview-qa');
   if (!lesson) notFound();
 
   const allQuestions = getInterviewQuestions(tech);
@@ -118,7 +119,9 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
           courseSlug="interview-qa"
           moduleSlug={technology}
           category="interviewQuestions"
-        />
+        >
+          <LessonNotesButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} />
+        </LessonActions>
         <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
           {lesson.title}
         </h1>
@@ -130,7 +133,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
       </div>
 
       {/* Lesson notes */}
-      <div className="mt-8">
+      <div className="mt-8" id="lesson-notes">
         <LessonNotes courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} />
       </div>
 

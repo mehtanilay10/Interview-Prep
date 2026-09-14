@@ -47,6 +47,29 @@ async function fetchProgressFromServer(): Promise<ProgressState | null> {
   }
 }
 
+function mergeProgress(base: ProgressState, incoming: ProgressState): ProgressState {
+  const merged = { ...base };
+  for (const category of Object.keys(merged) as Category[]) {
+    const baseEntries = merged[category].completedLessons;
+    const incomingEntries = incoming[category].completedLessons;
+    const seen = new Set(baseEntries.map((e) => `${e.moduleSlug}:${e.lessonSlug}`));
+    const mergedEntries = [...baseEntries];
+    for (const entry of incomingEntries) {
+      const key = `${entry.moduleSlug}:${entry.lessonSlug}`;
+      if (!seen.has(key)) {
+        mergedEntries.push(entry);
+        seen.add(key);
+      }
+    }
+    merged[category] = {
+      completedLessons: mergedEntries,
+      lastVisitedLesson: incoming[category].lastVisitedLesson ?? base[category].lastVisitedLesson,
+      startedAt: incoming[category].startedAt ?? base[category].startedAt,
+    };
+  }
+  return merged;
+}
+
 async function syncProgressToServer(progress: ProgressState): Promise<void> {
   try {
     const allEntries: Array<{ category: Category; lessonSlug: string; moduleSlug: string }> = [];
@@ -107,11 +130,12 @@ export function useProgress() {
       setSyncedToServer(false);
       fetchProgressFromServer().then((data) => {
         if (data) {
-          setServerProgress(data);
+          const merged = localProgress !== DEFAULT_PROGRESS ? mergeProgress(localProgress, data) : data;
+          setServerProgress(merged);
         }
       });
     }
-  }, [isLoggedIn, serverProgress]);
+  }, [isLoggedIn, serverProgress, localProgress]);
 
   useEffect(() => {
     if (isLoggedIn && serverProgress && !syncedToServer && localProgress !== DEFAULT_PROGRESS) {
@@ -119,7 +143,7 @@ export function useProgress() {
         (cp) => (cp.completedLessons?.length ?? 0) > 0
       );
       if (hasLocalData) {
-        syncProgressToServer(localProgress);
+        syncProgressToServer(serverProgress);
       }
       setSyncedToServer(true);
     }
