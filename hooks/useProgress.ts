@@ -13,7 +13,7 @@ const DEFAULT_PROGRESS: ProgressState = {
   interviewQuestions: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
 };
 
-type Category = 'lessons' | 'problems' | 'interviewQuestions';
+type Category = keyof ProgressState;
 
 async function fetchProgressFromServer(): Promise<ProgressState | null> {
   try {
@@ -77,22 +77,28 @@ export function useProgress() {
   );
   const [serverProgress, setServerProgress] = useState<ProgressState | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [syncedToServer, setSyncedToServer] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const activeProgress = isLoggedIn && serverProgress ? serverProgress : localProgress;
-  const setActiveProgress = isLoggedIn
-    ? (updater: ProgressState | ((prev: ProgressState) => ProgressState)) => {
-        const next = typeof updater === 'function' ? updater(activeProgress) : updater;
-        setServerProgress(next);
-        syncProgressToServer(next);
+
+  const setActiveProgress = useCallback(
+    (updater: ProgressState | ((prev: ProgressState) => ProgressState)) => {
+      if (isLoggedIn) {
+        setServerProgress(updater);
+      } else {
+        setLocalProgress(updater);
       }
-    : setLocalProgress;
+    },
+    [isLoggedIn, setLocalProgress]
+  );
 
   useEffect(() => {
     if (isLoggedIn && !serverProgress) {
+      setSyncedToServer(false);
       fetchProgressFromServer().then((data) => {
         if (data) {
           setServerProgress(data);
@@ -102,15 +108,29 @@ export function useProgress() {
   }, [isLoggedIn, serverProgress]);
 
   useEffect(() => {
-    if (isLoggedIn && localProgress !== DEFAULT_PROGRESS) {
+    if (isLoggedIn && serverProgress && !syncedToServer && localProgress !== DEFAULT_PROGRESS) {
       const hasLocalData = Object.values(localProgress).some(
         (cp) => (cp.completedLessons?.length ?? 0) > 0
       );
       if (hasLocalData) {
         syncProgressToServer(localProgress);
       }
+      setSyncedToServer(true);
     }
-  }, [isLoggedIn, localProgress]);
+  }, [isLoggedIn, serverProgress, syncedToServer, localProgress]);
+
+  useEffect(() => {
+    if (isLoggedIn && serverProgress) {
+      syncProgressToServer(serverProgress);
+    }
+  }, [isLoggedIn, serverProgress]);
+
+  useEffect(() => {
+    if (isLoggedOut) {
+      setServerProgress(null);
+      setSyncedToServer(false);
+    }
+  }, [isLoggedOut]);
 
   const getCategory = useCallback(
     (category: Category) => {

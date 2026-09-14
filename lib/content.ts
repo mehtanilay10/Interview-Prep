@@ -112,11 +112,13 @@ export function getAdjacentLessons(
 
 /** Return full breadcrumb data for a lesson */
 export function getLessonBreadcrumb(lesson: Lesson): {
+  course: Course | undefined;
   module: Module | undefined;
   lesson: Lesson;
 } {
   const mod = getModuleBySlug(lesson.moduleSlug);
-  return { module: mod, lesson };
+  const course = mod ? getCourseBySlug(mod.courseSlug) : undefined;
+  return { course, module: mod, lesson };
 }
 
 // ── Table of Contents extraction ─────────────────────────────────────────────

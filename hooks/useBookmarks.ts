@@ -43,22 +43,34 @@ export function useBookmarks() {
   );
   const [serverBookmarks, setServerBookmarks] = useState<BookmarkState | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [syncedToServer, setSyncedToServer] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const activeBookmarks = isLoggedIn && serverBookmarks ? serverBookmarks : localBookmarks;
-  const setActiveBookmarks = isLoggedIn
-    ? (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
-        const next = typeof updater === 'function' ? updater(activeBookmarks) : updater;
-        setServerBookmarks(next);
-        syncBookmarksToServer(next);
+
+  const setActiveBookmarks = useCallback(
+    (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
+      if (isLoggedIn) {
+        setServerBookmarks(updater);
+      } else {
+        setLocalBookmarks(updater);
       }
-    : setLocalBookmarks;
+    },
+    [isLoggedIn, setLocalBookmarks]
+  );
+
+  useEffect(() => {
+    if (isLoggedIn && serverBookmarks) {
+      syncBookmarksToServer(serverBookmarks);
+    }
+  }, [isLoggedIn, serverBookmarks]);
 
   useEffect(() => {
     if (isLoggedIn && !serverBookmarks) {
+      setSyncedToServer(false);
       fetchBookmarksFromServer().then((data) => {
         if (data) {
           setServerBookmarks(data);
@@ -68,13 +80,21 @@ export function useBookmarks() {
   }, [isLoggedIn, serverBookmarks]);
 
   useEffect(() => {
-    if (isLoggedIn && localBookmarks !== DEFAULT_BOOKMARKS) {
+    if (isLoggedIn && serverBookmarks && !syncedToServer && localBookmarks !== DEFAULT_BOOKMARKS) {
       const hasLocalData = localBookmarks.items.length > 0;
       if (hasLocalData) {
         syncBookmarksToServer(localBookmarks);
       }
+      setSyncedToServer(true);
     }
-  }, [isLoggedIn, localBookmarks]);
+  }, [isLoggedIn, serverBookmarks, syncedToServer, localBookmarks]);
+
+  useEffect(() => {
+    if (isLoggedOut) {
+      setServerBookmarks(null);
+      setSyncedToServer(false);
+    }
+  }, [isLoggedOut]);
 
   const addBookmark = useCallback(
     (item: Omit<BookmarkItem, 'id' | 'addedAt'>) => {
