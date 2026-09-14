@@ -9,6 +9,8 @@ export function Logo({ className }: { className?: string }) {
 				alt=""
 				role="presentation"
 				aria-hidden="true"
+				width={32}
+				height={32}
 				className={cn("block dark:hidden", className)}
 			/>
 			<Image
@@ -16,6 +18,8 @@ export function Logo({ className }: { className?: string }) {
 				alt=""
 				role="presentation"
 				aria-hidden="true"
+				width={32}
+				height={32}
 				className={cn("hidden dark:block", className)}
 			/>
 		</>
