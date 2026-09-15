@@ -94,6 +94,7 @@ export function useProgress() {
   const [serverProgress, setServerProgress] = useState<ProgressState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverProgressRef = useRef(serverProgress);
   serverProgressRef.current = serverProgress;
 
@@ -103,6 +104,7 @@ export function useProgress() {
 
   useEffect(() => {
     if (!isLoggedIn || serverProgress) return;
+    setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
     fetchProgressFromServer().then((data) => {
@@ -110,6 +112,7 @@ export function useProgress() {
       if (data) {
         setServerProgress(data);
       }
+      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -117,15 +120,15 @@ export function useProgress() {
   }, [isLoggedIn]); // intentionally ignore serverProgress to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverProgressRef.current || syncedToServer) return;
+    if (!isLoggedIn || !serverProgressRef.current || isInitialLoad) return;
     syncProgressToServer(serverProgressRef.current);
-    setSyncedToServer(true);
-  }, [isLoggedIn, serverProgress, syncedToServer]);
+  }, [isLoggedIn, serverProgress, isInitialLoad]);
 
   useEffect(() => {
     if (isLoggedOut) {
       setServerProgress(null);
       setSyncedToServer(false);
+      setIsInitialLoad(true);
     }
   }, [isLoggedOut]);
 

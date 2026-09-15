@@ -15,6 +15,17 @@ const ShikiHighlighter = dynamic(
 
 const INLINE_MARKDOWN_REGEX = /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
 
+function isUnsafeUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
+    return true;
+  }
+  return false;
+}
+
 function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
   if (!text) return [];
   const tokens = text.split(INLINE_MARKDOWN_REGEX);
@@ -32,6 +43,9 @@ function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[
       const match = token.match(/\[([^\]]+)\]\(([^)]+)\)/);
       if (match) {
         const href = match[2];
+        if (isUnsafeUrl(href)) {
+          return <span key={i}>{match[1]}</span>;
+        }
         const isExternal = href.startsWith('http');
         return (
           <a

@@ -42,6 +42,7 @@ export function useLessonNotes() {
   const [serverNotes, setServerNotes] = useState<LessonNote[] | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverNotesRef = useRef(serverNotes);
   serverNotesRef.current = serverNotes;
 
@@ -51,6 +52,7 @@ export function useLessonNotes() {
 
   useEffect(() => {
     if (!isLoggedIn || serverNotes) return;
+    setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
     fetchNotesFromServer().then((data) => {
@@ -58,6 +60,7 @@ export function useLessonNotes() {
       if (data) {
         setServerNotes(data);
       }
+      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -65,15 +68,16 @@ export function useLessonNotes() {
   }, [isLoggedIn]); // intentionally ignore serverNotes to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverNotesRef.current || syncedToServer) return;
+    if (!isLoggedIn || !serverNotesRef.current || isInitialLoad) return;
     syncNoteToServer(serverNotesRef.current[serverNotesRef.current.length - 1] as LessonNote);
     setSyncedToServer(true);
-  }, [isLoggedIn, serverNotes, syncedToServer]);
+  }, [isLoggedIn, serverNotes, isInitialLoad]);
 
   useEffect(() => {
     if (isLoggedOut) {
       setServerNotes(null);
       setSyncedToServer(false);
+      setIsInitialLoad(true);
     }
   }, [isLoggedOut]);
 

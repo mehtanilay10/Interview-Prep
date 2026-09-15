@@ -19,6 +19,15 @@ export function useKeyboardShortcuts() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      const isTyping =
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable);
+
+      if (isTyping) return;
+
       const key = e.key.toLowerCase();
       const shortcut = shortcuts[key];
       if (shortcut) {

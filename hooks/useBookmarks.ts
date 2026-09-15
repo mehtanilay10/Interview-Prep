@@ -37,6 +37,7 @@ export function useBookmarks() {
   const [serverBookmarks, setServerBookmarks] = useState<BookmarkState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverBookmarksRef = useRef(serverBookmarks);
   serverBookmarksRef.current = serverBookmarks;
 
@@ -46,6 +47,7 @@ export function useBookmarks() {
 
   useEffect(() => {
     if (!isLoggedIn || serverBookmarks) return;
+    setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
     fetchBookmarksFromServer().then((data) => {
@@ -53,6 +55,7 @@ export function useBookmarks() {
       if (data) {
         setServerBookmarks(data);
       }
+      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -60,15 +63,15 @@ export function useBookmarks() {
   }, [isLoggedIn]); // intentionally ignore serverBookmarks to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverBookmarksRef.current || syncedToServer) return;
+    if (!isLoggedIn || !serverBookmarksRef.current || isInitialLoad) return;
     syncBookmarksToServer(serverBookmarksRef.current);
-    setSyncedToServer(true);
-  }, [isLoggedIn, serverBookmarks, syncedToServer]);
+  }, [isLoggedIn, serverBookmarks, isInitialLoad]);
 
   useEffect(() => {
     if (isLoggedOut) {
       setServerBookmarks(null);
       setSyncedToServer(false);
+      setIsInitialLoad(true);
     }
   }, [isLoggedOut]);
 

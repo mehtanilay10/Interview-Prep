@@ -42,6 +42,7 @@ export function useOfflineQueue() {
   const [serverQueue, setServerQueue] = useState<OfflineQueueItem[] | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverQueueRef = useRef(serverQueue);
   serverQueueRef.current = serverQueue;
 
@@ -51,6 +52,7 @@ export function useOfflineQueue() {
 
   useEffect(() => {
     if (!isLoggedIn || serverQueue) return;
+    setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
     fetchQueueFromServer().then((data) => {
@@ -58,6 +60,7 @@ export function useOfflineQueue() {
       if (data) {
         setServerQueue(data);
       }
+      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -65,15 +68,16 @@ export function useOfflineQueue() {
   }, [isLoggedIn]); // intentionally ignore serverQueue to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverQueueRef.current || syncedToServer) return;
+    if (!isLoggedIn || !serverQueueRef.current || isInitialLoad) return;
     syncQueueToServer(serverQueueRef.current[serverQueueRef.current.length - 1] as OfflineQueueItem);
     setSyncedToServer(true);
-  }, [isLoggedIn, serverQueue, syncedToServer]);
+  }, [isLoggedIn, serverQueue, isInitialLoad]);
 
   useEffect(() => {
     if (isLoggedOut) {
       setServerQueue(null);
       setSyncedToServer(false);
+      setIsInitialLoad(true);
     }
   }, [isLoggedOut]);
 

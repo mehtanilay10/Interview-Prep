@@ -3,10 +3,24 @@ import { getAllCourses, getModulesForCourse, getLessonsForCourse, getInterviewTe
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
-function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRoute.Sitemap[0]['changeFrequency'] = 'monthly'): MetadataRoute.Sitemap[0] {
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
+  'sql server': 'sql-server',
+  'full-stack scenarios': 'fullstack-scenarios',
+  'performance optimization': 'performance-optimization',
+  'ci/cd pipelines': 'cicd-pipelines',
+};
+
+function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRoute.Sitemap[0]['changeFrequency'] = 'monthly', lastModified?: Date): MetadataRoute.Sitemap[0] {
   return {
     url,
-    lastModified: new Date(),
+    lastModified: lastModified ?? new Date(),
     changeFrequency,
     priority,
   };
@@ -42,11 +56,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const technologies = getInterviewTechnologies();
   for (const tech of technologies) {
-    entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${tech.toLowerCase()}`));
+    const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
+    entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${techSlug}`));
 
     const questions = getInterviewQuestions(tech);
     for (const q of questions) {
-      entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${tech.toLowerCase()}/${q.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${techSlug}/${q.slug}`));
     }
   }
 
