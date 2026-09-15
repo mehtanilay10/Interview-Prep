@@ -56,26 +56,54 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (
-    !body ||
-    !isBookmarkType(body.type) ||
-    typeof body.slug !== 'string' ||
-    typeof body.title !== 'string' ||
-    typeof body.courseSlug !== 'string' ||
-    typeof body.moduleSlug !== 'string'
-  ) {
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Invalid bookmark payload' }, { status: 400 });
+  }
+
+  const items = Array.isArray((body as any).items)
+    ? (body as any).items
+    : [body];
+
+  const validItems: Array<{
+    type: BookmarkType;
+    slug: string;
+    title: string;
+    courseSlug: string;
+    moduleSlug: string;
+  }> = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    if (
+      isBookmarkType(item.type) &&
+      typeof item.slug === 'string' &&
+      typeof item.title === 'string' &&
+      typeof item.courseSlug === 'string' &&
+      typeof item.moduleSlug === 'string'
+    ) {
+      validItems.push({
+        type: item.type,
+        slug: item.slug,
+        title: item.title,
+        courseSlug: item.courseSlug,
+        moduleSlug: item.moduleSlug,
+      });
+    }
+  }
+
+  if (validItems.length === 0) {
     return NextResponse.json({ error: 'Invalid bookmark payload' }, { status: 400 });
   }
 
   await prisma.userBookmark.createMany({
-    data: {
+    data: validItems.map((item) => ({
       userId: databaseUser.id,
-      type: body.type,
-      slug: body.slug,
-      title: body.title,
-      courseSlug: body.courseSlug,
-      moduleSlug: body.moduleSlug,
-    },
+      type: item.type,
+      slug: item.slug,
+      title: item.title,
+      courseSlug: item.courseSlug,
+      moduleSlug: item.moduleSlug,
+    })),
     skipDuplicates: true,
   });
 

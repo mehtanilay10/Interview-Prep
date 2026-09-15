@@ -55,17 +55,42 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (!body || !isProgressCategory(body.category) || typeof body.lessonSlug !== 'string' || typeof body.moduleSlug !== 'string') {
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Invalid progress payload' }, { status: 400 });
+  }
+
+  const entries = Array.isArray((body as any).entries)
+    ? (body as any).entries
+    : [body];
+
+  const validEntries: Array<{ category: ProgressCategory; lessonSlug: string; moduleSlug: string }> = [];
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (
+      isProgressCategory(entry.category) &&
+      typeof entry.lessonSlug === 'string' &&
+      typeof entry.moduleSlug === 'string'
+    ) {
+      validEntries.push({
+        category: entry.category,
+        lessonSlug: entry.lessonSlug,
+        moduleSlug: entry.moduleSlug,
+      });
+    }
+  }
+
+  if (validEntries.length === 0) {
     return NextResponse.json({ error: 'Invalid progress payload' }, { status: 400 });
   }
 
   await prisma.userProgress.createMany({
-    data: {
+    data: validEntries.map((entry) => ({
       userId: databaseUser.id,
-      category: body.category,
-      lessonSlug: body.lessonSlug,
-      moduleSlug: body.moduleSlug,
-    },
+      category: entry.category,
+      lessonSlug: entry.lessonSlug,
+      moduleSlug: entry.moduleSlug,
+    })),
     skipDuplicates: true,
   });
 
