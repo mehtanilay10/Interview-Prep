@@ -3,8 +3,14 @@ import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCh
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getCourseStats, getAllCourses } from '@/lib/content';
+import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
-import Head from 'next/head';
+
+export const metadata = buildMetadata({
+  title: 'Interview Prep — Interview Preparation',
+  description: 'Interview Prep is an educational platform designed to teach interview skills to everyone, from professionals to students.',
+  path: '/',
+});
 
 export default function HomePage() {
   const stats = getCourseStats();
@@ -54,12 +60,6 @@ export default function HomePage() {
 
   return (
     <>
-      <Head>
-        <title>Interview Prep — Interview Preparation</title>
-        <meta name="description" content="Interview Prep is an educational platform designed to teach interview skills to everyone, from professionals to students." />
-        <meta name="keywords" content="interview prep, interview skills, interview preparation, career" />
-      </Head>
-
       <HeroSection
         totalLessons={stats.totalLessons}
         totalHours={stats.totalHours}

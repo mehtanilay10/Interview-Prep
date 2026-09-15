@@ -80,6 +80,7 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
     description: lesson.description,
     moduleSlug: lesson.moduleSlug,
     lessonSlug: slug,
+    basePath: '/interview-questions',
   });
 }
 

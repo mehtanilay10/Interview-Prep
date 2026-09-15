@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import type { CourseProgress, LessonProgress, ProgressState } from '@/types';
 
@@ -101,10 +101,56 @@ export function useProgress() {
   const [serverProgress, setServerProgress] = useState<ProgressState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const serverProgressRef = useRef(serverProgress);
+  serverProgressRef.current = serverProgress;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || serverProgress) return;
+    setSyncedToServer(false);
+    let cancelled = false;
+    fetchProgressFromServer().then((data) => {
+      if (cancelled) return;
+      if (data) {
+        const merged = localProgress !== DEFAULT_PROGRESS ? mergeProgress(localProgress, data) : data;
+        setServerProgress(merged);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]); // intentionally ignore serverProgress/localProgress to avoid refetch loops
+
+  useEffect(() => {
+    if (!isLoggedIn || !serverProgress || syncedToServer || localProgress === DEFAULT_PROGRESS) return;
+    const hasLocalData = Object.values(localProgress).some(
+      (cp) => (cp.completedLessons?.length ?? 0) > 0
+    );
+    if (hasLocalData) {
+      syncProgressToServer(serverProgress);
+    }
+    setSyncedToServer(true);
+  }, [isLoggedIn, serverProgress, syncedToServer, localProgress]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !serverProgressRef.current) return;
+    const isInitialLoad = !syncedToServer;
+    if (isInitialLoad) {
+      setSyncedToServer(true);
+      return;
+    }
+    syncProgressToServer(serverProgressRef.current);
+  }, [isLoggedIn, serverProgress, syncedToServer]);
+
+  useEffect(() => {
+    if (isLoggedOut) {
+      setServerProgress(null);
+      setSyncedToServer(false);
+    }
+  }, [isLoggedOut]);
 
   const activeProgress = isLoggedIn && serverProgress ? serverProgress : localProgress;
 
@@ -124,43 +170,6 @@ export function useProgress() {
     },
     [isLoggedIn, setLocalProgress]
   );
-
-  useEffect(() => {
-    if (isLoggedIn && !serverProgress) {
-      setSyncedToServer(false);
-      fetchProgressFromServer().then((data) => {
-        if (data) {
-          const merged = localProgress !== DEFAULT_PROGRESS ? mergeProgress(localProgress, data) : data;
-          setServerProgress(merged);
-        }
-      });
-    }
-  }, [isLoggedIn, serverProgress, localProgress]);
-
-  useEffect(() => {
-    if (isLoggedIn && serverProgress && !syncedToServer && localProgress !== DEFAULT_PROGRESS) {
-      const hasLocalData = Object.values(localProgress).some(
-        (cp) => (cp.completedLessons?.length ?? 0) > 0
-      );
-      if (hasLocalData) {
-        syncProgressToServer(serverProgress);
-      }
-      setSyncedToServer(true);
-    }
-  }, [isLoggedIn, serverProgress, syncedToServer, localProgress]);
-
-  useEffect(() => {
-    if (isLoggedIn && serverProgress) {
-      syncProgressToServer(serverProgress);
-    }
-  }, [isLoggedIn, serverProgress]);
-
-  useEffect(() => {
-    if (isLoggedOut) {
-      setServerProgress(null);
-      setSyncedToServer(false);
-    }
-  }, [isLoggedOut]);
 
   const getCategory = useCallback(
     (category: Category) => {

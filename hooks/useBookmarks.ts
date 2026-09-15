@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocalStorage } from './useLocalStorage';
 import type { BookmarkState, BookmarkItem } from '@/types';
@@ -44,6 +44,8 @@ export function useBookmarks() {
   const [serverBookmarks, setServerBookmarks] = useState<BookmarkState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
+  const serverBookmarksRef = useRef(serverBookmarks);
+  serverBookmarksRef.current = serverBookmarks;
 
   useEffect(() => {
     setMounted(true);
@@ -69,30 +71,38 @@ export function useBookmarks() {
   );
 
   useEffect(() => {
-    if (isLoggedIn && serverBookmarks) {
-      syncBookmarksToServer(serverBookmarks);
-    }
-  }, [isLoggedIn, serverBookmarks]);
-
-  useEffect(() => {
-    if (isLoggedIn && !serverBookmarks) {
-      setSyncedToServer(false);
-      fetchBookmarksFromServer().then((data) => {
-        if (data) {
-          setServerBookmarks(data);
-        }
-      });
-    }
-  }, [isLoggedIn, serverBookmarks]);
-
-  useEffect(() => {
-    if (isLoggedIn && serverBookmarks && !syncedToServer && localBookmarks !== DEFAULT_BOOKMARKS) {
-      const hasLocalData = localBookmarks.items.length > 0;
-      if (hasLocalData) {
-        syncBookmarksToServer(localBookmarks);
+    if (isLoggedIn && serverBookmarksRef.current) {
+      const isInitialLoad = !syncedToServer;
+      if (isInitialLoad) {
+        setSyncedToServer(true);
+        return;
       }
-      setSyncedToServer(true);
+      syncBookmarksToServer(serverBookmarksRef.current);
     }
+  }, [isLoggedIn, serverBookmarks, syncedToServer]);
+
+  useEffect(() => {
+    if (!isLoggedIn || serverBookmarks) return;
+    setSyncedToServer(false);
+    let cancelled = false;
+    fetchBookmarksFromServer().then((data) => {
+      if (cancelled) return;
+      if (data) {
+        setServerBookmarks(data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]); // intentionally ignore serverBookmarks to avoid refetch loops
+
+  useEffect(() => {
+    if (!isLoggedIn || !serverBookmarks || syncedToServer || localBookmarks === DEFAULT_BOOKMARKS) return;
+    const hasLocalData = localBookmarks.items.length > 0;
+    if (hasLocalData) {
+      syncBookmarksToServer(localBookmarks);
+    }
+    setSyncedToServer(true);
   }, [isLoggedIn, serverBookmarks, syncedToServer, localBookmarks]);
 
   useEffect(() => {

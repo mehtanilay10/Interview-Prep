@@ -77,10 +77,10 @@ export default function SearchPage() {
                 const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
                 href = `/interview-questions/${techSlug}/${result.slug}`;
               } else {
-                href = `/courses/${result.moduleSlug}/${result.slug}`;
+                href = `/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
               }
             } else {
-              href = `/courses/${result.moduleSlug}`;
+              href = `/courses/${result.courseSlug}/${result.moduleSlug}`;
             }
 
             return (

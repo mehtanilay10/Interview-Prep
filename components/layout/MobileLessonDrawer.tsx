@@ -70,7 +70,7 @@ export function MobileLessonDrawer({
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4" onClick={() => setOpen(false)}>
+          <div className="flex-1 overflow-y-auto p-4">
             <LessonSidebar
               currentModuleSlug={currentModuleSlug}
               currentLessonSlug={currentLessonSlug}

@@ -52,6 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
     description: mod.description,
     moduleSlug: mod.slug,
     lessonSlug: 'cheatsheet',
+    basePath: '/cheatsheet',
   });
 }
 

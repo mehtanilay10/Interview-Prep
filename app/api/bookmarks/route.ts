@@ -117,17 +117,17 @@ export async function DELETE(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (body && typeof body.slug === 'string' && typeof body.type === 'string' && isBookmarkType(body.type)) {
-    await prisma.userBookmark.deleteMany({
-      where: {
-        userId: databaseUser.id,
-        slug: body.slug,
-        type: body.type,
-      },
-    });
-  } else {
-    await prisma.userBookmark.deleteMany({ where: { userId: databaseUser.id } });
+  if (!body || typeof body !== 'object' || typeof body.slug !== 'string' || typeof body.type !== 'string' || !isBookmarkType(body.type)) {
+    return NextResponse.json({ error: 'Invalid bookmark delete payload' }, { status: 400 });
   }
+
+  await prisma.userBookmark.deleteMany({
+    where: {
+      userId: databaseUser.id,
+      slug: body.slug,
+      type: body.type,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

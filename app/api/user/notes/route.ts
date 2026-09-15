@@ -90,22 +90,23 @@ export async function DELETE(request: Request) {
 
   const body = await request.json().catch(() => null);
   if (
-    body &&
-    typeof body.courseSlug === 'string' &&
-    typeof body.moduleSlug === 'string' &&
-    typeof body.lessonSlug === 'string'
+    !body ||
+    typeof body !== 'object' ||
+    typeof body.courseSlug !== 'string' ||
+    typeof body.moduleSlug !== 'string' ||
+    typeof body.lessonSlug !== 'string'
   ) {
-    await prisma.userLessonNote.deleteMany({
-      where: {
-        userId: databaseUser.id,
-        courseSlug: body.courseSlug,
-        moduleSlug: body.moduleSlug,
-        lessonSlug: body.lessonSlug,
-      },
-    });
-  } else {
-    await prisma.userLessonNote.deleteMany({ where: { userId: databaseUser.id } });
+    return NextResponse.json({ error: 'Invalid note delete payload' }, { status: 400 });
   }
+
+  await prisma.userLessonNote.deleteMany({
+    where: {
+      userId: databaseUser.id,
+      courseSlug: body.courseSlug,
+      moduleSlug: body.moduleSlug,
+      lessonSlug: body.lessonSlug,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

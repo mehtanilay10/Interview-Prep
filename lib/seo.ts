@@ -48,11 +48,13 @@ export function buildLessonMetadata(opts: {
   description: string;
   moduleSlug: string;
   lessonSlug: string;
+  basePath?: string;
 }): Metadata {
+  const basePath = opts.basePath ?? '/courses';
   return buildMetadata({
     title: opts.title,
     description: opts.description,
-    path: `/courses/${opts.moduleSlug}/${opts.lessonSlug}`,
+    path: `${basePath}/${opts.moduleSlug}/${opts.lessonSlug}`,
   });
 }
 
@@ -60,10 +62,12 @@ export function buildModuleMetadata(opts: {
   title: string;
   description: string;
   moduleSlug: string;
+  basePath?: string;
 }): Metadata {
+  const basePath = opts.basePath ?? '/courses';
   return buildMetadata({
     title: opts.title,
     description: opts.description,
-    path: `/courses/${opts.moduleSlug}`,
+    path: `${basePath}/${opts.moduleSlug}`,
   });
 }
