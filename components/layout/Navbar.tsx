@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Menu, X, Search, LogOut, User } from "lucide-react";
@@ -106,7 +107,7 @@ export function Navbar() {
                 aria-expanded={userMenuOpen}
               >
                 {session.user.image ? (
-                  <img src={session.user.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+                  <Image src={session.user.image} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" unoptimized />
                 ) : (
                   <User className="h-5 w-5" aria-hidden="true" />
                 )}

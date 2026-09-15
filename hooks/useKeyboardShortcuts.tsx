@@ -24,7 +24,7 @@ export function useKeyboardShortcuts() {
         active &&
         (active.tagName === 'INPUT' ||
           active.tagName === 'TEXTAREA' ||
-          active.isContentEditable);
+          (active as HTMLElement).isContentEditable);
 
       if (isTyping) return;
 
