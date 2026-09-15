@@ -9,6 +9,8 @@ import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ErrorBoundaryWrapper } from '@/components/app/ErrorBoundaryWrapper';
+import { ProgressProvider } from '@/components/progress/ProgressProvider';
+import { BookmarkProvider } from '@/components/bookmarks/BookmarkProvider';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
@@ -55,18 +57,22 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col bg-canvas text-fg-default antialiased transition-theme">
         <SkipLink />
         <AuthProvider>
-          <PWARegistration />
-          <ContinuePrompt />
-          <ThemeProvider>
-            <Navbar />
-            <main id="main-content" className="flex-1">
-              <ErrorBoundaryWrapper>
-                {children}
-              </ErrorBoundaryWrapper>
-            </main>
-            <Footer />
-            <OfflineIndicator />
-          </ThemeProvider>
+          <ProgressProvider>
+            <BookmarkProvider>
+              <PWARegistration />
+              <ContinuePrompt />
+              <ThemeProvider>
+                <Navbar />
+                <main id="main-content" className="flex-1">
+                  <ErrorBoundaryWrapper>
+                    {children}
+                  </ErrorBoundaryWrapper>
+                </main>
+                <Footer />
+                <OfflineIndicator />
+              </ThemeProvider>
+            </BookmarkProvider>
+          </ProgressProvider>
         </AuthProvider>
       </body>
     </html>

@@ -1,28 +1,29 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { getOrCreateUser, prisma } from '@/lib/prisma';
-import { getLessonBySlug, modules } from '@/lib/content';
+import { lessons } from '@/content/lessons';
 import type { ProgressCategory } from '@prisma/client';
-
-const MODULE_COURSE_MAP: Record<string, string> = {};
-for (const mod of modules) {
-  MODULE_COURSE_MAP[mod.slug] = mod.courseSlug;
-}
 
 function isProgressCategory(value: unknown): value is ProgressCategory {
   return value === 'lessons' || value === 'problems' || value === 'interviewQuestions';
 }
 
 function buildLessonHref(category: ProgressCategory, moduleSlug: string, lessonSlug: string): string {
+  const lesson = lessons.find((l) => l.moduleSlug === moduleSlug && l.slug === lessonSlug);
+  if (!lesson) {
+    if (category === 'interviewQuestions') {
+      return `/interview-questions/${moduleSlug}/${lessonSlug}`;
+    }
+    const prefix = category === 'problems' ? 'problems' : 'courses';
+    return `/${prefix}/${moduleSlug}/${lessonSlug}`;
+  }
+
   if (category === 'interviewQuestions') {
-    return `/interview-questions/${moduleSlug}/${lessonSlug}`;
+    return `/interview-questions/${lesson.moduleSlug}/${lesson.slug}`;
   }
-  const courseSlug = MODULE_COURSE_MAP[moduleSlug];
-  if (!courseSlug) {
-    return category === 'problems' ? `/problems/${moduleSlug}/${lessonSlug}` : `/courses/${moduleSlug}/${lessonSlug}`;
-  }
+
   const prefix = category === 'problems' ? 'problems' : 'courses';
-  return `/${prefix}/${courseSlug}/${moduleSlug}/${lessonSlug}`;
+  return `/${prefix}/${lesson.courseSlug}/${lesson.moduleSlug}/${lesson.slug}`;
 }
 
 async function getDatabaseUser() {
@@ -57,12 +58,8 @@ export async function GET() {
       progress[row.category] = [];
     }
 
-    let title = row.lessonSlug.replace(/-/g, ' ');
-    const courseSlug = MODULE_COURSE_MAP[row.moduleSlug];
-    if (courseSlug) {
-      const lesson = getLessonBySlug(row.lessonSlug, courseSlug);
-      if (lesson) title = lesson.title;
-    }
+    const lesson = lessons.find((l) => l.moduleSlug === row.moduleSlug && l.slug === row.lessonSlug);
+    const title = lesson?.title ?? row.lessonSlug.replace(/-/g, ' ');
 
     progress[row.category].push({
       lessonSlug: row.lessonSlug,
