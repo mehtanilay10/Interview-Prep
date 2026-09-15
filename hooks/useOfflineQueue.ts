@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 
 type OfflineQueueItem = {
@@ -39,33 +39,45 @@ export function useOfflineQueue() {
   const isLoggedIn = status === 'authenticated';
   const isLoggedOut = status === 'unauthenticated';
 
-  const [localQueue, setLocalQueue] = useState<OfflineQueueItem[]>([]);
   const [serverQueue, setServerQueue] = useState<OfflineQueueItem[] | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [syncedToServer, setSyncedToServer] = useState(false);
+  const serverQueueRef = useRef(serverQueue);
+  serverQueueRef.current = serverQueue;
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const stored = localStorage.getItem('interview_prep_offline_queue');
-      if (stored) {
-        setLocalQueue(JSON.parse(stored));
-      }
-    } catch {
-      // ignore
-    }
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn && !serverQueue) {
-      fetchQueueFromServer().then((data) => {
-        if (data) {
-          setServerQueue(data);
-        }
-      });
-    }
-  }, [isLoggedIn, serverQueue]);
+    if (!isLoggedIn || serverQueue) return;
+    setSyncedToServer(false);
+    let cancelled = false;
+    fetchQueueFromServer().then((data) => {
+      if (cancelled) return;
+      if (data) {
+        setServerQueue(data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]); // intentionally ignore serverQueue to avoid refetch loops
 
-  const activeQueue = isLoggedIn && serverQueue ? serverQueue : localQueue;
+  useEffect(() => {
+    if (!isLoggedIn || !serverQueueRef.current || syncedToServer) return;
+    syncQueueToServer(serverQueueRef.current[serverQueueRef.current.length - 1] as OfflineQueueItem);
+    setSyncedToServer(true);
+  }, [isLoggedIn, serverQueue, syncedToServer]);
+
+  useEffect(() => {
+    if (isLoggedOut) {
+      setServerQueue(null);
+      setSyncedToServer(false);
+    }
+  }, [isLoggedOut]);
+
+  const activeQueue = isLoggedIn && serverQueue ? serverQueue : [];
 
   const isQueued = useCallback(
     (courseSlug: string, moduleSlug: string, lessonSlug: string): boolean => {
@@ -76,6 +88,7 @@ export function useOfflineQueue() {
 
   const addToQueue = useCallback(
     (courseSlug: string, moduleSlug: string, lessonSlug: string, title: string) => {
+      if (!isLoggedIn) return;
       const item: OfflineQueueItem = {
         courseSlug,
         moduleSlug,
@@ -84,50 +97,31 @@ export function useOfflineQueue() {
         queuedAt: new Date().toISOString(),
       };
 
-      if (isLoggedIn) {
-        setServerQueue((prev) => {
-          const next = prev ? [...prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug)), item] : [item];
-          return next;
-        });
+      setServerQueue((prev) => {
+        const next = prev
+          ? [...prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug)), item]
+          : [item];
         syncQueueToServer(item);
-      } else {
-        setLocalQueue((prev) => {
-          const next = [...prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug)), item];
-          try {
-            localStorage.setItem('interview_prep_offline_queue', JSON.stringify(next));
-          } catch {
-            // ignore
-          }
-          return next;
-        });
-      }
+        return next;
+      });
     },
     [isLoggedIn]
   );
 
   const removeFromQueue = useCallback(
     (courseSlug: string, moduleSlug: string, lessonSlug: string) => {
-      if (isLoggedIn) {
-        setServerQueue((prev) => {
-          const next = prev ? prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug)) : [];
-          return next;
-        });
-        fetch('/api/user/offline-queue', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),
-        }).catch(() => undefined);
-      } else {
-        setLocalQueue((prev) => {
-          const next = prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug));
-          try {
-            localStorage.setItem('interview_prep_offline_queue', JSON.stringify(next));
-          } catch {
-            // ignore
-          }
-          return next;
-        });
-      }
+      if (!isLoggedIn) return;
+      setServerQueue((prev) => {
+        const next = prev
+          ? prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug))
+          : [];
+        return next;
+      });
+      fetch('/api/user/offline-queue', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),
+      }).catch(() => undefined);
     },
     [isLoggedIn]
   );

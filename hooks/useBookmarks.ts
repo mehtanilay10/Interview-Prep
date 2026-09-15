@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useLocalStorage } from './useLocalStorage';
 import type { BookmarkState, BookmarkItem } from '@/types';
-
-const STORAGE_KEY = 'interview_prep_bookmarks';
 
 const DEFAULT_BOOKMARKS: BookmarkState = { items: [] };
 
@@ -37,10 +34,6 @@ export function useBookmarks() {
   const isLoggedIn = status === 'authenticated';
   const isLoggedOut = status === 'unauthenticated';
 
-  const [localBookmarks, setLocalBookmarks, resetLocal] = useLocalStorage<BookmarkState>(
-    STORAGE_KEY,
-    DEFAULT_BOOKMARKS
-  );
   const [serverBookmarks, setServerBookmarks] = useState<BookmarkState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
@@ -50,36 +43,6 @@ export function useBookmarks() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const activeBookmarks = isLoggedIn && serverBookmarks ? serverBookmarks : localBookmarks;
-
-  const setActiveBookmarks = useCallback(
-    (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
-      if (isLoggedIn) {
-        setServerBookmarks((prev) => {
-          const current = prev ?? DEFAULT_BOOKMARKS;
-          if (typeof updater === 'function') {
-            return (updater as (prev: BookmarkState) => BookmarkState)(current);
-          }
-          return updater;
-        });
-      } else {
-        setLocalBookmarks(updater);
-      }
-    },
-    [isLoggedIn, setLocalBookmarks]
-  );
-
-  useEffect(() => {
-    if (isLoggedIn && serverBookmarksRef.current) {
-      const isInitialLoad = !syncedToServer;
-      if (isInitialLoad) {
-        setSyncedToServer(true);
-        return;
-      }
-      syncBookmarksToServer(serverBookmarksRef.current);
-    }
-  }, [isLoggedIn, serverBookmarks, syncedToServer]);
 
   useEffect(() => {
     if (!isLoggedIn || serverBookmarks) return;
@@ -97,13 +60,10 @@ export function useBookmarks() {
   }, [isLoggedIn]); // intentionally ignore serverBookmarks to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverBookmarks || syncedToServer || localBookmarks === DEFAULT_BOOKMARKS) return;
-    const hasLocalData = localBookmarks.items.length > 0;
-    if (hasLocalData) {
-      syncBookmarksToServer(localBookmarks);
-    }
+    if (!isLoggedIn || !serverBookmarksRef.current || syncedToServer) return;
+    syncBookmarksToServer(serverBookmarksRef.current);
     setSyncedToServer(true);
-  }, [isLoggedIn, serverBookmarks, syncedToServer, localBookmarks]);
+  }, [isLoggedIn, serverBookmarks, syncedToServer]);
 
   useEffect(() => {
     if (isLoggedOut) {
@@ -112,8 +72,25 @@ export function useBookmarks() {
     }
   }, [isLoggedOut]);
 
+  const activeBookmarks = isLoggedIn && serverBookmarks ? serverBookmarks : DEFAULT_BOOKMARKS;
+
+  const setActiveBookmarks = useCallback(
+    (updater: BookmarkState | ((prev: BookmarkState) => BookmarkState)) => {
+      if (!isLoggedIn) return;
+      setServerBookmarks((prev) => {
+        const current = prev ?? DEFAULT_BOOKMARKS;
+        if (typeof updater === 'function') {
+          return (updater as (prev: BookmarkState) => BookmarkState)(current);
+        }
+        return updater;
+      });
+    },
+    [isLoggedIn]
+  );
+
   const addBookmark = useCallback(
     (item: Omit<BookmarkItem, 'id' | 'addedAt'>) => {
+      if (!isLoggedIn) return;
       setActiveBookmarks((prev) => {
         const exists = prev.items.some((b) => b.slug === item.slug && b.type === item.type);
         if (exists) return prev;
@@ -125,21 +102,23 @@ export function useBookmarks() {
         return { ...prev, items: [...prev.items, newItem] };
       });
     },
-    [setActiveBookmarks]
+    [setActiveBookmarks, isLoggedIn]
   );
 
   const removeBookmark = useCallback(
     (id: string) => {
+      if (!isLoggedIn) return;
       setActiveBookmarks((prev) => ({
         ...prev,
         items: prev.items.filter((b) => b.id !== id),
       }));
     },
-    [setActiveBookmarks]
+    [setActiveBookmarks, isLoggedIn]
   );
 
   const toggleBookmark = useCallback(
     (item: Omit<BookmarkItem, 'id' | 'addedAt'>) => {
+      if (!isLoggedIn) return;
       const exists = activeBookmarks.items.some((b) => b.slug === item.slug && b.type === item.type);
       if (exists) {
         const existing = activeBookmarks.items.find((b) => b.slug === item.slug && b.type === item.type);
@@ -150,7 +129,7 @@ export function useBookmarks() {
         addBookmark(item);
       }
     },
-    [activeBookmarks, addBookmark, removeBookmark]
+    [activeBookmarks, addBookmark, removeBookmark, isLoggedIn]
   );
 
   const isBookmarked = useCallback(
@@ -178,12 +157,10 @@ export function useBookmarks() {
   }, [activeBookmarks]);
 
   const resetBookmarks = useCallback(() => {
-    setLocalBookmarks(DEFAULT_BOOKMARKS);
-    if (isLoggedIn) {
-      setServerBookmarks(DEFAULT_BOOKMARKS);
-      syncBookmarksToServer(DEFAULT_BOOKMARKS);
-    }
-  }, [setLocalBookmarks, isLoggedIn]);
+    if (!isLoggedIn) return;
+    setServerBookmarks(DEFAULT_BOOKMARKS);
+    syncBookmarksToServer(DEFAULT_BOOKMARKS);
+  }, [isLoggedIn]);
 
   return {
     bookmarks: activeBookmarks,

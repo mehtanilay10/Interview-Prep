@@ -2,10 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocalStorage } from './useLocalStorage';
 import type { CourseProgress, LessonProgress, ProgressState } from '@/types';
-
-const STORAGE_KEY = 'interview_prep_progress';
 
 const DEFAULT_PROGRESS: ProgressState = {
   lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
@@ -94,10 +91,6 @@ export function useProgress() {
   const isLoggedIn = status === 'authenticated';
   const isLoggedOut = status === 'unauthenticated';
 
-  const [localProgress, setLocalProgress, resetLocal] = useLocalStorage<ProgressState>(
-    STORAGE_KEY,
-    DEFAULT_PROGRESS
-  );
   const [serverProgress, setServerProgress] = useState<ProgressState | null>(null);
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
@@ -115,34 +108,18 @@ export function useProgress() {
     fetchProgressFromServer().then((data) => {
       if (cancelled) return;
       if (data) {
-        const merged = localProgress !== DEFAULT_PROGRESS ? mergeProgress(localProgress, data) : data;
-        setServerProgress(merged);
+        setServerProgress(data);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn]); // intentionally ignore serverProgress/localProgress to avoid refetch loops
+  }, [isLoggedIn]); // intentionally ignore serverProgress to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverProgress || syncedToServer || localProgress === DEFAULT_PROGRESS) return;
-    const hasLocalData = Object.values(localProgress).some(
-      (cp) => (cp.completedLessons?.length ?? 0) > 0
-    );
-    if (hasLocalData) {
-      syncProgressToServer(serverProgress);
-    }
-    setSyncedToServer(true);
-  }, [isLoggedIn, serverProgress, syncedToServer, localProgress]);
-
-  useEffect(() => {
-    if (!isLoggedIn || !serverProgressRef.current) return;
-    const isInitialLoad = !syncedToServer;
-    if (isInitialLoad) {
-      setSyncedToServer(true);
-      return;
-    }
+    if (!isLoggedIn || !serverProgressRef.current || syncedToServer) return;
     syncProgressToServer(serverProgressRef.current);
+    setSyncedToServer(true);
   }, [isLoggedIn, serverProgress, syncedToServer]);
 
   useEffect(() => {
@@ -152,23 +129,20 @@ export function useProgress() {
     }
   }, [isLoggedOut]);
 
-  const activeProgress = isLoggedIn && serverProgress ? serverProgress : localProgress;
+  const activeProgress = isLoggedIn && serverProgress ? serverProgress : DEFAULT_PROGRESS;
 
   const setActiveProgress = useCallback(
     (updater: ProgressState | ((prev: ProgressState) => ProgressState)) => {
-      if (isLoggedIn) {
-        setServerProgress((prev) => {
-          const current = prev ?? DEFAULT_PROGRESS;
-          if (typeof updater === 'function') {
-            return (updater as (prev: ProgressState) => ProgressState)(current);
-          }
-          return updater;
-        });
-      } else {
-        setLocalProgress(updater);
-      }
+      if (!isLoggedIn) return;
+      setServerProgress((prev) => {
+        const current = prev ?? DEFAULT_PROGRESS;
+        if (typeof updater === 'function') {
+          return (updater as (prev: ProgressState) => ProgressState)(current);
+        }
+        return updater;
+      });
     },
-    [isLoggedIn, setLocalProgress]
+    [isLoggedIn]
   );
 
   const getCategory = useCallback(
@@ -180,13 +154,14 @@ export function useProgress() {
 
   const setCategory = useCallback(
     (category: Category, value: CourseProgress | ((prev: CourseProgress) => CourseProgress)) => {
+      if (!isLoggedIn) return;
       setActiveProgress((prev) => {
         const current = prev[category] ?? DEFAULT_PROGRESS[category];
         const next = typeof value === 'function' ? (value as (p: CourseProgress) => CourseProgress)(current) : value;
         return { ...prev, [category]: next };
       });
     },
-    [setActiveProgress]
+    [setActiveProgress, isLoggedIn]
   );
 
   const isCompleted = useCallback(
@@ -199,6 +174,7 @@ export function useProgress() {
 
   const markComplete = useCallback(
     (lessonSlug: string, moduleSlug: string, category: Category = 'lessons') => {
+      if (!isLoggedIn) return;
       setCategory(category, (prev) => {
         if (prev.completedLessons.some((l) => l.lessonSlug === lessonSlug)) {
           return prev;
@@ -212,17 +188,18 @@ export function useProgress() {
         };
       });
     },
-    [setCategory]
+    [setCategory, isLoggedIn]
   );
 
   const markIncomplete = useCallback(
     (lessonSlug: string, category: Category = 'lessons') => {
+      if (!isLoggedIn) return;
       setCategory(category, (prev) => ({
         ...prev,
         completedLessons: prev.completedLessons.filter((l) => l.lessonSlug !== lessonSlug),
       }));
     },
-    [setCategory]
+    [setCategory, isLoggedIn]
   );
 
   const toggleComplete = useCallback(
@@ -238,13 +215,14 @@ export function useProgress() {
 
   const trackVisit = useCallback(
     (lessonSlug: string, category: Category = 'lessons') => {
+      if (!isLoggedIn) return;
       setCategory(category, (prev) => ({
         ...prev,
         lastVisitedLesson: lessonSlug,
         startedAt: prev.startedAt ?? new Date().toISOString(),
       }));
     },
-    [setCategory]
+    [setCategory, isLoggedIn]
   );
 
   const getModuleProgress = useCallback(
@@ -276,12 +254,10 @@ export function useProgress() {
   }, [activeProgress]);
 
   const resetProgress = useCallback(() => {
-    setLocalProgress(DEFAULT_PROGRESS);
-    if (isLoggedIn) {
-      setServerProgress(DEFAULT_PROGRESS);
-      syncProgressToServer(DEFAULT_PROGRESS);
-    }
-  }, [setLocalProgress, isLoggedIn]);
+    if (!isLoggedIn) return;
+    setServerProgress(DEFAULT_PROGRESS);
+    syncProgressToServer(DEFAULT_PROGRESS);
+  }, [isLoggedIn]);
 
   return {
     progress: activeProgress,
