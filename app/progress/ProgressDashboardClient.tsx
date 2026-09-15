@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Bookmark, CheckCircle2, LogOut, TrendingUp, Award, Target, BookOpen } from 'lucide-react';
@@ -89,20 +89,33 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
     fetchData();
   }, []);
 
-  const totalCompleted = Object.values(progress).reduce(
+  const totalCompleted = useMemo(() => Object.values(progress).reduce(
     (sum, cat) => sum + cat.completedLessons.length,
     0
-  );
+  ), [progress]);
 
   const lessonsCompleted = progress.lessons?.completedLessons.length || 0;
   const problemsCompleted = progress.problems?.completedLessons.length || 0;
   const interviewCompleted = progress.interviewQuestions?.completedLessons.length || 0;
 
-  const categoryStats = [
+  const categoryStats = useMemo(() => [
     { label: 'Lessons', count: lessonsCompleted, href: '/courses', icon: CheckCircle2, color: 'text-success-fg' },
     { label: 'Problems', count: problemsCompleted, href: '/problems', icon: Target, color: 'text-accent-fg' },
     { label: 'Interviews', count: interviewCompleted, href: '/interview-questions', icon: TrendingUp, color: 'text-warning-fg' },
-  ];
+  ], [lessonsCompleted, problemsCompleted, interviewCompleted]);
+
+  const recentCompletions = useMemo(() => {
+    if (totalCompleted === 0) return [];
+    return Object.values(progress)
+      .flatMap((cat) =>
+        cat.completedLessons.map((lesson) => ({
+          ...lesson,
+          category: Object.keys(progress).find((key) => progress[key] === cat),
+        }))
+      )
+      .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+      .slice(0, 10);
+  }, [progress, totalCompleted]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
@@ -149,20 +162,11 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
             <CheckCircle2 className="h-5 w-5 text-success-fg" aria-hidden="true" />
             <h2 className="text-lg font-semibold text-fg-default">Recent Completions</h2>
           </div>
-          {totalCompleted === 0 ? (
+          {recentCompletions.length === 0 ? (
             <p className="text-sm text-fg-muted">No completions yet. Start learning!</p>
           ) : (
             <ul className="space-y-2">
-              {Object.values(progress)
-                .flatMap((cat) =>
-                  cat.completedLessons.map((lesson) => ({
-                    ...lesson,
-                    category: Object.keys(progress).find((key) => progress[key] === cat),
-                  }))
-                )
-                .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-                .slice(0, 10)
-                .map((lesson) => (
+              {recentCompletions.map((lesson) => (
                   <li
                     key={`${lesson.category}-${lesson.lessonSlug}`}
                     className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2"

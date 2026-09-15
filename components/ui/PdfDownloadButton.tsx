@@ -2,8 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 export function PdfDownloadButton({
   targetId,
@@ -21,6 +19,11 @@ export function PdfDownloadButton({
     setLoading(true);
     setError(null);
     try {
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
+
       const element = document.getElementById(targetId);
       if (!element) {
         throw new Error('Content not found for PDF export.');

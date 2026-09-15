@@ -7,12 +7,17 @@ import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { ImageModal } from './ImageModal';
-import { ShikiHighlighter } from 'react-shiki';
 
+const ShikiHighlighter = dynamic(
+  () => import('react-shiki').then((m) => m.ShikiHighlighter),
+  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-canvas-subtle" /> }
+);
+
+const INLINE_MARKDOWN_REGEX = /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
 
 function renderInlineMarkdown(text: string | undefined | null): React.ReactNode[] {
   if (!text) return [];
-  const tokens = text.split(/(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
+  const tokens = text.split(INLINE_MARKDOWN_REGEX);
   return tokens.map((token, i) => {
     if (token.startsWith('**') && token.endsWith('**')) {
       return <strong key={i} className="font-semibold text-fg-default">{token.slice(2, -2)}</strong>;
@@ -246,6 +251,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
                 {block.data.headers.map((h, i) => (
                   <th
                     key={i}
+                    scope="col"
                     className="border-b border-border px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-fg-muted"
                   >
                     {h}
