@@ -10,6 +10,7 @@ interface ProgressTrackerProps {
   lessonSlug: string;
   moduleSlug: string;
   allModuleLessonSlugs: string[];
+  category?: 'lessons' | 'problems' | 'interviewQuestions';
   className?: string;
 }
 
@@ -17,13 +18,14 @@ export const ProgressTracker = memo(function ProgressTracker({
   lessonSlug,
   moduleSlug,
   allModuleLessonSlugs,
+  category = 'lessons',
   className,
 }: ProgressTrackerProps) {
   const { toggleComplete, isCompleted, isLoggedOut } = useProgress();
   const [showSignIn, setShowSignIn] = useState(false);
-  const done = isCompleted(lessonSlug);
+  const done = isCompleted(lessonSlug, category);
 
-  const completed = allModuleLessonSlugs.filter((s) => isCompleted(s)).length;
+  const completed = allModuleLessonSlugs.filter((s) => isCompleted(s, category)).length;
   const total = allModuleLessonSlugs.length;
   const percent = safePercent(completed, total);
 
@@ -32,7 +34,7 @@ export const ProgressTracker = memo(function ProgressTracker({
       setShowSignIn(true);
       return;
     }
-    toggleComplete(lessonSlug, moduleSlug);
+    toggleComplete(lessonSlug, moduleSlug, category);
   };
 
   return (

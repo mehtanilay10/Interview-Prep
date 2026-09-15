@@ -15,6 +15,7 @@ interface MobileProgressAndContentsProps {
   allModuleLessonSlugs: string[];
   modules: Module[];
   lessonsByModule: Record<string, Lesson[]>;
+  category?: 'lessons' | 'problems' | 'interviewQuestions';
   className?: string;
 }
 
@@ -26,6 +27,7 @@ export function MobileProgressAndContents({
   allModuleLessonSlugs,
   modules,
   lessonsByModule,
+  category = 'lessons',
   className,
 }: MobileProgressAndContentsProps) {
   const [contentsOpen, setContentsOpen] = useState(false);
@@ -37,6 +39,7 @@ export function MobileProgressAndContents({
           lessonSlug={lessonSlug}
           moduleSlug={moduleSlug}
           allModuleLessonSlugs={allModuleLessonSlugs}
+          category={category}
           className="border-0 bg-transparent rounded-none"
         />
 

@@ -110,7 +110,7 @@ export function useProgress() {
     fetchProgressFromServer().then((data) => {
       if (cancelled) return;
       if (data) {
-        setServerProgress(data);
+        setServerProgress((prev) => (prev ? mergeProgress(prev, data) : data));
       }
       setIsInitialLoad(false);
     });

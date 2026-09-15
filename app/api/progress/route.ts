@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { getOrCreateUser, prisma } from '@/lib/prisma';
+import { getLessonBySlug, modules } from '@/lib/content';
 import type { ProgressCategory } from '@prisma/client';
+
+const MODULE_COURSE_MAP: Record<string, string> = {};
+for (const mod of modules) {
+  MODULE_COURSE_MAP[mod.slug] = mod.courseSlug;
+}
 
 function isProgressCategory(value: unknown): value is ProgressCategory {
   return value === 'lessons' || value === 'problems' || value === 'interviewQuestions';
+}
+
+function buildLessonHref(category: ProgressCategory, moduleSlug: string, lessonSlug: string): string {
+  if (category === 'interviewQuestions') {
+    return `/interview-questions/${moduleSlug}/${lessonSlug}`;
+  }
+  const courseSlug = MODULE_COURSE_MAP[moduleSlug];
+  if (!courseSlug) {
+    return category === 'problems' ? `/problems/${moduleSlug}/${lessonSlug}` : `/courses/${moduleSlug}/${lessonSlug}`;
+  }
+  const prefix = category === 'problems' ? 'problems' : 'courses';
+  return `/${prefix}/${courseSlug}/${moduleSlug}/${lessonSlug}`;
 }
 
 async function getDatabaseUser() {
@@ -33,15 +51,25 @@ export async function GET() {
     },
   });
 
-  const progress: Record<string, Array<{ lessonSlug: string; moduleSlug: string; completedAt: string }>> = {};
+  const progress: Record<string, Array<{ lessonSlug: string; moduleSlug: string; completedAt: string; title: string; href: string }>> = {};
   for (const row of rows) {
     if (!progress[row.category]) {
       progress[row.category] = [];
     }
+
+    let title = row.lessonSlug.replace(/-/g, ' ');
+    const courseSlug = MODULE_COURSE_MAP[row.moduleSlug];
+    if (courseSlug) {
+      const lesson = getLessonBySlug(row.lessonSlug, courseSlug);
+      if (lesson) title = lesson.title;
+    }
+
     progress[row.category].push({
       lessonSlug: row.lessonSlug,
       moduleSlug: row.moduleSlug,
       completedAt: row.completedAt.toISOString(),
+      title,
+      href: buildLessonHref(row.category, row.moduleSlug, row.lessonSlug),
     });
   }
 

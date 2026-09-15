@@ -149,6 +149,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
               modules={courseModules}
               lessonsByModule={lessonsByModule}
+              category="lessons"
             />
           </div>
 
@@ -224,6 +225,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               lessonSlug={lessonSlug}
               moduleSlug={moduleSlug}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
+              category="lessons"
             />
             <TableOfContents entries={toc} />
           </div>

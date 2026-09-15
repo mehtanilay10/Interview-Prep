@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Bookmark, CheckCircle2, LogOut, TrendingUp, Award, Target, BookOpen } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
@@ -10,6 +11,8 @@ interface LessonProgress {
   lessonSlug: string;
   moduleSlug: string;
   completedAt: string;
+  title: string;
+  href: string;
 }
 
 interface CategoryProgress {
@@ -34,6 +37,16 @@ interface LessonNote {
   lessonSlug: string;
   content: string;
   updatedAt: string;
+}
+
+function bookmarkHref(item: BookmarkItem): string {
+  if (item.type === 'interview') {
+    return `/interview-questions/${item.moduleSlug}/${item.slug}`;
+  }
+  if (item.type === 'problem') {
+    return `/problems/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
+  }
+  return `/courses/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
 }
 
 export function ProgressDashboardClient({ user }: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } }) {
@@ -62,6 +75,8 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                 lessonSlug: item.lessonSlug,
                 moduleSlug: item.moduleSlug,
                 completedAt: item.completedAt,
+                title: item.title,
+                href: item.href,
               })),
               lastVisitedLesson: undefined,
               startedAt: (items as LessonProgress[])[0]?.completedAt,
@@ -117,6 +132,11 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
       .slice(0, 10);
   }, [progress, totalCompleted]);
 
+  const bookmarkLinks = useMemo(() => bookmarks.slice(0, 10).map((bookmark) => ({
+    ...bookmark,
+    href: bookmarkHref(bookmark),
+  })), [bookmarks]);
+
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
   };
@@ -167,17 +187,20 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
           ) : (
             <ul className="space-y-2">
               {recentCompletions.map((lesson) => (
-                  <li
-                    key={`${lesson.category}-${lesson.lessonSlug}`}
-                    className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2"
+                <li
+                  key={`${lesson.category}-${lesson.lessonSlug}`}
+                  className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2 transition-colors hover:border-accent-fg"
+                >
+                  <Link
+                    href={lesson.href}
+                    className="flex-1 min-w-0"
                   >
-                    <div>
-                      <p className="text-sm font-medium text-fg-default">{lesson.lessonSlug.replace(/-/g, ' ')}</p>
-                      <p className="text-xs text-fg-muted">{lesson.category}</p>
-                    </div>
-                    <span className="text-xs text-fg-subtle">{formatRelativeTime(lesson.completedAt)}</span>
-                  </li>
-                ))}
+                    <p className="text-sm font-medium text-fg-default group-hover:text-accent-fg transition-colors">{lesson.title}</p>
+                    <p className="text-xs text-fg-muted">{lesson.category}</p>
+                  </Link>
+                  <span className="text-xs text-fg-subtle">{formatRelativeTime(lesson.completedAt)}</span>
+                </li>
+              ))}
             </ul>
           )}
         </div>
@@ -187,19 +210,19 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
             <Bookmark className="h-5 w-5 text-accent-fg" aria-hidden="true" />
             <h2 className="text-lg font-semibold text-fg-default">Your Bookmarks</h2>
           </div>
-          {bookmarks.length === 0 ? (
+          {bookmarkLinks.length === 0 ? (
             <p className="text-sm text-fg-muted">No bookmarks yet. Save lessons to access them quickly.</p>
           ) : (
             <ul className="space-y-2">
-              {bookmarks.slice(0, 10).map((bookmark) => (
+              {bookmarkLinks.map((bookmark) => (
                 <li
                   key={bookmark.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2"
+                  className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2 transition-colors hover:border-accent-fg"
                 >
-                  <div>
+                  <Link href={bookmark.href} className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-fg-default">{bookmark.title}</p>
                     <p className="text-xs text-fg-muted capitalize">{bookmark.type}</p>
-                  </div>
+                  </Link>
                   <span className="text-xs text-fg-subtle">{formatRelativeTime(bookmark.addedAt)}</span>
                 </li>
               ))}
