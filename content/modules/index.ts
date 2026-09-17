@@ -33,6 +33,8 @@ import aspModule8 from "../courses/aspnet-core/08-authentication-identity/conten
 import aspModule9 from "../courses/aspnet-core/09-localization-globalization/content.json";
 import aspModule10 from "../courses/aspnet-core/10-ado-net-data-access/content.json";
 import aspModule11 from "../courses/aspnet-core/11-cors-cross-origin/content.json";
+import aspModule12 from "../courses/aspnet-core/12-whats-new-dotnet-10/content.json";
+import aspModule13 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/content.json";
 
 import linqModule1 from "../courses/linq/01-getting-started-linq/content.json";
 import linqModule2 from "../courses/linq/02-linq-fundamentals-syntax/content.json";
@@ -244,6 +246,7 @@ const rawModules = [
 	sqlModule20,
 	sqlModule21,
 	aspModule1,
+	aspModule12,
 	aspModule2,
 	aspModule3,
 	aspModule4,
@@ -254,6 +257,7 @@ const rawModules = [
 	aspModule9,
 	aspModule10,
 	aspModule11,
+	aspModule13,
 	linqModule1,
 	linqModule2,
 	linqModule3,

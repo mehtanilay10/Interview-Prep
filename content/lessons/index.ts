@@ -236,6 +236,16 @@ import aspLesson53 from "../courses/aspnet-core/11-cors-cross-origin/01-understa
 import aspLesson54 from "../courses/aspnet-core/11-cors-cross-origin/03-cors-policies-named-policies.json";
 import aspLesson55 from "../courses/aspnet-core/11-cors-cross-origin/04-cors-preflight-requests.json";
 import aspLesson56 from "../courses/aspnet-core/11-cors-cross-origin/05-cors-best-practices-troubleshooting.json";
+import aspLesson67 from "../courses/aspnet-core/12-whats-new-dotnet-10/openapi-31-yaml-support.json";
+import aspLesson58 from "../courses/aspnet-core/12-whats-new-dotnet-10/new-json-patch-implementation.json";
+import aspLesson59 from "../courses/aspnet-core/12-whats-new-dotnet-10/typed-results-controllers.json";
+import aspLesson60 from "../courses/aspnet-core/12-whats-new-dotnet-10/validation-minimal-apis.json";
+import aspLesson61 from "../courses/aspnet-core/12-whats-new-dotnet-10/server-sent-events.json";
+import aspLesson62 from "../courses/aspnet-core/12-whats-new-dotnet-10/passkey-authentication.json";
+import aspLesson63 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/cookie-login-redirects-api-endpoints.json";
+import aspLesson64 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/mvc-api-analyzers-deprecated.json";
+import aspLesson65 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/razor-runtime-compilation-obsolete.json";
+import aspLesson66 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/json-pipe-reader-deserialization.json";
 
 import linqLesson1 from "../courses/linq/01-getting-started-linq/learn-linq-step-by-step.json";
 import linqLesson2 from "../courses/linq/01-getting-started-linq/linq-api-in-net.json";
@@ -1556,6 +1566,16 @@ const rawLessonsPart1: any[] = [
 	aspLesson54,
 	aspLesson55,
 	aspLesson56,
+	aspLesson67,
+	aspLesson58,
+	aspLesson59,
+	aspLesson60,
+	aspLesson61,
+	aspLesson62,
+	aspLesson63,
+	aspLesson64,
+	aspLesson65,
+	aspLesson66,
 	linqLesson1,
 	linqLesson2,
 	linqLesson3,
