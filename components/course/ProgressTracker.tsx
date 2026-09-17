@@ -1,16 +1,18 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { CheckCircle2, RotateCcw } from 'lucide-react';
 import { cn, safePercent } from '@/lib/utils';
 import { useProgress } from '@/hooks/useProgress';
 import { SignInPrompt } from '@/components/auth/SignInPrompt';
+import { getLessonsForCourse } from '@/lib/content';
 
 interface ProgressTrackerProps {
   lessonSlug: string;
   moduleSlug: string;
   allModuleLessonSlugs: string[];
   category?: 'lessons' | 'problems' | 'interviewQuestions';
+  courseSlug?: string;
   className?: string;
 }
 
@@ -19,6 +21,7 @@ export const ProgressTracker = memo(function ProgressTracker({
   moduleSlug,
   allModuleLessonSlugs,
   category = 'lessons',
+  courseSlug,
   className,
 }: ProgressTrackerProps) {
   const { toggleComplete, isCompleted, isLoggedOut } = useProgress();
@@ -27,7 +30,20 @@ export const ProgressTracker = memo(function ProgressTracker({
 
   const completed = allModuleLessonSlugs.filter((s) => isCompleted(s, category)).length;
   const total = allModuleLessonSlugs.length;
-  const percent = safePercent(completed, total);
+  const modulePercent = safePercent(completed, total);
+
+  const courseLessons = useMemo(() => {
+    if (!courseSlug) return [];
+    return getLessonsForCourse(courseSlug);
+  }, [courseSlug]);
+
+  const courseCompleted = useMemo(() => {
+    if (!courseSlug) return 0;
+    return courseLessons.filter((l) => isCompleted(l.slug, category)).length;
+  }, [courseSlug, courseLessons, isCompleted, category]);
+
+  const courseTotal = courseLessons.length;
+  const coursePercent = safePercent(courseCompleted, courseTotal);
 
   const handleToggle = () => {
     if (isLoggedOut) {
@@ -48,12 +64,32 @@ export const ProgressTracker = memo(function ProgressTracker({
           <div className="h-2 w-full overflow-hidden rounded-full bg-canvas-inset">
             <div
               className="h-full rounded-full bg-success-emphasis transition-all duration-500"
-              style={{ width: `${percent}%` }}
+              style={{ width: `${modulePercent}%` }}
               role="progressbar"
-              aria-valuenow={percent}
+              aria-valuenow={modulePercent}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`${percent}% of module completed`}
+              aria-label={`${modulePercent}% of module completed`}
+            />
+          </div>
+        </div>
+      )}
+
+      {courseSlug && courseTotal > 0 && (
+        <div className="px-4 pb-2">
+          <div className="mb-1.5 flex items-center justify-between text-xs text-fg-muted">
+            <span>Course progress</span>
+            <span className="font-medium">{courseCompleted}/{courseTotal} lessons</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-canvas-inset">
+            <div
+              className="h-full rounded-full bg-accent-emphasis transition-all duration-500"
+              style={{ width: `${coursePercent}%` }}
+              role="progressbar"
+              aria-valuenow={coursePercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${coursePercent}% of course completed`}
             />
           </div>
         </div>

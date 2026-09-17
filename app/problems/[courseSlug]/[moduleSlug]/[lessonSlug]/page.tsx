@@ -226,6 +226,7 @@ export default async function ProblemDetailPage({ params }: Params) {
               moduleSlug={moduleSlug}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
               category="problems"
+              courseSlug={courseSlug}
             />
             <TableOfContents entries={toc} />
           </div>

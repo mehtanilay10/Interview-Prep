@@ -40,6 +40,7 @@ export function MobileProgressAndContents({
           moduleSlug={moduleSlug}
           allModuleLessonSlugs={allModuleLessonSlugs}
           category={category}
+          courseSlug={courseSlug}
           className="border-0 bg-transparent rounded-none"
         />
 
