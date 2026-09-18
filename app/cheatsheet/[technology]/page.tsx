@@ -8,8 +8,8 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { getModuleBySlug, getLessonsForModule } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
 import { LessonActions } from '@/components/progress/LessonActions';
-import { LessonNotes } from '@/components/lesson/LessonNotes';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
+import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 const TECH_ICONS: Record<string, string> = {
@@ -69,8 +69,9 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ tec
   const techName = TECH_NAMES[technology] ?? technology;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Breadcrumbs
+    <NotesModalProvider courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug}>
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <Breadcrumbs
         items={[
           { label: 'Cheat Sheets', href: '/cheatsheet' },
           { label: techName },
@@ -115,15 +116,11 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ tec
         <ContentBlockRenderer blocks={lesson.blocks} />
       </div>
 
-      {/* Lesson notes */}
-      <div className="mt-8" id="lesson-notes">
-        <LessonNotes courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} />
-      </div>
-
       {/* Offline save */}
       <div className="mt-4">
         <OfflineSaveButton courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
       </div>
     </div>
+    </NotesModalProvider>
   );
 }

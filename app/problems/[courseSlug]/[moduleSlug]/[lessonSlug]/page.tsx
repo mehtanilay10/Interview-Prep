@@ -23,8 +23,8 @@ import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
 import { LessonActions } from '@/components/progress/LessonActions';
-import { LessonNotes } from '@/components/lesson/LessonNotes';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
+import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 interface Params {
@@ -82,13 +82,14 @@ export default async function ProblemDetailPage({ params }: Params) {
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <aside
-        className="hidden w-64 shrink-0 lg:block"
-        aria-label="Course sidebar"
-      >
-        <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4">
+    <NotesModalProvider courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug}>
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar */}
+        <aside
+          className="hidden w-64 shrink-0 lg:block"
+          aria-label="Course sidebar"
+        >
+          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4">
           <LessonSidebar
             currentModuleSlug={moduleSlug}
             currentLessonSlug={lessonSlug}
@@ -157,11 +158,6 @@ export default async function ProblemDetailPage({ params }: Params) {
             <ContentBlockRenderer blocks={lesson.blocks} />
           </div>
 
-          {/* Lesson notes */}
-          <div className="mt-8" id="lesson-notes">
-            <LessonNotes courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
-          </div>
-
           {/* Offline save */}
           <div className="mt-4">
             <OfflineSaveButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} title={lesson.title} />
@@ -207,7 +203,6 @@ export default async function ProblemDetailPage({ params }: Params) {
                     lesson={rel}
                     moduleSlug={rel.moduleSlug}
                     courseSlug={courseSlug}
-                    basePrefix="problems"
                   />
                 ))}
               </div>
@@ -233,5 +228,6 @@ export default async function ProblemDetailPage({ params }: Params) {
         </aside>
       </div>
     </div>
+    </NotesModalProvider>
   );
 }

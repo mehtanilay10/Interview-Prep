@@ -76,8 +76,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   const problemCourses = [
-    { slug: 'csharp-problems', label: 'C# Problems' },
-    { slug: 'sql-problems', label: 'SQL Problems' },
+    { slug: 'csharp', label: 'C# Problems' },
+    { slug: 'sql', label: 'SQL Problems' },
+    { slug: 'system-design', label: 'System Design Problems' },
   ];
 
   for (const course of problemCourses) {

@@ -151,6 +151,75 @@ function ImageBlock({ block }: { block: ContentBlock & { type: 'image' } }) {
   );
 }
 
+function looksLikeCode(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const lines = trimmed.split('\n');
+  if (lines.length < 2) return false;
+  const codeIndicators = ['{', '}', '(', ')', ';', 'public', 'private', 'protected', 'class ', 'def ', 'function ', 'import ', 'from ', 'return ', 'const ', 'let ', 'var ', 'async ', 'await ', '=>', '/*', '//', '#', 'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE'];
+  return codeIndicators.some((indicator) => trimmed.includes(indicator));
+}
+
+function renderExampleBlock(block: ContentBlock & { type: 'example' }, idx: number): React.ReactNode {
+  const { title, content, code, language } = block.data;
+  const effectiveCode = code ?? (content && looksLikeCode(content) ? content : '');
+  const effectiveContent = code && content ? content : (effectiveCode ? '' : content);
+
+  return (
+    <div
+      key={idx}
+      className="my-3 rounded-xl border border-border bg-canvas-subtle overflow-hidden"
+    >
+      <div className="border-b border-border bg-canvas-inset px-4 py-2">
+        <span className="text-xs font-semibold text-fg-muted">
+          📌 {title ?? 'Example'}
+        </span>
+      </div>
+      <div className="p-3">
+        {effectiveContent && !effectiveCode && (
+          <p className="whitespace-pre-line text-sm text-fg-default leading-relaxed">
+            {effectiveContent}
+          </p>
+        )}
+        {effectiveContent && effectiveCode && (
+          <p className="mb-3 text-sm text-fg-default leading-relaxed">{effectiveContent}</p>
+        )}
+        {effectiveCode && (
+          <CustomCodeBlock code={effectiveCode} language={language} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderSolutionBlock(block: ContentBlock & { type: 'solution' }, idx: number): React.ReactNode {
+  const { title, content, code, language } = block.data;
+  const effectiveCode = code ?? (content && looksLikeCode(content) ? content : '');
+  const effectiveContent = code && content ? content : (effectiveCode ? '' : content);
+
+  return (
+    <div
+      key={idx}
+      className="my-3 rounded-xl border border-success-muted bg-success-subtle/50 overflow-hidden"
+    >
+      <div className="border-b border-success-muted bg-success-subtle px-4 py-2">
+        <span className="text-xs font-semibold text-success-fg">
+          ✅ {title ?? 'Solution'}
+        </span>
+      </div>
+      <div className="p-3">
+        {effectiveContent && (
+          <p className="mb-3 text-sm text-fg-default leading-relaxed">{effectiveContent}</p>
+        )}
+        {effectiveCode && (
+          <CustomCodeBlock code={effectiveCode} language={language} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
   switch (block.type) {
     case 'paragraph':
@@ -294,58 +363,11 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
         </div>
       );
 
-    case 'example': {
-      const { title, content, code, language } = block.data;
-      return (
-        <div
-          key={idx}
-          className="my-3 rounded-xl border border-border bg-canvas-subtle overflow-hidden"
-        >
-          <div className="border-b border-border bg-canvas-inset px-4 py-2">
-            <span className="text-xs font-semibold text-fg-muted">
-              📌 {title ?? 'Example'}
-            </span>
-          </div>
-          <div className="p-3">
-            {content && !code && (
-              <p className="whitespace-pre-line text-sm text-fg-default leading-relaxed">
-                {content}
-              </p>
-            )}
-            {content && code && (
-              <p className="mb-3 text-sm text-fg-default leading-relaxed">{content}</p>
-            )}
-            {code && (
-              <CustomCodeBlock code={code} language={language} />
-            )}
-          </div>
-        </div>
-      );
-    }
+    case 'example':
+      return renderExampleBlock(block as ContentBlock & { type: 'example' }, idx);
 
-    case 'solution': {
-      const { title, content, code, language } = block.data;
-      return (
-        <div
-          key={idx}
-          className="my-3 rounded-xl border border-success-muted bg-success-subtle/50 overflow-hidden"
-        >
-          <div className="border-b border-success-muted bg-success-subtle px-4 py-2">
-            <span className="text-xs font-semibold text-success-fg">
-              ✅ {title ?? 'Solution'}
-            </span>
-          </div>
-          <div className="p-3">
-            {content && (
-              <p className="mb-3 text-sm text-fg-default leading-relaxed">{content}</p>
-            )}
-            {code && (
-              <CustomCodeBlock code={code} language={language} />
-            )}
-          </div>
-        </div>
-      );
-    }
+    case 'solution':
+      return renderSolutionBlock(block as ContentBlock & { type: 'solution' }, idx);
 
     case 'exercise':
       return (
