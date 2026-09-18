@@ -41,7 +41,7 @@ function toVariableName(slug: string, prefix: string): string {
 
 function scanModules(): ModuleInfo[] {
   const modules: ModuleInfo[] = [];
-  const areas = ['courses', 'problems', 'sql-problems', 'interview-qa', 'cheatsheet'];
+  const areas = ['courses', 'problems', 'interview-qa', 'cheatsheet'];
 
   for (const area of areas) {
     const areaPath = path.join(CONTENT_DIR, area);
@@ -75,7 +75,7 @@ function scanModules(): ModuleInfo[] {
 
 function scanLessons(): LessonInfo[] {
   const lessons: LessonInfo[] = [];
-  const areas = ['courses', 'problems', 'sql-problems', 'interview-qa', 'cheatsheet'];
+  const areas = ['courses', 'problems', 'interview-qa', 'cheatsheet'];
   const usedNames = new Set<string>();
 
   for (const area of areas) {

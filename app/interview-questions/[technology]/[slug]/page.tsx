@@ -13,8 +13,8 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonActions } from '@/components/progress/LessonActions';
-import { LessonNotes } from '@/components/lesson/LessonNotes';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
+import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 const TECH_NAME_MAP: Record<string, string> = {
@@ -97,8 +97,9 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
   const next = currentIdx < allQuestions.length - 1 ? allQuestions[currentIdx + 1] : null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Breadcrumbs
+    <NotesModalProvider courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug}>
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <Breadcrumbs
         items={[
           { label: 'Interview Questions', href: '/interview-questions' },
           { label: tech, href: `/interview-questions/${technology}` },
@@ -133,11 +134,6 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         <ContentBlockRenderer blocks={lesson.blocks} />
       </div>
 
-      {/* Lesson notes */}
-      <div className="mt-8" id="lesson-notes">
-        <LessonNotes courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} />
-      </div>
-
       {/* Offline save */}
       <div className="mt-4">
         <OfflineSaveButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
@@ -166,5 +162,6 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         )}
       </div>
     </div>
+    </NotesModalProvider>
   );
 }

@@ -422,6 +422,9 @@ const rawModules = [
 	sqlProblemsModule1,
 	sqlProblemsModule2,
 	sqlProblemsModule3,
+	systemDesignModule1,
+	systemDesignModule2,
+	systemDesignModule3,
 	devOpsModule1,
 	devOpsModule2,
 	devOpsModule3,
@@ -503,13 +506,17 @@ import csModule10 from "../cheatsheet/react-router/content.json";
 import csModule11 from '../cheatsheet/aws/content.json';
 import csModule12 from '../cheatsheet/azure/content.json';
 
-import problemModule1 from "../problems/01-array-problems/content.json";
-import problemModule2 from "../problems/02-string-problems/content.json";
-import problemModule3 from "../problems/03-linked-list-problems/content.json";
-import problemModule4 from "../problems/04-tree-graph-problems/content.json";
-import problemModule5 from "../problems/05-dynamic-programming-problems/content.json";
-import problemModule6 from "../problems/06-sorting-searching-problems/content.json";
+import problemModule1 from "../problems/csharp/01-array-problems/content.json";
+import problemModule2 from "../problems/csharp/02-string-problems/content.json";
+import problemModule3 from "../problems/csharp/03-linked-list-problems/content.json";
+import problemModule4 from "../problems/csharp/04-tree-graph-problems/content.json";
+import problemModule5 from "../problems/csharp/05-dynamic-programming-problems/content.json";
+import problemModule6 from "../problems/csharp/06-sorting-searching-problems/content.json";
 
-import sqlProblemsModule1 from "../sql-problems/01-sql-basics/content.json";
-import sqlProblemsModule2 from "../sql-problems/02-sql-intermediate/content.json";
-import sqlProblemsModule3 from "../sql-problems/03-sql-advanced/content.json";
+import sqlProblemsModule1 from "../problems/sql/01-sql-basics/content.json";
+import sqlProblemsModule2 from "../problems/sql/02-sql-intermediate/content.json";
+import sqlProblemsModule3 from "../problems/sql/03-sql-advanced/content.json";
+
+import systemDesignModule1 from "../problems/system-design/react-system-design/content.json";
+import systemDesignModule2 from "../problems/system-design/aspnet-system-design/content.json";
+import systemDesignModule3 from "../problems/system-design/devops-system-design/content.json";

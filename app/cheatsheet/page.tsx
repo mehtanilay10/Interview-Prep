@@ -21,6 +21,7 @@ const TECH_ICONS: Record<string, string> = {
   'javascript': '⚡',
   'typescript': '📘',
   'react-router': '🧭',
+  'aspnet-core': '🌐',
 };
 
 const TECH_DESCRIPTIONS: Record<string, string> = {
@@ -34,6 +35,7 @@ const TECH_DESCRIPTIONS: Record<string, string> = {
   'javascript': 'ES6+ features: promises, async/await, destructuring, spread, modules.',
   'typescript': 'Types, interfaces, generics, decorators, and React typing.',
   'react-router': 'Route configuration, navigation, URL params, and nested routes.',
+  'aspnet-core': 'MVC, Web API, routing, middleware, DI, filters, and authentication.',
 };
 
 export default function CheatsheetsPage() {

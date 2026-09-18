@@ -24,8 +24,8 @@ import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { LessonCard } from '@/components/course/LessonCard';
 import { LessonActions } from '@/components/progress/LessonActions';
-import { LessonNotes } from '@/components/lesson/LessonNotes';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
+import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
 
 interface Params {
@@ -85,26 +85,27 @@ export default async function CourseLessonDetailPage({ params }: Params) {
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <aside
-        className="hidden w-64 shrink-0 lg:block"
-        aria-label="Course sidebar"
-      >
-        <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4">
-          <LessonSidebar
-            currentModuleSlug={moduleSlug}
-            currentLessonSlug={lessonSlug}
-            courseSlug={courseSlug}
-            modules={courseModules}
-            lessonsByModule={lessonsByModule}
-          />
-        </div>
-      </aside>
+    <NotesModalProvider courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug}>
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar */}
+        <aside
+          className="hidden w-64 shrink-0 lg:block"
+          aria-label="Course sidebar"
+        >
+          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4">
+            <LessonSidebar
+              currentModuleSlug={moduleSlug}
+              currentLessonSlug={lessonSlug}
+              courseSlug={courseSlug}
+              modules={courseModules}
+              lessonsByModule={lessonsByModule}
+            />
+          </div>
+        </aside>
 
-      {/* Main content */}
-      <div className="flex flex-1 min-w-0">
-        <article className="mx-auto w-full max-w-[800px] min-w-0 px-4 py-8 sm:px-6 lg:px-8">
+        {/* Main content */}
+        <div className="flex flex-1 min-w-0">
+          <article className="mx-auto w-full max-w-[800px] min-w-0 px-4 py-8 sm:px-6 lg:px-8">
           {/* Breadcrumbs */}
           <Breadcrumbs
             items={[
@@ -156,11 +157,6 @@ export default async function CourseLessonDetailPage({ params }: Params) {
           {/* Content blocks */}
           <div id="lesson-content" className="prose prose-slate dark:prose-invert max-w-none">
             <ContentBlockRenderer blocks={lesson.blocks} />
-          </div>
-
-          {/* Lesson notes */}
-          <div className="mt-8" id="lesson-notes">
-            <LessonNotes courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
           </div>
 
           {/* Offline save */}
@@ -233,5 +229,6 @@ export default async function CourseLessonDetailPage({ params }: Params) {
         </aside>
       </div>
     </div>
+    </NotesModalProvider>
   );
 }
