@@ -86,6 +86,17 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
       }
     }, [selectedIndex]);
 
+    const navigateToResult = useCallback(
+      (result: SearchResult) => {
+        const href = getSearchResultHref(result);
+        onChange('');
+        setIsOpen(false);
+        setSelectedIndex(-1);
+        router.push(href);
+      },
+      [onChange, router]
+    );
+
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (!isOpen || suggestions.length === 0) {
@@ -117,18 +128,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
           inputRef.current?.blur();
         }
       },
-      [isOpen, suggestions, selectedIndex, value, onSearch]
-    );
-
-    const navigateToResult = useCallback(
-      (result: SearchResult) => {
-        const href = getSearchResultHref(result);
-        onChange('');
-        setIsOpen(false);
-        setSelectedIndex(-1);
-        router.push(href);
-      },
-      [onChange, router]
+      [isOpen, suggestions, selectedIndex, value, onSearch, navigateToResult]
     );
 
     const handleClear = useCallback(() => {
@@ -236,6 +236,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
             {value.trim() && (
               <li
                 role="option"
+                aria-selected={selectedIndex === suggestions.length}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-t border-border',
                   selectedIndex === suggestions.length ? 'bg-accent-subtle' : 'hover:bg-canvas-subtle'
