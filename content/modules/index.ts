@@ -443,6 +443,7 @@ const rawModules = [
 	csModule9,
 	csModule10,
 	csModule11, csModule12,
+	csModule13,
 	problemModule1,
 	problemModule2,
 	problemModule3,
@@ -567,6 +568,7 @@ import csModule9 from "../cheatsheet/typescript/content.json";
 import csModule10 from "../cheatsheet/react-router/content.json";
 import csModule11 from '../cheatsheet/aws/content.json';
 import csModule12 from '../cheatsheet/azure/content.json';
+import csModule13 from '../cheatsheet/aspnet-core/content.json';
 
 import problemModule1 from "../problems/csharp/01-array-problems/content.json";
 import problemModule2 from "../problems/csharp/02-string-problems/content.json";

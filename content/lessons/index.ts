@@ -1099,6 +1099,7 @@ import csLesson9 from "../cheatsheet/typescript/cheatsheet.json";
 import csLesson10 from "../cheatsheet/react-router/cheatsheet.json";
 import csLesson11 from '../cheatsheet/aws/cheatsheet.json';
 import csLesson12 from '../cheatsheet/azure/cheatsheet.json';
+import csLesson13 from '../cheatsheet/aspnet-core/cheatsheet.json';
 
 import problemLesson1 from "../problems/csharp/01-array-problems/3sum.json";
 import problemLesson2 from "../problems/csharp/01-array-problems/best-time-to-buy-and-sell-stock.json";
@@ -2556,6 +2557,7 @@ const rawLessonsPart2: any[] = [
 	csLesson9,
 	csLesson10,
 	csLesson11, csLesson12,
+	csLesson13,
 	problemLesson1,
 	problemLesson2,
 	problemLesson3,
@@ -2783,6 +2785,7 @@ const rawLessonsPart2: any[] = [
 	csLesson9,
 	csLesson10,
 	csLesson11, csLesson12,
+	csLesson13,
 	devOpsLesson1,
 	devOpsLesson2,
 	devOpsLesson3,

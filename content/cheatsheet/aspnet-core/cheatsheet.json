@@ -4,10 +4,10 @@
   "moduleSlug": "aspnet-core",
   "courseSlug": "cheatsheet",
   "title": "ASP.NET Core Complete Cheat Sheet",
-  "description": "Quick reference for ASP.NET Core MVC and Web API: controllers, routing, model binding, validation, middleware, DI, configuration, filters, and authentication.",
+  "description": "Comprehensive reference for ASP.NET Core MVC and Web API: project structure, controllers, routing, model binding, validation, Razor views, tag helpers, middleware, DI, configuration, EF Core, filters, auth, CORS, responses, areas, session, caching, error handling, logging, file uploads, content negotiation, API versioning, rate limiting, health checks, SignalR, background services, and more.",
   "order": 1,
-  "difficulty": "beginner",
-  "estimatedMinutes": 35,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 60,
   "tags": [
     "aspnet-core",
     "mvc",
@@ -16,6 +16,10 @@
     "routing",
     "middleware",
     "dependency-injection",
+    "ef-core",
+    "authentication",
+    "cors",
+    "signalr",
     "quick-reference"
   ],
   "blocks": [
@@ -23,21 +27,29 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Project Structure"
+        "text": "Project Structure and Program.cs"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "ASP.NET Core apps start in `Program.cs`. The minimal hosting model registers services, configures middleware, and starts the app."
+        "text": "ASP.NET Core 7+ uses the minimal hosting model. `Program.cs` registers services via `builder.Services`, builds the middleware pipeline, and calls `app.Run()`. Environment-specific setup is handled via `IHostEnvironment` or `IWebHostEnvironment`."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Program.cs Minimal Hosting Model",
+        "title": "Program.cs with Environment-Aware Setup",
         "language": "csharp",
-        "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Add services\nbuilder.Services.AddControllers();\nbuilder.Services.AddDbContext<AppDbContext>(...);\nbuilder.Services.AddScoped<IProductService, ProductService>();\n\nvar app = builder.Build();\n\n// Middleware pipeline\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthorization();\napp.MapControllers();\n\napp.Run();"
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddControllers();\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseNpgsql(builder.Configuration.GetConnectionString(\"DefaultConnection\")));\nbuilder.Services.AddScoped<IProductService, ProductService>();\n\nif (builder.Environment.IsDevelopment())\n{\n    builder.Services.AddDatabaseDeveloperPageExceptionFilter();\n}\n\nvar app = builder.Build();\n\n// Middleware pipeline\nif (app.Environment.IsDevelopment())\n{\n    app.UseDeveloperExceptionPage();\n}\nelse\n{\n    app.UseExceptionHandler(\"/error\");\n    app.UseHsts();\n}\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseCors();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\n\napp.Run();"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Top-Level Statements and Builder Pattern",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Add services\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\nbuilder.Services.AddControllers();\n\nvar app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\napp.UseHttpsRedirection();\napp.UseAuthorization();\napp.MapControllers();\napp.Run();"
       }
     },
     {
@@ -50,23 +62,44 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Controllers handle HTTP requests. Inherit from `Controller` for views or `ControllerBase` for APIs. Use attributes for routing."
+        "text": "Inherit from `Controller` when rendering views. It provides view-related features like `View()`, `ViewData`, `ViewBag`, and `TempData`. Use `ControllerBase` for APIs or when you do not need view support."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "MVC Controller with Views",
+        "title": "MVC Controller with View Results",
         "language": "csharp",
-        "code": "[Route(\"products\")]\npublic class ProductsController : Controller\n{\n    private readonly IProductRepository _repo;\n\n    public ProductsController(IProductRepository repo)\n    {\n        _repo = repo;\n    }\n\n    // GET /products\n    public async Task<IActionResult> Index()\n    {\n        var products = await _repo.GetAllAsync();\n        return View(products); // Returns Views/Products/Index.cshtml\n    }\n\n    // GET /products/5\n    [Route(\"{id:int}\")]\n    public async Task<IActionResult> Details(int id)\n    {\n        var product = await _repo.GetByIdAsync(id);\n        if (product == null) return NotFound();\n        return View(product);\n    }\n}"
+        "code": "[Route(\"products\")]\npublic class ProductsController : Controller\n{\n    private readonly IProductRepository _repo;\n\n    public ProductsController(IProductRepository repo)\n    {\n        _repo = repo;\n    }\n\n    // GET /products\n    public async Task<IActionResult> Index()\n    {\n        var products = await _repo.GetAllAsync();\n        return View(products); // Views/Products/Index.cshtml\n    }\n\n    // GET /products/5\n    [Route(\"{id:int}\")]\n    public async Task<IActionResult> Details(int id)\n    {\n        var product = await _repo.GetByIdAsync(id);\n        if (product == null) return NotFound();\n        ViewBag.Category = \"Featured\";\n        return View(product);\n    }\n\n    // POST /products/5/edit\n    [HttpPost(\"{id}/edit\")]\n    [ValidateAntiForgeryToken]\n    public async Task<IActionResult> Edit(int id, ProductDto dto)\n    {\n        if (!ModelState.IsValid) return View(dto);\n        await _repo.UpdateAsync(dto);\n        return RedirectToAction(nameof(Index));\n    }\n}"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Web API Controller",
+        "title": "ControllerBase for Web API",
         "language": "csharp",
-        "code": "[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n\n    public ProductsController(IProductService service)\n    {\n        _service = service;\n    }\n\n    // GET api/products\n    [HttpGet]\n    public async Task<ActionResult<IEnumerable<ProductDto>>> Get()\n    {\n        return Ok(await _service.GetAllAsync());\n    }\n\n    // GET api/products/5\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<ProductDto>> Get(int id)\n    {\n        var product = await _service.GetByIdAsync(id);\n        if (product == null) return NotFound();\n        return Ok(product);\n    }\n\n    // POST api/products\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Post(CreateProductDto dto)\n    {\n        var created = await _service.CreateAsync(dto);\n        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);\n    }\n}"
+        "code": "[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n    private readonly ILogger<ProductsController> _logger;\n\n    public ProductsController(IProductService service, ILogger<ProductsController> logger)\n    {\n        _service = service;\n        _logger = logger;\n    }\n\n    // GET api/products\n    [HttpGet]\n    public async Task<ActionResult<IEnumerable<ProductDto>>> Get()\n    {\n        return Ok(await _service.GetAllAsync());\n    }\n\n    // GET api/products/5\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<ProductDto>> Get(int id)\n    {\n        return await _service.GetByIdAsync(id) is ProductDto product\n            ? Ok(product)\n            : NotFound();\n    }\n\n    // POST api/products\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Post(CreateProductDto dto)\n    {\n        var created = await _service.CreateAsync(dto);\n        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);\n    }\n\n    // PUT api/products/5\n    [HttpPut(\"{id}\")]\n    public async Task<IActionResult> Put(int id, UpdateProductDto dto)\n    {\n        if (id != dto.Id) return BadRequest();\n        await _service.UpdateAsync(dto);\n        return NoContent();\n    }\n\n    // DELETE api/products/5\n    [HttpDelete(\"{id}\")]\n    public async Task<IActionResult> Delete(int id)\n    {\n        await _service.DeleteAsync(id);\n        return NoContent();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Web API Controllers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `[ApiController]` attribute enables automatic 400 responses for invalid models, binding-source inference, and Swagger metadata. Use DTOs instead of exposing domain entities directly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ApiController Attribute and DTOs",
+        "language": "csharp",
+        "code": "[ApiController]\n[Route(\"api/[controller]\")]\n[Produces(\"application/json\")]\npublic class OrdersController : ControllerBase\n{\n    private readonly IOrderService _service;\n\n    public OrdersController(IOrderService service)\n    {\n        _service = service;\n    }\n\n    // [ApiController] automatically returns 400 for invalid ModelState\n    [HttpPost]\n    public async Task<ActionResult<OrderDto>> Create(CreateOrderDto dto)\n    {\n        // ModelState is automatically invalid if binding fails\n        var created = await _service.CreateAsync(dto);\n        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);\n    }\n\n    [HttpGet(\"{id}\")]\n    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]\n    [ProducesResponseType(StatusCodes.Status404NotFound)]\n    public async Task<ActionResult<OrderDto>> GetById(int id)\n    {\n        return await _service.GetByIdAsync(id) is OrderDto order\n            ? Ok(order)\n            : NotFound();\n    }\n}\n\n// DTOs keep API contracts stable\npublic record CreateOrderDto(string CustomerName, decimal Total);\npublic record OrderDto(int Id, string CustomerName, decimal Total, DateTime CreatedAt);"
       }
     },
     {
@@ -79,36 +112,131 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Routing maps URLs to controllers/actions. Use conventional routing for MVC and attribute routing for APIs."
+        "text": "Conventional routing maps URL patterns in `Program.cs`. Attribute routing places route templates directly on controllers and actions. Combine both for flexible URL structures."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Conventional vs Attribute Routing",
+        "title": "Conventional and Attribute Routing",
         "language": "csharp",
-        "code": "// Conventional routing (Program.cs or Startup.cs)\napp.MapControllerRoute(\n    name: \"default\",\n    pattern: \"{controller=Home}/{action=Index}/{id?}\"\n);\n\n// Attribute routing on controller\n[Route(\"api/[controller]\")] // resolves to api/products\npublic class ProductsController : ControllerBase\n{\n    // GET api/products/5/reviews\n    [HttpGet(\"{id}/reviews\")]\n    public IActionResult GetReviews(int id) => Ok(...);\n\n    // GET api/products/search?q=laptop&page=2\n    [HttpGet(\"search\")]\n    public IActionResult Search([FromQuery] string q, [FromQuery] int page = 1) => Ok(...);\n}"
+        "code": "// Program.cs - conventional route\napp.MapControllerRoute(\n    name: \"default\",\n    pattern: \"{controller=Home}/{action=Index}/{id?}\");\n\napp.MapControllerRoute(\n    name: \"api\",\n    pattern: \"api/{controller}/{action}/{id?}\");\n\n// Attribute routing on controller\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    // GET api/products\n    [HttpGet]\n    public IActionResult GetAll() => Ok(...);\n\n    // GET api/products/5/reviews\n    [HttpGet(\"{id}/reviews\")]\n    public IActionResult GetReviews(int id) => Ok(...);\n\n    // GET api/products/search?q=laptop&page=2\n    [HttpGet(\"search\")]\n    public IActionResult Search([FromQuery] string q, [FromQuery] int page = 1) => Ok(...);\n\n    // POST api/products/bulk\n    [HttpPost(\"bulk\")]\n    public async Task<IActionResult> BulkCreate([FromBody] List<ProductDto> products) => Ok(...);\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Route Tokens, Constraints, and URL Generation",
+        "language": "csharp",
+        "code": "// Route tokens: [controller], [action], [area]\n[Route(\"api/[controller]\")] // controller = Products\npublic class ProductsController : ControllerBase\n{\n    // GET api/products/active\n    [HttpGet(\"active\")]\n    public IActionResult GetActive() => Ok(...);\n}\n\n// Route constraints\n[HttpGet(\"{id:int:min(1)}\")]\npublic IActionResult Get(int id) => Ok(...);\n\n// Constraints: int, bool, datetime, decimal, double, float, guid, long\n// With min/max: {age:int:range(18,120)}\n// With regex: {slug:alpha:minlength(3)}\n\n// URL generation inside controller\npublic class OrdersController : ControllerBase\n{\n    [HttpPost]\n    public IActionResult Create(OrderDto dto)\n    {\n        var orderId = 42;\n        // Returns URL like /api/orders/42\n        var location = Url.Action(nameof(GetById), new { id = orderId });\n        return Created(location!, new { id = orderId });\n    }\n}\n\n// URL generation in views (Razor)\n// <a asp-action=\"Details\" asp-route-id=\"5\">Details</a>\n// <a asp-controller=\"Products\" asp-action=\"Index\">Products</a>"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Model Binding and Validation"
+        "text": "Model Binding"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Model binding maps request data to action parameters. Validation attributes enforce rules automatically."
+        "text": "Model binding maps incoming request data to action parameters. Binding-source attributes like `[FromBody]`, `[FromQuery]`, `[FromRoute]`, `[FromForm]`, and `[FromHeader]` control where data is read from."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Model Binding Sources and Validation",
+        "title": "Binding Sources and Complex Types",
         "language": "csharp",
-        "code": "public class CreateProductDto\n{\n    public int Id { get; set; }\n\n    // From route: [FromRoute]\n    // From query string: [FromQuery]\n    // From request body: [FromBody]\n    // From form: [FromForm]\n}\n\n// Controller action with binding sources\n[HttpPost]\npublic IActionResult Create(\n    [FromRoute] int id,\n    [FromQuery] bool active,\n    [FromBody] CreateProductDto dto)\n{\n    if (!ModelState.IsValid) return ValidationProblem(ModelState);\n    return Ok(dto);\n}\n\n// Validation attributes\npublic class ProductDto\n{\n    [Required]\n    [StringLength(100)]\n    public string Name { get; set; }\n\n    [Range(0.01, 9999.99)]\n    public decimal Price { get; set; }\n\n    [EmailAddress]\n    public string ContactEmail { get; set; }\n\n    [DataType(DataType.Date)]\n    public DateTime ReleaseDate { get; set; }\n\n    [Compare(nameof(Name))]\n    public string NameConfirm { get; set; }\n}"
+        "code": "public class CreateProductDto\n{\n    public string Name { get; set; } = string.Empty;\n    public decimal Price { get; set; }\n    public int CategoryId { get; set; }\n}\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    // GET api/products/5?active=true&sort=name\n    [HttpGet(\"{id}\")]\n    public IActionResult Get(\n        [FromRoute] int id,\n        [FromQuery] bool active,\n        [FromQuery] string sort = \"name\")\n    {\n        return Ok(new { id, active, sort });\n    }\n\n    // POST api/products\n    [HttpPost]\n    public IActionResult Create([FromBody] CreateProductDto dto)\n    {\n        // [ApiController] auto-binds JSON body\n        return CreatedAtAction(nameof(Get), new { id = 1 }, dto);\n    }\n\n    // POST api/products/upload?description=file1\n    [HttpPost(\"{id}/upload\")]\n    public async Task<IActionResult> Upload(\n        [FromRoute] int id,\n        [FromQuery] string description,\n        [FromForm] IFormFile file)\n    {\n        return Ok(new { id, description, file.FileName });\n    }\n\n    // Custom header binding\n    [HttpGet(\"client\")]\n    public IActionResult GetClient([FromHeader(Name = \"X-Client-Id\")] string clientId)\n    {\n        return Ok(new { clientId });\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Model Binder Example",
+        "language": "csharp",
+        "code": "// Bind a comma-separated string to a list of ints\npublic class CommaSeparatedArrayModelBinder : IModelBinder\n{\n    public Task BindModelAsync(ModelBindingContext context)\n    {\n        var value = context.ValueProvider.GetValue(context.ModelName).ToString();\n        if (string.IsNullOrEmpty(value))\n        {\n            return Task.CompletedTask;\n        }\n        var elements = value.Split(',', StringSplitOptions.RemoveEmptyEntries)\n            .Select(int.Parse)\n            .ToArray();\n        context.Result = ModelBindingResult.Success(elements);\n        return Task.CompletedTask;\n    }\n}\n\n[ModelBinder(BinderType = typeof(CommaSeparatedArrayModelBinder))]\npublic List<int> Ids { get; set; } = new();\n\n// Usage\n[HttpGet(\"bulk\")]\npublic IActionResult BulkGet([ModelBinder] List<int> ids)\n{\n    return Ok(ids);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Data annotations provide declarative validation. `[ApiController]` automatically returns 400 with validation details. For complex rules, implement `IValidatableObject` or create custom `ValidationAttribute` classes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Data Annotations and IValidatableObject",
+        "language": "csharp",
+        "code": "public class CreateProductDto : IValidatableObject\n{\n    [Required]\n    [StringLength(100, MinimumLength = 2)]\n    public string Name { get; set; } = string.Empty;\n\n    [Range(0.01, 9999.99)]\n    public decimal Price { get; set; }\n\n    [EmailAddress]\n    public string ContactEmail { get; set; } = string.Empty;\n\n    [RegularExpression(@\"^[A-Z]{2}\")]\n    public string CountryCode { get; set; } = string.Empty;\n\n    [Compare(nameof(Name))]\n    public string NameConfirm { get; set; } = string.Empty;\n\n    [DataType(DataType.Date)]\n    [Display(Name = \"Release Date\")]\n    public DateTime ReleaseDate { get; set; }\n\n    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)\n    {\n        if (Price <= 0 && string.IsNullOrWhiteSpace(Name))\n        {\n            yield return new ValidationResult(\"Price and Name are both required.\",\n                new[] { nameof(Price), nameof(Name) });\n        }\n    }\n}\n\n// Custom validation attribute\npublic class FutureDateAttribute : ValidationAttribute\n{\n    protected override ValidationResult? IsValid(object? value, ValidationContext context)\n    {\n        if (value is DateTime date && date <= DateTime.UtcNow)\n        {\n            return new ValidationResult(\"Date must be in the future.\");\n        }\n        return ValidationResult.Success;\n    }\n}\n\npublic class EventDto\n{\n    public string Title { get; set; } = string.Empty;\n    [FutureDate] public DateTime EventDate { get; set; }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Razor Views Basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Razor views use `.cshtml` files with C# code embedded in HTML. The `@model` directive declares the strongly-typed model. Use `@{}` for code blocks and `@Html` helpers for form generation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Strongly Typed Razor View",
+        "language": "csharp",
+        "code": "@model IEnumerable<Product>\n\n<h1>Products</h1>\n\n@{\n    var count = Model.Count();\n    var pageTitle = \"Product Catalog\";\n}\n\n<p>Showing @count products.</p>\n\n<table class=\"table\">\n    <thead>\n        <tr>\n            <th>Name</th>\n            <th>Price</th>\n        </tr>\n    </thead>\n    <tbody>\n    @foreach (var product in Model)\n    {\n        <tr>\n            <td>@product.Name</td>\n            <td>@product.Price.ToString(\"C\")</td>\n        </tr>\n    }\n    </tbody>\n</table>\n\n@if (User.IsInRole(\"Admin\"))\n{\n    <a asp-action=\"Create\" class=\"btn btn-primary\">Add Product</a>\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ViewData, ViewBag, and TempData",
+        "language": "csharp",
+        "code": "// Controller\npublic IActionResult Details(int id)\n{\n    ViewData[\"PageTitle\"] = \"Product Details\";\n    ViewBag.Message = \"Welcome!\"; // dynamic wrapper around ViewData\n    TempData[\"Alert\"] = \"Product saved successfully.\"; // persists across redirect\n    return View(product);\n}\n\n// Razor view\n@{ ViewData[\"Title\"] = ViewBag.PageTitle; }\n<h1>@ViewData[\"PageTitle\"]</h1>\n<div>@TempData[\"Alert\"]</div>"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Tag Helpers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Tag Helpers enhance HTML elements with server-side behavior. Built-in helpers cover forms, inputs, links, and validation. Create custom tag helpers for reusable components."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Built-in Tag Helpers",
+        "language": "csharp",
+        "code": "@model Product\n\n<!-- Form tag helper: generates action, method, and anti-forgery -->\n<form asp-action=\"Save\" asp-controller=\"Products\" method=\"post\">\n    <div asp-validation-summary=\"All\"></div>\n\n    <div class=\"form-group\">\n        <label asp-for=\"Name\"></label>\n        <input asp-for=\"Name\" class=\"form-control\" />\n        <span asp-validation-for=\"Name\" class=\"text-danger\"></span>\n    </div>\n\n    <div class=\"form-group\">\n        <label asp-for=\"Price\"></label>\n        <input asp-for=\"Price\" class=\"form-control\" />\n        <span asp-validation-for=\"Price\" class=\"text-danger\"></span>\n    </div>\n\n    <!-- Anchor tag helper -->\n    <a asp-action=\"Index\" class=\"btn btn-secondary\">Cancel</a>\n    <button type=\"submit\" class=\"btn btn-primary\">Save</button>\n</form>\n\n<!-- Cache tag helper -->\n<cache vary-by-route=\"id\" expires-after=\"00:05:00\">\n    @await Component.InvokeAsync(\"ProductSummary\", new { id = 5 })\n</cache>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Tag Helper",
+        "language": "csharp",
+        "code": "// Email tag helper: <email user=\"support\" domain=\"example.com\" />\n[HtmlTargetElement(\"email\")]\npublic class EmailTagHelper : TagHelper\n{\n    public string? User { get; set; }\n    public string? Domain { get; set; }\n\n    public override void Process(TagHelperContext context, TagHelperOutput output)\n    {\n        output.TagName = \"a\";\n        var email = $\"{User}@{Domain}\";\n        output.Attributes.SetAttribute(\"href\", $\"mailto:{email}\");\n        output.Content.SetContent(email);\n    }\n}\n\n// Usage in Razor\n// <email user=\"admin\" domain=\"contoso.com\" />"
       }
     },
     {
@@ -121,15 +249,15 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Middleware processes requests and responses in order. Use `Use`, `Run`, and `Map` to build the pipeline."
+        "text": "Middleware processes each request and response. Order matters: authentication must come before authorization. Use `Use` for next-middleware chains, `Run` for terminal middleware, and `Map` for branching pipelines."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Custom Middleware and Ordering",
+        "title": "Middleware Ordering and Custom Middleware",
         "language": "csharp",
-        "code": "// Built-in middleware order matters\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseCors();\napp.UseAuthentication();\napp.UseAuthorization();\n\n// Custom middleware class\npublic class RequestLoggingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger _logger;\n\n    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)\n    {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        _logger.LogInformation(\"Request: {Method} {Path}\", context.Request.Method, context.Request.Path);\n        await _next(context);\n        _logger.LogInformation(\"Response: {StatusCode}\", context.Response.StatusCode);\n    }\n}\n\n// Extension method for clean registration\npublic static class MiddlewareExtensions\n{\n    public static IApplicationBuilder UseRequestLogging(this IApplicationBuilder app)\n    {\n        return app.UseMiddleware<RequestLoggingMiddleware>();\n    }\n}\n\n// Usage in Program.cs\napp.UseRequestLogging();"
+        "code": "// Correct middleware order\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseCors(\"AllowFrontend\");\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\n\n// Custom inline middleware\napp.Use(async (context, next) =>\n{\n    var sw = System.Diagnostics.Stopwatch.StartNew();\n    await next();\n    sw.Stop();\n    Console.WriteLine($\"Request took {sw.ElapsedMilliseconds}ms\");\n});\n\n// Map branching\napp.Map(\"/api\", apiApp =>\n{\n    apiApp.UseRouting();\n    apiApp.UseAuthorization();\n    apiApp.MapControllers();\n});\n\n// Terminal middleware\napp.MapGet(\"/hello\", () => \"Hello World\"); // terminal, no next()\n\n// Custom middleware class\npublic class CorrelationIdMiddleware\n{\n    private readonly RequestDelegate _next;\n    public CorrelationIdMiddleware(RequestDelegate next) => _next = next;\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        context.Response.Headers[\"X-Correlation-Id\"] =\n            context.Request.Headers[\"X-Correlation-Id\"].ToString();\n        await _next(context);\n    }\n}"
       }
     },
     {
@@ -142,36 +270,57 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "ASP.NET Core has a built-in DI container. Register services with `AddTransient`, `AddScoped`, or `AddSingleton`."
+        "text": "ASP.NET Core DI supports `Transient`, `Scoped`, and `Singleton` lifetimes. Constructor injection is preferred. Use factories for dynamic resolution and `IServiceProvider` for late-bound services."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Service Lifetimes and Injection",
+        "title": "Service Lifetimes and Constructor Injection",
         "language": "csharp",
-        "code": "// Registration in Program.cs\nbuilder.Services.AddTransient<IGreetingService, GreetingService>();\nbuilder.Services.AddScoped<IProductRepository, ProductRepository>();\nbuilder.Services.AddSingleton<IAppCache, AppCache>();\n\n// Constructor injection (preferred)\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n    private readonly ILogger<ProductsController> _logger;\n\n    public ProductsController(IProductService service, ILogger<ProductsController> logger)\n    {\n        _service = service;\n        _logger = logger;\n    }\n}\n\n// injecting IEnumerable<T> for all implementations\npublic class ReportingController : ControllerBase\n{\n    private readonly IEnumerable<IReportGenerator> _generators;\n\n    public ReportingController(IEnumerable<IReportGenerator> generators)\n    {\n        _generators = generators;\n    }\n}"
+        "code": "// Program.cs registrations\nbuilder.Services.AddTransient<IGreetingService, GreetingService>();\nbuilder.Services.AddScoped<IProductRepository, ProductRepository>();\nbuilder.Services.AddSingleton<IAppCache, AppCache>();\n\n// Constructor injection\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n    private readonly ILogger<ProductsController> _logger;\n\n    public ProductsController(IProductService service, ILogger<ProductsController> logger)\n    {\n        _service = service;\n        _logger = logger;\n    }\n}\n\n// Injecting all implementations\npublic class ReportingController : ControllerBase\n{\n    private readonly IEnumerable<IReportGenerator> _generators;\n\n    public ReportingController(IEnumerable<IReportGenerator> generators)\n    {\n        _generators = generators;\n    }\n}\n\n// Factory pattern for transient resolution\npublic class OrderProcessor\n{\n    private readonly IServiceProvider _provider;\n\n    public OrderProcessor(IServiceProvider provider)\n    {\n        _provider = provider;\n    }\n\n    public async Task ProcessAsync(Order order)\n    {\n        using var scope = _provider.CreateScope();\n        var handler = scope.ServiceProvider.GetRequiredService<IOrderHandler>();\n        await handler.Handle(order);\n    }\n}\n\n// Keyed services (net 8+)\nbuilder.Services.AddKeyedScoped<ICache, RedisCache>(\"redis\");\nbuilder.Services.AddKeyedScoped<ICache, MemoryCache>(\"memory\");\n\npublic class DataService([FromKeyedServices(\"redis\")] ICache cache)\n{\n    // uses redis cache\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Configuration"
+        "text": "Configuration and Options"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Configuration comes from `appsettings.json`, environment variables, user secrets, and command-line args. The options pattern provides strongly-typed settings."
+        "text": "ASP.NET Core reads configuration from `appsettings.json`, `appsettings.{Environment}.json`, environment variables, user secrets, and command-line args. The options pattern binds configuration sections to strongly typed classes."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Options Pattern and appsettings.json",
+        "title": "appsettings.json and Options Pattern",
         "language": "csharp",
-        "code": "// appsettings.json\n{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Server=...;Database=...\"\n  },\n  \"Jwt\": {\n    \"Secret\": \"super-secret-key\",\n    \"ExpiryMinutes\": 60\n  }\n}\n\n// Strongly-typed options class\npublic class JwtOptions\n{\n    public string Secret { get; set; }\n    public int ExpiryMinutes { get; set; }\n}\n\n// Registration\nbuilder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(\"Jwt\"));\n\n// Consumption\npublic class AuthService\n{\n    private readonly JwtOptions _jwt;\n\n    public AuthService(IOptions<JwtOptions> jwt)\n    {\n        _jwt = jwt.Value; // strongly typed\n    }\n}\n\n// Direct configuration access\nvar connStr = builder.Configuration.GetConnectionString(\"DefaultConnection\");\nvar env = builder.Environment.EnvironmentName;"
+        "code": "// appsettings.json\n{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Host=localhost;Database=app;Username=postgres\"\n  },\n  \"Jwt\": {\n    \"Secret\": \"super-secret-key\",\n    \"Issuer\": \"https://api.example.com\",\n    \"Audience\": \"https://app.example.com\",\n    \"ExpiryMinutes\": 60\n  },\n  \"Email\": {\n    \"SmtpHost\": \"smtp.example.com\",\n    \"Port\": 587,\n    \"UseSsl\": true\n  }\n}\n\n// Strongly-typed options\npublic class JwtOptions\n{\n    public string Secret { get; set; } = string.Empty;\n    public string Issuer { get; set; } = string.Empty;\n    public string Audience { get; set; } = string.Empty;\n    public int ExpiryMinutes { get; set; }\n}\n\npublic class EmailOptions\n{\n    public string SmtpHost { get; set; } = string.Empty;\n    public int Port { get; set; }\n    public bool UseSsl { get; set; }\n}\n\n// Registration\nbuilder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(\"Jwt\"));\nbuilder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(\"Email\"));\n\n// Consumption with IOptions<T> (cached for app lifetime)\npublic class AuthService\n{\n    private readonly JwtOptions _jwt;\n\n    public AuthService(IOptions<JwtOptions> jwt)\n    {\n        _jwt = jwt.Value;\n    }\n}\n\n// IOptionsSnapshot<T> reloads on each request in development\npublic class EmailService\n{\n    private readonly EmailOptions _email;\n\n    public EmailService(IOptionsSnapshot<EmailOptions> email)\n    {\n        _email = email.Value;\n    }\n}\n\n// IOptionsMonitor<T> for change notifications\npublic class CacheService\n{\n    private readonly IOptionsMonitor<JwtOptions> _monitor;\n\n    public CacheService(IOptionsMonitor<JwtOptions> monitor)\n    {\n        _monitor = monitor;\n        _monitor.OnChange(options => Console.WriteLine(\"JWT changed!\"));\n    }\n}\n\n// Direct access\nvar connStr = builder.Configuration.GetConnectionString(\"DefaultConnection\");\nvar env = builder.Environment.EnvironmentName;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Entity Framework Core Basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core is the standard ORM. Define `DbSet<T>` properties in `DbContext`, configure with Fluent API or data annotations, and use LINQ for queries. Eager loading uses `Include`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "DbContext, DbSet, and CRUD with LINQ",
+        "language": "csharp",
+        "code": "// DbContext\npublic class AppDbContext : DbContext\n{\n    public DbSet<Product> Products => Set<Product>();\n    public DbSet<Category> Categories => Set<Category>();\n\n    public AppDbContext(DbContextOptions<AppDbContext> options)\n        : base(options) { }\n\n    protected override void OnModelCreating(ModelBuilder model)\n    {\n        model.Entity<Product>(entity =>\n        {\n            entity.HasKey(p => p.Id);\n            entity.Property(p => p.Name).HasMaxLength(100).IsRequired();\n            entity.HasOne(p => p.Category)\n                .WithMany(c => c.Products)\n                .HasForeignKey(p => p.CategoryId);\n        });\n    }\n}\n\n// Registration in Program.cs\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseNpgsql(builder.Configuration.GetConnectionString(\"DefaultConnection\")));\n\n// Repository pattern\npublic class ProductRepository : IProductRepository\n{\n    private readonly AppDbContext _db;\n\n    public ProductRepository(AppDbContext db) => _db = db;\n\n    public async Task<List<Product>> GetAllAsync()\n        => await _db.Products.AsNoTracking().ToListAsync();\n\n    public async Task<Product?> GetByIdAsync(int id)\n        => await _db.Products.FindAsync(id);\n\n    public async Task AddAsync(Product product)\n    {\n        await _db.Products.AddAsync(product);\n        await _db.SaveChangesAsync();\n    }\n\n    public async Task UpdateAsync(Product product)\n    {\n        _db.Products.Update(product);\n        await _db.SaveChangesAsync();\n    }\n\n    public async Task DeleteAsync(int id)\n    {\n        var product = await _db.Products.FindAsync(id);\n        if (product != null)\n        {\n            _db.Products.Remove(product);\n            await _db.SaveChangesAsync();\n        }\n    }\n}\n\n// Eager loading with Include\nvar productsWithCategory = await _db.Products\n    .Include(p => p.Category)\n    .ThenInclude(c => c.ParentCategory)\n    .ToListAsync();\n\n// Filtering and projection\nvar activeProducts = await _db.Products\n    .Where(p => p.IsActive && p.Price > 10)\n    .OrderByDescending(p => p.CreatedAt)\n    .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n    .ToListAsync();"
       }
     },
     {
@@ -184,15 +333,15 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Filters run code before or after specific pipeline stages: authorization, action execution, exceptions, and results."
+        "text": "Filters run code before or after pipeline stages: authorization, resources, action execution, results, and exceptions. Register globally, per-controller, or per-action using `ServiceFilter` or `TypeFilter`."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Action Filter and Exception Filter",
+        "title": "Action, Exception, and Resource Filters",
         "language": "csharp",
-        "code": "// Action filter\npublic class LogActionFilter : IActionFilter\n{\n    public void OnActionExecuting(ActionExecutingContext context)\n    {\n        // Before action runs\n    }\n\n    public void OnActionExecuted(ActionExecutedContext context)\n    {\n        // After action runs\n    }\n}\n\n// Register globally (Program.cs)\nbuilder.Services.AddControllers(options =>\n{\n    options.Filters.Add<LogActionFilter>();\n});\n\n// Or per-controller/per-action\n[ServiceFilter(typeof(LogActionFilter))]\npublic class ProductsController : ControllerBase { }\n\n// Exception filter\npublic class ApiExceptionFilter : IExceptionFilter\n{\n    public void OnException(ExceptionContext context)\n    {\n        context.Result = new ObjectResult(new { error = context.Exception.Message })\n        {\n            StatusCode = 500\n        };\n        context.ExceptionHandled = true;\n    }\n}"
+        "code": "// Action filter - runs before and after action execution\npublic class LogActionFilter : IActionFilter\n{\n    private readonly ILogger<LogActionFilter> _logger;\n\n    public LogActionFilter(ILogger<LogActionFilter> logger)\n    {\n        _logger = logger;\n    }\n\n    public void OnActionExecuting(ActionExecutingContext context)\n    {\n        _logger.LogInformation(\"Executing {Action}\",\n            context.ActionDescriptor.DisplayName);\n    }\n\n    public void OnActionExecuted(ActionExecutedContext context)\n    {\n        if (context.Exception != null)\n        {\n            _logger.LogError(context.Exception, \"Action threw exception\");\n        }\n    }\n}\n\n// Exception filter - handles exceptions\npublic class ApiExceptionFilter : IExceptionFilter\n{\n    private readonly IHostEnvironment _env;\n\n    public ApiExceptionFilter(IHostEnvironment env)\n    {\n        _env = env;\n    }\n\n    public void OnException(ExceptionContext context)\n    {\n        var result = new ObjectResult(new\n        {\n            error = \"An unexpected error occurred.\",\n            detail = _env.IsDevelopment() ? context.Exception.Message : null\n        })\n        {\n            StatusCode = 500\n        };\n\n        context.Result = result;\n        context.ExceptionHandled = true;\n    }\n}\n\n// Resource filter - runs early in pipeline\npublic class CacheResourceFilter : Attribute, IResourceFilter\n{\n    private readonly int _duration;\n    public CacheResourceFilter(int duration) => _duration = duration;\n\n    public void OnResourceExecuting(ResourceExecutingContext context)\n    {\n        context.HttpContext.Items[\"CachedAt\"] = DateTime.UtcNow;\n    }\n\n    public void OnResourceExecuted(ResourceExecutedContext context)\n    {\n        // post-processing\n    }\n}\n\n// Registration in Program.cs\nbuilder.Services.AddControllers(options =>\n{\n    options.Filters.Add<LogActionFilter>(); // global\n    options.Filters.Add<ApiExceptionFilter>();\n});\n\n// Per-controller registration\n[ServiceFilter(typeof(LogActionFilter))]\npublic class ProductsController : ControllerBase { }\n\n// Per-action with TypeFilter (no explicit registration needed)\n[TypeFilter(typeof(CacheResourceFilter), Arguments = new object[] { 60 })]\n[HttpGet(\"{id}\")]\npublic IActionResult Get(int id) => Ok(...);"
       }
     },
     {
@@ -205,15 +354,23 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Use `[Authorize]` to protect endpoints. Supports JWT, cookies, and external providers like Google."
+        "text": "Use `[Authorize]` to protect endpoints. Configure authentication schemes (JWT, cookies) in `Program.cs`. Policies, roles, and claims provide fine-grained access control. ASP.NET Core Identity is the full membership system."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "JWT Authentication Setup",
+        "title": "JWT Bearer Authentication and Policies",
         "language": "csharp",
-        "code": "// Program.cs\nbuilder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidateAudience = true,\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true,\n            ValidIssuer = builder.Configuration[\"Jwt:Issuer\"],\n            ValidAudience = builder.Configuration[\"Jwt:Audience\"],\n            IssuerSigningKey = new SymmetricSecurityKey(\n                Encoding.UTF8.GetBytes(builder.Configuration[\"Jwt:Secret\"]))\n        };\n    });\n\nbuilder.Services.AddAuthorization();\n\napp.UseAuthentication();\napp.UseAuthorization();\n\n// Controller\n[Authorize]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpGet]\n    public IActionResult Get() => Ok(...);\n\n    [Authorize(Roles = \"Admin\")]\n    [HttpDelete(\"{id}\")]\n    public IActionResult Delete(int id) => NoContent();\n}"
+        "code": "// Program.cs\nbuilder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidateAudience = true,\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true,\n            ValidIssuer = builder.Configuration[\"Jwt:Issuer\"],\n            ValidAudience = builder.Configuration[\"Jwt:Audience\"],\n            IssuerSigningKey = new SymmetricSecurityKey(\n                Encoding.UTF8.GetBytes(builder.Configuration[\"Jwt:Secret\"]))\n        };\n    });\n\n// Policy-based authorization\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"AdminOnly\", policy =>\n        policy.RequireRole(\"Admin\").RequireClaim(\"Department\", \"IT\"));\n    options.AddPolicy(\"MinimumAge\", policy =>\n        policy.Requirements.Add(new MinimumAgeRequirement(18)));\n});\n\nbuilder.Services.AddScoped<IAuthorizationHandler, MinimumAgeHandler>();\n\napp.UseAuthentication();\napp.UseAuthorization();\n\n// Controller\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpGet]\n    [Authorize] // any authenticated user\n    public IActionResult GetUserOrders() => Ok(...);\n\n    [HttpDelete(\"{id}\")]\n    [Authorize(Roles = \"Admin\")]\n    public IActionResult Delete(int id) => NoContent();\n\n    [HttpPost]\n    [Authorize(Policy = \"AdminOnly\")]\n    public IActionResult Create(OrderDto dto) => Ok(...);\n\n    [HttpGet(\"admin/reports\")]\n    [Authorize(Policy = \"MinimumAge\")]\n    public IActionResult AdminReports() => Ok(...);\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cookie Authentication and Identity Overview",
+        "language": "csharp",
+        "code": "// Cookie-based authentication\nbuilder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)\n    .AddCookie(options =>\n    {\n        options.LoginPath = \"/Account/Login\";\n        options.AccessDeniedPath = \"/Account/AccessDenied\";\n        options.ExpireTimeSpan = TimeSpan.FromDays(7);\n        options.SlidingExpiration = true;\n    });\n\n// ASP.NET Core Identity setup\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseNpgsql(connStr));\n\nbuilder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>\n{\n    options.Password.RequireDigit = true;\n    options.Password.RequiredLength = 8;\n    options.Lockout.MaxFailedAccessAttempts = 5;\n})\n.AddEntityFrameworkStores<AppDbContext>()\n.AddDefaultTokenProviders();\n\n// Sign-in\npublic class AccountController : Controller\n{\n    private readonly SignInManager<ApplicationUser> _signInManager;\n\n    public async Task<IActionResult> Login(LoginDto dto)\n    {\n        var result = await _signInManager.PasswordSignInAsync(\n            dto.Email, dto.Password, dto.RememberMe, lockoutOnFailure: false);\n\n        if (result.Succeeded) return RedirectToAction(\"Index\", \"Home\");\n        ModelState.AddModelError(\"\", \"Invalid login\");\n        return View(dto);\n    }\n}\n\n// Protect with [Authorize] on MVC controllers too\n[Authorize]\npublic class ProfileController : Controller\n{\n    public async Task<IActionResult> Index()\n    {\n        var user = await _userManager.GetUserAsync(User);\n        return View(user);\n    }\n}"
       }
     },
     {
@@ -226,15 +383,15 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Cross-Origin Resource Sharing (CORS) allows or blocks requests from different origins. Configure policies in `Program.cs`."
+        "text": "Cross-Origin Resource Sharing (CORS) controls which origins can call your API. Define named policies with specific origins, methods, and headers. Place `UseCors` in the correct pipeline order."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "CORS Policy Configuration",
+        "title": "CORS Policies and Placement",
         "language": "csharp",
-        "code": "// Program.cs\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AllowFrontend\", policy =>\n    {\n        policy.WithOrigins(\"https://app.example.com\")\n              .AllowAnyHeader()\n              .AllowAnyMethod()\n              .AllowCredentials();\n    });\n});\n\napp.UseCors(\"AllowFrontend\");\n\n// For development\nbuilder.Services.AddCors(options =>\n{\n    options.AddDefaultPolicy(policy =>\n    {\n        policy.AllowAnyOrigin()\n              .AllowAnyHeader()\n              .AllowAnyMethod();\n    });\n});"
+        "code": "// Program.cs - service registration\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AllowFrontend\", policy =>\n    {\n        policy.WithOrigins(\"https://app.example.com\", \"https://admin.example.com\")\n              .WithMethods(\"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\")\n              .WithHeaders(\"Authorization\", \"Content-Type\")\n              .AllowCredentials();\n    });\n\n    options.AddPolicy(\"AllowAllDev\", policy =>\n    {\n        policy.AllowAnyOrigin()\n              .AllowAnyHeader()\n              .AllowAnyMethod();\n    });\n});\n\n// Apply globally (must be after UseRouting, before UseAuthorization)\napp.UseCors(\"AllowFrontend\");\n\n// Or per-endpoint\napp.MapGet(\"/api/public\", () => \"Public\")\n   .AllowAnonymous();\n\napp.MapGet(\"/api/protected\", () => \"Protected\")\n   .RequireCors(\"AllowFrontend\");\n\n// Per-controller\n[EnableCors(\"AllowFrontend\")]\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase { }\n\n// Disable CORS for specific endpoint\n[DisableCors]\n[HttpGet(\"internal\")]\npublic IActionResult Internal() => Ok(...);"
       }
     },
     {
@@ -247,16 +404,481 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Return proper HTTP status codes using `IActionResult` helpers. APIs should use `ActionResult<T>` for automatic 200/201/400/404/500 handling."
+        "text": "Return proper HTTP status codes using `IActionResult` helpers. `ActionResult<T>` combines typed responses with status codes. `ProblemDetails` is the standard RFC 7807 error format."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Common IActionResult Returns",
+        "title": "Standard Status Code Responses",
         "language": "csharp",
-        "code": "public class ProductsController : ControllerBase\n{\n    // 200 OK with body\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<ProductDto>> Get(int id)\n    {\n        var product = await _repo.GetByIdAsync(id);\n        if (product == null) return NotFound(); // 404\n        return Ok(product); // 200\n    }\n\n    // 201 Created with Location header\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Post(CreateProductDto dto)\n    {\n        var created = await _repo.CreateAsync(dto);\n        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);\n    }\n\n    // 204 No Content\n    [HttpDelete(\"{id}\")]\n    public async Task<IActionResult> Delete(int id)\n    {\n        await _repo.DeleteAsync(id);\n        return NoContent(); // 204\n    }\n\n    // 400 Bad Request\n    [HttpPut(\"{id}\")]\n    public async Task<IActionResult> Put(int id, UpdateProductDto dto)\n    {\n        if (id != dto.Id) return BadRequest(); // 400\n        // ...\n    }\n}"
+        "code": "public class ProductsController : ControllerBase\n{\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<ProductDto>> Get(int id)\n    {\n        var product = await _repo.GetByIdAsync(id);\n        return product is not null ? Ok(product) : NotFound(); // 200 or 404\n    }\n\n    // 201 Created with Location header\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Create(CreateProductDto dto)\n    {\n        var created = await _repo.CreateAsync(dto);\n        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);\n    }\n\n    // 204 No Content\n    [HttpDelete(\"{id}\")]\n    public async Task<IActionResult> Delete(int id)\n    {\n        await _repo.DeleteAsync(id);\n        return NoContent();\n    }\n\n    // 400 Bad Request\n    [HttpPut(\"{id}\")]\n    public async Task<IActionResult> Update(int id, UpdateProductDto dto)\n    {\n        if (id != dto.Id) return BadRequest(\"ID mismatch\");\n        if (!ModelState.IsValid) return ValidationProblem(ModelState);\n        await _repo.UpdateAsync(dto);\n        return NoContent();\n    }\n\n    // 409 Conflict\n    [HttpPost(\"check-sku\")]\n    public async Task<IActionResult> CheckSku([FromBody] string sku)\n    {\n        if (await _repo.SkuExistsAsync(sku))\n            return Conflict(new { message = \"SKU already exists.\" });\n        return Ok(new { available = true });\n    }\n\n    // 401 Unauthorized\n    [HttpGet(\"admin\")]\n    [Authorize(Roles = \"Admin\")]\n    public IActionResult AdminOnly() => Ok(...);\n\n    // ProblemDetails for validation errors\n    [HttpPost]\n    public IActionResult CreateWithProblem(CreateProductDto dto)\n    {\n        if (!ModelState.IsValid)\n            return ValidationProblem(\"Invalid product data.\");\n        return Ok(dto);\n    }\n}\n\n// ProducesResponseType for Swagger metadata\n[ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]\n[ProducesResponseType(StatusCodes.Status404NotFound)]\n[HttpGet(\"{id}\")]\npublic async Task<ActionResult<ProductDto>> GetDocumented(int id) => ...;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Areas"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Areas partition large MVC apps into feature groups with their own controllers, views, and routes. Enable area routing with `{area:exists}` in conventional route patterns."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Area Setup and Route Pattern",
+        "language": "csharp",
+        "code": "// Program.cs - add area route BEFORE default route\napp.MapControllerRoute(\n    name: \"areas\",\n    pattern: \"{area:exists}/{controller=Home}/{action=Index}/{id?}\");\n\napp.MapControllerRoute(\n    name: \"default\",\n    pattern: \"{controller=Home}/{action=Index}/{id?}\");\n\n// Controller in Areas/Admin/Controllers/ProductsController.cs\n[Area(\"Admin\")]\n[Route(\"Admin/[controller]\")]\npublic class ProductsController : Controller\n{\n    public IActionResult Index()\n    {\n        return View(); // looks in Areas/Admin/Views/Products/Index.cshtml\n    }\n}\n\n// Controller in Areas/Admin/Controllers/OrdersController.cs\n[Area(\"Admin\")]\n[Route(\"Admin/[controller]\")]\n[Authorize(Roles = \"Admin\")]\npublic class OrdersController : Controller { }\n\n// _ViewStart.cshtml in Areas/Admin/Views/\n// @{\n//     Layout = \"~/Views/Shared/_Layout.cshtml\";\n// }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Session and Cache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use `ISession` for per-user session state. Use `IMemoryCache` for in-process caching. Add distributed cache for multi-server deployments. Response caching reduces server load for static-ish responses."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Session, Memory Cache, and Response Caching",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddDistributedMemoryCache(); // or AddStackExchangeRedisCache\nbuilder.Services.AddSession(options =>\n{\n    options.IdleTimeout = TimeSpan.FromMinutes(30);\n    options.Cookie.HttpOnly = true;\n    options.Cookie.IsEssential = true;\n});\n\nbuilder.Services.AddMemoryCache();\n\napp.UseSession(); // after UseRouting, before UseAuthorization\n\n// Session usage in controller\n[HttpPost(\"cart/add\")]\npublic async Task<IActionResult> AddToCart([FromBody] AddToCartDto dto)\n{\n    var cart = HttpContext.Session.Get<List<CartItem>>(\"Cart\") ?? new();\n    cart.Add(dto);\n    HttpContext.Session.Set(\"Cart\", cart);\n    return Ok(new { count = cart.Count });\n}\n\npublic IActionResult GetCart()\n{\n    var cart = HttpContext.Session.Get<List<CartItem>>(\"Cart\");\n    return Ok(cart ?? new List<CartItem>());\n}\n\n// Memory cache usage\npublic class ProductService\n{\n    private readonly IMemoryCache _cache;\n\n    public ProductService(IMemoryCache cache)\n    {\n        _cache = cache;\n    }\n\n    public async Task<Product?> GetProductAsync(int id)\n    {\n        return await _cache.GetOrCreateAsync(\"product:\" + id, async entry =>\n        {\n            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);\n            entry.SlidingExpiration = TimeSpan.FromMinutes(2);\n            return await _repo.GetByIdAsync(id);\n        });\n    }\n}\n\n// Response caching\nbuilder.Services.AddResponseCaching();\napp.UseResponseCaching(); // after UseRouting\n\n[HttpGet(\"products\")]\n[ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { \"page\", \"category\" })]\npublic async Task<ActionResult<List<ProductDto>>> GetProducts([FromQuery] int page, [FromQuery] string category)\n{\n    return Ok(await _service.GetPageAsync(page, category));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use `UseExceptionHandler` for production error handling. Developer Exception Page is for development only. `StatusCodePages` handles non-success HTTP responses. ProblemDetailsFactory creates RFC 7807 error bodies."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Exception Handling and ProblemDetails",
+        "language": "csharp",
+        "code": "// Program.cs\nif (app.Environment.IsDevelopment())\n{\n    app.UseDeveloperExceptionPage();\n}\nelse\n{\n    app.UseExceptionHandler(\"/error\");\n    app.UseHsts();\n}\n\n// Error controller for production\n[Route(\"error\")]\n[ApiController]\n[ApiExplorerSettings(IgnoreApi = true)]\npublic class ErrorController : ControllerBase\n{\n    private readonly ProblemDetailsFactory _problemFactory;\n\n    public ErrorController(ProblemDetailsFactory problemFactory)\n    {\n        _problemFactory = problemFactory;\n    }\n\n    [Route(\"500\")]\n    public IActionResult Handle500([FromServices] IHostEnvironment env)\n    {\n        var problem = _problemFactory.CreateProblemDetails(\n            HttpContext,\n            statusCode: 500,\n            title: \"An unexpected error occurred.\");\n\n        if (env.IsDevelopment())\n        {\n            problem.Extensions[\"traceId\"] = HttpContext.TraceIdentifier;\n        }\n\n        return new ObjectResult(problem) { StatusCode = 500 };\n    }\n}\n\n// StatusCodePages middleware\napp.UseStatusCodePages(async context =>\n{\n    var response = context.HttpContext.Response;\n    if (response.StatusCode == 404)\n    {\n        await response.WriteAsync(\"Page not found\");\n    }\n});\n\n// Global exception filter for Web API\npublic class GlobalExceptionFilter : IExceptionFilter\n{\n    private readonly ProblemDetailsFactory _factory;\n    private readonly IHostEnvironment _env;\n\n    public GlobalExceptionFilter(ProblemDetailsFactory factory, IHostEnvironment env)\n    {\n        _factory = factory;\n        _env = env;\n    }\n\n    public void OnException(ExceptionContext context)\n    {\n        var problem = _factory.CreateProblemDetails(\n            context.HttpContext,\n            statusCode: 500,\n            title: \"Server error\",\n            detail: _env.IsDevelopment() ? context.Exception.Message : null);\n\n        context.Result = new ObjectResult(problem) { StatusCode = 500 };\n        context.ExceptionHandled = true;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Logging"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core includes a built-in logging abstraction. Use `ILogger<T>` for structured logging. Configure providers and log levels in `appsettings.json`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ILogger and Structured Logging",
+        "language": "csharp",
+        "code": "// appsettings.json\n{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\",\n      \"MyApp\": \"Debug\"\n    }\n  }\n}\n\n// Controller\npublic class ProductsController : ControllerBase\n{\n    private readonly ILogger<ProductsController> _logger;\n\n    public ProductsController(ILogger<ProductsController> logger)\n    {\n        _logger = logger;\n    }\n\n    [HttpGet(\"{id}\")]\n    public async Task<IActionResult> Get(int id)\n    {\n        _logger.LogInformation(\"Fetching product {ProductId}\", id);\n\n        try\n        {\n            var product = await _service.GetByIdAsync(id);\n            return product is not null ? Ok(product) : NotFound();\n        }\n        catch (Exception ex)\n        {\n            _logger.LogError(ex, \"Failed to fetch product {ProductId}\", id);\n            throw;\n        }\n    }\n}\n\n// Scopes for correlated logging\npublic class OrderService\n{\n    private readonly ILogger<OrderService> _logger;\n\n    public async Task ProcessAsync(Order order)\n    {\n        using (_logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"OrderId\"] = order.Id,\n            [\"CustomerId\"] = order.CustomerId\n        }))\n        {\n            _logger.LogInformation(\"Processing order\");\n            // ...\n        }\n    }\n}\n\n// Log levels: Trace, Debug, Information, Warning, Error, Critical, None\n_logger.LogDebug(\"Debug message\");\n_logger.LogInformation(\"Info: {Count} items\", items.Count);\n_logger.LogWarning(\"Warning: {Item} is slow\", item.Name);\n_logger.LogError(ex, \"Error processing {RequestId}\", requestId);\n_logger.LogCritical(ex, \"System failure\");"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "File Upload"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Accept uploaded files via `IFormFile` for small files or stream them directly for large uploads. Always validate file type and size. Configure `RequestSizeLimit` for larger payloads."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "IFormFile and Streaming Upload",
+        "language": "csharp",
+        "code": "// Single file upload\n[HttpPost(\"upload\")]\npublic async Task<IActionResult> Upload([FromForm] IFormFile file)\n{\n    if (file == null || file.Length == 0)\n        return BadRequest(\"No file uploaded.\");\n\n    if (file.Length > 10 * 1024 * 1024)\n        return BadRequest(\"File too large. Max 10MB.\");\n\n    var allowedExtensions = new[] { \".jpg\", \".png\", \".pdf\" };\n    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();\n    if (!allowedExtensions.Contains(extension))\n        return BadRequest(\"Invalid file type.\");\n\n    var uploadsFolder = Path.Combine(_env.WebRootPath, \"uploads\");\n    Directory.CreateDirectory(uploadsFolder);\n    var filePath = Path.Combine(uploadsFolder, Guid.NewGuid() + extension);\n\n    await using var stream = new FileStream(filePath, FileMode.Create);\n    await file.CopyToAsync(stream);\n\n    return Ok(new { filePath, fileName = file.FileName, size = file.Length });\n}\n\n// Multiple files\n[HttpPost(\"upload-many\")]\npublic async Task<IActionResult> UploadMany([FromForm] List<IFormFile> files)\n{\n    var results = new List<object>();\n\n    foreach (var file in files.Take(10))\n    {\n        if (file.Length > 0)\n        {\n            var filePath = Path.Combine(_env.WebRootPath, file.FileName);\n            await using var stream = new FileStream(filePath, FileMode.Create);\n            await file.CopyToAsync(stream);\n            results.Add(new { file.FileName, file.Length });\n        }\n    }\n\n    return Ok(results);\n}\n\n// Large file streaming\n[HttpPost(\"upload-stream\")]\npublic async Task<IActionResult> StreamUpload()\n{\n    var fileSize = Request.ContentLength ?? 0;\n    if (fileSize > 500 * 1024 * 1024)\n        return BadRequest(\"File exceeds 500MB limit.\");\n\n    var filePath = Path.Combine(_env.WebRootPath, \"large-upload.bin\");\n    await using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write);\n    await Request.Body.CopyToAsync(stream);\n\n    return Ok(new { fileSize, savedTo = filePath });\n}\n\n// Disable request size limit per endpoint\n[HttpPost(\"upload-large\")]\n[RequestSizeLimit(100 * 1024 * 1024)] // 100MB\npublic async Task<IActionResult> UploadLarge([FromForm] IFormFile file) => ...;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Content Negotiation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Content negotiation selects the response format based on the `Accept` header. ASP.NET Core includes JSON and XML formatters. Configure JSON options or add custom formatters for other media types."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JSON Options and Produces Attribute",
+        "language": "csharp",
+        "code": "// Program.cs - configure JSON globally\nbuilder.Services.AddControllers()\n    .AddJsonOptions(options =>\n    {\n        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;\n        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;\n        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;\n    });\n\n// Add XML formatter\nbuilder.Services.AddControllers()\n    .AddXmlSerializerFormatters();\n\n// Controller-level produces\n[ApiController]\n[Route(\"api/[controller]\")]\n[Produces(\"application/json\", \"application/xml\")]\npublic class ProductsController : ControllerBase { }\n\n// Action-level produces\n[HttpGet(\"{id}\")]\n[Produces(\"application/json\")]\npublic async Task<ActionResult<ProductDto>> Get(int id) => ...;\n\n// Custom formatter (CSV example)\npublic class CsvOutputFormatter : TextOutputFormatter\n{\n    public CsvOutputFormatter()\n    {\n        SupportedMediaTypes.Add(\"text/csv\");\n        SupportedEncodings.Add(Encoding.UTF8);\n    }\n\n    protected override bool CanWriteType(Type? type)\n        => typeof(IEnumerable<ProductDto>).IsAssignableFrom(type);\n\n    public override async Task WriteResponseBodyAsync(OutputFormatterWriteContext context, Encoding selectedEncoding)\n    {\n        var products = (IEnumerable<ProductDto>)context.Object!;\n        var sb = new StringBuilder();\n        sb.AppendLine(\"Id,Name,Price\");\n        foreach (var p in products)\n            sb.AppendLine($\"{p.Id},{p.Name},{p.Price}\");\n        await context.HttpContext.Response.WriteAsync(sb.ToString());\n    }\n}\n\nbuilder.Services.AddControllers(options =>\n    options.OutputFormatters.Add(new CsvOutputFormatter()));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "API Versioning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "API versioning lets you evolve APIs without breaking existing clients. Use URL path, query string, header, or media type versioning. Mark old versions as deprecated."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "URL Path and Query String Versioning",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddApiVersioning(options =>\n{\n    options.DefaultApiVersion = new ApiVersion(1, 0);\n    options.AssumeDefaultVersionWhenUnspecified = true;\n    options.ReportApiVersions = true; // adds API-Version header to response\n    options.ApiVersionReader = ApiVersionReader.Combine(\n        new UrlPathApiVersionReader(\"api-version\"),\n        new QueryStringApiVersionReader(\"api-version\"));\n});\n\n// Controller with versioned routes\n[ApiVersion(\"1.0\")]\n[ApiVersion(\"2.0\")]\n[Route(\"api/v{version:apiVersion}/[controller]\")]\n[ApiController]\npublic class ProductsController : ControllerBase\n{\n    // GET api/v1/products\n    [HttpGet]\n    [MapToApiVersion(\"1.0\")]\n    public ActionResult<IEnumerable<ProductDto>> GetV1()\n        => Ok(new[] { new ProductDto(1, \"V1 Product\", 10) });\n\n    // GET api/v2/products\n    [HttpGet]\n    [MapToApiVersion(\"2.0\")]\n    [ProducesResponseType(typeof(ProductV2Dto), StatusCodes.Status200OK)]\n    public ActionResult<IEnumerable<ProductV2Dto>> GetV2()\n        => Ok(new[] { new ProductV2Dto(1, \"V2 Product\", 10, \"New feature\") });\n\n    // Deprecated in v2\n    [HttpGet(\"{id}\")]\n    [MapToApiVersion(\"2.0\")]\n    [Obsolete(\"Use GetV2 instead\")]\n    [ProducesDeprecatedApiResponse]\n    public ActionResult<ProductDto> GetV2Deprecated(int id) => ...;\n}\n\n// Version by media type (Accept header)\n// Accept: application/json; v=2.0\n[ApiVersion(\"2.0\")]\n[Route(\"api/[controller]\")]\n[Produces(\"application/json; v=2.0\")]\npublic class ProductsV2Controller : ControllerBase\n{\n    [HttpGet]\n    public ActionResult<ProductV2Dto> Get() => ...;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limiting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core 7+ includes built-in rate limiting. Use fixed window, sliding window, or concurrency limits. Define policies in `Program.cs` and attach them with `[EnableRateLimiting]`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rate Limiting Policies",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddRateLimiter(options =>\n{\n    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>\n    {\n        return RateLimitPartition.GetFixedWindowLimiter(\n            partitionKey: context.User.Identity?.Name ?? context.Request.Headers.Host.ToString(),\n            factory: partition => new FixedWindowRateLimiterOptions\n            {\n                PermitLimit = 100,\n                Window = TimeSpan.FromMinutes(1),\n                QueueLimit = 0\n            });\n    });\n\n    options.OnRejected = async (context, cancellationToken) =>\n    {\n        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;\n        await context.HttpContext.Response.WriteAsync(\n            \"Too many requests. Please try again later.\", cancellationToken);\n    };\n});\n\napp.UseRateLimiter();\n\n// Named policy for specific endpoints\nbuilder.Services.AddRateLimiter(options =>\n{\n    options.AddPolicy(\"auth\", context =>\n    {\n        return RateLimitPartition.GetSlidingWindowLimiter(\n            partitionKey: context.User.Identity?.Name ?? context.Request.Headers.Host.ToString(),\n            factory: partition => new SlidingWindowRateLimiterOptions\n            {\n                PermitLimit = 10,\n                Window = TimeSpan.FromMinutes(1),\n                SegmentsPerWindow = 4\n            });\n    });\n});\n\n[EnableRateLimiting(\"auth\")]\n[HttpPost(\"login\")]\npublic IActionResult Login(LoginDto dto) => ...;\n\n// Concurrency limiter\nbuilder.Services.AddRateLimiter(options =>\n{\n    options.AddPolicy(\"upload\", context =>\n    {\n        return RateLimitPartition.GetConcurrencyLimiter(\n            partitionKey: context.User.Identity?.Name ?? \"anonymous\",\n            factory: partition => new ConcurrencyLimiterOptions\n            {\n                PermitLimit = 5\n            });\n    });\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Health Checks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Health checks report the health of app dependencies. Use built-in checks for databases, add custom checks, and optionally expose a UI. Health checks are commonly used by load balancers and orchestrators."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Health Checks Configuration",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddHealthChecks()\n    .AddNpgSql(\n        connectionString: builder.Configuration.GetConnectionString(\"DefaultConnection\"),\n        name: \"database\",\n        tags: new[] { \"db\", \"postgres\" })\n    .AddRedis(\n        redisConnectionString: \"localhost:6379\",\n        name: \"cache\",\n        tags: new[] { \"cache\", \"redis\" })\n    .AddCheck<CustomHealthCheck>(\"custom\", tags: new[] { \"app\" });\n\napp.MapHealthChecks(\"/health\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"db\"),\n    ResponseWriter = async (context, report) =>\n    {\n        context.Response.ContentType = \"application/json\";\n        var result = JsonSerializer.Serialize(new\n        {\n            status = report.Status.ToString(),\n            checks = report.Entries.Select(e => new\n            {\n                name = e.Key,\n                status = e.Value.Status.ToString(),\n                duration = e.Value.Duration\n            })\n        });\n        await context.Response.WriteAsync(result);\n    }\n});\n\n// Custom health check\npublic class CustomHealthCheck : IHealthCheck\n{\n    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct)\n    {\n        var isHealthy = CheckExternalService();\n        return isHealthy\n            ? Task.FromResult(HealthCheckResult.Healthy(\"Service is up\"))\n            : Task.FromResult(HealthCheckResult.Unhealthy(\"Service is down\"));\n    }\n}\n\n// Health check publisher (periodic background reporting)\nbuilder.Services.AddHealthCheckPublisher(options =>\n{\n    options.Delay = TimeSpan.FromSeconds(5);\n    options.Period = TimeSpan.FromSeconds(30);\n});\n\n// Add health checks UI package for dashboard\n// builder.Services.AddHealthChecksUI();\n// app.MapHealthChecksUI();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SignalR Basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SignalR enables real-time server-to-client communication. Define a Hub class, call `SendAsync` on clients, and handle connection lifecycle events. The JavaScript client connects and invokes server methods."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SignalR Hub and JavaScript Client",
+        "language": "csharp",
+        "code": "// Hub class\npublic class ChatHub : Hub\n{\n    // Clients call this method\n    public async Task SendMessage(string user, string message)\n    {\n        // Broadcast to all connected clients\n        await Clients.All.SendAsync(\"ReceiveMessage\", user, message);\n    }\n\n    // Send to specific caller\n    public async Task SendPrivate(string toUser, string message)\n    {\n        await Clients.User(toUser).SendAsync(\"ReceivePrivate\", message);\n    }\n\n    // Send to group\n    public override async Task OnConnectedAsync()\n    {\n        await Groups.AddToGroupAsync(Context.ConnectionId, \"SignalR Users\");\n        await Clients.Group(\"SignalR Users\")\n            .SendAsync(\"UserConnected\", Context.ConnectionId);\n    }\n\n    public async Task JoinRoom(string roomName)\n    {\n        await Groups.AddToGroupAsync(Context.ConnectionId, roomName);\n        await Clients.Group(roomName)\n            .SendAsync(\"JoinedRoom\", Context.ConnectionId);\n    }\n\n    public override async Task OnDisconnectedAsync(Exception? exception)\n    {\n        await Clients.All.SendAsync(\"UserDisconnected\", Context.ConnectionId);\n        await base.OnDisconnectedAsync(exception);\n    }\n}\n\n// Program.cs\nbuilder.Services.AddSignalR();\napp.MapHub<ChatHub>(\"/chathub\");\n\n// JavaScript client (wwwroot/js/signalr-client.js)\n// const connection = new signalR.HubConnectionBuilder()\n//     .withUrl(\"/chathub\")\n//     .withAutomaticReconnect()\n//     .build();\n//\n// connection.on(\"ReceiveMessage\", (user, message) => {\n//     console.log(user + \": \" + message);\n// });\n//\n// await connection.start();\n// await connection.invoke(\"SendMessage\", \"Alice\", \"Hello!\");\n//\n// connection.onclose(() => console.log(\"Disconnected\"));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Background Services"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Run background tasks using `IHostedService` or inherit from `BackgroundService`. Use `BackgroundService` for long-running loops. Queue work items from requests for reliable processing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BackgroundService and Queued Hosted Service",
+        "language": "csharp",
+        "code": "// Long-running background task\npublic class TimedHostedService : BackgroundService\n{\n    private readonly ILogger<TimedHostedService> _logger;\n\n    public TimedHostedService(ILogger<TimedHostedService> logger)\n    {\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        _logger.LogInformation(\"Timed Hosted Service running\");\n\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            _logger.LogInformation(\"Worker running at: {Time}\", DateTimeOffset.Now);\n            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);\n        }\n\n        _logger.LogInformation(\"Timed Hosted Service is stopping\");\n    }\n}\n\n// Registration in Program.cs\nbuilder.Services.AddHostedService<TimedHostedService>();\n\n// Queued background service pattern\npublic interface IBackgroundTaskQueue\n{\n    ValueTask QueueBackgroundWorkItemAsync(Func<CancellationToken, Task> workItem);\n    ValueTask<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken);\n}\n\npublic class BackgroundTaskQueue : IBackgroundTaskQueue\n{\n    private readonly Channel<Func<CancellationToken, Task>> _queue;\n\n    public BackgroundTaskQueue(int capacity = 100)\n    {\n        var options = new BoundedChannelOptions(capacity)\n        {\n            FullMode = BoundedChannelFullMode.Wait\n        };\n        _queue = Channel.CreateBounded<Func<CancellationToken, Task>>(options);\n    }\n\n    public async ValueTask QueueBackgroundWorkItemAsync(Func<CancellationToken, Task> workItem)\n    {\n        if (workItem == null) throw new ArgumentNullException(nameof(workItem));\n        await _queue.Writer.WriteAsync(workItem);\n    }\n\n    public async ValueTask<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken)\n    {\n        return await _queue.Reader.ReadAsync(cancellationToken);\n    }\n}\n\npublic class QueuedHostedService : BackgroundService\n{\n    private readonly IBackgroundTaskQueue _taskQueue;\n    private readonly ILogger<QueuedHostedService> _logger;\n\n    public QueuedHostedService(IBackgroundTaskQueue taskQueue, ILogger<QueuedHostedService> logger)\n    {\n        _taskQueue = taskQueue;\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            var workItem = await _taskQueue.DequeueAsync(stoppingToken);\n            try\n            {\n                await workItem(stoppingToken);\n            }\n            catch (Exception ex)\n            {\n                _logger.LogError(ex, \"Error occurred executing background work item\");\n            }\n        }\n    }\n}\n\n// Usage in controller\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class EmailsController : ControllerBase\n{\n    private readonly IBackgroundTaskQueue _queue;\n\n    public EmailsController(IBackgroundTaskQueue queue)\n    {\n        _queue = queue;\n    }\n\n    [HttpPost(\"send\")]\n    public async Task<IActionResult> SendEmail([FromBody] EmailRequest request)\n    {\n        await _queue.QueueBackgroundWorkItemAsync(async token =>\n        {\n            await _emailService.SendAsync(request.To, request.Subject, request.Body);\n        });\n        return Accepted();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Partial Views and View Components"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Partial views render reusable view fragments. View Components are like mini-controllers with logic and views, ideal for dynamic content like sidebars, login widgets, or shopping cart summaries."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Partial View and View Component",
+        "language": "csharp",
+        "code": "// Partial view: Views/Shared/_ProductCard.cshtml\n// @model Product\n// <div class=\"card\">\n//     <h3>@Model.Name</h3>\n//     <p>@Model.Price.ToString(\"C\")</p>\n// </div>\n\n// Render partial from a view\n// <partial name=\"_ProductCard\" model=\"product\" />\n\n// View Component: Components/CartSummary/Default.cshtml\n// @model CartSummaryViewModel\n// <span>@Model.ItemCount items - @Model.Total.ToString(\"C\")</span>\n\n// View Component class\npublic class CartSummaryViewComponent : ViewComponent\n{\n    private readonly IShoppingCart _cart;\n\n    public CartSummaryViewComponent(IShoppingCart cart)\n    {\n        _cart = cart;\n    }\n\n    public async Task<IViewComponentResult> InvokeAsync()\n    {\n        var summary = await _cart.GetSummaryAsync(User);\n        return View(summary);\n    }\n}\n\n// Invoke from a view\n// @await Component.InvokeAsync(\"CartSummary\")\n// or\n// <vc:cart-summary />"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Razor Pages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Razor Pages organize UI code by page instead of controller. Each page has a `.cshtml` file and an optional PageModel class with handlers. Ideal for page-focused MVC apps."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Razor Page with PageModel",
+        "language": "csharp",
+        "code": "// Pages/Products/Details.cshtml\n@page\n@model DetailsModel\n@{\n    ViewData[\"Title\"] = Model.Product?.Name;\n}\n\n<h1>@Model.Product?.Name</h1>\n<p>@Model.Product?.Description</p>\n<p>Price: @Model.Product?.Price.ToString(\"C\")</p>\n\n<form method=\"post\" asp-page-handler=\"Buy\">\n    <button class=\"btn btn-primary\">Buy Now</button>\n</form>\n\n// Pages/Products/Details.cshtml.cs\npublic class DetailsModel : PageModel\n{\n    private readonly IProductRepository _repo;\n    public Product? Product { get; private set; }\n\n    public DetailsModel(IProductRepository repo)\n    {\n        _repo = repo;\n    }\n\n    public async Task<IActionResult> OnGetAsync(int id)\n    {\n        Product = await _repo.GetByIdAsync(id);\n        if (Product == null) return NotFound();\n        return Page();\n    }\n\n    public async Task<IActionResult> OnPostBuyAsync(int id)\n    {\n        var product = await _repo.GetByIdAsync(id);\n        if (product == null) return NotFound();\n        await _cart.AddAsync(product);\n        return RedirectToPage(\"/Cart/Index\");\n    }\n\n    public async Task<IActionResult> OnPostDeleteAsync(int id)\n    {\n        await _repo.DeleteAsync(id);\n        return RedirectToPage(\"./Index\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Entity Framework Core Migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core Migrations track schema changes over time. Use `dotnet ef migrations add` and `dotnet ef database update` in development. For production, apply migrations programmatically on startup."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Migrations and Programmatic Updates",
+        "language": "csharp",
+        "code": "// Install EF Core CLI\n// dotnet tool install --global dotnet-ef\n// dotnet add package Microsoft.EntityFrameworkCore.Design\n\n// CLI commands\n// dotnet ef migrations add InitialCreate\n// dotnet ef database update\n// dotnet ef migrations remove\n// dotnet ef dbcontext info\n\n// Program.cs - apply migrations on startup\nusing var scope = app.Services.CreateScope();\nvar db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\nawait db.Database.MigrateAsync();\n\n// Transaction scope\npublic async Task TransferAsync(int fromId, int toId, decimal amount)\n{\n    using var transaction = await _db.Database.BeginTransactionAsync();\n    try\n    {\n        var from = await _db.Accounts.FindAsync(fromId);\n        var to = await _db.Accounts.FindAsync(toId);\n\n        from!.Debit(amount);\n        to!.Credit(amount);\n\n        await _db.SaveChangesAsync();\n        await transaction.CommitAsync();\n    }\n    catch\n    {\n        await transaction.RollbackAsync();\n        throw;\n    }\n}\n\n// Raw SQL queries\nvar products = await _db.Products\n    .FromSqlInterpolated($\"SELECT * FROM Products WHERE IsActive = {true}\")\n    .ToListAsync();\n\n// Execute non-query SQL\nvar rows = await _db.Database.ExecuteSqlInterpolatedAsync(\n    $\"UPDATE Products SET Price = Price * 1.1m WHERE CategoryId = {categoryId}\");"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Minimal APIs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core supports minimal API endpoints without controllers. Use `MapGet`, `MapPost`, `MapPut`, `MapDelete` for lightweight HTTP endpoints. Great for microservices or rapid prototyping."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Minimal API Endpoints",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\nbuilder.Services.AddScoped<IProductService, ProductService>();\n\nvar app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\napp.UseHttpsRedirection();\n\n// GET /hello\napp.MapGet(\"/hello\", () => \"Hello World!\");\n\n// GET /api/products\napp.MapGet(\"/api/products\", async (IProductService service) =>\n{\n    return Results.Ok(await service.GetAllAsync());\n})\n.WithName(\"GetProducts\")\n.WithTags(\"Products\");\n\n// GET /api/products/{id}\napp.MapGet(\"/api/products/{id:int}\", async (int id, IProductService service) =>\n{\n    return await service.GetByIdAsync(id) is ProductDto product\n        ? Results.Ok(product)\n        : Results.NotFound();\n})\n.WithName(\"GetProductById\")\n.Produces<ProductDto>(StatusCodes.Status200OK)\n.Produces(StatusCodes.Status404NotFound);\n\n// POST /api/products\napp.MapPost(\"/api/products\", async (CreateProductDto dto, IProductService service) =>\n{\n    var created = await service.CreateAsync(dto);\n    return Results.CreatedAtRoute(\"GetProductById\", new { id = created.Id }, created);\n})\n.RequireAuthorization();\n\n// PUT /api/products/{id}\napp.MapPut(\"/api/products/{id:int}\", async (int id, UpdateProductDto dto, IProductService service) =>\n{\n    if (id != dto.Id) return Results.BadRequest();\n    await service.UpdateAsync(dto);\n    return Results.NoContent();\n});\n\n// DELETE /api/products/{id}\napp.MapDelete(\"/api/products/{id:int}\", async (int id, IProductService service) =>\n{\n    await service.DeleteAsync(id);\n    return Results.NoContent();\n});\n\n// Grouped routes\nvar products = app.MapGroup(\"/api/products\");\nproducts.MapGet(\"/\", ...);\nproducts.MapPost(\"/\", ...);\nproducts.MapGet(\"/{id}\", ...);\n\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "gRPC Basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "gRPC is a high-performance RPC framework using Protocol Buffers. Define services in `.proto` files, generate C# code, and implement services. ASP.NET Core hosts gRPC on HTTP/2."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "gRPC Service Definition and Implementation",
+        "language": "csharp",
+        "code": "// Protos/product.proto\n// syntax = \"proto3\";\n// package Product;\n//\n// service ProductService {\n//     rpc GetProduct (ProductRequest) returns (ProductResponse);\n//     rpc ListProducts (ListRequest) returns (stream ProductResponse);\n// }\n//\n// message ProductRequest { int32 id = 1; }\n// message ProductRequest { int32 id = 1; }\n// message ProductResponse { int32 id = 1; string name = 2; double price = 3; }\n// message ListRequest { int32 page_size = 1; int32 page = 2; }\n\n// Program.cs\nbuilder.Services.AddGrpc();\napp.MapGrpcService<ProductService>();\n\n// gRPC service implementation\npublic class ProductService : Product.ProductServiceBase\n{\n    private readonly IProductService _service;\n\n    public ProductService(IProductService service)\n    {\n        _service = service;\n    }\n\n    public override async Task<ProductResponse> GetProduct(ProductRequest request, ServerCallContext context)\n    {\n        var product = await _service.GetByIdAsync(request.Id);\n        if (product == null)\n            throw new RpcException(new Status(StatusCode.NotFound, \"Product not found\"));\n\n        return new ProductResponse\n        {\n            Id = product.Id,\n            Name = product.Name,\n            Price = product.Price\n        };\n    }\n\n    public override async Task ListProducts(ListRequest request, IServerStreamWriter<ProductResponse> responseStream, ServerCallContext context)\n    {\n        var products = await _service.GetAllAsync();\n        foreach (var product in products)\n        {\n            await responseStream.WriteAsync(new ProductResponse\n            {\n                Id = product.Id,\n                Name = product.Name,\n                Price = product.Price\n            });\n        }\n    }\n}\n\n// JavaScript gRPC client\n// const productService = new ProductService(\n//     'https://localhost:5001',\n//     credentials.createInsecure()\n// );\n// const product = await productService.getProduct({ id: 1 });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Localization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core supports localized strings and culture-specific formatting. Configure supported cultures, add resource files, and use `IStringLocalizer` for translation. The request culture is determined from Accept-Language, query, or cookie."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Localization Setup and Usage",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddLocalization(options => options.ResourcesPath = \"Resources\");\n\napp.UseRequestLocalization(new RequestLocalizationOptions\n{\n    DefaultRequestCulture = new RequestCulture(\"en-US\"),\n    SupportedCultures = new[] { new CultureInfo(\"en-US\"), new CultureInfo(\"fr-FR\"), new CultureInfo(\"es-ES\") },\n    SupportedUICultures = new[] { new CultureInfo(\"en-US\"), new CultureInfo(\"fr-FR\"), new CultureInfo(\"es-ES\") }\n});\n\n// Resource files\n// Resources/Controllers/HomeController.en.resx\n//   Greeting: Hello\n// Resources/Controllers/HomeController.fr.resx\n//   Greeting: Bonjour\n\n// Using IStringLocalizer in controller\npublic class HomeController : Controller\n{\n    private readonly IStringLocalizer<HomeController> _localizer;\n\n    public HomeController(IStringLocalizer<HomeController> localizer)\n    {\n        _localizer = localizer;\n    }\n\n    public IActionResult Index()\n    {\n        ViewBag.Greeting = _localizer[\"Greeting\"];\n        return View();\n    }\n}\n\n// Razor view\n// <h1>@Localizer[\"Greeting\"]</h1>\n// <p>@Localizer[\"WelcomeMessage\", User.Identity?.Name]</p>"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "More Middleware Examples"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Common middleware patterns include endpoint metadata, short-circuiting, and custom header manipulation. Use terminal middleware for health checks or static asset serving."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Advanced Middleware Patterns",
+        "language": "csharp",
+        "code": "// Short-circuit middleware - stops the pipeline early\napp.Use(async (context, next) =>\n{\n    if (context.Request.Path.StartsWithSegments(\"/favicon.ico\"))\n    {\n        context.Response.StatusCode = StatusCodes.Status204NoContent;\n        return; // short-circuit, next() is NOT called\n    }\n    await next();\n});\n\n// Middleware with options\npublic class SecurityHeadersMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly SecurityHeadersOptions _options;\n\n    public SecurityHeadersMiddleware(RequestDelegate next, IOptions<SecurityHeadersOptions> options)\n    {\n        _next = next;\n        _options = options.Value;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        foreach (var header in _options.Headers)\n        {\n            context.Response.Headers[header.Key] = header.Value;\n        }\n        await _next(context);\n    }\n}\n\n// Terminal MapGet endpoints (no controller needed)\nvar products = app.MapGroup(\"/api/products\");\n\nproducts.MapGet(\"/\", async (IProductService service) =>\n    Results.Ok(await service.GetAllAsync()))\n    .WithName(\"ListProducts\")\n    .WithTags(\"Products\");\n\nproducts.MapGet(\"/{id:int}\", async (int id, IProductService service) =>\n    await service.GetByIdAsync(id) is ProductDto p\n        ? Results.Ok(p)\n        : Results.NotFound())\n    .WithName(\"GetProduct\")\n    .Produces<ProductDto>(StatusCodes.Status200OK)\n    .Produces(StatusCodes.Status404NotFound);\n\nproducts.MapPost(\"/\", async (CreateProductDto dto, IProductService service) =>\n{\n    var created = await service.CreateAsync(dto);\n    return Results.CreatedAtRoute(\"GetProduct\", new { id = created.Id }, created);\n})\n.WithName(\"CreateProduct\");\n\n// Require authorization on a group\nvar admin = app.MapGroup(\"/admin\").RequireAuthorization(\"AdminOnly\");\nadmin.MapGet(\"/stats\", async (IProductService service) =>\n    Results.Ok(await service.GetStatsAsync()));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "More SignalR Examples"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SignalR supports groups, streaming, client results, authorization, and reconnect logic. Use strong-typed hubs for compile safety. Configure JSON serialization for hub payloads."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SignalR Groups, Streaming, and Authorization",
+        "language": "csharp",
+        "code": "// Strongly-typed hub\npublic interface IChatClient\n{\n    Task ReceiveMessage(string user, string message);\n}\n\npublic class ChatHub : Hub<IChatClient>\n{\n    public async Task SendMessage(string user, string message)\n    {\n        await Clients.All.ReceiveMessage(user, message);\n    }\n}\n\n// Authorization on hub methods\n[Authorize(Policy = \"ChatPolicy\")]\npublic async Task SendToRoom(string room, string message)\n{\n    await Clients.Group(room).SendAsync(\"ReceiveMessage\", User.Identity?.Name, message);\n}\n\n// Streaming from server to client\npublic async Task StreamStockPrices(CancellationToken ct)\n{\n    await foreach (var price in _stockService.GetStreamAsync(ct))\n    {\n        await Clients.Caller.SendAsync(\"ReceivePrice\", price.Symbol, price.Value);\n    }\n}\n\n// JavaScript client with reconnect\n// const connection = new signalR.HubConnectionBuilder()\n//     .withUrl(\"/chathub\", { accessTokenFactory: () => token })\n//     .withAutomaticReconnect([0, 2000, 5000, 10000])\n//     .configureLogging(signalR.LogLevel.Information)\n//     .build();\n//\n// connection.on(\"ReceiveMessage\", (user, message) => { ... });\n// await connection.start();\n//\n// connection.onreconnecting(error => console.log(\"Reconnecting...\"));\n// connection.onreconnected(connectionId => console.log(\"Reconnected\"));\n// connection.onclose(() => console.log(\"Closed\"));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Output Caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Output caching caches HTTP responses at the server level without changing application code. Available in .NET 8+. Use named policies or base policies to cache responses based on query, headers, or route values."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Output Caching Policies",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddOutputCache(options =>\n{\n    // Base policy applies to all endpoints unless overridden\n    options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(10)));\n\n    // Named policy for product catalog\n    options.AddPolicy(\"Products\", policy => policy\n        .Expire(TimeSpan.FromMinutes(1))\n        .VaryByQuery(\"page\", \"category\")\n        .VaryByHeader(\"Accept-Language\"));\n\n    // Named policy for user-specific data\n    options.AddPolicy(\"UserProfile\", policy => policy\n        .Expire(TimeSpan.FromSeconds(30))\n        .VaryByQuery(\"userId\"));\n});\n\napp.UseOutputCache();\n\n[HttpGet(\"products\")]\n[OutputCache(PolicyName = \"Products\")]\npublic async Task<ActionResult<List<ProductDto>>> GetProducts(\n    [FromQuery] int page,\n    [FromQuery] string category)\n{\n    return Ok(await _service.GetPageAsync(page, category));\n}\n\n// Evict cache from code\npublic class ProductsController : ControllerBase\n{\n    private readonly IOutputCacheStore _cache;\n\n    public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto)\n    {\n        await _service.UpdateAsync(dto);\n        await _cache.EvictByTagAsync(\"products\", default);\n        return NoContent();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Antiforgery and CSRF Protection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Antiforgery tokens prevent Cross-Site Request Forgery attacks. ASP.NET Core generates tokens automatically for form tag helpers and validates them on unsafe HTTP methods. Configure token header names for AJAX requests."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Antiforgery Configuration",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddAntiforgery(options =>\n{\n    options.HeaderName = \"X-CSRF-TOKEN\";\n    options.Cookie.Name = \"CSRF-TOKEN\";\n    options.Cookie.HttpOnly = true;\n    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;\n});\n\n// Send token with AJAX requests (JavaScript)\n// const token = document.querySelector('input[name=\"__RequestVerificationToken\"]')?.value;\n// fetch('/api/orders', {\n//     method: 'POST',\n//     headers: {\n//         'Content-Type': 'application/json',\n//         'X-CSRF-TOKEN': token\n//     },\n//     body: JSON.stringify(data)\n// });\n\n// Expose token to JavaScript in layout\n// @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery\n// <script>\n//     window.csrfToken = '@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken';\n// </script>\n\n// Validate in custom middleware for API endpoints\napp.Use(async (context, next) =>\n{\n    if (string.Equals(context.Request.Method, \"GET\", StringComparison.OrdinalIgnoreCase) ||\n        string.Equals(context.Request.Method, \"HEAD\", StringComparison.OrdinalIgnoreCase) ||\n        string.Equals(context.Request.Method, \"OPTIONS\", StringComparison.OrdinalIgnoreCase) ||\n        string.Equals(context.Request.Method, \"TRACE\", StringComparison.OrdinalIgnoreCase))\n    {\n        await next();\n        return;\n    }\n\n    try\n    {\n        await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context);\n    }\n    catch (AntiforgeryValidationException)\n    {\n        context.Response.StatusCode = StatusCodes.Status400BadRequest;\n        await context.Response.WriteAsync(\"Invalid CSRF token\");\n        return;\n    }\n\n    await next();\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Useful Built-in Services"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core ships with many useful services. Enable CORS, static files, WebSockets, output caching, response caching, request localization, rate limiting, and health checks as needed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Common Service Registration Overview",
+        "language": "csharp",
+        "code": "// Program.cs - common built-in services\n\n// Static files (wwwroot)\nbuilder.Services.AddDirectoryBrowser();\nbuilder.Services.AddStaticWebAssets();\napp.UseStaticFiles(); // wwwroot files\napp.UseStaticFiles(new StaticFileOptions\n{\n    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, \"node_modules\")),\n    RequestPath = \"/npm\"\n});\n\n// CORS\nbuilder.Services.AddCors();\napp.UseCors();\n\n// WebSockets\napp.UseWebSockets();\napp.MapWebSocketHub<ChatHub>(\"/chathub\");\n\n// Output Caching (net 8+)\nbuilder.Services.AddOutputCache(options =>\n{\n    options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(10)));\n    options.AddPolicy(\"Products\", policy => policy.Expire(TimeSpan.FromMinutes(1)));\n});\napp.UseOutputCache();\n\n[HttpGet(\"products\")]\n[OutputCache(PolicyName = \"Products\")]\npublic async Task<ActionResult<List<ProductDto>>> GetProducts() => ...;\n\n// Response Caching\nbuilder.Services.AddResponseCaching();\napp.UseResponseCaching();\n\n// Request Localization\nbuilder.Services.AddLocalization(options => options.ResourcesPath = \"Resources\");\napp.UseRequestLocalization(new RequestLocalizationOptions\n{\n    DefaultRequestCulture = new RequestCulture(\"en-US\"),\n    SupportedCultures = new[] { new CultureInfo(\"en-US\"), new CultureInfo(\"fr-FR\") },\n    SupportedUICultures = new[] { new CultureInfo(\"en-US\"), new CultureInfo(\"fr-FR\") }\n});\n\n// Health checks\nbuilder.Services.AddHealthChecks();\napp.MapHealthChecks(\"/health\");\n\n// Swagger / OpenAPI\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\n// Rate Limiting\nbuilder.Services.AddRateLimiter();\napp.UseRateLimiter();\n\n// Session\nbuilder.Services.AddDistributedMemoryCache();\nbuilder.Services.AddSession();\napp.UseSession();\n\n// Antiforgery\nbuilder.Services.AddAntiforgery(options =>\n{\n    options.HeaderName = \"X-CSRF-TOKEN\";\n    options.Cookie.Name = \"CSRF-TOKEN\";\n});\n\n// Output formatters\nbuilder.Services.AddControllers()\n    .AddXmlSerializerFormatters()\n    .AddJsonOptions(opt =>\n    {\n        opt.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;\n        opt.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;\n    });\n\n// Memory cache\nbuilder.Services.AddMemoryCache();\n\n// Distributed cache (Redis)\nbuilder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n    options.InstanceName = \"MyApp:\";\n});"
       }
     }
   ]
 }
+
+
+
