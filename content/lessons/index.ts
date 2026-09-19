@@ -1358,6 +1358,43 @@ import systemDesignDevopsLesson1 from "../problems/system-design/devops-system-d
 import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-design/kubernetes-multi-env-architecture.json";
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
 
+
+import dotnetLesson1 from "../courses/dotnet-nuget-packages/nuget-fundamentals/what-is-nuget.json";
+import dotnetLesson2 from "../courses/dotnet-nuget-packages/nuget-fundamentals/installing-packages.json";
+import dotnetLesson3 from "../courses/dotnet-nuget-packages/nuget-fundamentals/creating-packages.json";
+import dotnetLesson4 from "../courses/dotnet-nuget-packages/nuget-fundamentals/nuget-config.json";
+import dotnetLesson5 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-options.json";
+import dotnetLesson6 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-logging.json";
+import dotnetLesson7 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-configuration.json";
+import dotnetLesson8 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-dependencyinjection.json";
+import dotnetLesson9 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-mvc.json";
+import dotnetLesson10 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-authentication.json";
+import dotnetLesson11 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-authorization.json";
+import dotnetLesson12 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-cors.json";
+import dotnetLesson13 from "../courses/dotnet-nuget-packages/database-data-access/entity-framework-core.json";
+import dotnetLesson14 from "../courses/dotnet-nuget-packages/database-data-access/dapper.json";
+import dotnetLesson15 from "../courses/dotnet-nuget-packages/database-data-access/npgsql.json";
+import dotnetLesson16 from "../courses/dotnet-nuget-packages/database-data-access/mysqlconnector.json";
+import dotnetLesson17 from "../courses/dotnet-nuget-packages/database-data-access/sqlclient.json";
+import dotnetLesson18 from "../courses/dotnet-nuget-packages/database-data-access/redis.json";
+import dotnetLesson19 from "../courses/dotnet-nuget-packages/database-data-access/stackexchange-redis.json";
+import dotnetLesson20 from "../courses/dotnet-nuget-packages/database-data-access/mongodb-driver.json";
+import dotnetLesson21 from "../courses/dotnet-nuget-packages/serialization-mapping/system-text-json.json";
+import dotnetLesson22 from "../courses/dotnet-nuget-packages/serialization-mapping/newtonsoft-json.json";
+import dotnetLesson23 from "../courses/dotnet-nuget-packages/serialization-mapping/yamldotnet.json";
+import dotnetLesson24 from "../courses/dotnet-nuget-packages/serialization-mapping/automapper.json";
+import dotnetLesson25 from "../courses/dotnet-nuget-packages/serialization-mapping/mapster.json";
+import dotnetLesson26 from "../courses/dotnet-nuget-packages/serialization-mapping/messagepack.json";
+import dotnetLesson27 from "../courses/dotnet-nuget-packages/serialization-mapping/protobuf.json";
+import dotnetLesson28 from "../courses/dotnet-nuget-packages/serialization-mapping/csvhelper.json";
+import dotnetLesson29 from "../courses/dotnet-nuget-packages/messaging-events/masstransit.json";
+import dotnetLesson30 from "../courses/dotnet-nuget-packages/messaging-events/rabbitmq-client.json";
+import dotnetLesson31 from "../courses/dotnet-nuget-packages/messaging-events/rebus.json";
+import dotnetLesson32 from "../courses/dotnet-nuget-packages/messaging-events/mediatr.json";
+import dotnetLesson33 from "../courses/dotnet-nuget-packages/messaging-events/hangfire.json";
+import dotnetLesson34 from "../courses/dotnet-nuget-packages/messaging-events/quartz.json";
+import dotnetLesson35 from "../courses/dotnet-nuget-packages/messaging-events/cronos.json";
+import dotnetLesson36 from "../courses/dotnet-nuget-packages/messaging-events/background-service.json";
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -2688,6 +2725,42 @@ const rawLessonsPart2: any[] = [
 	sqlProblemsLesson48,
 	sqlProblemsLesson49,
 	sqlProblemsLesson50,
+	dotnetLesson1,
+	dotnetLesson2,
+	dotnetLesson3,
+	dotnetLesson4,
+	dotnetLesson5,
+	dotnetLesson6,
+	dotnetLesson7,
+	dotnetLesson8,
+	dotnetLesson9,
+	dotnetLesson10,
+	dotnetLesson11,
+	dotnetLesson12,
+	dotnetLesson13,
+	dotnetLesson14,
+	dotnetLesson15,
+	dotnetLesson16,
+	dotnetLesson17,
+	dotnetLesson18,
+	dotnetLesson19,
+	dotnetLesson20,
+	dotnetLesson21,
+	dotnetLesson22,
+	dotnetLesson23,
+	dotnetLesson24,
+	dotnetLesson25,
+	dotnetLesson26,
+	dotnetLesson27,
+	dotnetLesson28,
+	dotnetLesson29,
+	dotnetLesson30,
+	dotnetLesson31,
+	dotnetLesson32,
+	dotnetLesson33,
+	dotnetLesson34,
+	dotnetLesson35,
+	dotnetLesson36,
 	systemDesignReactLesson1,
 	systemDesignReactLesson2,
 	systemDesignReactLesson3,
@@ -2697,6 +2770,29 @@ const rawLessonsPart2: any[] = [
 	systemDesignDevopsLesson1,
 	systemDesignDevopsLesson2,
 	systemDesignDevopsLesson3,
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];

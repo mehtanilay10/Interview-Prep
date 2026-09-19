@@ -223,6 +223,23 @@ import devOpsModule4 from "../courses/devops/04-kubernetes-advanced/content.json
 import devOpsModule5 from "../courses/devops/05-ci-cd-fundamentals/content.json";
 import devOpsModule6 from "../courses/devops/06-ci-cd-modern-tools/content.json";
 
+
+import dotnetModule1 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/content.json";
+import dotnetModule2 from "../courses/dotnet-nuget-packages/02-core-extensions/content.json";
+import dotnetModule3 from "../courses/dotnet-nuget-packages/03-aspnet-web/content.json";
+import dotnetModule4 from "../courses/dotnet-nuget-packages/04-database-data-access/content.json";
+import dotnetModule5 from "../courses/dotnet-nuget-packages/05-serialization-mapping/content.json";
+import dotnetModule6 from "../courses/dotnet-nuget-packages/06-messaging-events/content.json";
+import dotnetModule7 from "../courses/dotnet-nuget-packages/07-testing-quality/content.json";
+import dotnetModule8 from "../courses/dotnet-nuget-packages/08-security-cryptography/content.json";
+import dotnetModule9 from "../courses/dotnet-nuget-packages/09-utilities-helpers/content.json";
+import dotnetModule10 from "../courses/dotnet-nuget-packages/advanced-patterns/content.json";
+import dotnetModule11 from "../courses/dotnet-nuget-packages/api-documentation-swagger/content.json";
+import dotnetModule12 from "../courses/dotnet-nuget-packages/cloud-integration/content.json";
+import dotnetModule13 from "../courses/dotnet-nuget-packages/http-clients-resilience/content.json";
+import dotnetModule14 from "../courses/dotnet-nuget-packages/logging-monitoring/content.json";
+import dotnetModule15 from "../courses/dotnet-nuget-packages/validation-authorization/content.json";
+
 const rawModules = [
 	sqlModule1,
 	sqlModule2,
@@ -425,6 +442,21 @@ const rawModules = [
 	systemDesignModule1,
 	systemDesignModule2,
 	systemDesignModule3,
+	dotnetModule1,
+	dotnetModule2,
+	dotnetModule3,
+	dotnetModule4,
+	dotnetModule5,
+	dotnetModule6,
+	dotnetModule7,
+	dotnetModule8,
+	dotnetModule9,
+	dotnetModule10,
+	dotnetModule11,
+	dotnetModule12,
+	dotnetModule13,
+	dotnetModule14,
+	dotnetModule15,
 	devOpsModule1,
 	devOpsModule2,
 	devOpsModule3,
@@ -523,3 +555,4 @@ import sqlProblemsModule3 from "../problems/sql/03-sql-advanced/content.json";
 import systemDesignModule1 from "../problems/system-design/react-system-design/content.json";
 import systemDesignModule2 from "../problems/system-design/aspnet-system-design/content.json";
 import systemDesignModule3 from "../problems/system-design/devops-system-design/content.json";
+
