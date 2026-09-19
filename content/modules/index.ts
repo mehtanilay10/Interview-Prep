@@ -239,20 +239,23 @@ import dotnetModule13 from "../courses/dotnet-nuget-packages/http-clients-resili
 import dotnetModule14 from "../courses/dotnet-nuget-packages/logging-monitoring/content.json";
 import dotnetModule15 from "../courses/dotnet-nuget-packages/validation-authorization/content.json";
 
-import yarnModule1 from "../courses/yarn-npm-packages/01-package-managers/content.json";
-import yarnModule2 from "../courses/yarn-npm-packages/02-build-tools/content.json";
-import yarnModule3 from "../courses/yarn-npm-packages/03-testing-libraries/content.json";
-import yarnModule4 from "../courses/yarn-npm-packages/04-styling/content.json";
-import yarnModule5 from "../courses/yarn-npm-packages/05-state-management/content.json";
-import yarnModule6 from "../courses/yarn-npm-packages/06-routing/content.json";
+import yarnModule1 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/content.json";
+import yarnModule2 from "../courses/yarn-npm-packages/frontend-frameworks/content.json";
+import yarnModule3 from "../courses/yarn-npm-packages/build-tools/content.json";
+import yarnModule4 from "../courses/yarn-npm-packages/styling/content.json";
+import yarnModule5 from "../courses/yarn-npm-packages/state-management/content.json";
+import yarnModule6 from "../courses/yarn-npm-packages/routing/content.json";
 import yarnModule7 from "../courses/yarn-npm-packages/http-clients/content.json";
 import yarnModule8 from "../courses/yarn-npm-packages/testing/content.json";
 import yarnModule9 from "../courses/yarn-npm-packages/utilities/content.json";
-import yarnModule10 from "../courses/yarn-npm-packages/react-hooks-patterns/content.json";
-import yarnModule11 from "../courses/yarn-npm-packages/react-performance/content.json";
-import yarnModule12 from "../courses/yarn-npm-packages/react-forms-input/content.json";
-import yarnModule13 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
-import yarnModule14 from "../courses/yarn-npm-packages/react-testing/content.json";
+import yarnModule10 from "../courses/yarn-npm-packages/forms/content.json";
+import yarnModule11 from "../courses/yarn-npm-packages/animation/content.json";
+import yarnModule12 from "../courses/yarn-npm-packages/advanced-patterns/content.json";
+import yarnModule13 from "../courses/yarn-npm-packages/react-hooks-patterns/content.json";
+import yarnModule14 from "../courses/yarn-npm-packages/react-performance/content.json";
+import yarnModule15 from "../courses/yarn-npm-packages/react-forms-input/content.json";
+import yarnModule16 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
+import yarnModule17 from "../courses/yarn-npm-packages/react-testing/content.json";
 
 const rawModules = [
 	sqlModule1,
@@ -456,6 +459,14 @@ const rawModules = [
 	systemDesignModule1,
 	systemDesignModule2,
 	systemDesignModule3,
+	azureProblemsModule1,
+	azureProblemsModule2,
+	azureProblemsModule3,
+	azureProblemsModule4,
+	azureProblemsModule5,
+	azureProblemsModule6,
+	azureProblemsModule7,
+	azureProblemsModule8,
 	dotnetModule1,
 	dotnetModule2,
 	dotnetModule3,
@@ -527,6 +538,9 @@ const rawModules = [
 	yarnModule12,
 	yarnModule13,
 	yarnModule14,
+	yarnModule15,
+	yarnModule16,
+	yarnModule17,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];
@@ -584,4 +598,13 @@ import sqlProblemsModule3 from "../problems/sql/03-sql-advanced/content.json";
 import systemDesignModule1 from "../problems/system-design/react-system-design/content.json";
 import systemDesignModule2 from "../problems/system-design/aspnet-system-design/content.json";
 import systemDesignModule3 from "../problems/system-design/devops-system-design/content.json";
+
+import azureProblemsModule1 from "../problems/azure/01-azure-foundations-problems/content.json";
+import azureProblemsModule2 from "../problems/azure/02-azure-compute-problems/content.json";
+import azureProblemsModule3 from "../problems/azure/03-azure-serverless-problems/content.json";
+import azureProblemsModule4 from "../problems/azure/04-azure-storage-problems/content.json";
+import azureProblemsModule5 from "../problems/azure/05-azure-databases-problems/content.json";
+import azureProblemsModule6 from "../problems/azure/06-azure-networking-problems/content.json";
+import azureProblemsModule7 from "../problems/azure/07-azure-security-problems/content.json";
+import azureProblemsModule8 from "../problems/azure/08-azure-ai-services-problems/content.json";
 

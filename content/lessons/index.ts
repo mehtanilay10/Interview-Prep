@@ -1352,6 +1352,30 @@ import systemDesignDevopsLesson1 from "../problems/system-design/devops-system-d
 import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-design/kubernetes-multi-env-architecture.json";
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
 
+import azureProblemLesson1 from "../problems/azure/01-azure-foundations-problems/choosing-azure-region-and-availability-zone.json";
+import azureProblemLesson2 from "../problems/azure/01-azure-foundations-problems/resource-groups-vs-management-groups.json";
+import azureProblemLesson3 from "../problems/azure/01-azure-foundations-problems/azure-pricing-and-cost-management.json";
+import azureProblemLesson4 from "../problems/azure/02-azure-compute-problems/choosing-between-vm-and-app-service.json";
+import azureProblemLesson5 from "../problems/azure/02-azure-compute-problems/deploying-containerized-apps-on-aks.json";
+import azureProblemLesson6 from "../problems/azure/02-azure-compute-problems/vm-scale-sets-vs-availability-sets.json";
+import azureProblemLesson7 from "../problems/azure/03-azure-serverless-problems/azure-functions-vs-app-service.json";
+import azureProblemLesson8 from "../problems/azure/03-azure-serverless-problems/designing-event-driven-serverless-architecture.json";
+import azureProblemLesson9 from "../problems/azure/03-azure-serverless-problems/serverless-api-best-practices.json";
+import azureProblemLesson10 from "../problems/azure/04-azure-storage-problems/blob-storage-access-tiers.json";
+import azureProblemLesson11 from "../problems/azure/04-azure-storage-problems/azure-files-vs-blob-storage.json";
+import azureProblemLesson12 from "../problems/azure/04-azure-storage-problems/storage-encryption-and-security.json";
+import azureProblemLesson13 from "../problems/azure/05-azure-databases-problems/azure-sql-vs-cosmos-db.json";
+import azureProblemLesson14 from "../problems/azure/05-azure-databases-problems/redis-caching-patterns.json";
+import azureProblemLesson15 from "../problems/azure/05-azure-databases-problems/database-migration-strategies.json";
+import azureProblemLesson16 from "../problems/azure/06-azure-networking-problems/virtual-network-design.json";
+import azureProblemLesson17 from "../problems/azure/06-azure-networking-problems/load-balancer-vs-application-gateway.json";
+import azureProblemLesson18 from "../problems/azure/06-azure-networking-problems/front-door-vs-application-gateway.json";
+import azureProblemLesson19 from "../problems/azure/07-azure-security-problems/managed-identity-vs-service-principal.json";
+import azureProblemLesson20 from "../problems/azure/07-azure-security-problems/key-vault-secrets-management.json";
+import azureProblemLesson21 from "../problems/azure/07-azure-security-problems/network-security-groups-and-firewalls.json";
+import azureProblemLesson22 from "../problems/azure/08-azure-ai-services-problems/azure-openai-vs-cognitive-services.json";
+import azureProblemLesson23 from "../problems/azure/08-azure-ai-services-problems/building-ai-powered-apps-on-azure.json";
+import azureProblemLesson24 from "../problems/azure/08-azure-ai-services-problems/azure-ml-vs-ai-services.json";
 
 import dotnetLesson1 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/what-is-nuget.json";
 import dotnetLesson2 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/installing-packages.json";
@@ -1454,79 +1478,96 @@ import nugetLesson18 from "../courses/dotnet-nuget-packages/http-clients-resilie
 import nugetLesson19 from "../courses/dotnet-nuget-packages/http-clients-resilience/polly-simmy.json";
 import nugetLesson20 from "../courses/dotnet-nuget-packages/http-clients-resilience/httpclientfactory.json";
 
-import yarnLesson1 from "../courses/yarn-npm-packages/01-package-managers/npm-basics.json";
-import yarnLesson2 from "../courses/yarn-npm-packages/01-package-managers/yarn-classic.json";
-import yarnLesson3 from "../courses/yarn-npm-packages/01-package-managers/yarn-berry.json";
-import yarnLesson4 from "../courses/yarn-npm-packages/01-package-managers/pnpm.json";
-import yarnLesson5 from "../courses/yarn-npm-packages/02-build-tools/webpack.json";
-import yarnLesson6 from "../courses/yarn-npm-packages/02-build-tools/vite.json";
-import yarnLesson7 from "../courses/yarn-npm-packages/02-build-tools/esbuild.json";
-import yarnLesson8 from "../courses/yarn-npm-packages/02-build-tools/rollup.json";
-import yarnLesson9 from "../courses/yarn-npm-packages/02-build-tools/parcel.json";
-import yarnLesson10 from "../courses/yarn-npm-packages/03-testing-libraries/jest.json";
-import yarnLesson11 from "../courses/yarn-npm-packages/03-testing-libraries/vitest.json";
-import yarnLesson12 from "../courses/yarn-npm-packages/03-testing-libraries/react-testing-library.json";
-import yarnLesson13 from "../courses/yarn-npm-packages/03-testing-libraries/cypress.json";
-import yarnLesson14 from "../courses/yarn-npm-packages/03-testing-libraries/playwright.json";
-import yarnLesson15 from "../courses/yarn-npm-packages/04-styling/tailwind-css.json";
-import yarnLesson16 from "../courses/yarn-npm-packages/04-styling/sass.json";
-import yarnLesson17 from "../courses/yarn-npm-packages/04-styling/css-modules.json";
-import yarnLesson18 from "../courses/yarn-npm-packages/04-styling/styled-components.json";
-import yarnLesson19 from "../courses/yarn-npm-packages/04-styling/emotion.json";
-import yarnLesson20 from "../courses/yarn-npm-packages/04-styling/postcss.json";
-import yarnLesson21 from "../courses/yarn-npm-packages/05-state-management/redux-toolkit.json";
-import yarnLesson22 from "../courses/yarn-npm-packages/05-state-management/zustand.json";
-import yarnLesson23 from "../courses/yarn-npm-packages/05-state-management/mobx.json";
-import yarnLesson24 from "../courses/yarn-npm-packages/05-state-management/jotai.json";
-import yarnLesson25 from "../courses/yarn-npm-packages/05-state-management/react-query.json";
-import yarnLesson26 from "../courses/yarn-npm-packages/05-state-management/swr.json";
-import yarnLesson27 from "../courses/yarn-npm-packages/06-routing/react-router.json";
-import yarnLesson28 from "../courses/yarn-npm-packages/06-routing/vue-router.json";
-import yarnLesson29 from "../courses/yarn-npm-packages/06-routing/angular-router.json";
-import yarnLesson30 from "../courses/yarn-npm-packages/06-routing/reach-router.json";
-import yarnLesson31 from "../courses/yarn-npm-packages/06-routing/tanstack-router.json";
-import yarnLesson32 from "../courses/yarn-npm-packages/http-clients/axios.json";
-import yarnLesson33 from "../courses/yarn-npm-packages/http-clients/fetch-api.json";
-import yarnLesson34 from "../courses/yarn-npm-packages/http-clients/graphql-request.json";
-import yarnLesson35 from "../courses/yarn-npm-packages/http-clients/apollo-client.json";
-import yarnLesson36 from "../courses/yarn-npm-packages/http-clients/urql.json";
-import yarnLesson37 from "../courses/yarn-npm-packages/http-clients/socket.io.json";
-import yarnLesson38 from "../courses/yarn-npm-packages/testing/jest.json";
-import yarnLesson39 from "../courses/yarn-npm-packages/testing/vitest.json";
-import yarnLesson40 from "../courses/yarn-npm-packages/testing/react-testing-library.json";
+import yarnLesson1 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/what-is-npm-yarn.json";
+import yarnLesson2 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/installing-packages.json";
+import yarnLesson3 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/package-json-scripts.json";
+import yarnLesson4 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/workspaces-monorepos.json";
+import yarnLesson5 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/npx-yarn-pnp.json";
+import yarnLesson6 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/versioning-semver.json";
+import yarnLesson7 from "../courses/yarn-npm-packages/frontend-frameworks/react-essentials.json";
+import yarnLesson8 from "../courses/yarn-npm-packages/frontend-frameworks/vue-essentials.json";
+import yarnLesson9 from "../courses/yarn-npm-packages/frontend-frameworks/angular-essentials.json";
+import yarnLesson10 from "../courses/yarn-npm-packages/frontend-frameworks/nextjs.json";
+import yarnLesson11 from "../courses/yarn-npm-packages/frontend-frameworks/nuxtjs.json";
+import yarnLesson12 from "../courses/yarn-npm-packages/frontend-frameworks/svelte.json";
+import yarnLesson13 from "../courses/yarn-npm-packages/build-tools/webpack.json";
+import yarnLesson14 from "../courses/yarn-npm-packages/build-tools/vite.json";
+import yarnLesson15 from "../courses/yarn-npm-packages/build-tools/rollup.json";
+import yarnLesson16 from "../courses/yarn-npm-packages/build-tools/babel.json";
+import yarnLesson17 from "../courses/yarn-npm-packages/build-tools/esbuild.json";
+import yarnLesson18 from "../courses/yarn-npm-packages/build-tools/turbo.json";
+import yarnLesson19 from "../courses/yarn-npm-packages/styling/tailwind-css.json";
+import yarnLesson20 from "../courses/yarn-npm-packages/styling/sass.json";
+import yarnLesson21 from "../courses/yarn-npm-packages/styling/styled-components.json";
+import yarnLesson22 from "../courses/yarn-npm-packages/styling/emotion.json";
+import yarnLesson23 from "../courses/yarn-npm-packages/styling/css-modules.json";
+import yarnLesson24 from "../courses/yarn-npm-packages/state-management/redux.json";
+import yarnLesson25 from "../courses/yarn-npm-packages/state-management/zustand.json";
+import yarnLesson26 from "../courses/yarn-npm-packages/state-management/jotai.json";
+import yarnLesson27 from "../courses/yarn-npm-packages/state-management/mobx.json";
+import yarnLesson28 from "../courses/yarn-npm-packages/state-management/xstate.json";
+import yarnLesson29 from "../courses/yarn-npm-packages/routing/react-router.json";
+import yarnLesson30 from "../courses/yarn-npm-packages/routing/vue-router.json";
+import yarnLesson31 from "../courses/yarn-npm-packages/routing/angular-router.json";
+import yarnLesson32 from "../courses/yarn-npm-packages/routing/nextjs-routing.json";
+import yarnLesson33 from "../courses/yarn-npm-packages/routing/tanstack-router.json";
+import yarnLesson34 from "../courses/yarn-npm-packages/http-clients/axios.json";
+import yarnLesson35 from "../courses/yarn-npm-packages/http-clients/ky.json";
+import yarnLesson36 from "../courses/yarn-npm-packages/http-clients/ofetch.json";
+import yarnLesson37 from "../courses/yarn-npm-packages/http-clients/graphql-request.json";
+import yarnLesson38 from "../courses/yarn-npm-packages/http-clients/apollo-client.json";
+import yarnLesson39 from "../courses/yarn-npm-packages/testing/jest.json";
+import yarnLesson40 from "../courses/yarn-npm-packages/testing/vitest.json";
 import yarnLesson41 from "../courses/yarn-npm-packages/testing/cypress.json";
 import yarnLesson42 from "../courses/yarn-npm-packages/testing/playwright.json";
 import yarnLesson43 from "../courses/yarn-npm-packages/testing/testing-library.json";
-import yarnLesson44 from "../courses/yarn-npm-packages/utilities/lodash.json";
-import yarnLesson45 from "../courses/yarn-npm-packages/utilities/dayjs.json";
-import yarnLesson46 from "../courses/yarn-npm-packages/utilities/zod.json";
-import yarnLesson47 from "../courses/yarn-npm-packages/utilities/axios-retry.json";
-import yarnLesson48 from "../courses/yarn-npm-packages/utilities/clsx.json";
-import yarnLesson49 from "../courses/yarn-npm-packages/utilities/tailwind-merge.json";
-import yarnLesson50 from "../courses/yarn-npm-packages/react-hooks-patterns/use-state-effect.json";
-import yarnLesson51 from "../courses/yarn-npm-packages/react-hooks-patterns/use-context-reducer.json";
-import yarnLesson52 from "../courses/yarn-npm-packages/react-hooks-patterns/use-ref-callback.json";
-import yarnLesson53 from "../courses/yarn-npm-packages/react-hooks-patterns/use-memo-debug.json";
-import yarnLesson54 from "../courses/yarn-npm-packages/react-hooks-patterns/custom-hooks.json";
-import yarnLesson55 from "../courses/yarn-npm-packages/react-performance/react-memoization.json";
-import yarnLesson56 from "../courses/yarn-npm-packages/react-performance/code-splitting.json";
-import yarnLesson57 from "../courses/yarn-npm-packages/react-performance/virtualization.json";
-import yarnLesson58 from "../courses/yarn-npm-packages/react-performance/profiling-debugging.json";
-import yarnLesson59 from "../courses/yarn-npm-packages/react-performance/rendering-optimization.json";
-import yarnLesson60 from "../courses/yarn-npm-packages/react-forms-input/controlled-components.json";
-import yarnLesson61 from "../courses/yarn-npm-packages/react-forms-input/form-validation.json";
-import yarnLesson62 from "../courses/yarn-npm-packages/react-forms-input/react-hook-form.json";
-import yarnLesson63 from "../courses/yarn-npm-packages/react-forms-input/file-upload.json";
-import yarnLesson64 from "../courses/yarn-npm-packages/react-forms-input/multi-step-forms.json";
-import yarnLesson65 from "../courses/yarn-npm-packages/react-data-fetching/fetch-api-basics.json";
-import yarnLesson66 from "../courses/yarn-npm-packages/react-data-fetching/react-query.json";
-import yarnLesson67 from "../courses/yarn-npm-packages/react-data-fetching/swr.json";
-import yarnLesson68 from "../courses/yarn-npm-packages/react-data-fetching/axios-react.json";
-import yarnLesson69 from "../courses/yarn-npm-packages/react-data-fetching/error-boundaries-loading.json";
-import yarnLesson70 from "../courses/yarn-npm-packages/react-testing/react-testing-library.json";
-import yarnLesson71 from "../courses/yarn-npm-packages/react-testing/vitest-react.json";
-import yarnLesson72 from "../courses/yarn-npm-packages/react-testing/cypress-component.json";
-import yarnLesson73 from "../courses/yarn-npm-packages/react-testing/testing-hooks.json";
+import yarnLesson44 from "../courses/yarn-npm-packages/testing/storybook.json";
+import yarnLesson45 from "../courses/yarn-npm-packages/utilities/lodash.json";
+import yarnLesson46 from "../courses/yarn-npm-packages/utilities/date-fns.json";
+import yarnLesson47 from "../courses/yarn-npm-packages/utilities/uuid.json";
+import yarnLesson48 from "../courses/yarn-npm-packages/utilities/crypto-js.json";
+import yarnLesson49 from "../courses/yarn-npm-packages/utilities/zod.json";
+import yarnLesson50 from "../courses/yarn-npm-packages/utilities/immer.json";
+import yarnLesson51 from "../courses/yarn-npm-packages/forms/react-hook-form.json";
+import yarnLesson52 from "../courses/yarn-npm-packages/forms/zod-validation.json";
+import yarnLesson53 from "../courses/yarn-npm-packages/forms/formik.json";
+import yarnLesson54 from "../courses/yarn-npm-packages/forms/yup.json";
+import yarnLesson55 from "../courses/yarn-npm-packages/forms/final-form.json";
+import yarnLesson56 from "../courses/yarn-npm-packages/animation/framer-motion.json";
+import yarnLesson57 from "../courses/yarn-npm-packages/animation/react-spring.json";
+import yarnLesson58 from "../courses/yarn-npm-packages/animation/gsap.json";
+import yarnLesson59 from "../courses/yarn-npm-packages/animation/anime-js.json";
+import yarnLesson60 from "../courses/yarn-npm-packages/animation/popmotion.json";
+import yarnLesson61 from "../courses/yarn-npm-packages/advanced-patterns/dependency-injection.json";
+import yarnLesson62 from "../courses/yarn-npm-packages/advanced-patterns/mediator-pattern.json";
+import yarnLesson63 from "../courses/yarn-npm-packages/advanced-patterns/observer-pattern.json";
+import yarnLesson64 from "../courses/yarn-npm-packages/advanced-patterns/factory-pattern.json";
+import yarnLesson65 from "../courses/yarn-npm-packages/advanced-patterns/module-federation.json";
+import yarnLesson66 from "../courses/yarn-npm-packages/advanced-patterns/micro-frontends.json";
+import yarnLesson67 from "../courses/yarn-npm-packages/react-hooks-patterns/use-state-effect.json";
+import yarnLesson68 from "../courses/yarn-npm-packages/react-hooks-patterns/use-context-reducer.json";
+import yarnLesson69 from "../courses/yarn-npm-packages/react-hooks-patterns/use-ref-callback.json";
+import yarnLesson70 from "../courses/yarn-npm-packages/react-hooks-patterns/use-memo-debug.json";
+import yarnLesson71 from "../courses/yarn-npm-packages/react-hooks-patterns/custom-hooks.json";
+import yarnLesson72 from "../courses/yarn-npm-packages/react-performance/react-memoization.json";
+import yarnLesson73 from "../courses/yarn-npm-packages/react-performance/code-splitting.json";
+import yarnLesson74 from "../courses/yarn-npm-packages/react-performance/virtualization.json";
+import yarnLesson75 from "../courses/yarn-npm-packages/react-performance/profiling-debugging.json";
+import yarnLesson76 from "../courses/yarn-npm-packages/react-performance/rendering-optimization.json";
+import yarnLesson77 from "../courses/yarn-npm-packages/react-forms-input/controlled-components.json";
+import yarnLesson78 from "../courses/yarn-npm-packages/react-forms-input/form-validation.json";
+import yarnLesson79 from "../courses/yarn-npm-packages/react-forms-input/react-hook-form.json";
+import yarnLesson80 from "../courses/yarn-npm-packages/react-forms-input/file-upload.json";
+import yarnLesson81 from "../courses/yarn-npm-packages/react-forms-input/multi-step-forms.json";
+import yarnLesson82 from "../courses/yarn-npm-packages/react-data-fetching/fetch-api-basics.json";
+import yarnLesson83 from "../courses/yarn-npm-packages/react-data-fetching/react-query.json";
+import yarnLesson84 from "../courses/yarn-npm-packages/react-data-fetching/swr.json";
+import yarnLesson85 from "../courses/yarn-npm-packages/react-data-fetching/axios-react.json";
+import yarnLesson86 from "../courses/yarn-npm-packages/react-data-fetching/error-boundaries-loading.json";
+import yarnLesson87 from "../courses/yarn-npm-packages/react-testing/react-testing-library.json";
+import yarnLesson88 from "../courses/yarn-npm-packages/react-testing/vitest-react.json";
+import yarnLesson89 from "../courses/yarn-npm-packages/react-testing/cypress-component.json";
+import yarnLesson90 from "../courses/yarn-npm-packages/react-testing/testing-hooks.json";
 
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
@@ -2962,6 +3003,30 @@ const rawLessonsPart2: any[] = [
 	systemDesignDevopsLesson1,
 	systemDesignDevopsLesson2,
 	systemDesignDevopsLesson3,
+	azureProblemLesson1,
+	azureProblemLesson2,
+	azureProblemLesson3,
+	azureProblemLesson4,
+	azureProblemLesson5,
+	azureProblemLesson6,
+	azureProblemLesson7,
+	azureProblemLesson8,
+	azureProblemLesson9,
+	azureProblemLesson10,
+	azureProblemLesson11,
+	azureProblemLesson12,
+	azureProblemLesson13,
+	azureProblemLesson14,
+	azureProblemLesson15,
+	azureProblemLesson16,
+	azureProblemLesson17,
+	azureProblemLesson18,
+	azureProblemLesson19,
+	azureProblemLesson20,
+	azureProblemLesson21,
+	azureProblemLesson22,
+	azureProblemLesson23,
+	azureProblemLesson24,
 	yarnLesson1,
 	yarnLesson2,
 	yarnLesson3,
@@ -2993,6 +3058,24 @@ const rawLessonsPart2: any[] = [
 	yarnLesson29,
 	yarnLesson30,
 	yarnLesson31,
+	yarnLesson32,
+	yarnLesson33,
+	yarnLesson34,
+	yarnLesson35,
+	yarnLesson36,
+	yarnLesson37,
+	yarnLesson38,
+	yarnLesson39,
+	yarnLesson40,
+	yarnLesson41,
+	yarnLesson42,
+	yarnLesson43,
+	yarnLesson44,
+	yarnLesson45,
+	yarnLesson46,
+	yarnLesson47,
+	yarnLesson48,
+	yarnLesson49,
 	yarnLesson50,
 	yarnLesson51,
 	yarnLesson52,
@@ -3017,6 +3100,23 @@ const rawLessonsPart2: any[] = [
 	yarnLesson71,
 	yarnLesson72,
 	yarnLesson73,
+	yarnLesson74,
+	yarnLesson75,
+	yarnLesson76,
+	yarnLesson77,
+	yarnLesson78,
+	yarnLesson79,
+	yarnLesson80,
+	yarnLesson81,
+	yarnLesson82,
+	yarnLesson83,
+	yarnLesson84,
+	yarnLesson85,
+	yarnLesson86,
+	yarnLesson87,
+	yarnLesson88,
+	yarnLesson89,
+	yarnLesson90,
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];
