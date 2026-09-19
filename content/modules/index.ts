@@ -450,6 +450,14 @@ const rawModules = [
 	systemDesignModule1,
 	systemDesignModule2,
 	systemDesignModule3,
+	azureProblemsModule1,
+	azureProblemsModule2,
+	azureProblemsModule3,
+	azureProblemsModule4,
+	azureProblemsModule5,
+	azureProblemsModule6,
+	azureProblemsModule7,
+	azureProblemsModule8,
 	dotnetModule1,
 	dotnetModule2,
 	dotnetModule3,
@@ -572,4 +580,13 @@ import sqlProblemsModule3 from "../problems/sql/03-sql-advanced/content.json";
 import systemDesignModule1 from "../problems/system-design/react-system-design/content.json";
 import systemDesignModule2 from "../problems/system-design/aspnet-system-design/content.json";
 import systemDesignModule3 from "../problems/system-design/devops-system-design/content.json";
+
+import azureProblemsModule1 from "../problems/azure/01-azure-foundations-problems/content.json";
+import azureProblemsModule2 from "../problems/azure/02-azure-compute-problems/content.json";
+import azureProblemsModule3 from "../problems/azure/03-azure-serverless-problems/content.json";
+import azureProblemsModule4 from "../problems/azure/04-azure-storage-problems/content.json";
+import azureProblemsModule5 from "../problems/azure/05-azure-databases-problems/content.json";
+import azureProblemsModule6 from "../problems/azure/06-azure-networking-problems/content.json";
+import azureProblemsModule7 from "../problems/azure/07-azure-security-problems/content.json";
+import azureProblemsModule8 from "../problems/azure/08-azure-ai-services-problems/content.json";
 

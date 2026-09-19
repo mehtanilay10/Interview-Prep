@@ -1350,6 +1350,30 @@ import systemDesignDevopsLesson1 from "../problems/system-design/devops-system-d
 import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-design/kubernetes-multi-env-architecture.json";
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
 
+import azureProblemLesson1 from "../problems/azure/01-azure-foundations-problems/choosing-azure-region-and-availability-zone.json";
+import azureProblemLesson2 from "../problems/azure/01-azure-foundations-problems/resource-groups-vs-management-groups.json";
+import azureProblemLesson3 from "../problems/azure/01-azure-foundations-problems/azure-pricing-and-cost-management.json";
+import azureProblemLesson4 from "../problems/azure/02-azure-compute-problems/choosing-between-vm-and-app-service.json";
+import azureProblemLesson5 from "../problems/azure/02-azure-compute-problems/deploying-containerized-apps-on-aks.json";
+import azureProblemLesson6 from "../problems/azure/02-azure-compute-problems/vm-scale-sets-vs-availability-sets.json";
+import azureProblemLesson7 from "../problems/azure/03-azure-serverless-problems/azure-functions-vs-app-service.json";
+import azureProblemLesson8 from "../problems/azure/03-azure-serverless-problems/designing-event-driven-serverless-architecture.json";
+import azureProblemLesson9 from "../problems/azure/03-azure-serverless-problems/serverless-api-best-practices.json";
+import azureProblemLesson10 from "../problems/azure/04-azure-storage-problems/blob-storage-access-tiers.json";
+import azureProblemLesson11 from "../problems/azure/04-azure-storage-problems/azure-files-vs-blob-storage.json";
+import azureProblemLesson12 from "../problems/azure/04-azure-storage-problems/storage-encryption-and-security.json";
+import azureProblemLesson13 from "../problems/azure/05-azure-databases-problems/azure-sql-vs-cosmos-db.json";
+import azureProblemLesson14 from "../problems/azure/05-azure-databases-problems/redis-caching-patterns.json";
+import azureProblemLesson15 from "../problems/azure/05-azure-databases-problems/database-migration-strategies.json";
+import azureProblemLesson16 from "../problems/azure/06-azure-networking-problems/virtual-network-design.json";
+import azureProblemLesson17 from "../problems/azure/06-azure-networking-problems/load-balancer-vs-application-gateway.json";
+import azureProblemLesson18 from "../problems/azure/06-azure-networking-problems/front-door-vs-application-gateway.json";
+import azureProblemLesson19 from "../problems/azure/07-azure-security-problems/managed-identity-vs-service-principal.json";
+import azureProblemLesson20 from "../problems/azure/07-azure-security-problems/key-vault-secrets-management.json";
+import azureProblemLesson21 from "../problems/azure/07-azure-security-problems/network-security-groups-and-firewalls.json";
+import azureProblemLesson22 from "../problems/azure/08-azure-ai-services-problems/azure-openai-vs-cognitive-services.json";
+import azureProblemLesson23 from "../problems/azure/08-azure-ai-services-problems/building-ai-powered-apps-on-azure.json";
+import azureProblemLesson24 from "../problems/azure/08-azure-ai-services-problems/azure-ml-vs-ai-services.json";
 
 import dotnetLesson1 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/what-is-nuget.json";
 import dotnetLesson2 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/installing-packages.json";
@@ -2933,6 +2957,30 @@ const rawLessonsPart2: any[] = [
 	systemDesignDevopsLesson1,
 	systemDesignDevopsLesson2,
 	systemDesignDevopsLesson3,
+	azureProblemLesson1,
+	azureProblemLesson2,
+	azureProblemLesson3,
+	azureProblemLesson4,
+	azureProblemLesson5,
+	azureProblemLesson6,
+	azureProblemLesson7,
+	azureProblemLesson8,
+	azureProblemLesson9,
+	azureProblemLesson10,
+	azureProblemLesson11,
+	azureProblemLesson12,
+	azureProblemLesson13,
+	azureProblemLesson14,
+	azureProblemLesson15,
+	azureProblemLesson16,
+	azureProblemLesson17,
+	azureProblemLesson18,
+	azureProblemLesson19,
+	azureProblemLesson20,
+	azureProblemLesson21,
+	azureProblemLesson22,
+	azureProblemLesson23,
+	azureProblemLesson24,
 	yarnLesson1,
 	yarnLesson2,
 	yarnLesson3,
