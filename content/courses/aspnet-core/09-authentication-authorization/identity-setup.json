@@ -4,26 +4,243 @@
   "moduleSlug": "09-authentication-authorization",
   "courseSlug": "aspnet-core",
   "title": "ASP.NET Core Identity Setup",
-  "description": "Learn asp.net core identity setup in ASP.NET Core.",
+  "description": "Set up ASP.NET Core Identity for full user management, including registration, login, password hashing, email confirmation, and role support backed by Entity Framework Core.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 32,
   "tags": [
     "identity",
-    "users"
+    "users",
+    "roles"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is ASP.NET Core Identity?"
+    },
+    {
       "type": "paragraph",
-      "text": "Identity provides user management, password hashing, and role support."
+      "text": "ASP.NET Core Identity is a complete membership system that handles user accounts, password management, role assignments, claims, and authentication tokens. It eliminates the need to build user management from scratch, providing proven implementations for registration, login, password reset, email confirmation, and two-factor authentication."
+    },
+    {
+      "type": "paragraph",
+      "text": "Identity stores user data in a database using Entity Framework Core. The default schema includes tables for users, roles, user claims, user logins, user tokens, and role claims. When you add Identity to your project, EF Core creates this schema automatically through migrations."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Identity vs. custom authentication",
+      "text": "If you only need simple authentication without user management features, cookie or JWT authentication may be simpler. Identity is the right choice when you need registration flows, password reset, role management, or email confirmation out of the box."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Setting Up Identity"
+    },
+    {
+      "type": "paragraph",
+      "text": "To add Identity to an ASP.NET Core project, you install the Microsoft.AspNetCore.Identity.EntityFrameworkCore package and register Identity in Program.cs. You also need a DbContext that inherits from IdentityDbContext instead of the standard DbContext."
     },
     {
       "type": "example",
+      "title": "Installing Identity packages",
+      "content": "Add the Identity NuGet package to your project.",
       "language": "csharp",
-      "code": "builder.Services.AddIdentity<ApplicationUser, IdentityRole>()\n    .AddEntityFrameworkStores<AppDbContext>()\n    .AddDefaultTokenProviders();"
+      "code": "dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore\ndotnet add package Microsoft.AspNetCore.Identity.UI"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Identity.UI package provides pre-built Razor Pages for registration, login, password reset, and other common identity operations. You can scaffold these pages to customize their appearance, or build your own from scratch using the SignInManager and UserManager services."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring the Identity DbContext"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Identity DbContext extends the standard DbContext with Identity-specific DbSet properties for users, roles, and claims. You must inherit from IdentityDbContext<TUser> where TUser is your custom user class."
+    },
+    {
+      "type": "example",
+      "title": "Custom Identity DbContext",
+      "content": "A DbContext configured for Identity with a custom ApplicationUser class.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.Identity;\nusing Microsoft.AspNetCore.Identity.EntityFrameworkCore;\nusing Microsoft.EntityFrameworkCore;\n\npublic class ApplicationUser : IdentityUser\n{\n    public string? FullName { get; set; }\n    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;\n}\n\npublic class AppDbContext : IdentityDbContext<ApplicationUser>\n{\n    public AppDbContext(DbContextOptions<AppDbContext> options)\n        : base(options) { }\n\n    protected override void OnModelCreating(ModelBuilder builder)\n    {\n        base.OnModelCreating(builder);\n        // Custom entity configurations here\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "ApplicationUser extends IdentityUser, which provides standard properties like UserName, Email, PasswordHash, PhoneNumber, and EmailConfirmed. Adding FullName and CreatedAt lets you store additional user profile data without replacing the entire identity schema."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Registering Identity in Program.cs"
+    },
+    {
+      "type": "paragraph",
+      "text": "After creating the DbContext, you register Identity services and configure the default settings. The AddIdentity method wires up UserManager, SignInManager, RoleManager, and all the supporting services."
+    },
+    {
+      "type": "example",
+      "title": "Identity registration in Program.cs",
+      "content": "Full Identity setup with EF Core and default UI.",
+      "language": "csharp",
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"DefaultConnection\")));\n\nbuilder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>\n    {\n        options.Password.RequireDigit = true;\n        options.Password.RequiredLength = 8;\n        options.Password.RequireUppercase = true;\n        options.Password.RequireLowercase = true;\n        options.Password.RequireNonAlphanumeric = false;\n        options.SignIn.RequireConfirmedEmail = true;\n        options.Lockout.MaxFailedAccessAttempts = 5;\n        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);\n    })\n    .AddEntityFrameworkStores<AppDbContext>()\n    .AddDefaultTokenProviders();\n\nbuilder.Services.AddRazorPages();\n\nvar app = builder.Build();\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapRazorPages();\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "The AddIdentity call configures password requirements, email confirmation requirements, and account lockout policies. AddEntityFrameworkStores tells Identity to use AppDbContext for storing user data. AddDefaultTokenProviders enables email confirmation and password reset tokens."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Password policy flexibility",
+      "text": "Adjust the password options based on your application's security requirements. For internal tools, you might relax the requirements. For consumer-facing applications, the stricter defaults provide better protection against brute-force attacks."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Using Identity Services"
+    },
+    {
+      "type": "paragraph",
+      "text": "Once Identity is configured, you use two primary services: UserManager<TUser> for user management operations (create, find, update, delete), and SignInManager<TUser> for authentication operations (sign in, sign out, password verification, two-factor authentication)."
+    },
+    {
+      "type": "example",
+      "title": "Registering a new user",
+      "content": "Using UserManager to create a user account with a password.",
+      "language": "csharp",
+      "code": "public class AccountController : Controller\n{\n    private readonly UserManager<ApplicationUser> _userManager;\n    private readonly SignInManager<ApplicationUser> _signInManager;\n\n    public AccountController(\n        UserManager<ApplicationUser> userManager,\n        SignInManager<ApplicationUser> signInManager)\n    {\n        _userManager = userManager;\n        _signInManager = signInManager;\n    }\n\n    [HttpGet]\n    public IActionResult Register() => View();\n\n    [HttpPost]\n    [ValidateAntiForgeryToken]\n    public async Task<IActionResult> Register(RegisterViewModel model)\n    {\n        if (!ModelState.IsValid) return View(model);\n\n        var user = new ApplicationUser\n        {\n            UserName = model.Email,\n            Email = model.Email,\n            FullName = model.FullName\n        };\n\n        var result = await _userManager.CreateAsync(user, model.Password);\n\n        if (result.Succeeded)\n        {\n            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);\n            // Send confirmation email here...\n            await _signInManager.SignInAsync(user, isPersistent: false);\n            return RedirectToAction(\"Index\", \"Home\");\n        }\n\n        foreach (var error in result.Errors)\n        {\n            ModelState.AddModelError(string.Empty, error.Description);\n        }\n        return View(model);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The UserManager.CreateAsync method creates the user and hashes the password before storing it. Passwords are never stored in plain text. The SignInManager then signs the user in by issuing an authentication cookie. The email confirmation token can be sent to the user's email for verification."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Database Migrations for Identity"
+    },
+    {
+      "type": "paragraph",
+      "text": "After configuring Identity, you need to create and apply a migration to generate the identity tables. The identity schema includes tables for users, roles, claims, logins, tokens, and role claims."
+    },
+    {
+      "type": "example",
+      "title": "Creating and applying the Identity migration",
+      "content": "Generate and apply the migration that creates the Identity schema.",
+      "language": "csharp",
+      "code": "dotnet ef migrations add AddIdentitySchema\ndotnet ef database update"
+    },
+    {
+      "type": "paragraph",
+      "text": "After running these commands, your database will have the AspNetUsers, AspNetRoles, AspNetUserClaims, AspNetUserLogins, AspNetUserTokens, AspNetRoleClaims, and AspNetUserRoles tables. These tables are managed by Identity and should not be modified directly."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "IdentityUser",
+          "definition": "The base class for Identity user entities, providing standard properties like UserName, Email, and PasswordHash."
+        },
+        {
+          "term": "UserManager<TUser>",
+          "definition": "The Identity service for managing users — creating, finding, updating, deleting, and validating passwords."
+        },
+        {
+          "term": "SignInManager<TUser>",
+          "definition": "The Identity service for authentication — signing users in, signing out, and handling two-factor authentication."
+        },
+        {
+          "term": "IdentityDbContext",
+          "definition": "A DbContext pre-configured with DbSet properties for Identity tables like users, roles, and claims."
+        },
+        {
+          "term": "AddDefaultTokenProviders",
+          "definition": "Enables token generation for email confirmation, password reset, and two-factor authentication in Identity."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Set Up Identity with Registration and Login",
+      "description": "Add ASP.NET Core Identity to a new project, configure it with EF Core, and implement registration and login pages.",
+      "steps": [
+        "Create a new MVC project: 'dotnet new mvc -n IdentityDemo'",
+        "Install the Microsoft.AspNetCore.Identity.EntityFrameworkCore and Microsoft.AspNetCore.Identity.UI packages",
+        "Create an ApplicationUser class extending IdentityUser with FullName and CreatedAt properties",
+        "Create an AppDbContext inheriting from IdentityDbContext<ApplicationUser>",
+        "Configure the connection string in appsettings.json for a local database",
+        "In Program.cs, register Identity with AddIdentity, configure password and lockout options, and add AddEntityFrameworkStores and AddDefaultTokenProviders",
+        "Add authentication and authorization middleware in the correct order",
+        "Create a simple Register and Login controller or use the built-in Identity UI, then run 'dotnet ef migrations add InitIdentity' and 'dotnet ef database update'",
+        "Run the app, register a new user, and verify the AspNetUsers table contains the hashed password"
+      ],
+      "expectedOutcome": "Identity is fully configured. A new user can register through the UI, the password is hashed and stored in AspNetUsers, and the user can log in to access protected pages."
+    },
+    {
+      "type": "checklist",
+      "title": "Identity Setup Checklist",
+      "items": [
+        {
+          "text": "I can explain what ASP.NET Core Identity provides out of the box",
+          "hint": "User management, password hashing, roles, claims, email confirmation, and 2FA."
+        },
+        {
+          "text": "I can create a custom user class by extending IdentityUser",
+          "hint": "Add custom properties like FullName while inheriting standard identity properties."
+        },
+        {
+          "text": "I can configure IdentityDbContext for EF Core",
+          "hint": "Inherit from IdentityDbContext<TUser> and pass DbContextOptions to the base constructor."
+        },
+        {
+          "text": "I can register Identity services in Program.cs",
+          "hint": "Use AddIdentity with AddEntityFrameworkStores and AddDefaultTokenProviders."
+        },
+        {
+          "text": "I can use UserManager and SignInManager in a controller",
+          "hint": "Inject them via constructor and call CreateAsync and SignInAsync for registration."
+        },
+        {
+          "text": "I can create and apply an Identity migration",
+          "hint": "Run 'dotnet ef migrations add' then 'dotnet ef database update' after adding Identity."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "ASP.NET Core Identity Summary",
+      "points": [
+        "Identity provides a complete membership system with user management, roles, and claims",
+        "ApplicationUser extends IdentityUser to add custom profile properties",
+        "IdentityDbContext provides DbSet properties for all Identity tables",
+        "UserManager handles user CRUD operations and password validation",
+        "SignInManager handles sign-in, sign-out, and two-factor authentication",
+        "Migrations create the Identity schema including AspNetUsers, AspNetRoles, and related tables"
+      ],
+      "takeaway": "ASP.NET Core Identity is the standard way to add user management to .NET applications. It handles the complex and security-critical details of password hashing, token generation, and session management so you can focus on your application's features."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "ASP.NET Core Identity Overview",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Introduction to Identity architecture, setup, and customization."
+    },
+    {
+      "title": "Customize ASP.NET Core Identity",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authentication/customize-identity-model",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to extending the Identity model with custom properties and configurations."
+    }
+  ]
 }

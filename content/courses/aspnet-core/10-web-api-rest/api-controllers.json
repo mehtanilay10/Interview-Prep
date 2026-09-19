@@ -4,26 +4,234 @@
   "moduleSlug": "10-web-api-rest",
   "courseSlug": "aspnet-core",
   "title": "API Controllers",
-  "description": "Learn api controllers in ASP.NET Core.",
+  "description": "Learn how to build API controllers in ASP.NET Core using the [ApiController] attribute, convention-based routing, and action results. Understand how API controllers differ from MVC controllers and when to use each.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "controllers",
-    "api"
+    "api",
+    "routing"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "API controllers return data rather than views and use convention-based routing."
+      "text": "In ASP.NET Core, an API controller is a class responsible for handling HTTP requests and returning responses — typically JSON data rather than HTML views. The [ApiController] attribute enables a set of behaviors that make building APIs faster and more consistent, such as automatic model validation and binding source inference."
+    },
+    {
+      "type": "paragraph",
+      "text": "API controllers inherit from ControllerBase, not Controller. ControllerBase provides all the core controller functionality without the view-related features that Controller adds. Since APIs do not return HTML pages, ControllerBase is the appropriate base class."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The [ApiController] Attribute"
+    },
+    {
+      "type": "paragraph",
+      "text": "Adding [ApiController] to a controller class activates several conveniences. Attribute routing is required — you must use [Route] on the controller or actions. Model validation errors automatically trigger a 400 response. Binding source attributes like [FromBody] are inferred for complex types, meaning you no longer need to decorate every action parameter explicitly."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "What [ApiController] Does Automatically",
+      "text": "With [ApiController], complex type parameters are automatically bound from the request body. Simple types (int, string, Guid) default to the route or query string. You no longer need [FromBody] on every complex parameter, but you can still use it for clarity."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Convention-Based Routing with [Route]"
+    },
+    {
+      "type": "paragraph",
+      "text": "The [Route] attribute on the controller class defines a base template. The token [controller] is replaced with the controller class name minus the 'Controller' suffix. For a ProductsController with [Route(\"api/[controller]\")], the base route becomes /api/products."
+    },
+    {
+      "type": "paragraph",
+      "text": "Individual action methods can add additional segments using [HttpGet], [HttpPost], [HttpPut], [HttpDelete], and [HttpPatch]. You can also include route parameters like {id} to capture values from the URL."
     },
     {
       "type": "example",
+      "title": "Full API Controller Example with Routing",
+      "content": "A complete ProductsController demonstrating [ApiController], route attributes, dependency injection, and common action results.",
       "language": "csharp",
-      "code": "[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n    public ProductsController(IProductService service) => _service = service;\n\n    [HttpGet]\n    public async Task<ActionResult<IEnumerable<Product>>> Get()\n        => Ok(await _service.GetAllAsync());\n}"
+      "code": "using Microsoft.AspNetCore.Mvc;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n\n    public ProductsController(IProductService service)\n    {\n        _service = service;\n    }\n\n    [HttpGet]\n    public async Task<ActionResult<IEnumerable<ProductDto>>> GetAll()\n    {\n        var products = await _service.GetAllAsync();\n        return Ok(products);\n    }\n\n    [HttpGet(\"{id:int}\")]\n    public async Task<ActionResult<ProductDto>> GetById(int id)\n    {\n        var product = await _service.GetByIdAsync(id);\n        if (product is null) return NotFound();\n        return Ok(product);\n    }\n\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Create(CreateProductDto dto)\n    {\n        var created = await _service.CreateAsync(dto);\n        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);\n    }\n\n    [HttpDelete(\"{id:int}\")]\n    public async Task<IActionResult> Delete(int id)\n    {\n        var deleted = await _service.DeleteAsync(id);\n        if (!deleted) return NotFound();\n        return NoContent();\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Action Results and Status Codes"
+    },
+    {
+      "type": "paragraph",
+      "text": "ControllerBase provides helper methods that return the appropriate HTTP status code alongside your data. Ok() returns 200, CreatedAtAction() returns 201 with a Location header, NotFound() returns 404, and NoContent() returns 204. Using these helpers is preferred over manually setting the status code."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Common Action Result Helpers",
+      "items": [
+        {
+          "text": "Ok(data) — Returns 200 OK with the serialized data in the response body"
+        },
+        {
+          "text": "CreatedAtAction(actionName, routeValues, value) — Returns 201 Created with a Location header pointing to the new resource"
+        },
+        {
+          "text": "NoContent() — Returns 204 No Content, used after successful DELETE or PUT operations"
+        },
+        {
+          "text": "NotFound() — Returns 404 Not Found when a requested resource does not exist"
+        },
+        {
+          "text": "BadRequest() — Returns 400 Bad Request for invalid input or missing required data"
+        },
+        {
+          "text": "StatusCode(code) — Returns a custom status code when no specific helper fits"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Model Binding and Validation"
+    },
+    {
+      "type": "paragraph",
+      "text": "Model binding is the process of converting incoming HTTP request data into .NET objects that action methods can work with. With [ApiController], complex types (classes) are automatically bound from the request body using the configured JSON serializer. Simple types come from the route or query string."
+    },
+    {
+      "type": "paragraph",
+      "text": "When [ApiController] is active, model validation happens automatically before the action method runs. If validation attributes like [Required] or [StringLength] fail, the framework returns a 400 response with details about which fields are invalid — without your action method ever executing."
+    },
+    {
+      "type": "example",
+      "title": "DTO with Validation Attributes",
+      "content": "Data Transfer Objects (DTOs) use data annotation attributes to declare validation rules that [ApiController] enforces automatically.",
+      "language": "csharp",
+      "code": "using System.ComponentModel.DataAnnotations;\n\npublic class CreateProductDto\n{\n    [Required(ErrorMessage = \"Product name is required\")]\n    [StringLength(100, MinimumLength = 2,\n        ErrorMessage = \"Name must be between 2 and 100 characters\")]\n    public string Name { get; set; } = string.Empty;\n\n    [Range(0.01, 9999.99,\n        ErrorMessage = \"Price must be between $0.01 and $9,999.99\")]\n    public decimal Price { get; set; }\n\n    [StringLength(500)]\n    public string? Description { get; set; }\n\n    [Required]\n    public int CategoryId { get; set; }\n}\n\n// [ApiController] automatically returns 400 if validation fails\n// No need to check ModelState.IsValid manually in each action"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Dependency Injection in Controllers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Controllers are created by the ASP.NET Core dependency injection container. This means you can request services through constructor injection, just like any other service in your application. Registered services like your business logic layer or data repositories are passed in automatically."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Keep Controllers Thin",
+      "text": "Controllers should only handle HTTP concerns: routing, model binding, and returning the right status code. Business logic belongs in services. This keeps your controllers short, testable, and focused."
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: API Controllers",
+      "terms": [
+        {
+          "term": "ControllerBase",
+          "definition": "The base class for API controllers that provides HTTP response helpers without view support."
+        },
+        {
+          "term": "[ApiController]",
+          "definition": "An attribute that enables API-specific behaviors like automatic model validation and binding source inference."
+        },
+        {
+          "term": "Action Result",
+          "definition": "The return type of a controller action, representing both the data and the HTTP status code."
+        },
+        {
+          "term": "Model Binding",
+          "definition": "The process of converting raw HTTP request data (JSON body, query params, route values) into .NET method parameters."
+        },
+        {
+          "term": "DTO",
+          "definition": "Data Transfer Object — a simple class used to shape the data sent to or received from an API, separate from the database entity."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: API Controllers",
+      "points": [
+        "Use ControllerBase (not Controller) for API controllers since APIs return data, not views",
+        "[ApiController] enables automatic model validation, binding inference, and consistent error responses",
+        "Route templates use [controller] as a token that resolves to the class name without the 'Controller' suffix",
+        "Action result helpers like Ok(), CreatedAtAction(), and NotFound() return proper HTTP status codes",
+        "DTOs with validation attributes let [ApiController] reject bad requests automatically before your action runs",
+        "Constructor injection provides services to controllers through the built-in DI container"
+      ],
+      "takeaway": "API controllers in ASP.NET Core are designed to be thin HTTP handlers. The [ApiController] attribute removes boilerplate, action result helpers enforce proper HTTP semantics, and dependency injection keeps your code clean and testable."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Build a Categories API Controller",
+      "description": "Create a complete API controller for managing product categories, following the patterns from this lesson.",
+      "steps": [
+        "Create a CategoriesController class with [ApiController] and [Route(\"api/[controller]\")] attributes",
+        "Add constructor injection for an ICategoryService (mock or real)",
+        "Implement a GET /api/categories action that returns all categories with Ok()",
+        "Implement a GET /api/categories/{id} action that returns NotFound() if the category does not exist",
+        "Implement a POST /api/categories action that accepts a CreateCategoryDto, creates the item, and returns CreatedAtAction with a 201 status",
+        "Implement a DELETE /api/categories/{id} action that returns NoContent() on success or NotFound() if the ID does not exist"
+      ],
+      "expectedOutcome": "A complete CategoriesController with five action methods covering the full CRUD lifecycle. Each action returns the correct HTTP status code, uses dependency injection, and follows the thin-controller pattern."
+    },
+    {
+      "type": "checklist",
+      "title": "API Controllers Checklist",
+      "items": [
+        {
+          "text": "I know why API controllers inherit from ControllerBase instead of Controller",
+          "hint": "ControllerBase has no view support — APIs return JSON data, not HTML pages."
+        },
+        {
+          "text": "I understand what [ApiController] does automatically",
+          "hint": "It infers binding sources, auto-validates models, and returns 400 errors without manual checks."
+        },
+        {
+          "text": "I can explain how route tokens like [controller] work",
+          "hint": "[controller] resolves to the class name minus the 'Controller' suffix — ProductsController becomes 'products'."
+        },
+        {
+          "text": "I know when to use CreatedAtAction vs Ok()",
+          "hint": "CreatedAtAction (201) for new resources, Ok() (200) for existing or list results."
+        },
+        {
+          "text": "I understand why controllers should be thin and delegate business logic to services",
+          "hint": "Thin controllers are easier to test and maintain. Business logic in services can be reused."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "rest-principles",
+        "http-methods-and-status-codes"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "ASP.NET Core API Controllers",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "rest-principles",
+    "http-methods-and-status-codes"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "ASP.NET Core API Controllers",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/"
+    }
+  ]
 }

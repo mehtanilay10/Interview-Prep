@@ -248,6 +248,11 @@ import yarnModule6 from "../courses/yarn-npm-packages/06-routing/content.json";
 import yarnModule7 from "../courses/yarn-npm-packages/http-clients/content.json";
 import yarnModule8 from "../courses/yarn-npm-packages/testing/content.json";
 import yarnModule9 from "../courses/yarn-npm-packages/utilities/content.json";
+import yarnModule10 from "../courses/yarn-npm-packages/react-hooks-patterns/content.json";
+import yarnModule11 from "../courses/yarn-npm-packages/react-performance/content.json";
+import yarnModule12 from "../courses/yarn-npm-packages/react-forms-input/content.json";
+import yarnModule13 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
+import yarnModule14 from "../courses/yarn-npm-packages/react-testing/content.json";
 
 const rawModules = [
 	sqlModule1,
@@ -524,6 +529,11 @@ const rawModules = [
 	yarnModule7,
 	yarnModule8,
 	yarnModule9,
+	yarnModule10,
+	yarnModule11,
+	yarnModule12,
+	yarnModule13,
+	yarnModule14,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];

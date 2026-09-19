@@ -4,26 +4,186 @@
   "moduleSlug": "04-model-binding-validation",
   "courseSlug": "aspnet-core",
   "title": "Custom Validation",
-  "description": "Learn custom validation in ASP.NET Core.",
+  "description": "Create reusable validation rules when built-in attributes are not enough for your business rules.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "custom",
-    "validation"
+    "validation",
+    "attributes"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "When Built-in Rules Are Not Enough"
+    },
+    {
       "type": "paragraph",
-      "text": "Implement IValidatableObject or create custom ValidationAttribute classes."
+      "text": "Built-in validation attributes handle common scenarios like required fields and email formats, but business applications often need rules that are unique to their domain. A booking site might require a check-out date after the check-in date. An inventory system might enforce that a product code follows an internal naming scheme."
+    },
+    {
+      "type": "paragraph",
+      "text": "Custom validation lets you encode these rules in one place and reuse them across multiple models. You can create a custom ValidationAttribute for standalone rules or implement IValidatableObject when a rule depends on multiple properties at once."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Validation Is Still Server-Side",
+      "text": "Custom validation attributes run on the server by default. If you want client-side validation for a custom attribute, you must also write a JavaScript adapter."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Creating a Custom ValidationAttribute"
+    },
+    {
+      "type": "paragraph",
+      "text": "To create a custom attribute, derive from ValidationAttribute and override the IsValid method. The method receives the value to validate and a ValidationContext that gives you access to the model instance and the service provider."
+    },
+    {
+      "type": "paragraph",
+      "text": "Return ValidationResult.Success if the value passes. Return a new ValidationResult with an error message if it fails. The framework collects the result and adds it to ModelState automatically."
     },
     {
       "type": "example",
+      "title": "FutureDateAttribute",
+      "content": "This attribute ensures a date is in the future.",
       "language": "csharp",
-      "code": "public class FutureDateAttribute : ValidationAttribute\n{\n    protected override ValidationResult IsValid(object value, ValidationContext context)\n    {\n        if (value is DateTime dt && dt > DateTime.UtcNow)\n            return ValidationResult.Success;\n        return new ValidationResult(\"Date must be in the future.\");\n    }\n}"
+      "code": "using System;\nusing System.ComponentModel.DataAnnotations;\n\npublic class FutureDateAttribute : ValidationAttribute\n{\n    protected override ValidationResult IsValid(object value, ValidationContext context)\n    {\n        if (value is DateTime date)\n        {\n            if (date > DateTime.UtcNow)\n            {\n                return ValidationResult.Success;\n            }\n            return new ValidationResult(\n                ErrorMessage ?? \"The date must be in the future.\");\n        }\n\n        return new ValidationResult(\"Invalid date value.\");\n    }\n}\n\n// Usage\npublic class EventViewModel\n{\n    public string Title { get; set; }\n\n    [FutureDate(ErrorMessage = \"Please choose a date after today.\")]\n    public DateTime EventDate { get; set;;\n}\n\n[HttpPost]\npublic IActionResult Create(EventViewModel model)\n{\n    if (!ModelState.IsValid) return View(model);\n    return RedirectToAction(\"Details\", new { id = model.Id });\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "Notice the use of ErrorMessage. When you pass ErrorMessage in the constructor or via the attribute property, the IsValid method can use it as a fallback. This keeps the error text configurable instead of hard-coded."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Validating Across Multiple Properties"
+    },
+    {
+      "type": "paragraph",
+      "text": "Some rules compare two or more properties on the same model. For example, a StartDate must be earlier than an EndDate, or a Password must match a ConfirmPassword field. The IValidatableObject interface is designed for exactly this scenario."
+    },
+    {
+      "type": "paragraph",
+      "text": "When your model implements IValidatableObject, the framework calls Validate after it has finished validating individual attributes. You can inspect multiple properties and yield return ValidationResult objects for each failure."
+    },
+    {
+      "type": "example",
+      "title": "IValidatableObject for Cross-Field Validation",
+      "content": "This model validates that the end date is after the start date.",
+      "language": "csharp",
+      "code": "using System;\nusing System.Collections.Generic;\nusing System.ComponentModel.DataAnnotations;\n\npublic class BookingViewModel : IValidatableObject\n{\n    [Required]\n    public DateTime StartDate { get; set; }\n\n    [Required]\n    public DateTime EndDate { get; set; }\n\n    public IEnumerable<ValidationResult> Validate(ValidationContext context)\n    {\n        if (EndDate <= StartDate)\n        {\n            yield return new ValidationResult(\n                \"End date must be after the start date.\",\n                new[] { nameof(EndDate) });\n        }\n\n        var nights = (EndDate - StartDate).TotalDays;\n        if (nights > 30)\n        {\n            yield return new ValidationResult(\n                \"Bookings cannot exceed 30 nights.\",\n                new[] { nameof(EndDate) });\n        }\n    }\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Member Names Matter",
+      "text": "The second parameter of ValidationResult is an array of member names. These names tell the framework which fields to highlight in the UI. Always include the relevant property names so validation messages appear next to the correct inputs."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Client-Side Support for Custom Rules"
+    },
+    {
+      "type": "paragraph",
+      "text": "Custom validation attributes do not work client-side out of the box. To enable them, you must write a jQuery Validation adapter that tells the browser how to interpret your attribute. This requires JavaScript in addition to the C# attribute."
+    },
+    {
+      "type": "paragraph",
+      "text": "If client-side support is not critical, you can rely on server-side validation alone. The form will still submit, the server will validate, and the errors will be returned. The user experience is slightly slower, but the security and correctness are the same."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Approaches to Custom Validation",
+      "items": [
+        "Derive from ValidationAttribute for single-property rules.",
+        "Implement IValidatableObject when a rule depends on multiple properties.",
+        "Use IClientModelValidator for client-side adapters on custom attributes.",
+        "Keep validation logic inside the model or attribute to stay reusable."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "ValidationAttribute",
+          "definition": "The base class for custom validation attributes; you override IsValid to implement the rule."
+        },
+        {
+          "term": "IValidatableObject",
+          "definition": "An interface a model implements to provide cross-field validation logic through the Validate method."
+        },
+        {
+          "term": "ValidationContext",
+          "definition": "An object passed to IsValid or Validate that contains the instance being validated and the service provider."
+        },
+        {
+          "term": "ValidationResult",
+          "definition": "The outcome of a validation check; Success means the value is valid, otherwise it carries an error message."
+        },
+        {
+          "term": "Client Adapter",
+          "definition": "A JavaScript class that mirrors server-side validation logic so the browser can validate before submitting."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Build a ConfirmPassword Attribute",
+      "description": "Create a custom attribute that compares two password fields for equality.",
+      "steps": [
+        "Create a class named ComparePasswordAttribute that derives from ValidationAttribute.",
+        "Accept a string otherProperty in the constructor.",
+        "Override IsValid to compare the current property value with the otherProperty value.",
+        "Return a ValidationResult with a helpful message if they differ.",
+        "Apply the attribute to a ConfirmPassword property on a RegisterViewModel.",
+        "Test that ModelState becomes invalid when the passwords do not match."
+      ],
+      "expectedOutcome": "You will have a reusable custom attribute that can be applied to any pair of properties that must match."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Custom Validation",
+      "items": [
+        {
+          "text": "I know when to use ValidationAttribute versus IValidatableObject.",
+          "hint": "Use ValidationAttribute for single properties and IValidatableObject for cross-field rules."
+        },
+        {
+          "text": "I can create a custom attribute with a meaningful error message.",
+          "hint": "Override IsValid and return ValidationResult.Success or a new ValidationResult."
+        },
+        {
+          "text": "I understand that custom attributes do not validate client-side automatically.",
+          "hint": "Write a JavaScript adapter if you need client-side support."
+        },
+        {
+          "text": "I can implement IValidatableObject.Validate with multiple error results.",
+          "hint": "Use yield return to return one ValidationResult per failed rule."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Custom validation attributes extend the built-in validation system.",
+        "Derive from ValidationAttribute and override IsValid for single-property rules.",
+        "Implement IValidatableObject when validation depends on multiple properties.",
+        "ValidationContext gives access to the model and services inside IsValid.",
+        "Client-side support for custom rules requires an extra JavaScript adapter."
+      ],
+      "takeaway": "Custom validation keeps your business rules inside the model layer where they are easy to find, test, and reuse across controllers and pages."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "validation-attributes",
+    "client-side-validation"
+  ],
   "technology": null,
   "furtherReading": []
 }

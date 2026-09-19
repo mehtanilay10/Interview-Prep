@@ -4,26 +4,262 @@
   "moduleSlug": "12-deployment-production",
   "courseSlug": "aspnet-core",
   "title": "Monitoring and Alerting",
-  "description": "Learn monitoring and alerting in ASP.NET Core.",
+  "description": "Implement health checks, metrics collection, and application monitoring for ASP.NET Core applications in production. Learn to configure health check endpoints, integrate with monitoring platforms, and set up alerts that notify your team before users report problems.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "monitoring",
-    "health-checks"
+    "health-checks",
+    "alerting"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Add health checks and integrate with monitoring tools."
+      "text": "Monitoring is the practice of observing your application's behavior in production to detect issues, track performance, and understand usage patterns. Alerting is the mechanism that notifies your team when something goes wrong. Together, monitoring and alerting form the safety net that lets you sleep soundly after deploying code."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core has built-in support for health checks, structured logging with OpenTelemetry, and metrics via System.Diagnostics.Metrics. These features integrate with monitoring platforms like Azure Application Insights, Prometheus, Grafana, and Datadog to provide a complete observability stack."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Health Checks"
+    },
+    {
+      "type": "paragraph",
+      "text": "Health checks are lightweight endpoints that report whether your application and its dependencies are healthy. A typical health check endpoint (/health) tests the database connection, Redis connection, and any other critical dependency. Load balancers and container orchestrators use health checks to determine if an instance is healthy enough to receive traffic."
     },
     {
       "type": "example",
+      "title": "Configuring Health Checks in Program.cs",
+      "content": "Registering health check services and exposing a health endpoint with detailed response output.",
       "language": "csharp",
-      "code": "builder.Services.AddHealthChecks()\n    .AddDbContextCheck<AppDbContext>();\n\nvar app = builder.Build();\napp.MapHealthChecks(\"/health\");"
+      "code": "using Microsoft.Extensions.Diagnostics.HealthChecks;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddHealthChecks()\n    // Check the database connection\n    .AddDbContextCheck<AppDbContext>(name: \"database\")\n    // Check a Redis cache connection\n    .AddRedis(\n        builder.Configuration.GetConnectionString(\"Redis\") ?? \"localhost:6379\",\n        name: \"redis\")\n    // Custom health check for an external API\n    .AddUrlGroup(\n        new Uri(\"https://api.example.com/health\"),\n        name: \"external-api\",\n        timeout: TimeSpan.FromSeconds(5));\n\nvar app = builder.Build();\n\n// Simple health endpoint (suitable for load balancers)\napp.MapHealthChecks(\"/health\");\n\n// Detailed health endpoint (for debugging — restrict in production)\napp.MapHealthChecks(\"/health/detailed\", new HealthCheckOptions\n{\n    Predicate = _ => true,\n    ResponseWriter = async (context, report) =>\n    {\n        context.Response.ContentType = \"application/json\";\n        var result = System.Text.Json.JsonSerializer.Serialize(new\n        {\n            status = report.Status.ToString(),\n            checks = report.Entries.Select(e => new\n            {\n                name = e.Key,\n                status = e.Value.Status.ToString(),\n                description = e.Value.Description\n            })\n        });\n        await context.Response.WriteAsync(result);\n    }\n});\n\napp.Run();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Health Check Response Statuses"
+    },
+    {
+      "type": "paragraph",
+      "text": "The health check system returns a status for each registered check: Healthy, Degraded, or Unhealthy. The overall endpoint status reflects the worst individual check status. A degraded dependency returns Degraded — the app is functional but not performing well. An unhealthy dependency returns Unhealthy — the app should be taken out of rotation."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Health Status Meanings",
+      "items": [
+        {
+          "text": "Healthy (200): All dependencies are responding normally. The app is ready to serve traffic."
+        },
+        {
+          "text": "Degraded (200 or 503): One or more dependencies are under stress or slow, but the app is still functional."
+        },
+        {
+          "text": "Unhealthy (503): One or more critical dependencies are failing. The app should not receive new traffic."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Protect Detailed Health Endpoints",
+      "text": "The detailed health endpoint exposes internal dependency names and failure descriptions. In production, restrict it to internal networks or authenticated users. The simple /health endpoint is safe for load balancers and uptime monitors."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Metrics and Observability"
+    },
+    {
+      "type": "paragraph",
+      "text": "Metrics are numerical measurements collected over time: request count, response time, error rate, active connections. In .NET 6+, System.Diagnostics.Metrics provides a built-in API for creating and publishing metrics. These metrics integrate with OpenTelemetry, an open standard for distributed tracing and metrics collection."
+    },
+    {
+      "type": "example",
+      "title": "Custom Metrics with System.Diagnostics.Metrics",
+      "content": "Creating and recording custom application metrics using the built-in .NET meters API.",
+      "language": "csharp",
+      "code": "using System.Diagnostics.Metrics;\n\npublic class OrderService(\n    IOrderRepository repository,\n    ILogger<OrderService> logger)\n{\n    // Define a meter (a collection of related metrics)\n    private static readonly Meter s_meter = new(\n        \"MyApp.Orders\",\n        \"1.0.0\");\n\n    // Define a counter metric\n    private readonly Counter<int> _ordersProcessed = s_meter.CreateCounter<int>(\n        name: \"orders.processed\",\n        unit: \"orders\",\n        description: \"Number of orders processed\");\n\n    // Define a histogram for measuring duration\n    private readonly Histogram<double> _orderDuration = s_meter.CreateHistogram<double>(\n        name: \"order.processing.duration\",\n        unit: \"seconds\",\n        description: \"Time taken to process an order\");\n\n    public async Task<Order> ProcessAsync(CreateOrderDto dto)\n    {\n        var stopwatch = System.Diagnostics.Stopwatch.StartNew();\n\n        try\n        {\n            var order = await repository.CreateAsync(dto);\n\n            // Record the metric\n            _ordersProcessed.Add(1,\n                new KeyValuePair<string, object?>([]));\n\n            return order;\n        }\n        finally\n        {\n            stopwatch.Stop();\n            // Record the duration regardless of success/failure\n            _orderDuration.Record(stopwatch.Elapsed.TotalSeconds,\n                new KeyValuePair<string, object?>([]));\n        }\n    }\n}\n\n// Metrics are collected by OpenTelemetry and\n// exported to Prometheus, Grafana, or Application Insights"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "OpenTelemetry and Distributed Tracing"
+    },
+    {
+      "type": "paragraph",
+      "text": "OpenTelemetry is an open-source observability framework that standardizes how applications collect traces, metrics, and logs. In ASP.NET Core, you add OpenTelemetry via NuGet packages and configure exporters for your target platform — Jaeger for local tracing, Prometheus for metrics, or Application Insights for Azure-hosted apps."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Setting Up Alerts"
+    },
+    {
+      "type": "paragraph",
+      "text": "Monitoring without alerting is just data collection. Alerts notify your team when a metric crosses a threshold that indicates a problem. Common alert conditions include: error rate above 5 percent, response time above 2 seconds, health check failing for more than 2 minutes, or CPU usage above 80 percent for 5 minutes."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Essential Alerts for Production APIs",
+      "items": [
+        {
+          "text": "Error Rate Alert: Triggers when 5xx responses exceed 5 percent of total requests over a 5-minute window"
+        },
+        {
+          "text": "Latency Alert: Triggers when p95 response time exceeds 2 seconds over a 5-minute window"
+        },
+        {
+          "text": "Health Check Alert: Triggers when /health returns Unhealthy for more than 60 seconds"
+        },
+        {
+          "text": "Disk Space Alert: Triggers when available disk drops below 20 percent (prevents log-related outages)"
+        },
+        {
+          "text": "CPU/Memory Alert: Triggers when resource usage exceeds sustainable thresholds for more than 10 minutes"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Log Aggregation"
+    },
+    {
+      "type": "paragraph",
+      "text": "In production, you have multiple instances of your application running across multiple servers. Console logs scattered across servers are impossible to search effectively. Log aggregation tools — Seq, ELK Stack (Elasticsearch, Logstash, Kibana), Azure Monitor, or Datadog — collect logs from all instances into a single searchable interface."
+    },
+    {
+      "type": "paragraph",
+      "text": "With structured logging and correlation IDs, you can trace a single request across multiple services and instances. Search for the correlation ID and see every log entry from every service that handled that request — a powerful tool for debugging distributed issues."
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Monitoring and Alerting",
+      "terms": [
+        {
+          "term": "Health Check",
+          "definition": "A lightweight endpoint that verifies application and dependency health. Used by load balancers and uptime monitors."
+        },
+        {
+          "term": "Metric",
+          "definition": "A numerical measurement collected over time — request count, latency, error rate — used for monitoring and alerting."
+        },
+        {
+          "term": "OpenTelemetry",
+          "definition": "An open standard for collecting distributed traces, metrics, and logs from applications across multiple services."
+        },
+        {
+          "term": "Alert",
+          "definition": "A notification triggered when a metric crosses a defined threshold — e.g., error rate exceeds 5 percent."
+        },
+        {
+          "term": "Correlation ID",
+          "definition": "A unique identifier attached to requests that links all logs, traces, and metrics from that single request together."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Start Simple, Then Scale Up",
+      "text": "You do not need a full observability stack from day one. Start with health checks and structured logging to a central location. Add metrics and distributed tracing when your team has enough incidents to justify the investment. The goal is actionable insight, not data hoarding."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Monitoring and Alerting",
+      "points": [
+        "Health checks provide a simple HTTP endpoint that verifies application and dependency health",
+        "Health statuses are Healthy, Degraded, or Unhealthy — load balancers use these for routing decisions",
+        "System.Diagnostics.Metrics lets you create custom counters and histograms for application metrics",
+        "OpenTelemetry is the open standard for distributed tracing and metrics collection across services",
+        "Alert rules notify your team when critical thresholds are breached — before users report problems",
+        "Log aggregation centralizes logs from all instances into a searchable interface for investigation"
+      ],
+      "takeaway": "Monitoring and alerting transform your application from a black box into an observable system. Health checks tell you if your app is alive, metrics show you how it performs, and alerts ensure your team knows about problems before they become outages."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Add Health Checks and Metrics to an API",
+      "description": "Implement health checks for your API's dependencies and add a custom metric to track request processing.",
+      "steps": [
+        "Register AddHealthChecks in Program.cs with a DbContext check for your database",
+        "Map /health and /health/detailed endpoints using MapHealthChecks",
+        "Write a custom IHealthCheck implementation that tests a third-party API endpoint",
+        "Add the custom health check to the health check services",
+        "Create a custom counter metric using System.Diagnostics.Metrics to track API requests",
+        "Record the metric in a controller action using middleware or an action filter",
+        "Verify the /health endpoint returns Healthy and the metric counter increments on requests"
+      ],
+      "expectedOutcome": "A running API with /health returning the correct status, a custom health check monitoring a third-party service, and a custom metric that increments on each API request. All observability features work correctly when the application is hit with test traffic."
+    },
+    {
+      "type": "checklist",
+      "title": "Monitoring and Alerting Checklist",
+      "items": [
+        {
+          "text": "I can configure health checks in Program.cs and explain what they do",
+          "hint": "AddHealthChecks with DbContext, Redis, or URL checks. MapHealthChecks exposes them as HTTP endpoints."
+        },
+        {
+          "text": "I understand the difference between /health and /health/detailed",
+          "hint": "/health returns a simple status code. /health/detailed includes individual check results."
+        },
+        {
+          "text": "I can create a custom metric using System.Diagnostics.Metrics",
+          "hint": "Create a Meter, then CreateCounter or CreateHistogram. Record values with .Add() or .Record()."
+        },
+        {
+          "text": "I know what OpenTelemetry is and why it matters",
+          "hint": "It standardizes traces, metrics, and logs across languages and platforms. Use it for distributed systems."
+        },
+        {
+          "text": "I can list the essential alerts every production API should have",
+          "hint": "Error rate, latency, health check failures, disk space, and CPU/memory thresholds."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "logging-and-monitoring",
+        "performance-tuning"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Health Checks in ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks"
+        },
+        {
+          "type": "article",
+          "title": "OpenTelemetry for .NET",
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/observability-with-otel"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "logging-and-monitoring",
+    "performance-tuning"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Health Checks in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks"
+    },
+    {
+      "type": "article",
+      "title": "OpenTelemetry for .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/observability-with-otel"
+    }
+  ]
 }

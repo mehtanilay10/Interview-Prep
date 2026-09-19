@@ -4,26 +4,252 @@
   "moduleSlug": "08-entity-framework-core",
   "courseSlug": "aspnet-core",
   "title": "Performance Optimization",
-  "description": "Learn performance optimization in ASP.NET Core.",
+  "description": "Optimize EF Core performance using AsNoTracking, compiled queries, batch operations, and strategies to avoid common performance pitfalls like N+1 queries.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 32,
   "tags": [
     "performance",
-    "async"
+    "async",
+    "optimization",
+    "tracking"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Why EF Core Performance Matters"
+    },
+    {
       "type": "paragraph",
-      "text": "Use AsNoTracking, compiled queries, and batching for performance."
+      "text": "EF Core is powerful, but it can be slow if used carelessly. The most common performance problems are N+1 queries (fetching related data one row at a time), tracking entities unnecessarily, and loading entire tables when only a few columns are needed. Understanding how EF Core works internally helps you avoid these traps."
+    },
+    {
+      "type": "paragraph",
+      "text": "This lesson covers the most important EF Core performance techniques: disabling change tracking for read-only queries, using compiled queries to reduce translation overhead, batching multiple operations, and detecting common pitfalls before they reach production."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Change Tracking Overhead"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every entity loaded by EF Core is tracked by default. The change tracker maintains a snapshot of the original property values so it can detect what changed when you call SaveChangesAsync. For read-only queries where you never modify the entities, this tracking work is wasted."
+    },
+    {
+      "type": "paragraph",
+      "text": "AsNoTracking tells EF Core to skip change tracking for a query. This is significantly faster for read-only scenarios and reduces memory usage because EF Core does not need to maintain the original value snapshots."
     },
     {
       "type": "example",
+      "title": "AsNoTracking for read-only queries",
+      "content": "Fetching products for display in a read-only list without change tracking overhead.",
       "language": "csharp",
-      "code": "var products = await _context.Products\n    .AsNoTracking()\n    .Where(p => p.IsActive)\n    .ToListAsync();"
+      "code": "// With tracking (default) — slower for read-only data\nvar trackedProducts = await context.Products\n    .Where(p => p.IsActive)\n    .ToListAsync();\n\ntrackedProducts[0].Price = 99.99m; // this would be persisted by SaveChangesAsync\n\n// Without tracking — faster for read-only data\nvar readOnlyProducts = await context.Products\n    .AsNoTracking()\n    .Where(p => p.IsActive)\n    .Select(p => new { p.Name, p.Price, Category = p.Category.Name })\n    .ToListAsync();\n\n// readOnlyProducts[0].Price = 99.99m; // this change is ignored — no tracking"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Use AsNoTracking for read-only scenarios",
+      "text": "Any query that only reads data for display — like product listings, search results, or report data — should use AsNoTracking. It can improve query performance by 20-50% for large result sets."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Avoiding the N+1 Query Problem"
+    },
+    {
+      "type": "paragraph",
+      "text": "The N+1 query problem is the most common EF Core performance anti-pattern. It happens when you load a list of entities and then access a navigation property for each one in a loop. EF Core issues one query for the list and then N additional queries for the related data."
+    },
+    {
+      "type": "example",
+      "title": "N+1 problem and its fix",
+      "content": "Comparing lazy loading (N+1 queries) with eager loading (single query).",
+      "language": "csharp",
+      "code": "// N+1 PROBLEM: 1 query for products + N queries for categories\nvar products = await context.Products.ToListAsync();\nforeach (var product in products)\n{\n    // Each access triggers a separate database query!\n    Console.WriteLine($\"{product.Name} - {product.Category.Name}\");\n}\n// Total queries: 1 + 50 = 51 queries for 50 products\n\n// FIX: Eager load categories with Include\nvar productsWithCategory = await context.Products\n    .Include(p => p.Category)\n    .AsNoTracking()\n    .ToListAsync();\nforeach (var product in productsWithCategory)\n{\n    Console.WriteLine($\"{product.Name} - {product.Category.Name}\");\n}\n// Total queries: 1 (with JOIN)"
+    },
+    {
+      "type": "paragraph",
+      "text": "In the N+1 example, accessing product.Category.Name inside the loop causes EF Core to issue a separate SELECT query for each product's category. For 50 products, that is 51 database round trips instead of one. The fix is to use Include to load the related data in the initial query."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Always profile your queries",
+      "text": "The N+1 problem is invisible in code and only shows up when you look at the executed SQL. Enable logging to see the queries your application is generating, or use tools like MiniProfiler to detect excessive database calls."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Compiled Queries"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every time you execute a LINQ query, EF Core translates it into SQL. This translation has a small but measurable cost, especially for frequently executed queries. Compiled queries cache the translation result, skipping the LINQ-to-SQL conversion on subsequent executions."
+    },
+    {
+      "type": "paragraph",
+      "text": "In EF Core 7+, you can use compiled queries with the new CompiledQuery type. In earlier versions, you use EF.CompileQuery. Compiled queries are most beneficial for hot paths that execute thousands of times per second."
+    },
+    {
+      "type": "example",
+      "title": "Compiled query for frequently executed lookups",
+      "content": "Creating and using a compiled query to fetch a product by name.",
+      "language": "csharp",
+      "code": "using Microsoft.EntityFrameworkCore;\n\n// Define the compiled query (do this once at startup)\nprivate static readonly Func<AppDbContext, string, Task<Product?>> _getProductByName =\n    EF.CompileAsyncQuery((AppDbContext ctx, string name) =>\n        ctx.Products.FirstOrDefault(p => p.Name == name));\n\n// Use the compiled query\npublic async Task<Product?> GetProductByNameAsync(string name)\n{\n    await using var context = _contextFactory.CreateDbContext();\n    return await _getProductByName(context, name);\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The compiled query is defined as a static readonly field. EF Core builds the SQL once when the application starts and reuses it for every call. The only thing that changes per call is the parameter value, which is passed efficiently to the database."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Batching Operations"
+    },
+    {
+      "type": "paragraph",
+      "text": "When inserting, updating, or deleting multiple entities, use batch operations to reduce round trips to the database. EF Core 7+ supports ExecuteUpdate and ExecuteDelete, which translate to single SQL UPDATE or DELETE statements without loading entities into memory."
+    },
+    {
+      "type": "example",
+      "title": "Batch update and delete without loading entities",
+      "content": "Using ExecuteUpdateAsync and ExecuteDeleteAsync for efficient bulk operations.",
+      "language": "csharp",
+      "code": "// Update all inactive products to inactive status in one SQL statement\nawait context.Products\n    .Where(p => !p.IsActive && p.CreatedAt < DateTime.UtcNow.AddDays(-30))\n    .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false));\n\n// Delete all archived products in one SQL statement\nawait context.Products\n    .Where(p => p.Status == \"Archived\")\n    .ExecuteDeleteAsync();"
+    },
+    {
+      "type": "paragraph",
+      "text": "Before EF Core 7, you would have to load all matching entities into memory, modify them, and call SaveChangesAsync. This was slow and memory-intensive. ExecuteUpdate and ExecuteDelete push the operation to the database, processing all matching rows in a single round trip."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Other Performance Tips"
+    },
+    {
+      "type": "paragraph",
+      "text": "Beyond the techniques above, several other practices help keep EF Core fast in production. Avoid loading entire tables when you only need a subset, use projection to fetch only required columns, and be cautious with lazy loading in hot paths."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Additional performance best practices",
+      "items": [
+        "Use projection with Select to fetch only the columns you need rather than loading full entities",
+        "Avoid loading entire tables — always use Where or pagination",
+        "Use split queries when Include loads too many related entities, reducing JOIN complexity",
+        "Cache frequently accessed reference data like product categories in memory",
+        "Monitor generated SQL using logging to identify slow or unexpected queries"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Enable SQL logging during development",
+      "text": "Call logging.AddConsole() in Program.cs or set the log level to Information for Microsoft.EntityFrameworkCore.Database.Command to see every SQL query. This is invaluable for spotting N+1 problems and verifying that indexes are being used."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "AsNoTracking",
+          "definition": "A query method that disables change tracking for faster read-only queries and lower memory usage."
+        },
+        {
+          "term": "N+1 query problem",
+          "definition": "A performance issue where one query loads a list and then N additional queries load related data one by one."
+        },
+        {
+          "term": "Compiled query",
+          "definition": "A query whose LINQ-to-SQL translation is cached and reused, reducing overhead for frequently executed queries."
+        },
+        {
+          "term": "ExecuteUpdate/ExecuteDelete",
+          "definition": "EF Core 7+ methods that perform bulk updates or deletes in the database without loading entities into memory."
+        },
+        {
+          "term": "Change tracker",
+          "definition": "EF Core's internal system that monitors entity property changes to know what to persist during SaveChangesAsync."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Identify and Fix Performance Issues",
+      "description": "Profile an existing EF Core codebase, identify N+1 queries, and apply optimizations including AsNoTracking and projection.",
+      "steps": [
+        "Create a new project with EF Core, SQLite, and at least two entities with a one-to-many relationship",
+        "Seed the database with 100 products across 5 categories",
+        "Write a method that loads all products and accesses each product's Category.Name in a loop — observe the N+1 problem",
+        "Enable EF Core SQL logging to console to verify multiple queries are being issued",
+        "Fix the N+1 problem by adding Include and measure the reduction in queries",
+        "Rewrite the query using AsNoTracking and projection to a DTO, measuring the performance difference",
+        "Add a compiled query for the most frequently executed lookup and verify it works correctly"
+      ],
+      "expectedOutcome": "The N+1 version issues over 100 queries for 100 products. The Include version issues 1 query. The projected AsNoTracking version issues 1 query with less data transferred. The compiled query produces identical results with reduced translation overhead."
+    },
+    {
+      "type": "checklist",
+      "title": "Performance Optimization Checklist",
+      "items": [
+        {
+          "text": "I can explain the N+1 query problem and how to detect it",
+          "hint": "Accessing navigation properties in a loop without Include causes N+1 queries."
+        },
+        {
+          "text": "I can use AsNoTracking to improve read-only query performance",
+          "hint": "Call AsNoTracking() beforeToListAsync() for queries that do not modify entities."
+        },
+        {
+          "text": "I understand when compiled queries are beneficial",
+          "hint": "Use them for hot paths executed many times per second."
+        },
+        {
+          "text": "I can perform batch updates and deletes with ExecuteUpdate and ExecuteDelete",
+          "hint": "These methods push the operation to SQL without loading entities."
+        },
+        {
+          "text": "I can use projection with Select to reduce data transfer",
+          "hint": "Select only the columns needed for the operation rather than loading full entities."
+        },
+        {
+          "text": "I can enable and read EF Core SQL logs to diagnose performance issues",
+          "hint": "Set the log level for Microsoft.EntityFrameworkCore.Database.Command to Information."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Performance Optimization Summary",
+      "points": [
+        "Change tracking has overhead — use AsNoTracking for read-only queries",
+        "The N+1 problem occurs when navigation properties are accessed in loops without Include",
+        "Eager loading with Include prevents N+1 queries by fetching related data in one round trip",
+        "Compiled queries cache LINQ-to-SQL translations for frequently executed hot paths",
+        "ExecuteUpdate and ExecuteDelete perform bulk operations in SQL without loading entities",
+        "Always profile generated SQL to catch performance problems before they reach production"
+      ],
+      "takeaway": "EF Core performance is not automatic — it requires intentional choices about tracking, loading strategy, and query shape. The difference between a slow and fast EF Core application often comes down to using AsNoTracking, Include, and compiled queries consistently."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "EF Core Performance Best Practices",
+      "url": "https://learn.microsoft.com/en-us/ef/core/performance/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official guide to EF Core performance, covering tracking, compiled queries, batching, and common pitfalls."
+    },
+    {
+      "title": "Avoiding Common EF Core Performance Pitfalls",
+      "url": "https://learn.microsoft.com/en-us/ef/core/performance/performance#common-performance-issues",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Catalog of the most common EF Core performance problems and how to fix them."
+    }
+  ]
 }

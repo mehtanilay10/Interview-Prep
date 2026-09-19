@@ -4,26 +4,228 @@
   "moduleSlug": "02-mvc-fundamentals",
   "courseSlug": "aspnet-core",
   "title": "Handling User Input",
-  "description": "Learn handling user input in ASP.NET Core.",
+  "description": "Learn how to collect and process form submissions in ASP.NET Core MVC using model binding, validation, and the POST-RedIRECT-GET pattern. Includes practical form examples with validation feedback.",
   "order": 5,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "forms",
-    "input"
+    "input",
+    "model-binding",
+    "validation"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Collect and process form submissions using model binding."
+      "text": "Most web applications need to **collect information from users** — a contact form, a product search, a registration page, or a checkout process. ASP.NET Core handles user input through **model binding** (converting request data into C# objects) and **validation** (ensuring the data meets your business rules)."
+    },
+    {
+      "type": "paragraph",
+      "text": "In this lesson, you will learn how to build HTML forms, receive form data in controller actions, validate the input, and give users clear feedback when something goes wrong."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The POST-Redirect-GET Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "Before diving into code, it is important to understand the standard pattern for handling form submissions: **POST-Redirect-GET (PRG)**. When a user submits a form (POST), your action processes the data. If successful, it redirects to a GET action (showing a confirmation page or the updated list). If validation fails, it re-renders the form with error messages."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Why POST-Redirect-GET matters",
+      "items": [
+        "Prevents duplicate submissions when the user refreshes the page",
+        "Provides a clean URL after form submission",
+        "Separates the form display (GET) from form processing (POST)",
+        "Keeps the browser history clean and predictable"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Creating a Form in Razor"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides **Tag Helpers** that make building forms easy. The `<form>` Tag Helper generates the correct `action` and `method` attributes, while `<input asp-for>` and `<span asp-validation-for>` automatically bind to your model and display validation messages."
     },
     {
       "type": "example",
+      "title": "A contact form in Razor",
+      "content": "A Razor view with a form that collects a name and message, using Tag Helpers for binding and validation.",
       "language": "csharp",
-      "code": "[HttpPost]\npublic IActionResult Create(Product model)\n{\n    if (ModelState.IsValid)\n    {\n        _repo.Add(model);\n        return RedirectToAction(nameof(Index));\n    }\n    return View(model);\n}"
+      "code": "@model MyFirstApp.Models.ContactForm\n\n<h2>Contact Us</h2>\n\n<form asp-action=\"Submit\" method=\"post\">\n    <div class=\"form-group\">\n        <label asp-for=\"Name\"></label>\n        <input asp-for=\"Name\" class=\"form-control\" />\n        <span asp-validation-for=\"Name\" class=\"text-danger\"></span>\n    </div>\n\n    <div class=\"form-group\">\n        <label asp-for=\"Email\"></label>\n        <input asp-for=\"Email\" class=\"form-control\" />\n        <span asp-validation-for=\"Email\" class=\"text-danger\"></span>\n    </div>\n\n    <div class=\"form-group\">\n        <label asp-for=\"Message\"></label>\n        <textarea asp-for=\"Message\" class=\"form-control\"></textarea>\n        <span asp-validation-for=\"Message\" class=\"text-danger\"></span>\n    </div>\n\n    <button type=\"submit\" class=\"btn btn-primary\">Send Message</button>\n</form>\n\n@section Scripts {\n    <partial name=\"_ValidationScriptsPartial\" />\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Receiving Form Data in a Controller"
+    },
+    {
+      "type": "paragraph",
+      "text": "When the form is submitted, ASP.NET Core's model binding automatically maps the form fields to a C# object. You simply declare the model type as a parameter in your POST action."
+    },
+    {
+      "type": "example",
+      "title": "The ContactForm model and POST action",
+      "content": "Define a model with validation attributes, then receive and validate it in a POST action.",
+      "language": "csharp",
+      "code": "using System.ComponentModel.DataAnnotations;\n\nnamespace MyFirstApp.Models\n{\n    public class ContactForm\n    {\n        [Required(ErrorMessage = \"Please enter your name\")]\n        [StringLength(100, ErrorMessage = \"Name cannot exceed 100 characters\")]\n        public string Name { get; set; } = string.Empty;\n\n        [Required(ErrorMessage = \"Please enter your email address\")]\n        [EmailAddress(ErrorMessage = \"Please enter a valid email address\")]\n        public string Email { get; set; } = string.Empty;\n\n        [Required(ErrorMessage = \"Please enter a message\")]\n        [StringLength(1000, ErrorMessage = \"Message cannot exceed 1000 characters\")]\n        public string Message { get; set; } = string.Empty;\n    }\n}\n\n// In HomeController\n[HttpGet]\npublic IActionResult Contact() => View();\n\n[HttpPost]\n[ValidateAntiForgeryToken]\npublic IActionResult Contact(ContactForm model)\n{\n    if (!ModelState.IsValid)\n    {\n        // Validation failed — re-render the form with error messages\n        return View(model);\n    }\n\n    // Process the valid form data\n    _emailService.Send(model.Email, \"Contact Form\", model.Message);\n\n    TempData[\"SuccessMessage\"] = \"Your message has been sent!\";\n    return RedirectToAction(nameof(Contact)); // POST-Redirect-GET\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Always validate with ModelState.IsValid",
+      "text": "Never process form data without first checking `ModelState.IsValid`. Data annotation attributes like `[Required]` and `[EmailAddress]` run automatically during model binding. If any validation rule fails, `ModelState.IsValid` returns false and the error messages are available in the view."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Validation Attributes"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core includes built-in validation attributes that you can apply directly to model properties. These attributes enforce rules declaratively, so you do not need to write manual validation logic in every action."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Common validation attributes",
+      "items": [
+        "**[Required]** — The field must have a value",
+        "**[StringLength(max)]** — Limits the character count of a string",
+        "**[MinLength(min)]** — Requires a minimum character count",
+        "**[Range(min, max)]** — Requires a numeric or date value within a range",
+        "**[EmailAddress]** — Validates that the value is a properly formatted email address",
+        "**[Phone]** — Validates phone number format",
+        "**[Compare(\"OtherProperty\")]** — Ensures two fields match (e.g., password confirmation)",
+        "**[RegularExpression(pattern)]** — Validates the value against a regex pattern"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Displaying Validation Errors"
+    },
+    {
+      "type": "paragraph",
+      "text": "When `ModelState.IsValid` is false, the error messages from validation attributes are automatically displayed in the view where you placed `<span asp-validation-for>` elements. The validation scripts partial (`_ValidationScriptsPartial.cshtml`) enables client-side validation so errors appear immediately without a page reload."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Client-side vs. server-side validation",
+      "text": "Client-side validation provides instant feedback and reduces unnecessary server requests. However, it is not a security measure — a user can bypass client-side validation by crafting their own HTTP request. Always validate on the server side as well."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Anti-Forgery Tokens"
+    },
+    {
+      "type": "paragraph",
+      "text": "The `[ValidateAntiForgeryToken]` attribute on POST actions and the `@addTagHelper` in forms work together to prevent **Cross-Site Request Forgery (CSRF)** attacks. The form Tag Helper automatically generates a hidden anti-forgery token, and the action attribute validates it. Always include both."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Model Binding",
+          "definition": "The automatic process of converting HTTP request data (form fields, query strings, route values) into .NET objects that action methods accept as parameters."
+        },
+        {
+          "term": "ModelState",
+          "definition": "A dictionary that tracks validation state. ModelState.IsValid is true when all validation rules pass; false when any rule fails."
+        },
+        {
+          "term": "Data Annotation",
+          "definition": "Attributes applied to model properties (e.g., [Required], [EmailAddress]) that declare validation rules declaratively."
+        },
+        {
+          "term": "POST-Redirect-GET",
+          "definition": "A pattern where a POST action processes data and redirects to a GET action, preventing duplicate submissions and keeping URLs clean."
+        },
+        {
+          "term": "CSRF Token",
+          "definition": "A hidden form field that prevents Cross-Site Request Forgery attacks. Generated automatically by the form Tag Helper and validated by [ValidateAntiForgeryToken]."
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "Handling User Input Checklist",
+      "items": [
+        {
+          "text": "I can create a model class with data annotation validation attributes",
+          "hint": "Use [Required], [EmailAddress], [StringLength] on model properties"
+        },
+        {
+          "text": "I understand the POST-Redirect-GET pattern and why it is important",
+          "hint": "POST processes data; RedirectToAction prevents duplicate submissions on refresh"
+        },
+        {
+          "text": "I can build a form in Razor using Tag Helpers (asp-for, asp-validation-for)",
+          "hint": "Use <form asp-action>, <input asp-for>, <span asp-validation-for>"
+        },
+        {
+          "text": "I always check ModelState.IsValid before processing form data",
+          "hint": "If invalid, return View(model) to re-render with validation errors"
+        },
+        {
+          "text": "I have added [ValidateAntiForgeryToken] to my POST actions",
+          "hint": "The form Tag Helper generates the token automatically; the attribute validates it"
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Build a Contact Form with Validation",
+      "description": "Create a contact form that collects a name, email, and message, with full validation and success feedback.",
+      "steps": [
+        "Create a ContactForm model in the Models folder with Name, Email, and Message properties",
+        "Add [Required] and [EmailAddress] validation attributes to the appropriate properties",
+        "Create a Contact action in HomeController with both GET and POST versions",
+        "In the GET action, return the empty contact form view",
+        "In the POST action, accept ContactForm as a parameter, check ModelState.IsValid, and redirect on success",
+        "Create Views/Home/Contact.cshtml with a form using Tag Helpers (asp-for, asp-validation-for)",
+        "Add _ValidationScriptsPartial at the bottom of the view for client-side validation",
+        "Run the app, submit an empty form, and confirm validation error messages appear"
+      ],
+      "expectedOutcome": "Submitting an empty form displays client-side validation errors. Submitting valid data redirects to the Contact page with a success message. The form uses Tag Helpers and validation attributes throughout."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "The POST-Redirect-GET pattern separates form display (GET) from form processing (POST)",
+        "Model binding automatically converts form data into C# objects passed to action parameters",
+        "Data annotation attributes like [Required] and [EmailAddress] declare validation rules on model properties",
+        "ModelState.IsValid checks whether all validation rules passed before processing data",
+        "Tag Helpers (asp-for, asp-validation-for) generate correct HTML and wire up validation automatically",
+        "Always use [ValidateAntiForgeryToken] on POST actions to prevent CSRF attacks"
+      ],
+      "takeaway": "Handling user input safely is one of the most critical skills in web development. ASP.NET Core's model binding and validation system provides a robust, declarative approach that protects both your application and your users."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "models-and-viewdata"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Model Binding in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/models/model-binding",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete guide to model binding — how ASP.NET Core converts HTTP requests into .NET objects."
+    },
+    {
+      "title": "Validation in ASP.NET Core MVC",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/models/validation",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How to use data annotation attributes, custom validation, and client-side validation."
+    }
+  ]
 }

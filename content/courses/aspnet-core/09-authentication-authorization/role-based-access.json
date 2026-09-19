@@ -4,26 +4,234 @@
   "moduleSlug": "09-authentication-authorization",
   "courseSlug": "aspnet-core",
   "title": "Role-Based Access Control",
-  "description": "Learn role-based access control in ASP.NET Core.",
+  "description": "Implement role-based access control in ASP.NET Core to restrict application features to specific user roles such as Admin, Manager, or Member.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 28,
   "tags": [
     "roles",
-    "authorization"
+    "authorization",
+    "access-control"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is Role-Based Access Control?"
+    },
+    {
       "type": "paragraph",
-      "text": "Restrict access to roles using the [Authorize] attribute."
+      "text": "Role-Based Access Control, or RBAC, is an authorization model where permissions are assigned to roles rather than individual users. Users are assigned to roles, and roles determine what the user can access. This is much simpler to manage than assigning permissions to each user individually."
+    },
+    {
+      "type": "paragraph",
+      "text": "In a typical application, you might have roles like Admin, Manager, and Member. An Admin can access everything. A Manager can manage team resources but not system settings. A Member can view their own data but not modify shared resources. RBAC makes these rules explicit and enforceable."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Roles vs. claims",
+      "text": "Roles are a special type of claim — a role claim has a type of ClaimTypes.Role and a value like 'Admin'. You can think of roles as named buckets of permissions. Claims offer more granular control when roles are not flexible enough."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring Role Support in Identity"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you register Identity with AddIdentity, you specify the role type using the generic parameters. The second generic parameter is IdentityRole, which represents a role entity. The RoleManager service manages role creation and queries."
     },
     {
       "type": "example",
+      "title": "Identity registration with role support",
+      "content": "Registering Identity with IdentityRole for role-based authorization.",
       "language": "csharp",
-      "code": "[Authorize(Roles = \"Admin,Manager\")]\npublic IActionResult ManageUsers() => View();\n\n// Policy-based\nservices.AddAuthorization(options =>\n    options.AddPolicy(\"AdminsOnly\", p => p.RequireRole(\"Admin\")));"
+      "code": "builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>\n    {\n        options.Password.RequireDigit = true;\n        options.Password.RequiredLength = 8;\n        options.SignIn.RequireConfirmedEmail = false;\n    })\n    .AddEntityFrameworkStores<AppDbContext>()\n    .AddDefaultTokenProviders();\n\n// Ensure the Admin role exists during startup\nusing (var scope = app.Services.CreateScope())\n{\n    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();\n    if (!await roleManager.RoleExistsAsync(\"Admin\"))\n    {\n        await roleManager.CreateAsync(new IdentityRole(\"Admin\"));\n    }\n    if (!await roleManager.RoleExistsAsync(\"Manager\"))\n    {\n        await roleManager.CreateAsync(new IdentityRole(\"Manager\"));\n    }\n    if (!await roleManager.RoleExistsAsync(\"Member\"))\n    {\n        await roleManager.CreateAsync(new IdentityRole(\"Member\"));\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The RoleManager service is used here to ensure the Admin, Manager, and Member roles exist when the application starts. This seed logic runs once and safely skips roles that already exist. You can also create roles through an admin UI if you prefer."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Assigning Roles to Users"
+    },
+    {
+      "type": "paragraph",
+      "text": "Users are assigned roles through the UserManager service. You can assign roles during registration, through an admin panel, or in response to business logic. When a user logs in, their role claims are included in the authentication cookie or JWT."
+    },
+    {
+      "type": "example",
+      "title": "Assigning roles during registration",
+      "content": "Adding a user to the Member role after successful registration.",
+      "language": "csharp",
+      "code": "public async Task<IActionResult> Register(RegisterViewModel model)\n{\n    if (!ModelState.IsValid) return View(model);\n\n    var user = new ApplicationUser\n    {\n        UserName = model.Email,\n        Email = model.Email,\n        FullName = model.FullName\n    };\n\n    var result = await _userManager.CreateAsync(user, model.Password);\n    if (result.Succeeded)\n    {\n        await _userManager.AddToRoleAsync(user, \"Member\");\n        await _signInManager.SignInAsync(user, isPersistent: false);\n        return RedirectToAction(\"Index\", \"Home\");\n    }\n\n    foreach (var error in result.Errors)\n    {\n        ModelState.AddModelError(string.Empty, error.Description);\n    }\n    return View(model);\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Important: Role claims are added at sign-in",
+      "text": "Role claims are not automatically included in the authentication cookie unless you request them. For cookie authentication, call SignInManager.SignInAsync with the user, and Identity adds the role claims. For JWT, include role claims when you generate the token."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Protecting Controllers with Roles"
+    },
+    {
+      "type": "paragraph",
+      "text": "The [Authorize] attribute accepts a Roles parameter that restricts access to users in the specified roles. Multiple roles are separated by commas. You can apply role restrictions at the controller level, the action level, or both."
+    },
+    {
+      "type": "example",
+      "title": "Role-based authorization on controllers and actions",
+      "content": "Restricting access to admin and management features using roles.",
+      "language": "csharp",
+      "code": "[Authorize(Roles = \"Admin,Manager\")]\npublic class ManagementController : Controller\n{\n    public IActionResult Dashboard() => View();\n    public IActionResult Reports() => View();\n}\n\npublic class ProductsController : Controller\n{\n    // All authenticated users\n    public IActionResult List() => View();\n\n    // Only admins can create products\n    [Authorize(Roles = \"Admin\")]\n    public IActionResult Create() => View();\n\n    // Admins and managers can edit\n    [Authorize(Roles = \"Admin,Manager\")]\n    public IActionResult Edit(int id) => View();\n}\n\n// Deny access to a specific role\n[Authorize(Roles = \"Admin\", Policy = \"RequireEmailVerified\")]\npublic IActionResult AdminSettings() => View();"
+    },
+    {
+      "type": "paragraph",
+      "text": "In the ManagementController, only users in the Admin or Manager roles can access any action. In ProductsController, the Create action requires Admin, while Edit allows both Admin and Manager. Combining Roles with Policy provides fine-grained control over access."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Policy-Based Role Authorization"
+    },
+    {
+      "type": "paragraph",
+      "text": "For more complex role scenarios, you can register named authorization policies in Program.cs. Policies can combine role requirements with other conditions like claim requirements or custom logic. This keeps your controllers clean by moving authorization rules to a central location."
+    },
+    {
+      "type": "example",
+      "title": "Registering role-based policies",
+      "content": "Defining authorization policies in Program.cs that require specific roles.",
+      "language": "csharp",
+      "code": "builder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"RequireAdmin\", policy =>\n        policy.RequireRole(\"Admin\"));\n\n    options.AddPolicy(\"RequireManagerOrAdmin\", policy =>\n        policy.RequireRole(\"Admin\", \"Manager\"));\n\n    options.AddPolicy(\"RequireSeniorManagement\", policy =>\n        policy.RequireRole(\"Admin\")\n               .RequireClaim(\"Department\", \"Executive\"));\n});\n\n// Apply the policy in a controller\n[Authorize(Policy = \"RequireAdmin\")]\npublic IActionResult SystemSettings() => View();\n\n[Authorize(Policy = \"RequireSeniorManagement\")]\npublic IActionResult BoardReports() => View();"
+    },
+    {
+      "type": "paragraph",
+      "text": "Policies named 'RequireAdmin' and 'RequireManagerOrAdmin' centralize role rules. If you need to change who qualifies as a manager, you update the policy in one place instead of searching through every [Authorize] attribute across your controllers."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Checking Roles Programmatically"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sometimes you need to check roles inside a service or controller action rather than using attributes. The User property on ControllerBase provides access to the current user's claims, and you can check roles directly."
+    },
+    {
+      "type": "example",
+      "title": "Checking roles in controller code",
+      "content": "Using User.IsInRole to conditionally show UI elements or execute logic.",
+      "language": "csharp",
+      "code": "public IActionResult Index()\n{\n    if (User.IsInRole(\"Admin\"))\n    {\n        ViewBag.ShowAdminPanel = true;\n    }\n\n    var isManager = User.IsInRole(\"Manager\");\n    ViewBag.ShowManagerTools = isManager;\n\n    return View();\n}\n\n// In a Razor view\n@if (User.IsInRole(\"Admin\"))\n{\n    <a href=\"/Admin\" class=\"btn btn-danger\">Admin Panel</a>\n}"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "RBAC",
+          "definition": "Role-Based Access Control — an authorization model where permissions are grouped by role rather than assigned per-user."
+        },
+        {
+          "term": "IdentityRole",
+          "definition": "The EF Core entity that represents a role in ASP.NET Core Identity, stored in the AspNetRoles table."
+        },
+        {
+          "term": "RoleManager",
+          "definition": "The Identity service for managing roles — creating, finding, updating, and deleting roles."
+        },
+        {
+          "term": "[Authorize(Roles)]",
+          "definition": "An attribute parameter that restricts access to users in the specified comma-separated roles."
+        },
+        {
+          "term": "Authorization policy",
+          "definition": "A named set of requirements registered in Program.cs that can be applied with [Authorize(Policy)]."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Implement Role-Based Access Control",
+      "description": "Add role-based authorization to an existing Identity project with Admin, Manager, and Member roles.",
+      "steps": [
+        "Use the IdentityDemo project from the previous lesson or create a new one",
+        "In Program.cs, add a role seeding block that creates Admin, Manager, and Member roles on startup",
+        "Create an AdminController accessible only to the Admin role using [Authorize(Roles = \"Admin\")]",
+        "Create a ManagementController accessible to both Admin and Manager roles",
+        "Add a Register action that assigns the Member role to new users",
+        "Add a second login action for Admin users that assigns the Admin role after verifying a secret code",
+        "In the HomeController Index view, conditionally show Admin and Manager links based on User.IsInRole",
+        "Run the app, create users with different roles, and verify the role restrictions work correctly"
+      ],
+      "expectedOutcome": "Users assigned to the Admin role can access the AdminController. Users with Manager or Admin roles can access the ManagementController. Regular Members cannot access either. The UI shows role-specific links based on the current user's roles."
+    },
+    {
+      "type": "checklist",
+      "title": "Role-Based Access Control Checklist",
+      "items": [
+        {
+          "text": "I can explain the concept of Role-Based Access Control",
+          "hint": "Permissions are assigned to roles, and users are assigned to roles."
+        },
+        {
+          "text": "I can register Identity with role support",
+          "hint": "Use AddIdentity<TUser, IdentityRole> with AddEntityFrameworkStores."
+        },
+        {
+          "text": "I can create and seed roles using RoleManager",
+          "hint": "Call RoleExistsAsync and CreateAsync during application startup."
+        },
+        {
+          "text": "I can assign roles to users with UserManager",
+          "hint": "Use AddToRoleAsync after creating a user."
+        },
+        {
+          "text": "I can restrict controller access using [Authorize(Roles)]",
+          "hint": "Pass comma-separated role names to the Roles parameter."
+        },
+        {
+          "text": "I can define role-based authorization policies in Program.cs",
+          "hint": "Use options.AddPolicy with policy.RequireRole for named policies."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Role-Based Access Control Summary",
+      "points": [
+        "RBAC groups permissions by role, simplifying access management across many users",
+        "IdentityRole is the entity type for roles, managed by RoleManager",
+        "Assign roles to users with UserManager.AddToRoleAsync during or after registration",
+        "[Authorize(Roles = \"Admin,Manager\")] restricts access to comma-separated roles",
+        "Named policies in Program.cs centralize role rules for reuse across controllers",
+        "User.IsInRole checks roles programmatically in controller code and Razor views"
+      ],
+      "takeaway": "Role-based access control is the most common and straightforward authorization pattern in web applications. ASP.NET Core Identity provides all the tools needed to implement RBAC with minimal custom code."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Role-Based Authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/roles",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete guide to role-based authorization, role management, and policy-based role requirements."
+    },
+    {
+      "title": "Simple Role-Based Authorization",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/simple/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Step-by-step tutorial for adding role-based authorization to an existing application."
+    }
+  ]
 }

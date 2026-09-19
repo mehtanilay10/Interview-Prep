@@ -4,26 +4,236 @@
   "moduleSlug": "12-deployment-production",
   "courseSlug": "aspnet-core",
   "title": "Performance Tuning",
-  "description": "Learn performance tuning in ASP.NET Core.",
+  "description": "Optimize ASP.NET Core application performance with response caching, output caching, Kestrel tuning, and async best practices. Learn to profile your application, identify bottlenecks, and apply targeted optimizations that deliver measurable improvements.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "performance",
-    "optimization"
+    "optimization",
+    "caching"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Profile and optimize response times and throughput."
+      "text": "Performance tuning is the process of identifying and resolving bottlenecks that slow down your application. In ASP.NET Core, the most impactful optimizations are caching, asynchronous programming, database query optimization, and server configuration. Before optimizing anything, you need to measure — assumptions about what is slow are almost always wrong."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core is one of the fastest web frameworks available, consistently ranking at the top of TechEmpower benchmarks. But even a fast framework can be slowed by inefficient code, unoptimized database queries, or missing caching. The goal of performance tuning is not to make a slow framework fast — it is to ensure you are using the framework correctly."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Response Caching"
+    },
+    {
+      "type": "paragraph",
+      "text": "Response caching stores the output of an action method so that subsequent identical requests are served from the cache without executing the action logic again. This is the simplest and most effective optimization for read-heavy APIs. ASP.NET Core provides Response Caching Middleware that handles cache key generation, expiration, and validation."
     },
     {
       "type": "example",
+      "title": "Enabling Response Caching",
+      "content": "Registering response caching services and middleware, then applying cache profiles to controller actions.",
       "language": "csharp",
-      "code": "builder.Services.AddResponseCaching();\napp.UseResponseCaching();\n\n// Kestrel tuning in Program.cs\nbuilder.WebHost.ConfigureKestrel(options =>\n{\n    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10MB\n    options.AllowSynchronousIO = false;\n});"
+      "code": "using Microsoft.AspNetCore.Http;\nusing Microsoft.AspNetCore.ResponseCaching;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddResponseCaching(options =>\n{\n    options.MaximumBodySize = 1024;          // Cache responses up to 1KB\n    options.SizeLimit = 100 * 1024 * 1024;    // Total cache size limit: 100MB\n});\n\nvar app = builder.Build();\n\napp.UseResponseCaching();\napp.MapControllers();\napp.Run();\n\n// In your controller:\n[ApiController]\n[Route(\"api/[controller]\")]\n[ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { \"category\" })]\npublic class ProductsController : ControllerBase\n{\n    [HttpGet]\n    public async Task<ActionResult<List<ProductDto>>> GetAll()\n    {\n        // This result is cached for 60 seconds\n        var products = await _service.GetAllAsync();\n        return Ok(products);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Output Caching"
+    },
+    {
+      "type": "paragraph",
+      "text": "Output Caching, introduced in .NET 7, is a more powerful alternative to Response Caching. It caches at the server level, supports cache eviction policies, and can be configured per endpoint or globally. Output Cache is the preferred caching approach for new ASP.NET Core applications."
+    },
+    {
+      "type": "example",
+      "title": "Configuring Output Cache",
+      "content": "Using the Output Cache middleware to cache API responses with a fixed expiration time.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.OutputCaching;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddOutputCache(options =>\n{\n    // Add a named policy for product listings\n    options.AddPolicy(\"ProductList\", policy =>\n    {\n        policy.Expire(TimeSpan.FromMinutes(2))\n              .VaryByQuery(\"category\", \"page\");\n    });\n});\n\nvar app = builder.Build();\n\napp.UseOutputCache();\n\napp.MapGet(\"/api/products\", async (IProductService service) =>\n{\n    var products = await service.GetAllAsync();\n    return Results.Ok(products);\n})\n.CacheOutput(\"ProductList\"); // Apply the named policy\n\napp.Run();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Kestrel Server Tuning"
+    },
+    {
+      "type": "paragraph",
+      "text": "Kestrel is fast out of the box, but its default settings are conservative. Tuning Kestrel's limits lets your application handle more concurrent connections, larger payloads, and higher throughput. The most important settings to review are maximum request body size, concurrent connection limits, and request header timeouts."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Key Kestrel Limits to Configure",
+      "items": [
+        {
+          "text": "MaxRequestBodySize: Controls the maximum size of incoming requests. The default is approximately 28MB. Lower it if you do not accept large uploads."
+        },
+        {
+          "text": "MaxConcurrentConnections: Limits total concurrent connections. Set based on your server's memory and CPU."
+        },
+        {
+          "text": "RequestHeadersTimeout: How long Kestrel waits for the client to send headers. The default is 30 seconds."
+        },
+        {
+          "text": "KeepAliveTimeout: How long an idle connection stays open. Lower it to free resources faster."
+        },
+        {
+          "text": "Limits.MaxResponseBufferSize: Controls response buffering. Increase for large response payloads."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Kestrel Tuning in Program.cs",
+      "content": "Configuring Kestrel limits for a high-throughput API scenario.",
+      "language": "csharp",
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.WebHost.ConfigureKestrel(options =>\n{\n    options.Limits.MaxRequestBodySize = 5 * 1024 * 1024; // 5MB max upload\n    options.Limits.MaxConcurrentConnections = 1000;\n    options.Limits.MaxConcurrentUpgradedConnections = 1000;\n\n    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(15);\n    options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(30);\n\n    // HTTP/2 settings for gRPC or HTTP/2 clients\n    options.Limits.Http2.MaxStreamsPerConnection = 100;\n});"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Asynchronous Programming"
+    },
+    {
+      "type": "paragraph",
+      "text": "async and await are not just about avoiding thread blocking — they are about throughput. In a web server, every blocked thread is a thread that cannot serve another request. Using async I/O for database calls, HTTP requests, and file operations lets the thread return to the thread pool while waiting, dramatically increasing the number of concurrent requests the server can handle."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Avoid .Result and .Wait()",
+      "text": "Calling .Result or .Wait() on a Task blocks the thread and can cause deadlocks under load. Always use await. The compiler transforms async methods into efficient state machines that free the thread while waiting."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Database Query Optimization"
+    },
+    {
+      "type": "paragraph",
+      "text": "Database queries are the most common source of API slowness. An N+1 query problem — where you fetch a list of items and then query the database once per item — can turn a 50ms API call into a 2-second one. Use Entity Framework's Include method to eager-load related data, and always profile queries with logging to identify slow ones."
+    },
+    {
+      "type": "example",
+      "title": "Avoiding N+1 Queries with Eager Loading",
+      "content": "Using Include to load related entities in a single query instead of lazy-loading them one at a time.",
+      "language": "csharp",
+      "code": "// Slow: N+1 query problem\n// First query: SELECT * FROM Products (N queries)\n// Then N more queries for each product's Category\nvar products = await _context.Products.ToListAsync();\nforeach (var product in products)\n{\n    var categoryName = product.Category.Name; // Triggers a query per product\n}\n\n// Fast: single query with eager loading\nvar products = await _context.Products\n    .Include(p => p.Category)\n    .Include(p => p.Reviews)\n    .ToListAsync();\n\n// EF Core generates one SQL query with JOINs\n// instead of N+1 separate queries"
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Performance Tuning",
+      "terms": [
+        {
+          "term": "Response Cache",
+          "definition": "Middleware that stores HTTP response output and serves cached responses for identical subsequent requests."
+        },
+        {
+          "term": "Output Cache",
+          "definition": "A .NET 7+ caching system that caches at the server level with configurable expiration and eviction policies."
+        },
+        {
+          "term": "Kestrel",
+          "definition": "ASP.NET Core's cross-platform web server whose limits can be tuned for higher throughput and lower latency."
+        },
+        {
+          "term": "async/await",
+          "definition": "C# language features that write asynchronous code in a synchronous style, freeing threads during I/O operations for better throughput."
+        },
+        {
+          "term": "N+1 Query Problem",
+          "definition": "A performance anti-pattern where a single initial query is followed by N individual queries for related data."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Measure Before You Optimize",
+      "text": "Premature optimization wastes time and often makes code harder to maintain. Use tools like MiniProfiler, Application Insights, or EF Core's query logging to identify actual bottlenecks. Optimize the slowest 20 percent of requests — it will account for 80 percent of your response time."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Performance Tuning",
+      "points": [
+        "Response caching and output caching store computed results to avoid redundant processing on repeated requests",
+        "Output Cache (.NET 7+) is the preferred caching mechanism with flexible policies and eviction strategies",
+        "Kestrel limits can be tuned to handle more concurrent connections and larger payloads",
+        "async/await increases throughput by freeing threads during I/O operations",
+        "Database N+1 queries are a common performance killer — use eager loading with Include to fix them",
+        "Always profile before optimizing — the actual bottleneck is rarely where you expect it"
+      ],
+      "takeaway": "Performance tuning in ASP.NET Core follows a simple pattern: measure, identify the bottleneck, apply a targeted fix, and re-measure. Caching eliminates redundant work, async I/O increases throughput, and proper database queries prevent the most common slowdowns."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Optimize a Slow API Endpoint",
+      "description": "Profile a deliberately slow API endpoint, identify the bottleneck, and apply targeted optimizations.",
+      "steps": [
+        "Create a GetAllProducts endpoint that loads products and their categories using lazy loading",
+        "Add logging to measure the total execution time of the endpoint",
+        "Run the endpoint and observe the slow response time (N+1 queries)",
+        "Enable EF Core query logging to confirm multiple database round-trips",
+        "Refactor the query to use Include for eager loading of the Category relationship",
+        "Re-run the endpoint and compare the execution time — it should drop significantly",
+        "Add Output Cache with a 60-second expiration and verify the second request returns instantly"
+      ],
+      "expectedOutcome": "The API endpoint response time drops from hundreds of milliseconds to single digits after eager loading. The second request (with caching) returns in under a millisecond. Query logs confirm a single SQL query instead of N+1."
+    },
+    {
+      "type": "checklist",
+      "title": "Performance Tuning Checklist",
+      "items": [
+        {
+          "text": "I understand when to use response caching vs output caching",
+          "hint": "Output Cache is preferred for new apps. Response Cache is the older approach. Both store computed results."
+        },
+        {
+          "text": "I can identify an N+1 query problem in EF Core code",
+          "hint": "Loading a list, then accessing a navigation property for each item in a loop triggers N+1 queries."
+        },
+        {
+          "text": "I know how to fix N+1 queries using Include",
+          "hint": "Use .Include(p => p.RelatedEntity) to load related data in the initial query."
+        },
+        {
+          "text": "I can describe key Kestrel limits and when to adjust them",
+          "hint": "MaxRequestBodySize, MaxConcurrentConnections, RequestHeadersTimeout — tune for your workload."
+        },
+        {
+          "text": "I understand why async/await improves server throughput",
+          "hint": "Await frees the thread during I/O, letting it serve other requests while waiting for the operation to complete."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "monitoring-and-alerting"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Performance Best Practices for ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/performance-best-practices"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "monitoring-and-alerting"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Performance Best Practices for ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/performance-best-practices"
+    }
+  ]
 }

@@ -4,26 +4,229 @@
   "moduleSlug": "07-middleware-pipeline",
   "courseSlug": "aspnet-core",
   "title": "Exception Handling Middleware",
-  "description": "Learn exception handling middleware in ASP.NET Core.",
+  "description": "Learn how to gracefully handle unhandled exceptions in ASP.NET Core using built-in exception handling middleware, developer exception pages, and custom error pages.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 8,
+  "estimatedMinutes": 30,
   "tags": [
     "errors",
-    "exception"
+    "exception",
+    "error-handling"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Exception Handling Matters"
+    },
+    {
       "type": "paragraph",
-      "text": "Use UseExceptionHandler to catch and log unhandled exceptions."
+      "text": "Unhandled exceptions are inevitable in any application. A database connection might fail, a file could be missing, or a user might submit unexpected data. Without proper exception handling, these errors result in raw stack traces being returned to the client — exposing sensitive information and providing a poor user experience."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides two primary built-in approaches for handling exceptions: the Developer Exception Page for local development, and the Exception Handler Middleware for production environments. Using the right approach in each environment keeps your application secure and your users informed."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Never expose stack traces in production",
+      "text": "The Developer Exception Page shows sensitive information like connection strings, file paths, and source code. It must never be enabled in production. Always use UseExceptionHandler for production environments."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Developer Exception Page"
+    },
+    {
+      "type": "paragraph",
+      "text": "During development, ASP.NET Core automatically enables the Developer Exception Page when the environment is set to Development. This page provides detailed error information including the stack trace, query strings, headers, and route data — invaluable for debugging."
+    },
+    {
+      "type": "paragraph",
+      "text": "The Developer Exception Page is enabled by default in the CreateBuilder template. If you need to enable it manually, call app.UseDeveloperExceptionPage() in your pipeline configuration."
     },
     {
       "type": "example",
+      "title": "Developer exception page in development",
+      "content": "Manually enabling the developer exception page for debugging during local development.",
       "language": "csharp",
-      "code": "if (!app.Environment.IsDevelopment())\n{\n    app.UseExceptionHandler(\"/Home/Error\");\n    app.UseHsts();\n}"
+      "code": "var builder = WebApplication.CreateBuilder(args);\nvar app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseDeveloperExceptionPage();\n}\nelse\n{\n    app.UseExceptionHandler(\"/Home/Error\");\n    app.UseHsts();\n}\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "The if/else pattern ensures developers get full debugging information locally, while production users see a clean error page. The UseHsts() call in the else block adds HTTP Strict Transport Security headers, another production-only security measure."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Exception Handler Middleware"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Exception Handler Middleware (app.UseExceptionHandler) catches unhandled exceptions and redirects the request to a specific path. This path should map to an error handling endpoint that renders a user-friendly error page and logs the exception details."
+    },
+    {
+      "type": "paragraph",
+      "text": "Unlike the Developer Exception Page, the Exception Handler Middleware does not expose error details to the client. It is the correct choice for any non-development environment. The error handling endpoint receives the original exception through the IExceptionHandlerFeature service."
+    },
+    {
+      "type": "example",
+      "title": "Custom error handling with Exception Handler Middleware",
+      "content": "Configure exception handling and an error controller action that logs and displays a friendly error page.",
+      "language": "csharp",
+      "code": "// Program.cs\nif (!app.Environment.IsDevelopment())\n{\n    app.UseExceptionHandler(\"/Home/Error\");\n    app.UseHsts();\n}\n\n// HomeController.cs\npublic class HomeController : Controller\n{\n    private readonly ILogger<HomeController> _logger;\n\n    public IActionResult Error()\n    {\n        var exceptionFeature = HttpContext.Features.Get<IExceptionHandlerFeature>();\n        var exception = exceptionFeature?.Error;\n\n        if (exception != null)\n        {\n            _logger.LogError(exception, \"An unhandled exception occurred.\");\n        }\n\n        return View(new ErrorViewModel { Message = \"Something went wrong.\" });\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "In the Error action, IExceptionHandlerFeature provides access to the original exception. You can use this to log the full details for debugging while showing only a generic message to the user. Never pass the exception object or its message directly to the view in production."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Status Code Pages"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Status Code Pages Middleware (app.UseStatusCodePages) handles HTTP error status codes like 404 Not Found and 500 Internal Server Error. It is separate from exception handling because a 404 is not always caused by an exception — it is simply a response status."
+    },
+    {
+      "type": "paragraph",
+      "text": "You can configure status code pages to return plain text, JSON, or redirect to a dedicated error page for each status code range."
+    },
+    {
+      "type": "example",
+      "title": "Configuring status code pages",
+      "content": "Different ways to handle HTTP error status codes with the Status Code Pages Middleware.",
+      "language": "csharp",
+      "code": "// Plain text response for 404 and 500\napp.UseStatusCodePages(\n    \"text/plain\", \"Status Code: {0}\");\n\n// Redirect to a dedicated error page\napp.UseStatusCodePagesWithRedirects(\"/Error/{0}\");\n\n// Re-execute the request pipeline on a different path\napp.UseStatusCodePagesWithReExecute(\"/Error/{0}\");"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Re-execute preserves the original URL",
+      "text": "UseStatusCodePagesWithReExecute re-runs the request through the pipeline on a different path while keeping the original URL in the browser. This lets your error page access the original route data via RouteData. Use this when you need the original URL for logging or display."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Global Exception Handling with a Filter"
+    },
+    {
+      "type": "paragraph",
+      "text": "For MVC and API controllers, you can use an Exception Filter as an alternative to middleware-based error handling. Exception filters run after the middleware pipeline and can catch exceptions within specific controllers or actions."
+    },
+    {
+      "type": "example",
+      "title": "Global exception filter for MVC controllers",
+      "content": "An exception filter attribute that catches exceptions and returns a standardized JSON response for API controllers.",
+      "language": "csharp",
+      "code": "public class ApiExceptionFilter : IExceptionFilter\n{\n    private readonly ILogger<ApiExceptionFilter> _logger;\n    private readonly IWebHostEnvironment _env;\n\n    public ApiExceptionFilter(\n        ILogger<ApiExceptionFilter> logger,\n        IWebHostEnvironment env)\n    {\n        _logger = logger;\n        _env = env;\n    }\n\n    public void OnException(ExceptionContext context)\n    {\n        _logger.LogError(context.Exception, \"Unhandled exception\");\n\n        context.Result = new JsonResult(new\n        {\n            StatusCode = 500,\n            Message = _env.IsDevelopment()\n                ? context.Exception.Message\n                : \"An internal server error occurred.\",\n            Detail = _env.IsDevelopment()\n                ? context.Exception.StackTrace\n                : null\n        })\n        {\n            StatusCode = StatusCodes.Status500InternalServerError\n        };\n\n        context.ExceptionHandled = true;\n    }\n}\n\n// Register globally in Program.cs\nbuilder.Services.AddControllers(options =>\n{\n    options.Filters.Add<ApiExceptionFilter>();\n});"
+    },
+    {
+      "type": "paragraph",
+      "text": "Exception filters are useful when you want different error handling behavior for different parts of your application. For example, you might return JSON for API controllers and HTML views for MVC controllers. The filter approach gives you that granularity."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Developer Exception Page",
+          "definition": "A detailed error page shown during development with stack traces and request data. Never enable in production."
+        },
+        {
+          "term": "UseExceptionHandler",
+          "definition": "Middleware that catches unhandled exceptions and redirects to a configured error path. Used in production."
+        },
+        {
+          "term": "IExceptionHandlerFeature",
+          "definition": "A service that provides access to the original exception details inside the error handling endpoint."
+        },
+        {
+          "term": "Status Code Pages",
+          "definition": "Middleware that handles HTTP error status codes like 404 and 500 with custom responses."
+        },
+        {
+          "term": "Exception Filter",
+          "definition": "An MVC filter that catches exceptions within controllers, providing an alternative to middleware-based error handling."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Implement Production-Grade Error Handling",
+      "description": "Add robust exception handling and status code pages to an existing ASP.NET Core project.",
+      "steps": [
+        "Create a new MVC project: 'dotnet new mvc -n ErrorHandlingDemo'",
+        "Create an ErrorViewModel class in the Models folder with Message and RequestId properties",
+        "Create an Error action in HomeController that reads IExceptionHandlerFeature, logs the exception, and returns the Error view",
+        "Create an Error.cshtml view that displays the Message and shows RequestId if available",
+        "In Program.cs, add UseDeveloperExceptionPage for Development and UseExceptionHandler('/Home/Error') with UseHsts for other environments",
+        "Add app.UseStatusCodePagesWithReExecute('/Home/Error') to handle 404 and other status codes",
+        "Run the app, navigate to a non-existent route to see the error page, and verify no stack trace is exposed"
+      ],
+      "expectedOutcome": "Visiting a non-existent route shows a clean error page without stack traces. In Development mode, the developer exception page shows full details. All errors are logged through ILogger for later review."
+    },
+    {
+      "type": "checklist",
+      "title": "Exception Handling Checklist",
+      "items": [
+        {
+          "text": "I can explain the difference between Developer Exception Page and Exception Handler Middleware",
+          "hint": "Developer page is for debugging; Exception Handler is for production."
+        },
+        {
+          "text": "I can configure conditional exception handling based on IHostEnvironment",
+          "hint": "Use IsDevelopment() to choose between the two approaches."
+        },
+        {
+          "text": "I understand why UseHsts is production-only",
+          "hint": "HSTS requires a valid HTTPS certificate and should not be enforced during local development."
+        },
+        {
+          "text": "I can read exception details inside an error handling endpoint using IExceptionHandlerFeature",
+          "hint": "HttpContext.Features.Get<IExceptionHandlerFeature>() returns the original exception."
+        },
+        {
+          "text": "I can configure Status Code Pages to handle 404 and 500 errors",
+          "hint": "UseStatusCodePagesWithReExecute preserves the original URL in the browser."
+        },
+        {
+          "text": "I know when to use an exception filter instead of middleware",
+          "hint": "Use filters when you need different error handling per controller or action."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Exception Handling Summary",
+      "points": [
+        "Always use the Developer Exception Page only in Development environment",
+        "UseExceptionHandler with a dedicated error path is the production approach",
+        "IExceptionHandlerFeature provides access to the original exception inside error endpoints",
+        "Status Code Pages Middleware handles non-exception HTTP errors like 404 Not Found",
+        "Exception filters provide controller-level error handling as an alternative to middleware",
+        "Never pass raw exception messages or stack traces to the browser in production"
+      ],
+      "takeaway": "Proper exception handling protects your users from confusing error pages and protects your application from leaking sensitive information. Combining middleware-based handling with exception filters gives you complete coverage from the pipeline down to individual controllers."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Handle Errors in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comprehensive guide to exception handling, status code pages, and exception filters."
+    },
+    {
+      "title": "Exception Filters in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/filters",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Documentation covering all MVC filter types including exception filters."
+    }
+  ]
 }

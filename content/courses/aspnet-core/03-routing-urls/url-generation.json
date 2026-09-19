@@ -4,26 +4,246 @@
   "moduleSlug": "03-routing-urls",
   "courseSlug": "aspnet-core",
   "title": "URL Generation",
-  "description": "Learn url generation in ASP.NET Core.",
+  "description": "Learn how to generate URLs dynamically from route names and action names instead of hardcoding paths. Covers Url.Action, Url.RouteUrl, Html.ActionLink, and the IUrlHelper interface.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 8,
+  "estimatedMinutes": 25,
   "tags": [
     "url-generation",
-    "links"
+    "links",
+    "routing"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Generate URLs from route names to avoid hardcoded paths."
+      "text": "**URL generation** is the practice of creating URLs dynamically based on your application's routing configuration, rather than hardcoding paths in your views and controllers. When you change a route pattern later, every dynamically generated URL updates automatically — hardcoded paths do not."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides several helpers for URL generation, each suited to different contexts: `Url.Action` for controllers, `Url.RouteUrl` for named routes, `Html.ActionLink` for generating complete anchor tags, and `IUrlHelper` for advanced scenarios."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Not Hardcode URLs?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Hardcoding a URL like `<a href=\"/Products/Details/5\">` seems harmless at first. But consider what happens when you later change the route pattern to `/shop/product/5` or add a localization prefix like `/en/products/5`. Every hardcoded link in every view breaks silently."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Hardcoded URLs are a maintenance trap",
+      "text": "Even a small routing change can break dozens of hardcoded links across many views. Dynamic URL generation ensures your links always reflect the current routing configuration, eliminating a whole category of bugs."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Url.Action: Generate URLs by Controller and Action"
+    },
+    {
+      "type": "paragraph",
+      "text": "`Url.Action` generates a URL by specifying the action name, controller name, and route values. It looks up the matching route and returns the correct URL string."
     },
     {
       "type": "example",
+      "title": "Using Url.Action in a Razor view",
+      "content": "Generate a URL to the Details action in the Products controller with a route value for the id.",
       "language": "csharp",
-      "code": "var url = Url.Action(\"Details\", \"Products\", new { id = 5 });\n// returns /Products/Details/5"
+      "code": "@* Generates /Products/Details/5 *@\n<a href=\"@Url.Action(\"Details\", \"Products\", new { id = 5 })\">\n    View Product 5\n</a>\n\n@* Generates /Products (default action) *@\n<a href=\"@Url.Action(\"Index\", \"Products\")\">\n    All Products\n</a>\n\n@* Generates / (home page) *@\n<a href=\"@Url.Action(\"Index\", \"Home\")\">Home</a>"
+    },
+    {
+      "type": "paragraph",
+      "text": "`Url.Action` returns the full path (e.g., `/Products/Details/5`). If your application is hosted in a virtual directory (e.g., `https://example.com/myapp/`), it automatically includes the application path."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Url.RouteUrl: Generate URLs by Route Name"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you name your routes using the `name` parameter in `MapControllerRoute`, you can generate URLs by route name using `Url.RouteUrl`. This is the most resilient approach because it does not depend on controller or action names."
+    },
+    {
+      "type": "example",
+      "title": "Named routes and Url.RouteUrl",
+      "content": "Name your routes in Program.cs and generate URLs by route name.",
+      "language": "csharp",
+      "code": "// In Program.cs\napp.MapControllerRoute(\n    name: \"product-details\",\n    pattern: \"Products/{id:int}\",\n    defaults: new { controller = \"Products\", action = \"Details\" });\n\n// In a Razor view\n<a href=\"@Url.RouteUrl(\"product-details\", new { id = 5 })\">\n    View Product 5\n</a>\n<!-- Generates: /Products/5 -->"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Name important routes",
+      "text": "Naming your routes makes URL generation more resilient and your code more readable. `Url.RouteUrl(\"product-details\", ...)` is self-documenting compared to `Url.Action(\"Details\", \"Products\", ...)` which requires you to know the controller name."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Html.ActionLink: Generate Complete Anchor Tags"
+    },
+    {
+      "type": "paragraph",
+      "text": "`Html.ActionLink` is a convenience helper that generates a complete `<a>` tag with the correct `href` attribute. It is equivalent to writing `<a href=\"@Url.Action(...)\">...</a>` but in a single method call."
+    },
+    {
+      "type": "example",
+      "title": "Using Html.ActionLink",
+      "content": "Generate complete anchor tags with Html.ActionLink for links to other actions.",
+      "language": "csharp",
+      "code": "@Html.ActionLink(\n    linkText: \"View Product 5\",\n    actionName: \"Details\",\n    controllerName: \"Products\",\n    routeValues: new { id = 5 },\n    htmlAttributes: new { @class = \"btn btn-primary\" }\n)\n<!-- Generates: <a href=\"/Products/Details/5\" class=\"btn btn-primary\">View Product 5</a> -->"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Generating URLs in Controllers"
+    },
+    {
+      "type": "paragraph",
+      "text": "The same `Url` helper is available in controllers via the `ControllerBase.Url` property. This is useful when you need to redirect to a specific URL or build absolute URLs for emails or notifications."
+    },
+    {
+      "type": "example",
+      "title": "URL generation in a controller action",
+      "content": "Generate URLs inside a controller for redirects, emails, or API responses.",
+      "language": "csharp",
+      "code": "public class ProductsController : Controller\n{\n    private readonly IEmailService _emailService;\n\n    public ProductsController(IEmailService emailService)\n    {\n        _emailService = emailService;\n    }\n\n    [HttpPost]\n    public IActionResult Create(Product product)\n    {\n        if (!ModelState.IsValid) return View(product);\n\n        _repo.Add(product);\n\n        // Generate a URL to send in a confirmation email\n        var productUrl = Url.Action(\n            \"Details\",\n            \"Products\",\n            new { id = product.Id },\n            protocol: Request.Scheme // includes http:// or https://\n        );\n\n        _emailService.SendConfirmation(product.OwnerEmail, productUrl);\n\n        return RedirectToAction(nameof(Index));\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "Note the `protocol: Request.Scheme` parameter. Without it, `Url.Action` returns a relative path (e.g., `/Products/Details/5`). With it, you get an absolute URL (e.g., `https://localhost:5001/Products/Details/5`) suitable for emails and external links."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The IUrlHelper Interface"
+    },
+    {
+      "type": "paragraph",
+      "text": "`Url` in controllers and views is an instance of `IUrlHelper`. If you need URL generation outside of controllers or views (e.g., in a service class), you can inject `IUrlHelperFactory` and `IActionContextAccessor` to create your own `IUrlHelper` instance."
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "IUrlHelper in services",
+      "text": "Generating URLs in service classes requires `IUrlHelperFactory` and `IActionContextAccessor`. This is an advanced scenario — most URL generation should happen in controllers or views where `Url` is already available."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Current Request URL Helpers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sometimes you need parts of the current request URL — the path, query string, or host. ASP.NET Core provides access to these through the `HttpRequest` object."
+    },
+    {
+      "type": "example",
+      "title": "Accessing current request URL parts",
+      "content": "Use the HttpContext to read the current request's path, query string, and host.",
+      "language": "csharp",
+      "code": "public class HomeController : Controller\n{\n    public IActionResult CurrentUrlInfo()\n    {\n        var request = HttpContext.Request;\n\n        ViewBag.Path = request.Path;           // /Products/Details/5\n        ViewBag.QueryString = request.QueryString.Value; // ?ref=homepage\n        ViewBag.Host = request.Host.Value;     // localhost:5001\n        ViewBag.Scheme = request.Scheme;       // https\n        ViewBag.FullUrl = $\"{request.Scheme}://{request.Host}{request.Path}\";\n\n        return View();\n    }\n}"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Url.Action",
+          "definition": "Generates a URL from a controller action name and route values. Returns a relative URL path."
+        },
+        {
+          "term": "Url.RouteUrl",
+          "definition": "Generates a URL from a named route and route values. More resilient than Url.Action because it does not depend on controller or action names."
+        },
+        {
+          "term": "Html.ActionLink",
+          "definition": "Generates a complete HTML anchor tag (<a>) with the correct href attribute based on an action, controller, and route values."
+        },
+        {
+          "term": "IUrlHelper",
+          "definition": "The interface behind the Url helper in controllers and views. Provides methods for generating URLs and links within your application."
+        },
+        {
+          "term": "Absolute URL",
+          "definition": "A full URL including the protocol and host (e.g., https://example.com/Products/5). Generated by passing protocol: Request.Scheme to Url.Action."
+        }
+      ]
+    },
+    {
+      "type": "bullet-list",
+      "title": "URL generation methods at a glance",
+      "items": [
+        "**Url.Action** — generates a URL from a controller action name and route values",
+        "**Url.RouteUrl** — generates a URL from a named route — the most resilient approach",
+        "**Html.ActionLink** — generates a complete anchor tag with the correct href attribute",
+        "**IUrlHelper** — the interface behind the Url helper, usable outside controllers and views"
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "URL Generation Checklist",
+      "items": [
+        {
+          "text": "I can replace a hardcoded href with Url.Action in a Razor view",
+          "hint": "Use @Url.Action(\"Details\", \"Products\", new { id = 5 }) instead of href=\"/Products/Details/5\""
+        },
+        {
+          "text": "I can name a route in Program.cs and generate a URL with Url.RouteUrl",
+          "hint": "app.MapControllerRoute(\"product-details\", \"Products/{id:int}\", ...) then Url.RouteUrl(\"product-details\", ...)"
+        },
+        {
+          "text": "I understand why dynamic URL generation is safer than hardcoded paths",
+          "hint": "When route patterns change, dynamic URLs update automatically; hardcoded ones break"
+        },
+        {
+          "text": "I can generate an absolute URL for use in emails",
+          "hint": "Pass protocol: Request.Scheme to Url.Action to include https://"
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Replace Hardcoded Links with Dynamic URLs",
+      "description": "Find and replace hardcoded URL links in a view with Url.Action and Url.RouteUrl calls.",
+      "steps": [
+        "Create a layout view with a navigation bar containing links: Home, Products, About, Contact",
+        "Replace hardcoded href values like `/` and `/Products` with `@Url.Action(\"Index\", \"Home\")` and `@Url.Action(\"Index\", \"Products\")`",
+        "Add a named route in Program.cs: `app.MapControllerRoute(\"about\", \"About\", new { controller = \"Home\", action = \"About\" })`",
+        "Replace the About link with `@Url.RouteUrl(\"about\")`",
+        "In the Products Index view, add links to Details pages using `@Url.Action(\"Details\", \"Products\", new { id = product.Id })`",
+        "Change the default route pattern in Program.cs to `{controller=Home}/{action=Index}/{id?}/info`",
+        "Confirm all dynamically generated links still work correctly (hardcoded links would now be broken)"
+      ],
+      "expectedOutcome": "All navigation links use dynamic URL generation. After changing the route pattern, only the hardcoded links (if any remain) break — all Url.Action and Url.RouteUrl links continue to work correctly."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Url.Action generates URLs from controller/action names and route values",
+        "Url.RouteUrl generates URLs from named routes — the most resilient approach",
+        "Html.ActionLink creates a complete anchor tag with the correct href in one call",
+        "IUrlHelper is the interface behind the Url helper, available in controllers and views",
+        "Pass protocol: Request.Scheme to generate absolute URLs for emails and external use",
+        "Named routes make your application more maintainable when URL patterns change"
+      ],
+      "takeaway": "Dynamic URL generation is a best practice that prevents a whole class of bugs when your routing configuration changes. Use Url.Action, Url.RouteUrl, or Html.ActionLink everywhere instead of hardcoding paths."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "route-constraints",
+    "area-routing"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "URL Generation in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing#url-generation",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on generating URLs from routes, actions, and named routes."
+    }
+  ]
 }

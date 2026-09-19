@@ -4,26 +4,202 @@
   "moduleSlug": "04-model-binding-validation",
   "courseSlug": "aspnet-core",
   "title": "Client-Side Validation",
-  "description": "Learn client-side validation in ASP.NET Core.",
+  "description": "Enable instant user feedback by adding unobtrusive client-side validation to your forms.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "client-side",
-    "javascript"
+    "javascript",
+    "ux"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Client-Side Validation?"
+    },
+    {
       "type": "paragraph",
-      "text": "Enable unobtrusive client-side validation with jQuery Validation or native approaches."
+      "text": "Server-side validation is non-negotiable for security and correctness, but it has a downside: the user must submit the form, wait for a round-trip, and then see errors. Client-side validation catches mistakes immediately, before the request ever leaves the browser."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core implements client-side validation using unobtrusive JavaScript. The server renders HTML5 data attributes that describe the validation rules. A small JavaScript library reads those attributes, attaches behaviors to form fields, and prevents submission when rules are broken."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Progressive Enhancement",
+      "text": "Client-side validation is a progressive enhancement. If JavaScript is disabled, the form still submits and server-side validation still runs. Never remove server-side checks just because client-side validation is enabled."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "How Unobtrusive Validation Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you use validation tag helpers in a Razor view, ASP.NET Core emits data-val attributes on input elements. These attributes contain the rule name, parameters, and error message. The jQuery Validation Unobtrusive library reads them and wires up the corresponding checks."
     },
     {
       "type": "example",
+      "title": "Rendered HTML with Data Attributes",
+      "content": "This is the HTML that tag helpers produce for a validated field.",
+      "language": "html",
+      "code": "<input type=\"text\"\n       id=\"Email\"\n       name=\"Email\"\n       data-val=\"true\"\n       data-val-required=\"The Email field is required.\"\n       data-val-email=\"The Email field is not a valid e-mail address.\"\n       data-val-length=\"The field Email must be a string with a maximum length of 100.\"\n       data-val-length-max=\"100\" />\n<span class=\"field-validation-valid\"\n      data-valmsg-for=\"Email\"\n      data-valmsg-replace=\"true\"></span>"
+    },
+    {
+      "type": "paragraph",
+      "text": "The data-val=true attribute signals that the field has validation rules. Each rule becomes its own data-val-* attribute. The framework uses the error message you defined in the attribute or falls back to a default."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Enabling Client-Side Validation"
+    },
+    {
+      "type": "paragraph",
+      "text": "To enable client-side validation, you need two JavaScript libraries: jQuery Validation and jQuery Validation Unobtrusive. Most ASP.NET Core templates include them via the _ValidationScriptsPartial view."
+    },
+    {
+      "type": "example",
+      "title": "Including Validation Scripts",
+      "content": "Add the validation scripts at the bottom of your layout or view.",
       "language": "csharp",
-      "code": "// _Layout.cshtml\n<script src=\"~/lib/jquery-validation/dist/jquery.validate.min.js\"></script>\n<script src=\"~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js\"></script>"
+      "code": "<!-- _Layout.cshtml -->\n<body>\n    @RenderBody()\n\n    <script src=\"~/lib/jquery/dist/jquery.min.js\"></script>\n    <script src=\"~/lib/jquery-validation/dist/jquery.validate.min.js\"></script>\n    <script src=\"~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js\"></script>\n    @await RenderSectionAsync(\"Scripts\", required: false)\n</body>"
+    },
+    {
+      "type": "paragraph",
+      "text": "If you are using the default project template, these libraries are already installed through LibMan or npm. The validation scripts are rendered automatically when you call @await RenderSectionAsync(\"Scripts\") in the layout and define a Scripts section in your view."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Enabling or Disabling in Program.cs"
+    },
+    {
+      "type": "paragraph",
+      "text": "Client-side validation is enabled by default when the necessary scripts are present. You can explicitly control it with the options pattern if you need to turn it off globally or for specific areas of your app."
+    },
+    {
+      "type": "example",
+      "title": "Configuring Client Validation Options",
+      "content": "Control client-side validation behavior in Program.cs.",
+      "language": "csharp",
+      "code": "builder.Services.AddRazorPages(options =>\n{\n    // Enable or disable client-side validation globally\n    options.Conventions.ConfigureFilter(new IgnoreAntiforgeryTokenAttribute());\n});\n\n// Or inside a controller/area using the attribute\n[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]\npublic class DisableClientValidationAttribute : Attribute, IAsyncPageFilter, IAsyncActionFilter\n{\n    public async Task OnPageHandlerSelectionAsync(PageHandlerExecutingContext context) { }\n    public async Task OnPageHandlerExecutedAsync(PageHandlerExecutedContext context) { }\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Not All Rules Validate Client-Side",
+      "text": "Built-in attributes like [Required], [StringLength], [Range], and [EmailAddress] have client-side adapters. Custom attributes do not unless you write one."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Remote Validation"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sometimes a rule needs to check data on the server, such as whether a username already exists or whether a discount code is valid. The [Remote] attribute performs an AJAX call to a server endpoint while the user is typing."
+    },
+    {
+      "type": "example",
+      "title": "Remote Validation for Username Availability",
+      "content": "The Remote attribute calls an API endpoint to verify the value.",
+      "language": "csharp",
+      "code": "public class RegisterViewModel\n{\n    [Required]\n    [Remote(action: \"IsUsernameAvailable\", controller: \"Account\")]\n    public string Username { get; set; }\n}\n\n// AccountController\n[AcceptVerbs(\"GET\", \"POST\")]\npublic IActionResult IsUsernameAvailable(string username)\n{\n    var exists = _userRepo.Exists(username);\n    return Json(!exists ? true : (object)\"Username is already taken.\");\n}\n\n// In the view, jQuery Validation sends an AJAX request as the user types."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Client-Side Validation Best Practices",
+      "items": [
+        "Always keep server-side validation as the authoritative check.",
+        "Use unobtrusive validation for the best user experience.",
+        "Test with JavaScript disabled to confirm the server fallback works.",
+        "Add custom JavaScript adapters only when client-side support for a rule is essential.",
+        "Use [Remote] sparingly because it increases server load with extra AJAX requests."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Unobtrusive Validation",
+          "definition": "A technique where the server emits HTML5 data attributes and a client-side library interprets them to validate forms without inline JavaScript."
+        },
+        {
+          "term": "jQuery Validation",
+          "definition": "A jQuery plugin that provides a framework for validating form fields on the client."
+        },
+        {
+          "term": "Data Attribute",
+          "definition": "An HTML attribute starting with data- that stores custom information, such as data-val-required for validation rules."
+        },
+        {
+          "term": "Remote Validation",
+          "definition": "Client-side validation that sends an AJAX request to the server to verify a value that cannot be checked locally."
+        },
+        {
+          "term": "Progressive Enhancement",
+          "definition": "A design approach where basic functionality works without JavaScript, and JavaScript enhances the experience when available."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Add Client-Side Validation to a Form",
+      "description": "Enable instant feedback on a contact form by adding unobtrusive validation scripts and data annotations.",
+      "steps": [
+        "Create a ContactViewModel with Name, Email, Subject, and Message properties.",
+        "Apply [Required], [StringLength], and [EmailAddress] attributes.",
+        "Create a Razor view with validation tag helpers and asp-validation-summary='All'.",
+        "Add the jQuery Validation and Unobtrusive scripts to _Layout.cshtml.",
+        "Open the page, leave a field empty, and confirm the error appears without a page reload.",
+        "Disable JavaScript and confirm the form still validates on the server."
+      ],
+      "expectedOutcome": "The form will show errors instantly when JavaScript is enabled and still validate correctly when it is disabled."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Client-Side Validation",
+      "items": [
+        {
+          "text": "I can describe how unobtrusive validation connects server rules to the browser.",
+          "hint": "Server emits data-val attributes; JavaScript reads them and enforces rules."
+        },
+        {
+          "text": "I know which two scripts are required for client-side validation.",
+          "hint": "jquery.validate.min.js and jquery.validate.unobtrusive.min.js."
+        },
+        {
+          "text": "I can use the [Remote] attribute to validate a value against the server.",
+          "hint": "Point it to an action that returns Json(true) or an error string."
+        },
+        {
+          "text": "I understand why client-side validation cannot replace server-side validation.",
+          "hint": "JavaScript can be bypassed; the server is the final authority."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Client-side validation improves UX by catching errors before submission.",
+        "Unobtrusive validation uses data-val attributes rendered by tag helpers.",
+        "jQuery Validation and jQuery Validation Unobtrusive are the standard libraries.",
+        "[Remote] enables server-side checks during form entry via AJAX.",
+        "Client-side validation is a progressive enhancement, not a security boundary."
+      ],
+      "takeaway": "Good validation is layered: data annotations enforce rules on the server, unobtrusive JavaScript adds instant feedback in the browser, and the user gets the best of both worlds."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "validation-attributes",
+    "custom-validation"
+  ],
   "technology": null,
   "furtherReading": []
 }

@@ -4,26 +4,297 @@
   "moduleSlug": "03-routing-urls",
   "courseSlug": "aspnet-core",
   "title": "Route Constraints",
-  "description": "Learn route constraints in ASP.NET Core.",
+  "description": "Learn how to use route constraints to restrict which values a route parameter accepts. Covers built-in constraints (int, guid, regex, min/max) and how they prevent ambiguous matches and 404 errors.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "constraints",
-    "validation"
+    "validation",
+    "routing"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Restrict route parameter values with constraints like int, guid, or regex."
+      "text": "**Route constraints** restrict what values a route parameter can match. Without constraints, a route like `{id}` matches any value — numbers, strings, GUIDs, or even empty segments. Constraints let you say: \"this parameter must be an integer\" or \"this parameter must match this regular expression.\""
+    },
+    {
+      "type": "paragraph",
+      "text": "Using constraints prevents ambiguous route matches, provides early validation, and produces meaningful 404 responses when a URL does not fit any route."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Use Constraints?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Consider a scenario where you have two actions in the same controller: one that lists products by category name (string) and one that shows product details by numeric ID. Without constraints, a URL like `/products/5` might match the category action (treating `5` as a category name) instead of the details action."
     },
     {
       "type": "example",
+      "title": "The problem without constraints",
+      "content": "Two actions that could ambiguously match the same URL pattern without constraints.",
       "language": "csharp",
-      "code": "[HttpGet(\"{id:int:min(1)}\")]\npublic IActionResult Get(int id) => Ok(_service.Get(id));"
+      "code": "[Route(\"products\")]\npublic class ProductsController : Controller\n{\n    // GET /products/electronics  — but also matches /products/5!\n    [HttpGet(\"{category}\")]\n    public IActionResult ByCategory(string category) => View(model: category);\n\n    // GET /products/5 — but also matches /products/electronics!\n    [HttpGet(\"{id}\")]\n    public IActionResult Details(int id) => View(model: id);\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "In this case, ASP.NET Core will match the first route that succeeds. Since both `{category}` and `{id}` match any string, the order of registration determines which action runs — leading to unpredictable behavior."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Built-in Route Constraints"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides built-in constraints for common data types. Append the constraint after the parameter name using a colon (`:`) separator."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Constraint",
+        "Matches",
+        "Example"
+      ],
+      "rows": [
+        [
+          "int",
+          "32-bit signed integer",
+          "{id:int}"
+        ],
+        [
+          "bool",
+          "true or false",
+          "{active:bool}"
+        ],
+        [
+          "datetime",
+          "Valid DateTime value",
+          "{date:datetime}"
+        ],
+        [
+          "decimal",
+          "Decimal number",
+          "{price:decimal}"
+        ],
+        [
+          "double",
+          "64-bit floating-point number",
+          "{rating:double}"
+        ],
+        [
+          "float",
+          "32-bit floating-point number",
+          "{score:float}"
+        ],
+        [
+          "guid",
+          "Globally unique identifier",
+          "{id:guid}"
+        ],
+        [
+          "long",
+          "64-bit signed integer",
+          "{id:long}"
+        ],
+        [
+          "min(value)",
+          "Minimum numeric value",
+          "{id:min(1)}"
+        ],
+        [
+          "max(value)",
+          "Maximum numeric value",
+          "{id:max(1000)}"
+        ],
+        [
+          "range(min,max)",
+          "Numeric range",
+          "{id:range(1,100)}"
+        ],
+        [
+          "regex(pattern)",
+          "Regular expression match",
+          "{name:regex(^[a-z]+$)}"
+        ],
+        [
+          "required",
+          "Non-empty parameter",
+          "{name:required}"
+        ]
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Applying Constraints to Routes"
+    },
+    {
+      "type": "paragraph",
+      "text": "Constraints are applied inline in the route template by appending them after the parameter name with a colon. Multiple constraints can be chained with additional colons."
+    },
+    {
+      "type": "example",
+      "title": "Routes with int and range constraints",
+      "content": "Use :int and :range constraints to ensure only valid numeric IDs match the details route.",
+      "language": "csharp",
+      "code": "[Route(\"products\")]\npublic class ProductsController : Controller\n{\n    // Matches /products/5, /products/100 — but NOT /products/abc\n    [HttpGet(\"{id:int:min(1)}\")]\n    public IActionResult Details(int id) => View(model: id);\n\n    // Matches /products/page/1 through /products/page/50\n    [HttpGet(\"page/{page:int:range(1,50)}\")]\n    public IActionResult List(int page) => View(model: page);\n\n    // Matches GUID format IDs like /products/550e8400-e29b...\n    [HttpGet(\"{id:guid}\")]\n    public IActionResult DetailsByGuid(Guid id) => View(model: id);\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Constraints run before model binding",
+      "text": "Route constraints are evaluated during routing, before the action method is even called. If a constraint fails, the route does not match and the framework continues checking other routes. This is why `/products/abc` returns 404 with an `:int` constraint rather than reaching your action with a binding error."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Multiple Constraints on One Parameter"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can chain multiple constraints on a single parameter. This is useful when you need to enforce both a type and a range."
+    },
+    {
+      "type": "example",
+      "title": "Chaining multiple constraints",
+      "content": "Apply both int and range constraints to a single route parameter.",
+      "language": "csharp",
+      "code": "// id must be an integer between 1 and 1000\n[HttpGet(\"{id:int:range(1,1000)}\")]\npublic IActionResult Edit(int id) => View(model: id);\n\n// Combined with a regex constraint on a string parameter\n// slug must be non-empty and contain only lowercase letters and hyphens\n[HttpGet(\"{slug:required:regex(^[a-z-]+$)}\")]\npublic IActionResult Post(string slug) => View(model: slug);"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Regular Expression Constraints"
+    },
+    {
+      "type": "paragraph",
+      "text": "The `regex` constraint lets you apply custom validation patterns to route parameters. This is powerful for enforcing URL-friendly formats like slugs or specific identifier patterns."
+    },
+    {
+      "type": "example",
+      "title": "Regex constraint for a URL slug",
+      "content": "Use a regex constraint to ensure the slug parameter matches a URL-safe format.",
+      "language": "csharp",
+      "code": "// Matches slugs like: my-first-post, aspnet-core-guide, hello-world\n[HttpGet(\"{slug:regex(^[a-z0-9]+(?:-[a-z0-9]+)*$)}\")]\npublic IActionResult Post(string slug) => View(model: slug);\n\n// /blog/hello-world      -> matches\n// /blog/Hello-World      -> does NOT match (uppercase not allowed)\n// /blog/hello_world      -> does NOT match (underscore not allowed)"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Custom Route Constraints"
+    },
+    {
+      "type": "paragraph",
+      "text": "When built-in constraints are not enough, you can create your own by implementing the `IRouteConstraint` interface. This is an advanced topic, but it is useful to know it exists for domain-specific validation."
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Custom constraints require registration",
+      "text": "Custom route constraints must be registered in Program.cs using `options.ConstraintMap.Add(\"yourname\", typeof(YourConstraintClass))`. Most applications never need custom constraints — built-in constraints cover the vast majority of use cases."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Common Routing Pitfalls"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Watch out for these common mistakes",
+      "items": [
+        "**Forgot the colon** — Writing `{idint}` instead of `{id:int}` means no constraint is applied",
+        "**Constraint too strict** — `{id:int}` excludes negative IDs; use `{id:min(-1)}` if negatives are valid",
+        " **Wrong order** — A general route registered before a specific one will shadow the specific one",
+        " **Regex errors** — An invalid regex pattern throws at startup. Test patterns at regex101.com before using them",
+        "**Missing `MapControllers()`** — Attribute routes are silently ignored if `MapControllers()` is not called"
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Route Constraint",
+          "definition": "A rule that restricts what values a route parameter can accept (e.g., :int, :guid, :regex). Constraints run during routing, before the action is invoked."
+        },
+        {
+          "term": "Ambiguous Route",
+          "definition": "A situation where two routes could match the same URL, leading to unpredictable behavior. Constraints help eliminate ambiguity."
+        },
+        {
+          "term": "Route Parameter",
+          "definition": "A placeholder in a route template ({id}) that captures a value from the URL and passes it to the action method."
+        },
+        {
+          "term": "Regex Constraint",
+          "definition": "A route constraint using a regular expression pattern to validate a parameter's format (e.g., {slug:regex(^[a-z-]+$)})."
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "Route Constraints Checklist",
+      "items": [
+        {
+          "text": "I can apply at least three built-in constraints (int, guid, regex) to route parameters",
+          "hint": "Use {id:int}, {id:guid}, {slug:regex(^[a-z]+$)} syntax"
+        },
+        {
+          "text": "I understand why constraints prevent ambiguous route matches",
+          "hint": "Without constraints, /products/5 could match both a category string route and an ID route"
+        },
+        {
+          "text": "I can chain multiple constraints on a single parameter",
+          "hint": "{id:int:min(1):max(1000)} applies type, minimum, and maximum constraints"
+        },
+        {
+          "text": "I have tested that invalid URLs return 404 rather than causing binding errors",
+          "hint": "/api/blog/abc should 404 with :int constraint, not reach the action"
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Add Route Constraints to an API Controller",
+      "description": "Create an API controller with attribute-routed actions using appropriate route constraints to prevent invalid requests.",
+      "steps": [
+        "Create a new API controller `BlogController` with [ApiController] and [Route(\"api/[controller]\")] attributes",
+        "Create a static in-memory list of Post objects with Id (int), Slug (string), and Title (string)",
+        "Add a GET action `GetAll()` mapped to [HttpGet] — returns all posts",
+        "Add a GET action `GetById(int id)` with [HttpGet(\"{id:int:min(1)}\")] — returns a single post by numeric ID",
+        "Add a GET action `GetBySlug(string slug)` with [HttpGet(\"post/{slug:regex(^[a-z0-9-]+$)}\")] — returns a post by URL slug",
+        "Run the app and test: `/api/blog` (list), `/api/blog/1` (by ID), `/api/blog/post/hello-world` (by slug)",
+        "Test invalid URLs: `/api/blog/abc` should return 404 (not an int), `/api/blog/post/Hello` should return 404 (uppercase not allowed)"
+      ],
+      "expectedOutcome": "Valid URLs return the correct data. Invalid URLs like `/api/blog/abc` return 404 because the `:int` constraint rejects non-numeric IDs, and `/api/blog/post/Hello` returns 404 because the regex rejects uppercase letters."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Route constraints restrict what values a route parameter can match (e.g., :int, :guid, :regex)",
+        "Constraints are evaluated during routing, before the action method is called",
+        "Chaining constraints (e.g., {id:int:min(1)}) applies multiple rules to one parameter",
+        "Constraints prevent ambiguous route matches and return meaningful 404 responses",
+        "Built-in constraints cover most use cases; custom constraints are available for domain-specific logic",
+        "Always call `app.MapControllers()` to enable attribute-routed controllers"
+      ],
+      "takeaway": "Route constraints are a simple but powerful tool for making your URL structure predictable and your application more robust. They catch invalid requests early, before any action code runs, and prevent ambiguous route matches that cause confusing behavior."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "attribute-routing",
+    "url-generation"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Route Constraints Reference",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing#route-constraints",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete reference for all built-in route constraints with examples."
+    }
+  ]
 }

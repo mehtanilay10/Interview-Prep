@@ -4,26 +4,245 @@
   "moduleSlug": "08-entity-framework-core",
   "courseSlug": "aspnet-core",
   "title": "DbContext and Migrations",
-  "description": "Learn dbcontext and migrations in ASP.NET Core.",
+  "description": "Learn to configure DbContext properly, use the migration system to evolve your database schema over time, and understand how EF Core tracks changes between your model and the database.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 12,
+  "estimatedMinutes": 30,
   "tags": [
     "dbcontext",
-    "migrations"
+    "migrations",
+    "schema-evolution"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "DbContext Lifetime and Configuration"
+    },
+    {
       "type": "paragraph",
-      "text": "Use migrations to evolve your database schema over time."
+      "text": "DbContext is the workhorse of EF Core, but how you configure and manage its lifetime matters. In ASP.NET Core applications, DbContext should be registered as a scoped service, meaning one instance per HTTP request. This allows EF Core to track changes throughout the request and ensures thread safety."
+    },
+    {
+      "type": "paragraph",
+      "text": "DbContextOptions carries all configuration for the context, including the database provider, connection string, and provider-specific options. You can configure these options in OnConfiguring within the DbContext class, or in Program.cs using AddDbContext."
     },
     {
       "type": "example",
+      "title": "Registering DbContext in Program.cs",
+      "content": "Registering AppDbContext as a scoped service with a SQL Server connection string from configuration.",
       "language": "csharp",
-      "code": "dotnet ef migrations add InitialCreate\ndotnet ef database update"
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(\n        builder.Configuration.GetConnectionString(\"DefaultConnection\")));\n\nbuilder.Services.AddScoped<IProductService, ProductService>();\nvar app = builder.Build();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "AddDbContext registers the context as scoped and ensures that any service consuming AppDbContext receives the same instance within a single request. This is critical for change tracking — entities loaded in one part of the request are tracked and can be updated or deleted later in the same request."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Do not inject DbContext into singletons",
+      "text": "Because DbContext is scoped, injecting it into a singleton service causes runtime exceptions. If you need database access from a singleton, inject IServiceProvider and create a scope manually, or use a factory pattern."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Overriding OnConfiguring"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can configure the database connection inside the DbContext class by overriding OnConfiguring. This approach is common in console applications where Program.cs does not have the same dependency injection setup. However, for ASP.NET Core, AddDbContext is the preferred approach."
+    },
+    {
+      "type": "example",
+      "title": "OnConfiguring override for a console app",
+      "content": "Configuring the database connection directly inside the DbContext class.",
+      "language": "csharp",
+      "code": "public class AppDbContext : DbContext\n{\n    public DbSet<Product> Products => Set<Product>();\n\n    protected override void OnConfiguring(DbContextOptionsBuilder options)\n    {\n        options.UseSqlite(\"Data Source=shop.db\");\n    }\n\n    protected override void OnModelCreating(ModelBuilder modelBuilder)\n    {\n        modelBuilder.Entity<Product>(entity =>\n        {\n            entity.HasKey(e => e.Id);\n            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();\n            entity.Property(e => e.Price).HasPrecision(10, 2);\n        });\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "OnModelCreating uses the Fluent API to configure entity properties. Here, we set a maximum length on Name, require it to be non-null, and define Price with a precision of 10 digits and 2 decimal places — common for currency columns."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Are Migrations?"
+    },
+    {
+      "type": "paragraph",
+      "text": "As your application evolves, your database schema needs to change too. You might add a new column, rename a table, or create relationships between entities. Migrations are EF Core's system for managing these schema changes over time in a predictable, version-controlled way."
+    },
+    {
+      "type": "paragraph",
+      "text": "A migration is a snapshot of your model at a point in time, along with the SQL operations needed to transform the database from the previous state to the new state. Migrations are stored as C# files in your project, so they can be reviewed, edited, and tracked in source control."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "How migrations work",
+      "text": "EF Core compares your entity classes (the model) to a __EFMigrationsHistory table in the database. If the model has changed, EF Core generates a migration file containing the Up() and Down() methods to apply or reverse the schema changes."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Creating and Applying Migrations"
+    },
+    {
+      "type": "paragraph",
+      "text": "The migration workflow has two steps: first, you generate a migration file by comparing the current model to the last migration; second, you apply the migration to the database by running the SQL it contains."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Migration workflow",
+      "items": [
+        "Run 'dotnet ef migrations add <Name>' to generate a new migration file",
+        "Review the generated C# file to ensure it contains the expected schema changes",
+        "Run 'dotnet ef database update' to apply pending migrations to the database",
+        "To undo the last migration, run 'dotnet ef migrations remove' before applying it"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Generating and applying migrations",
+      "content": "CLI commands for managing the migration lifecycle.",
+      "language": "csharp",
+      "code": "# Step 1: Add a new migration after changing the model\ndotnet ef migrations add AddProductCategory\n\n# Step 2: Review the generated migration file in Migrations/\n\n# Step 3: Apply the migration to the database\ndotnet ef database update\n\n# If something went wrong, remove the last migration\ndotnet ef migrations remove"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you run 'dotnet ef migrations add AddProductCategory', EF Core compares your entity classes to the last migration and generates a file with two methods: Up() adds the new column, and Down() removes it. This allows you to roll back the migration if needed."
+    },
+    {
+      "type": "example",
+      "title": "Generated migration file example",
+      "content": "What a typical migration file looks like after adding a Category column to the Product table.",
+      "language": "csharp",
+      "code": "public partial class AddProductCategory : Migration\n{\n    protected override void Up(MigrationBuilder migrationBuilder)\n    {\n        migrationBuilder.AddColumn<string>(\n            name: \"Category\",\n            table: \"Products\",\n            type: \"nvarchar(max)\",\n            nullable: true);\n    }\n\n    protected override void Down(MigrationBuilder migrationBuilder)\n    {\n        migrationBuilder.DropColumn(\n            name: \"Category\",\n            table: \"Products\");\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Seeding Initial Data"
+    },
+    {
+      "type": "paragraph",
+      "text": "Migrations support data seeding, which lets you insert initial data as part of a migration. This is useful for reference data like countries, product categories, or default user roles that your application needs to function."
+    },
+    {
+      "type": "example",
+      "title": "Seeding product categories in a migration",
+      "content": "Inserting initial category data as part of a migration using HasData.",
+      "language": "csharp",
+      "code": "protected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    modelBuilder.Entity<ProductCategory>().HasData(\n        new ProductCategory { Id = 1, Name = \"Electronics\", Description = \"Devices and gadgets\" },\n        new ProductCategory { Id = 2, Name = \"Books\", Description = \"Printed and digital books\" },\n        new ProductCategory { Id = 3, Name = \"Clothing\", Description = \"Apparel and accessories\" }\n    );\n}\n\n// After adding the HasData call, create a new migration\ndotnet ef migrations add SeedProductCategories\n// Apply it\ndotnet ef database update"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Use explicit Id values for seeded data",
+      "text": "When seeding data with HasData, always provide explicit primary key values. EF Core needs these keys to track whether the data already exists and whether to update or insert during migration."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "DbContext",
+          "definition": "The EF Core class that manages database connections, tracks entity changes, and coordinates queries and saves."
+        },
+        {
+          "term": "DbContext lifetime",
+          "definition": "The service lifetime of DbContext. In ASP.NET Core, it is scoped (one instance per request)."
+        },
+        {
+          "term": "Migration",
+          "definition": "A versioned schema change generated by EF Core to evolve the database model over time."
+        },
+        {
+          "term": "Up() and Down()",
+          "definition": "Methods in a migration file: Up() applies the change, Down() reverses it for rollbacks."
+        },
+        {
+          "term": "Data seeding",
+          "definition": "Inserting initial reference data as part of a migration so it is present on fresh databases."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Create and Apply Your First Migration",
+      "description": "Add a new entity to an existing EF Core model, generate a migration, and apply it to the database.",
+      "steps": [
+        "Create a new console project with EF Core and SQLite: 'dotnet new console -n MigrationDemo' and install the required packages",
+        "Define a Product entity with Id, Name, Price, and CreatedAt properties",
+        "Create a LibraryDbContext with DbSet<Product> and configure it to use SQLite with 'shop.db'",
+        "In Program.cs, create the database with context.Database.EnsureCreated() and add two sample products",
+        "Add a new Category entity with Id and Name properties, and add a DbSet<Category> to the context",
+        "Add a one-to-many relationship: a Category has many Products, and a Product belongs to one Category",
+        "Run 'dotnet ef migrations add AddCategories' and review the generated migration file",
+        "Run 'dotnet ef database update' to apply the migration, then query categories to verify the new table exists"
+      ],
+      "expectedOutcome": "The database now has a Categories table with a foreign key relationship to Products. The migration file correctly defines the Up() and Down() methods for creating and dropping the table and its foreign key."
+    },
+    {
+      "type": "checklist",
+      "title": "DbContext and Migrations Checklist",
+      "items": [
+        {
+          "text": "I can register DbContext correctly in an ASP.NET Core application",
+          "hint": "Use AddDbContext<TContext> with options from configuration."
+        },
+        {
+          "text": "I understand why DbContext should be scoped, not singleton or transient",
+          "hint": "Scoped ensures one instance per request and supports change tracking."
+        },
+        {
+          "text": "I can configure DbContext using OnConfiguring or AddDbContext",
+          "hint": "OnConfiguring is in the class; AddDbContext is in Program.cs."
+        },
+        {
+          "text": "I can create and apply a migration using the dotnet ef CLI",
+          "hint": "Use 'dotnet ef migrations add' then 'dotnet ef database update'."
+        },
+        {
+          "text": "I understand the purpose of Up() and Down() in a migration file",
+          "hint": "Up() applies the change; Down() reverses it for rollbacks."
+        },
+        {
+          "text": "I can seed initial data using HasData in OnModelCreating",
+          "hint": "HasData requires explicit Id values for tracked seed data."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "DbContext and Migrations Summary",
+      "points": [
+        "DbContext should be registered as scoped in ASP.NET Core for proper change tracking",
+        "AddDbContext<T> in Program.cs is the preferred way to configure DbContext for web apps",
+        "Migrations track schema changes over time as versioned C# files with Up() and Down() methods",
+        "Use 'dotnet ef migrations add' to generate migrations and 'dotnet ef database update' to apply them",
+        "Data seeding with HasData inserts initial reference data during migration",
+        "Never inject scoped DbContext into singleton services — it causes runtime errors"
+      ],
+      "takeaway": "Mastering DbContext configuration and the migration workflow is essential for maintaining database schemas alongside evolving application code. Migrations provide a reliable, version-controlled path from any schema state to the next."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "EF Core DbContext Lifetime",
+      "url": "https://learn.microsoft.com/en-us/ef/core/dbcontext-configuration/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guidance on DbContext lifetime, configuration patterns, and common pitfalls."
+    },
+    {
+      "title": "EF Core Migrations Overview",
+      "url": "https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete guide to creating, applying, and managing EF Core migrations."
+    }
+  ]
 }

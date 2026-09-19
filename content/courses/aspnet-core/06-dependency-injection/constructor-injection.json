@@ -4,26 +4,187 @@
   "moduleSlug": "06-dependency-injection",
   "courseSlug": "aspnet-core",
   "title": "Constructor Injection",
-  "description": "Learn constructor injection in ASP.NET Core.",
+  "description": "Use constructor injection to supply dependencies to your controllers and services in a clean, testable way.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 20,
   "tags": [
     "constructor",
-    "injection"
+    "injection",
+    "testing"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Constructor Injection?"
+    },
+    {
       "type": "paragraph",
-      "text": "Constructor injection is the most common pattern for supplying dependencies."
+      "text": "Constructor injection is the most common and recommended pattern for supplying dependencies. When a class declares its dependencies in the constructor, those dependencies become explicit. Anyone reading the class immediately knows what it needs to function. There are no hidden dependencies created behind the scenes."
+    },
+    {
+      "type": "paragraph",
+      "text": "Constructor injection also enables immutability. By assigning dependencies to readonly fields, you guarantee that once an object is created, its dependencies cannot change. This makes the object safer to share and easier to reason about."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Readonly Fields Are Your Friend",
+      "text": "Always assign injected dependencies to readonly fields. This signals intent and prevents accidental reassignment later."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Basic Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "The constructor accepts interfaces or abstractions as parameters. The framework resolves the concrete implementations and passes them in. Inside the constructor, you store the references in private readonly fields."
     },
     {
       "type": "example",
+      "title": "Constructor Injection in a Controller",
+      "content": "A controller that depends on a repository and a logger.",
       "language": "csharp",
-      "code": "public class ProductService\n{\n    private readonly IProductRepository _repo;\n    private readonly ILogger<ProductService> _logger;\n\n    public ProductService(IProductRepository repo, ILogger<ProductService> logger)\n    {\n        _repo = repo;\n        _logger = logger;\n    }\n}"
+      "code": "public interface IProductRepository { Task<List<Product>> GetAllAsync(); }\npublic class EfProductRepository : IProductRepository\n{\n    private readonly AppDbContext _db;\n    public EfProductRepository(AppDbContext db) => _db = db;\n    public async Task<List<Product>> GetAllAsync() => await _db.Products.ToListAsync();\n}\n\npublic class ProductsController : Controller\n{\n    private readonly IProductRepository _repo;\n    private readonly ILogger<ProductsController> _logger;\n\n    public ProductsController(IProductRepository repo, ILogger<ProductsController> logger)\n    {\n        _repo = repo;\n        _logger = logger;\n    }\n\n    public async Task<IActionResult> Index()\n    {\n        _logger.LogInformation(\"Loading products\");\n        var products = await _repo.GetAllAsync();\n        return View(products);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The framework provides IProductRepository and ILogger<ProductsController> automatically because they have been registered in Program.cs. The controller does not need to know how they are created."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Multiple Dependencies"
+    },
+    {
+      "type": "paragraph",
+      "text": "A class can have as many constructor parameters as it needs. The container resolves each one in turn. If a dependency is missing from the container, the framework throws an exception at startup or runtime, which helps you catch configuration mistakes early."
+    },
+    {
+      "type": "example",
+      "title": "Multiple Dependencies",
+      "content": "A service with three dependencies.",
+      "language": "csharp",
+      "code": "public class OrderProcessingService\n{\n    private readonly IOrderRepository _orderRepo;\n    private readonly IPaymentGateway _paymentGateway;\n    private readonly IEmailSender _emailSender;\n\n    public OrderProcessingService(\n        IOrderRepository orderRepo,\n        IPaymentGateway paymentGateway,\n        IEmailSender emailSender)\n    {\n        _orderRepo = orderRepo;\n        _paymentGateway = paymentGateway;\n        _emailSender = emailSender;\n    }\n\n    public async Task<bool> ProcessAsync(Order order)\n    {\n        var paymentResult = await _paymentGateway.ChargeAsync(order.Total);\n        if (!paymentResult.Succeeded) return false;\n\n        await _orderRepo.SaveAsync(order);\n        await _emailSender.SendOrderConfirmationAsync(order);\n        return true;\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Testing with Constructor Injection"
+    },
+    {
+      "type": "paragraph",
+      "text": "Constructor injection makes unit testing straightforward. Because dependencies are passed in, you can substitute real implementations with fakes or mocks. You do not need a running database or web server to test your business logic."
+    },
+    {
+      "type": "example",
+      "title": "Unit Test with Fakes",
+      "content": "Testing OrderProcessingService with in-memory fakes.",
+      "language": "csharp",
+      "code": "public class FakeOrderRepository : IOrderRepository\n{\n    public List<Order> Saved { get; } = new();\n    public Task SaveAsync(Order order)\n    {\n        Saved.Add(order);\n        return Task.CompletedTask;\n    }\n}\n\npublic class FakePaymentGateway : IPaymentGateway\n{\n    public bool Succeed = true;\n    public Task<PaymentResult> ChargeAsync(decimal amount)\n    {\n        return Task.FromResult(new PaymentResult { Succeeded = Succeed });\n    }\n}\n\n[Fact]\npublic async Task ProcessAsync_WhenPaymentSucceeds_SavesOrder()\n{\n    var repo = new FakeOrderRepository();\n    var payment = new FakePaymentGateway();\n    var service = new OrderProcessingService(repo, payment, NullFake<EmailSender>());\n\n    await service.ProcessAsync(new Order { Total = 100m });\n\n    repo.Saved.Should().HaveCount(1);\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Property Injection Is Rare",
+      "text": "ASP.NET Core supports property injection, but it is not recommended for required dependencies. Constructor injection makes requirements explicit and guarantees the object is fully initialized before use."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Best Practices"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Constructor Injection Rules",
+      "items": [
+        "Accept abstractions (interfaces), not concrete classes.",
+        "Assign injected parameters to readonly fields.",
+        "Keep constructors simple; avoid complex logic in the constructor body.",
+        "Do not resolve services manually inside the class; let the container inject everything.",
+        "If a class has too many constructor parameters, it may be doing too much and should be split."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Constructor Injection",
+          "definition": "The practice of supplying a class with its dependencies through constructor parameters."
+        },
+        {
+          "term": "Readonly Field",
+          "definition": "A field that can only be assigned during declaration or inside the constructor, ensuring immutability."
+        },
+        {
+          "term": "Service Locator",
+          "definition": "An anti-pattern where a class asks a global container for dependencies rather than receiving them."
+        },
+        {
+          "term": "Mock",
+          "definition": "A test double that simulates the behavior of a real dependency for testing purposes."
+        },
+        {
+          "term": "Composition Root",
+          "definition": "The single location in an application where all services are registered with the DI container."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Write a Testable Service",
+      "description": "Create a service with constructor injection and write a unit test for it.",
+      "steps": [
+        "Create an IWeatherService interface with a GetForecastAsync method.",
+        "Create a WeatherService class that injects IWeatherService through its constructor.",
+        "Add a WeatherController that takes WeatherService in its constructor.",
+        "Register the services in Program.cs.",
+        "Write a unit test that passes a fake IWeatherService and verifies the controller returns the expected result.",
+        "Run the test and confirm it passes without any real HTTP or database calls."
+      ],
+      "expectedOutcome": "You will have a testable controller that depends on abstractions and can be verified with fake services."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Constructor Injection",
+      "items": [
+        {
+          "text": "I know why constructor injection is the recommended pattern.",
+          "hint": "It makes dependencies explicit and enables immutability."
+        },
+        {
+          "text": "I can inject multiple services into a single class.",
+          "hint": "Accept each service as a constructor parameter."
+        },
+        {
+          "text": "I understand how constructor injection enables unit testing.",
+          "hint": "You can pass fake or mock implementations in place of real services."
+        },
+        {
+          "text": "I know why property injection is generally discouraged.",
+          "hint": "It hides dependencies and allows incomplete object initialization."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Constructor injection passes dependencies through the constructor parameters.",
+        "It makes dependencies explicit and enables readonly fields.",
+        "Constructor injection is the most testable and maintainable DI pattern.",
+        "The framework resolves constructor parameters automatically from the registered services.",
+        "Avoid property injection and service locators because they hide dependencies."
+      ],
+      "takeaway": "Constructor injection is the foundation of testable, maintainable code. Once you get used to reading classes through their constructors, you will find hidden dependencies and design problems much faster."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "di-basics",
+    "service-lifetimes"
+  ],
   "technology": null,
   "furtherReading": []
 }

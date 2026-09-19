@@ -4,26 +4,239 @@
   "moduleSlug": "11-testing-debugging",
   "courseSlug": "aspnet-core",
   "title": "Integration Testing",
-  "description": "Learn integration testing in ASP.NET Core.",
+  "description": "Learn to write integration tests for ASP.NET Core APIs using WebApplicationFactory and TestServer. Understand how to test the full HTTP pipeline, use a real or in-memory database, and verify end-to-end request behavior.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "integration",
-    "testserver"
+    "testserver",
+    "webapplicationfactory"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Use WebApplicationFactory to test the full pipeline."
+      "text": "Integration testing sits between unit testing and end-to-end testing. While unit tests mock everything, integration tests let real components interact — the full HTTP pipeline runs, routing resolves, controllers execute, and (optionally) a real database is used. This catches bugs that mocks would never reveal, such as serialization issues, routing typos, and configuration mistakes."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides WebApplicationFactory, a helper class from the Microsoft.AspNetCore.Mvc.Testing package that starts your application in-memory for testing. It creates a TestServer — a lightweight, in-process web server — and gives you an HttpClient that sends real HTTP requests to it. The entire pipeline, from routing to response serialization, runs exactly as it would in production."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "WebApplicationFactory and TestServer"
+    },
+    {
+      "type": "paragraph",
+      "text": "WebApplicationFactory<TEntryPoint> bootstraps your application using the Program.cs or Startup.cs from your main project. It creates a new host, wires up middleware, and exposes a CreateClient() method that returns an HttpClient pointing at the in-memory server. Because it uses your real Program.cs, any configuration, services, or middleware you have registered are all active during the test."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "WebApplicationFactory Creates a Real Host",
+      "text": "WebApplicationFactory does not mock Program.cs. It runs your actual startup logic, so if your DI registrations, middleware order, or route configuration have bugs, integration tests will catch them. This is exactly what makes integration testing so valuable."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Setting Up the Test Project"
+    },
+    {
+      "type": "paragraph",
+      "text": "Create a separate test project in your solution. Install three NuGet packages: Microsoft.AspNetCore.Mvc.Testing for WebApplicationFactory, Microsoft.EntityFrameworkCore.InMemory for an in-memory database, and xunit with the Microsoft.NET.Test.Sdk runner. Your test project should reference your main API project."
     },
     {
       "type": "example",
+      "title": "Test Project csproj Configuration",
+      "content": "The minimum .csproj configuration for an ASP.NET Core integration test project.",
+      "language": "xml",
+      "code": "<Project Sdk=\"Microsoft.NET.Sdk\">\n\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <Nullable>enable</Nullable>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" Version=\"8.0.0\" />\n    <PackageReference Include=\"Microsoft.EntityFrameworkCore.InMemory\" Version=\"8.0.0\" />\n    <PackageReference Include=\"xunit\" Version=\"2.6.2\" />\n    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"2.5.4\" />\n    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.8.0\" />\n  </ItemGroup>\n\n  <ItemGroup>\n    <ProjectReference Include=\"..\\MyApi\\MyApi.csproj\" />\n  </ItemGroup>\n\n</Project>"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Your First Integration Test"
+    },
+    {
+      "type": "paragraph",
+      "text": "Integration tests implement IClassFixture<WebApplicationFactory<Program>>. The fixture creates one shared instance of the factory for the entire test class, meaning the application starts once and all tests reuse it. The factory's CreateClient() gives you an HttpClient that sends real HTTP requests to the in-memory server."
+    },
+    {
+      "type": "example",
+      "title": "Basic Integration Test with WebApplicationFactory",
+      "content": "A complete integration test class that uses WebApplicationFactory to test the Products API end-to-end.",
       "language": "csharp",
-      "code": "public class ApiTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly HttpClient _client;\n    public ApiTests(WebApplicationFactory<Program> factory)\n    {\n        _client = factory.CreateClient();\n    }\n\n    [Fact]\n    public async Task Get_Products_ReturnsSuccess()\n    {\n        var response = await _client.GetAsync(\"/api/products\");\n        response.EnsureSuccessStatusCode();\n    }\n}"
+      "code": "using Xunit;\nusing Microsoft.AspNetCore.Mvc.Testing;\nusing System.Net;\nusing System.Net.Http.Json;\n\npublic class ProductsApiTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly HttpClient _client;\n\n    public ProductsApiTests(WebApplicationFactory<Program> factory)\n    {\n        // CreateClient spins up the in-memory server and returns an HttpClient\n        _client = factory.CreateClient();\n    }\n\n    [Fact]\n    public async Task Get_Products_ReturnsSuccessAndList()\n    {\n        // Act\n        var response = await _client.GetAsync(\"/api/products\");\n\n        // Assert — status code\n        Assert.Equal(HttpStatusCode.OK, response.StatusCode);\n\n        // Assert — deserialize and verify content\n        var products = await response.Content.ReadFromJsonAsync<List<ProductDto>>();\n        Assert.NotNull(products);\n        Assert.NotEmpty(products);\n    }\n\n    [Fact]\n    public async Task Get_ProductById_ReturnsCorrectProduct()\n    {\n        // Act\n        var response = await _client.GetAsync(\"/api/products/1\");\n\n        // Assert\n        Assert.Equal(HttpStatusCode.OK, response.StatusCode);\n\n        var product = await response.Content.ReadFromJsonAsync<ProductDto>();\n        Assert.NotNull(product);\n        Assert.Equal(1, product.Id);\n    }\n\n    [Fact]\n    public async Task Get_ProductById_Missing_ReturnsNotFound()\n    {\n        // Act\n        var response = await _client.GetAsync(\"/api/products/9999\");\n\n        // Assert\n        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Using a Real Database for Integration Tests"
+    },
+    {
+      "type": "paragraph",
+      "text": "For more realistic integration tests, you can use a real database instead of mocks. The in-memory provider (Microsoft.EntityFrameworkCore.InMemory) is convenient but does not enforce relational constraints or use real SQL. For SQL Server or SQLite, use a test-specific connection string that points to a database created and destroyed for each test run."
+    },
+    {
+      "type": "paragraph",
+      "text": "A common pattern is to use SQLite in-memory mode for integration tests. It supports real SQL and relational constraints while remaining fast and isolated. You configure your DbContext to use SQLite during tests and seed known data before each test."
+    },
+    {
+      "type": "example",
+      "title": "Custom WebApplicationFactory with In-Memory Database",
+      "content": "Overriding the WebApplicationFactory to swap the database for an in-memory SQLite instance during tests.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.Mvc.Testing;\nusing Microsoft.Data.Sqlite;\nusing Microsoft.EntityFrameworkCore;\n\npublic class CustomWebApplicationFactory : WebApplicationFactory<Program>\n{\n    private SqliteConnection? _connection;\n\n    protected override void ConfigureWebHost(IWebHostBuilder builder)\n    {\n        builder.ConfigureServices(services =>\n        {\n            // Remove the existing DbContext registration\n            var descriptor = services.SingleOrDefault(\n                d => d.ServiceType == typeof(DbContextOptions<AppDbContext>)\n            );\n            if (descriptor is not null)\n            {\n                services.Remove(descriptor);\n            }\n\n            // Add a new DbContext using an in-memory SQLite database\n            _connection = new SqliteConnection(\"DataSource=:memory:\");\n            _connection.Open();\n\n            services.AddDbContext<AppDbContext>(options =>\n                options.UseSqlite(_connection));\n        });\n    }\n\n    protected override void Dispose(bool disposing)\n    {\n        base.Dispose(disposing);\n        _connection?.Dispose();\n    }\n}\n\n// Usage in tests:\npublic class ProductsApiWithDbTests : IClassFixture<CustomWebApplicationFactory>\n{\n    private readonly HttpClient _client;\n\n    public ProductsApiWithDbTests(CustomWebApplicationFactory factory)\n    {\n        _client = factory.CreateClient();\n        // Database is seeded during factory creation\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Integration Tests Cover"
+    },
+    {
+      "type": "paragraph",
+      "text": "Integration tests validate the boundaries between components. They confirm that routing correctly maps URLs to controller actions, that model binding populates action parameters, that the controller calls the service layer, and that the response is serialized correctly. They do not test individual method logic — that is the job of unit tests."
+    },
+    {
+      "type": "bullet-list",
+      "title": "What Integration Tests Verify",
+      "items": [
+        {
+          "text": "Route templates correctly match incoming request URLs to controller actions"
+        },
+        {
+          "text": "Middleware (authentication, authorization, CORS) runs and behaves as expected"
+        },
+        {
+          "text": "Model binding converts request data into the correct action parameters"
+        },
+        {
+          "text": "Controllers return the correct status codes and response shapes"
+        },
+        {
+          "text": "Response serialization (JSON) matches the expected schema"
+        },
+        {
+          "text": "Database operations (with a real DB) correctly persist and retrieve data"
+        }
+      ]
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Integration Testing",
+      "terms": [
+        {
+          "term": "WebApplicationFactory",
+          "definition": "An ASP.NET Core helper that starts your application in-memory for testing and provides a test HttpClient."
+        },
+        {
+          "term": "TestServer",
+          "definition": "The in-process web server created by WebApplicationFactory that handles HTTP requests without network overhead."
+        },
+        {
+          "term": "IClassFixture<T>",
+          "definition": "An xUnit interface that shares a single fixture instance across all test methods in a class."
+        },
+        {
+          "term": "In-Memory Database",
+          "definition": "A database (SQLite or EF InMemory) that runs in-process during tests, providing realistic data behavior without external infrastructure."
+        },
+        {
+          "term": "HttpClient",
+          "definition": "The .NET HTTP client used in integration tests to send real requests to the in-memory TestServer."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Keep Integration Tests Focused",
+      "text": "Each integration test should verify one user-facing behavior: 'GET /api/products returns 200 with a list.' If a test fails, the name should make it obvious what broke. Avoid testing multiple endpoints or scenarios in a single test method."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Integration Testing",
+      "points": [
+        "Integration tests verify how multiple components work together through the real HTTP pipeline",
+        "WebApplicationFactory starts your app in-memory, giving you a TestServer and HttpClient",
+        "IClassFixture<T> shares one factory instance across all tests in a class for efficiency",
+        "Use SQLite in-memory mode for realistic database behavior without external infrastructure",
+        "Integration tests catch routing, serialization, and middleware bugs that unit tests miss",
+        "Run integration tests in CI/CD alongside unit tests to catch pipeline-level regressions"
+      ],
+      "takeaway": "Integration tests fill the gap between fast unit tests and slow end-to-end tests. With WebApplicationFactory, you get a production-like environment at the cost of seconds per test suite run — an excellent trade-off for catching real-world bugs."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Write Integration Tests for the Products API",
+      "description": "Create a complete integration test class for the Products API using WebApplicationFactory.",
+      "steps": [
+        "Create a test project with Microsoft.AspNetCore.Mvc.Testing and Microsoft.EntityFrameworkCore.InMemory",
+        "Create a CustomWebApplicationFactory that swaps the database for SQLite in-memory mode",
+        "Write a test that GETs /api/products and asserts 200 OK with a non-empty list",
+        "Write a test that GETs /api/products/1 and asserts 200 OK with the correct product name",
+        "Write a test that GETs /api/products/9999 and asserts 404 Not Found",
+        "Write a test that POSTs a new product and asserts 201 Created with the correct Location header",
+        "Seed the in-memory database with test data before running the tests"
+      ],
+      "expectedOutcome": "A complete integration test class with six test methods covering the full HTTP lifecycle. Tests run against the real pipeline, validate real HTTP status codes, and use a real database for data operations."
+    },
+    {
+      "type": "checklist",
+      "title": "Integration Testing Checklist",
+      "items": [
+        {
+          "text": "I understand the difference between unit tests and integration tests",
+          "hint": "Unit tests mock dependencies. Integration tests let real components interact."
+        },
+        {
+          "text": "I can explain what WebApplicationFactory does",
+          "hint": "It starts your ASP.NET Core app in-memory and gives you an HttpClient to send real requests."
+        },
+        {
+          "text": "I know what IClassFixture<T> is for",
+          "hint": "It shares a single factory instance across all tests in a class so the app starts once."
+        },
+        {
+          "text": "I can set up a SQLite in-memory database for integration tests",
+          "hint": "Override ConfigureWebHost in a custom factory to swap DbContext options to UseSqlite."
+        },
+        {
+          "text": "I know what kinds of bugs integration tests catch that unit tests miss",
+          "hint": "Routing errors, serialization issues, middleware problems, and configuration mistakes."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "testing-fundamentals",
+        "unit-testing-controllers",
+        "logging-and-monitoring"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Integration Testing in ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "testing-fundamentals",
+    "unit-testing-controllers"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Integration Testing in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests"
+    }
+  ]
 }

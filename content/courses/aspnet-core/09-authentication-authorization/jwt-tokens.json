@@ -4,26 +4,229 @@
   "moduleSlug": "09-authentication-authorization",
   "courseSlug": "aspnet-core",
   "title": "JWT Tokens",
-  "description": "Learn jwt tokens in ASP.NET Core.",
+  "description": "Learn how to implement stateless API authentication using JSON Web Tokens (JWT), including token generation, validation configuration, and sending tokens from client applications.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "jwt",
-    "tokens"
+    "tokens",
+    "api-auth"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Are JSON Web Tokens?"
+    },
+    {
       "type": "paragraph",
-      "text": "Use JSON Web Tokens for stateless API authentication."
+      "text": "JSON Web Token, or JWT, is an open standard for securely transmitting information between parties as a compact, URL-safe string. In authentication, a JWT acts as a digital ID card: the server issues it after verifying the user's credentials, and the client presents it with every subsequent request."
+    },
+    {
+      "type": "paragraph",
+      "text": "JWTs are ideal for API authentication because they are stateless. The server does not need to store session data or look up the user in a database on every request. All the information needed to authenticate the user is contained within the token itself, signed with a secret key to prevent tampering."
+    },
+    {
+      "type": "paragraph",
+      "text": "A JWT has three parts separated by dots: the header, the payload, and the signature. The header describes the token type and signing algorithm. The payload contains claims about the user. The signature verifies that the token was issued by a trusted server and has not been altered."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "JWT anatomy",
+      "text": "A JWT looks like this: 'xxxxx.yyyyy.zzzzz'. The first part is the base64-encoded header, the second is the base64-encoded payload (claims), and the third is the signature. Anyone can decode the payload, but only the server can verify the signature."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "When to Use JWT vs Cookies"
+    },
+    {
+      "type": "paragraph",
+      "text": "Cookie authentication works well for browser-based applications where the browser automatically sends cookies with each request. JWTs are better suited for APIs, mobile apps, single-page applications, and cross-origin scenarios where cookies are inconvenient or unavailable."
+    },
+    {
+      "type": "bullet-list",
+      "title": "JWT advantages and trade-offs",
+      "items": [
+        "Stateless — no server-side session storage required, which simplifies scaling",
+        "Cross-origin friendly — can be sent in the Authorization header across domains with CORS",
+        "Self-contained — the token carries all necessary user information",
+        "Limited lifetime — tokens expire and must be refreshed, improving security",
+        "Not automatically sent — the client must manually attach the token to requests",
+        "Cannot be invalidated easily — a revoked token remains valid until it expires"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring JWT Authentication"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core supports JWT authentication through the Microsoft.AspNetCore.Authentication.JwtBearer package. Configuration involves setting the token validation parameters to define how the token is verified — which issuer is trusted, which audience is expected, and which signing key to use."
     },
     {
       "type": "example",
+      "title": "JWT bearer authentication configuration",
+      "content": "Configuring JWT authentication in Program.cs with validation parameters.",
       "language": "csharp",
-      "code": "builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidateAudience = true,\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true\n        };\n    });"
+      "code": "using Microsoft.IdentityModel.Tokens;\nusing System.Text;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidateAudience = true,\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true,\n\n            ValidIssuer = builder.Configuration[\"Jwt:Issuer\"],\n            ValidAudience = builder.Configuration[\"Jwt:Audience\"],\n            IssuerSigningKey = new SymmetricSecurityKey(\n                Encoding.UTF8.GetBytes(builder.Configuration[\"Jwt:Key\"]))\n        };\n    });\n\nbuilder.Services.AddAuthorization();\n\nvar app = builder.Build();\napp.UseHttpsRedirection();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "The TokenValidationParameters define the security rules. ValidateIssuer ensures the token was issued by your server. ValidateAudience ensures the token was intended for your API. ValidateLifetime rejects expired tokens. ValidateIssuerSigningKey ensures the token was signed with your secret key and has not been tampered with."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Never hardcode signing keys",
+      "text": "The JWT signing key should always come from a secure configuration source like user secrets, environment variables, or a secrets manager. Never commit the key to source control. In production, use a key with at least 256 bits of entropy."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Generating JWT Tokens"
+    },
+    {
+      "type": "paragraph",
+      "text": "When a user logs in with valid credentials, the server generates a JWT containing claims about the user. The token is signed with the secret key and returned to the client. The client stores the token and includes it in the Authorization header of subsequent requests."
+    },
+    {
+      "type": "example",
+      "title": "JWT token generation in a login endpoint",
+      "content": "Creating a JWT with user claims and returning it to the client.",
+      "language": "csharp",
+      "code": "using Microsoft.IdentityModel.Tokens;\nusing System.IdentityModel.Tokens.Jwt;\nusing System.Security.Claims;\nusing System.Text;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class AuthController : ControllerBase\n{\n    private readonly IConfiguration _config;\n    private readonly SignInManager<ApplicationUser> _signInManager;\n    private readonly UserManager<ApplicationUser> _userManager;\n\n    public AuthController(IConfiguration config, SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)\n    {\n        _config = config;\n        _signInManager = signInManager;\n        _userManager = userManager;\n    }\n\n    [HttpPost(\"login\")]\n    public async Task<IActionResult> Login([FromBody] LoginRequest request)\n    {\n        var user = await _userManager.FindByEmailAsync(request.Email);\n        if (user == null) return Unauthorized();\n\n        var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);\n        if (!result.Succeeded) return Unauthorized();\n\n        var token = GenerateJwtToken(user);\n        return Ok(new { token });\n    }\n\n    private string GenerateJwtToken(ApplicationUser user)\n    {\n        var claims = new List<Claim>\n        {\n            new Claim(ClaimTypes.NameIdentifier, user.Id),\n            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),\n            new Claim(ClaimTypes.Name, user.FullName ?? user.UserName ?? string.Empty)\n        };\n\n        var roles = _userManager.GetRolesAsync(user).Result;\n        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));\n\n        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config[\"Jwt:Key\"]!));\n        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);\n\n        var token = new JwtSecurityToken(\n            issuer: _config[\"Jwt:Issuer\"],\n            audience: _config[\"Jwt:Audience\"],\n            claims: claims,\n            expires: DateTime.UtcNow.AddHours(2),\n            signingCredentials: creds\n        );\n\n        return new JwtSecurityTokenHandler().WriteToken(token);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The GenerateJwtToken method creates a list of claims from the user's data, creates a signing key from the configuration, builds a JWT security token with a 2-hour expiration, and serializes it to a string. The client receives the token in the JSON response and must store it for future requests."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Sending JWT from the Client"
+    },
+    {
+      "type": "paragraph",
+      "text": "Clients send JWTs in the Authorization HTTP header using the Bearer scheme. The header looks like 'Authorization: Bearer <token>'. The JwtBearer middleware in ASP.NET Core automatically reads this header, validates the token, and sets the User property on HttpContext."
+    },
+    {
+      "type": "example",
+      "title": "Calling a protected API with JWT in JavaScript",
+      "content": "Fetching a protected endpoint with a Bearer token in the Authorization header.",
+      "language": "javascript",
+      "code": "async function getProtectedData(token) {\n  const response = await fetch('/api/dashboard', {\n    headers: {\n      'Authorization': `Bearer ${token}`,\n      'Content-Type': 'application/json'\n    }\n  });\n\n  if (response.status === 401) {\n    // Token expired or invalid — redirect to login\n    window.location.href = '/login';\n    return;\n  }\n\n  const data = await response.json();\n  console.log(data);\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Store tokens securely",
+      "text": "In browser applications, store JWTs in memory or HttpOnly cookies rather than localStorage. localStorage is vulnerable to XSS attacks. For native mobile apps, use the platform's secure storage."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "JWT",
+          "definition": "JSON Web Token — a compact, URL-safe token containing claims, used for stateless authentication."
+        },
+        {
+          "term": "Claims",
+          "definition": "Statements about a user encoded in the JWT payload, such as name, email, and roles."
+        },
+        {
+          "term": "TokenValidationParameters",
+          "definition": "Configuration that defines how the JwtBearer middleware validates tokens, including issuer, audience, and signing key."
+        },
+        {
+          "term": "Bearer scheme",
+          "definition": "The standard HTTP authentication scheme for tokens: 'Authorization: Bearer <token>'."
+        },
+        {
+          "term": "Signing key",
+          "definition": "A secret key used to sign JWTs and verify their authenticity. Must be kept confidential."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Build a JWT Authentication API",
+      "description": "Create a minimal API with JWT authentication, a login endpoint that issues tokens, and a protected endpoint that requires a valid token.",
+      "steps": [
+        "Create a new minimal API project: 'dotnet new web -n JwtAuthDemo'",
+        "Install Microsoft.AspNetCore.Authentication.JwtBearer and Microsoft.IdentityModel.Tokens packages",
+        "Add Jwt configuration sections to appsettings.json with Key, Issuer, Audience, and DurationInMinutes",
+        "Configure JWT bearer authentication in Program.cs with validation parameters",
+        "Add a simple hardcoded user validation in a POST /login endpoint that returns a JWT",
+        "Create a GET /api/secure endpoint decorated with [Authorize] that returns the current user's claims",
+        "Use curl or Postman to POST credentials to /login and receive a token",
+        "Use the token in an Authorization header to call /api/secure and verify the response includes user claims"
+      ],
+      "expectedOutcome": "The /login endpoint returns a JWT for valid credentials. The /api/secure endpoint returns a 401 for missing or invalid tokens and returns user claims for valid tokens. The JWT is correctly validated by the JwtBearer middleware."
+    },
+    {
+      "type": "checklist",
+      "title": "JWT Tokens Checklist",
+      "items": [
+        {
+          "text": "I can explain what a JWT is and when to use it",
+          "hint": "JWT is a stateless token for API authentication, ideal when cookies are not practical."
+        },
+        {
+          "text": "I understand the three parts of a JWT: header, payload, and signature",
+          "hint": "Header describes the token, payload contains claims, signature verifies integrity."
+        },
+        {
+          "text": "I can configure JWT bearer authentication in Program.cs",
+          "hint": "Use AddJwtBearer with TokenValidationParameters including issuer, audience, and signing key."
+        },
+        {
+          "text": "I can generate a JWT with user claims and a signing key",
+          "hint": "Use JwtSecurityTokenHandler and JwtSecurityToken with claims, expiration, and SigningCredentials."
+        },
+        {
+          "text": "I know how clients send JWTs in the Authorization header",
+          "hint": "Use 'Authorization: Bearer <token>' in the HTTP request header."
+        },
+        {
+          "text": "I understand the security considerations for storing JWTs",
+          "hint": "Never hardcode keys; use secure storage and prefer HttpOnly cookies over localStorage in browsers."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "JWT Tokens Summary",
+      "points": [
+        "JWT provides stateless, self-contained authentication for APIs and cross-origin applications",
+        "A JWT contains a header, payload of claims, and a cryptographic signature",
+        "Configure JWT authentication with AddJwtBearer and TokenValidationParameters",
+        "Generate tokens server-side with JwtSecurityTokenHandler after validating credentials",
+        "Clients send tokens in the Authorization: Bearer header on each request",
+        "Always protect signing keys and configure appropriate token expiration times"
+      ],
+      "takeaway": "JWT tokens are the standard for modern API authentication. Understanding how to generate, validate, and transmit JWTs securely enables you to build APIs that work across browsers, mobile apps, and server-to-server scenarios."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "JWT Bearer Authentication in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authentication/jwt bearer",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation for configuring and using JWT bearer authentication."
+    },
+    {
+      "title": "Introduction to JSON Web Tokens",
+      "url": "https://jwt.io/introduction",
+      "type": "article",
+      "author": "Auth0",
+      "description": "JWT fundamentals, structure, and common use cases."
+    }
+  ]
 }

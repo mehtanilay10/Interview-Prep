@@ -4,26 +4,260 @@
   "moduleSlug": "08-entity-framework-core",
   "courseSlug": "aspnet-core",
   "title": "Querying with LINQ",
-  "description": "Learn querying with linq in ASP.NET Core.",
+  "description": "Master LINQ querying techniques in EF Core, including filtering, sorting, projection, eager loading with Include, and understanding how queries are executed.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 12,
+  "estimatedMinutes": 32,
   "tags": [
     "linq",
-    "queries"
+    "queries",
+    "eager-loading"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "The Power of LINQ in EF Core"
+    },
+    {
       "type": "paragraph",
-      "text": "Write expressive queries using LINQ methods."
+      "text": "Language Integrated Query, or LINQ, is the primary way to query data in EF Core. LINQ lets you write database queries using C# syntax with full IntelliSense support and compile-time type checking. EF Core translates LINQ expressions into SQL at runtime, giving you the best of both worlds: type-safe code and efficient database queries."
+    },
+    {
+      "type": "paragraph",
+      "text": "LINQ queries in EF Core can be written using either query syntax (similar to SQL) or method syntax (chaining extension methods like Where, Select, and OrderBy). Both produce identical SQL. Method syntax is more common in EF Core codebases because it composes more naturally with conditional logic."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Query Syntax vs Method Syntax"
+    },
+    {
+      "type": "paragraph",
+      "text": "Query syntax uses 'from', 'where', 'select', and 'orderby' keywords that look like SQL. Method syntax chains extension methods onto an IQueryable. Both are fully supported by EF Core and produce the same SQL."
     },
     {
       "type": "example",
+      "title": "Query syntax vs method syntax",
+      "content": "The same query written in both LINQ syntax styles.",
       "language": "csharp",
-      "code": "var cheap = await _context.Products\n    .Where(p => p.Price < 50)\n    .OrderBy(p => p.Name)\n    .Select(p => new { p.Name, p.Price })\n    .ToListAsync();"
+      "code": "// Query syntax (SQL-like)\nvar querySyntax = from p in context.Products\n                 where p.Price > 100 && p.IsActive\n                 orderby p.Name\n                 select p;\n\n// Method syntax (more common in EF Core)\nvar methodSyntax = context.Products\n    .Where(p => p.Price > 100 && p.IsActive)\n    .OrderBy(p => p.Name);"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Prefer method syntax for complex queries",
+      "text": "Method syntax composes more naturally with conditional logic. For example, you can conditionally add Where clauses using if statements with method syntax, which is awkward in query syntax."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Core Query Operations"
+    },
+    {
+      "type": "paragraph",
+      "text": "EF Core supports a rich set of LINQ operations. Understanding when and how to use them is key to writing efficient queries. The most common operations are filtering, sorting, projection, and pagination."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Filtering with Where"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Where method filters results based on a predicate. It accepts a lambda expression that returns a boolean. Multiple Where calls can be chained, and they are combined with AND logic. Use the || operator within a single Where for OR logic."
+    },
+    {
+      "type": "example",
+      "title": "Filtering products by price and status",
+      "content": "Using Where with multiple conditions and the OR operator.",
+      "language": "csharp",
+      "code": "// AND conditions (chained Where clauses are combined)\nvar activeElectronics = await context.Products\n    .Where(p => p.Price > 100)\n    .Where(p => p.Category.Name == \"Electronics\")\n    .ToListAsync();\n\n// OR condition (use || within a single Where)\nvar cheapOrFeatured = await context.Products\n    .Where(p => p.Price < 20 || p.IsFeatured)\n    .ToListAsync();\n\n// String methods are translated to SQL LIKE\nvar searchResults = await context.Products\n    .Where(p => p.Name.Contains(\"laptop\"))\n    .ToListAsync();"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Sorting with OrderBy and ThenBy"
+    },
+    {
+      "type": "paragraph",
+      "text": "OrderBy sorts results in ascending order by default. Use OrderByDescending for descending order. For secondary sorting, chain ThenBy or ThenByDescending after the primary sort."
+    },
+    {
+      "type": "example",
+      "title": "Multi-level sorting",
+      "content": "Sorting products by category name first, then by price descending.",
+      "language": "csharp",
+      "code": "var sortedProducts = await context.Products\n    .OrderBy(p => p.Category.Name)\n    .ThenByDescending(p => p.Price)\n    .Select(p => new { p.Name, Category = p.Category.Name, p.Price })\n    .ToListAsync();"
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Projection with Select"
+    },
+    {
+      "type": "paragraph",
+      "text": "Select projects the query results into a different shape. You can select individual properties, anonymous types, or DTO classes. Projection is important for performance — it tells EF Core to fetch only the columns you need rather than the entire entity."
+    },
+    {
+      "type": "example",
+      "title": "Projecting to an anonymous type and a DTO",
+      "content": "Selecting only the columns needed for a product list view.",
+      "language": "csharp",
+      "code": "// Anonymous type projection\nvar productList = await context.Products\n    .Where(p => p.IsActive)\n    .Select(p => new { p.Name, p.Price, Category = p.Category.Name })\n    .ToListAsync();\n\n// DTO projection\nvar productDtos = await context.Products\n    .Where(p => p.IsActive)\n    .Select(p => new ProductDto\n    {\n        Name = p.Name,\n        Price = p.Price,\n        CategoryName = p.Category.Name\n    })\n    .ToListAsync();"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Avoid projecting to entity types",
+      "text": "Do not use Select to project into an entity type like 'Select(p => new Product { ... })'. This bypasses change tracking and can cause unexpected behavior. Project into anonymous types or dedicated DTO classes instead."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Eager Loading with Include"
+    },
+    {
+      "type": "paragraph",
+      "text": "By default, EF Core does not automatically load related entities. If you access a navigation property that has not been loaded, EF Core may throw an exception or trigger lazy loading (if enabled). Eager loading is the recommended approach: you explicitly tell EF Core which related data to fetch using Include."
+    },
+    {
+      "type": "paragraph",
+      "text": "Include loads related entities in a single database query using SQL JOINs. For nested relationships, chain ThenInclude to load grandchildren or deeper levels."
+    },
+    {
+      "type": "example",
+      "title": "Eager loading with Include and ThenInclude",
+      "content": "Loading a product with its category and the category's products.",
+      "language": "csharp",
+      "code": "var productWithCategory = await context.Products\n    .Include(p => p.Category)\n        .ThenInclude(c => c.Products)\n    .FirstOrDefaultAsync(p => p.Id == 1);\n\nif (productWithCategory?.Category != null)\n{\n    Console.WriteLine($\"Product: {productWithCategory.Name}\");\n    Console.WriteLine($\"Category: {productWithCategory.Category.Name}\");\n    Console.WriteLine($\"Products in same category: {productWithCategory.Category.Products.Count}\");\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "Include generates a single SQL query with JOINs that fetches the Product, its Category, and the Category's Products collection. Without Include, accessing productWithCategory.Category would trigger a lazy load or throw an error depending on your configuration."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Info: Select vs Include",
+      "text": "Include loads full entity objects, which creates more database round trips. Select with projection fetches only the columns you need and is more efficient for read-only scenarios. Use Include when you need full entities with tracking; use Select for read-only DTOs."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Pagination with Skip and Take"
+    },
+    {
+      "type": "paragraph",
+      "text": "For large datasets, always paginate results. Skip and Take let you fetch a specific page of data. EF Core translates these into SQL OFFSET and FETCH clauses, which are efficient for large tables when used with an ORDER BY."
+    },
+    {
+      "type": "example",
+      "title": "Paginated product listing",
+      "content": "Fetching page 3 of products with 10 items per page.",
+      "language": "csharp",
+      "code": "int pageSize = 10;\nint pageNumber = 3;\n\nvar page = await context.Products\n    .Where(p => p.IsActive)\n    .OrderBy(p => p.Name) // required for pagination\n    .Skip((pageNumber - 1) * pageSize)\n    .Take(pageSize)\n    .Select(p => new { p.Name, p.Price })\n    .ToListAsync();\n\nConsole.WriteLine($\"Showing page {pageNumber}, {page.Count} items\");"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "LINQ",
+          "definition": "Language Integrated Query — a C# feature for writing type-safe queries that EF Core translates to SQL."
+        },
+        {
+          "term": "IQueryable<T>",
+          "definition": "The interface representing a query that can be executed against a data source. EF Core builds SQL when you enumerate it."
+        },
+        {
+          "term": "Include",
+          "definition": "A LINQ method that tells EF Core to eagerly load related entities in the same query using JOINs."
+        },
+        {
+          "term": "ThenInclude",
+          "definition": "Chained after Include to load nested or multi-level relationships."
+        },
+        {
+          "term": "Deferred execution",
+          "definition": "LINQ queries are not executed until you enumerate them (e.g., ToListAsync, FirstOrDefaultAsync)."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Build a Paginated Product Query",
+      "description": "Write a LINQ query that loads products with their categories, applies a price filter, and returns a paginated result.",
+      "steps": [
+        "Open the MigrationDemo project from the previous lesson or create a new one with Product and Category entities",
+        "Seed the database with at least 25 products across 3 categories using a migration or manual insertion",
+        "Write a LINQ query that filters products with Price > 50 and includes the Category using Include",
+        "Apply OrderBy on Category.Name then Product.Name",
+        "Use Skip and Take to implement page 2 with a page size of 10",
+        "Project the results into a ProductListDto with Name, Price, and CategoryName",
+        "Execute the query with ToListAsync and print each product's details to the console"
+      ],
+      "expectedOutcome": "The console shows 10 products from page 2, each with its category name and price, sorted by category then name. The SQL generated by EF Core includes a JOIN with the Categories table and OFFSET/FETCH for pagination."
+    },
+    {
+      "type": "checklist",
+      "title": "Querying with LINQ Checklist",
+      "items": [
+        {
+          "text": "I can write LINQ queries using both query syntax and method syntax",
+          "hint": "Query syntax uses 'from/wheres/select'; method syntax chains .Where()/.Select()."
+        },
+        {
+          "text": "I understand deferred execution in EF Core queries",
+          "hint": "The query is not sent to the database until you call ToListAsync or similar."
+        },
+        {
+          "text": "I can use Where with multiple conditions and OR logic",
+          "hint": "Chain Where for AND; use || inside a single Where for OR."
+        },
+        {
+          "text": "I can sort results with OrderBy and ThenBy",
+          "hint": "OrderBy is the primary sort; ThenBy adds secondary sort levels."
+        },
+        {
+          "text": "I understand when to use Include vs Select",
+          "hint": "Include loads full entities for tracking; Select projects only needed columns for read-only data."
+        },
+        {
+          "text": "I can implement pagination using Skip and Take",
+          "hint": "Skip((page-1) * pageSize) then Take(pageSize), always with OrderBy."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Querying with LINQ Summary",
+      "points": [
+        "LINQ queries in EF Core are translated to SQL at runtime with full type safety",
+        "Use Where for filtering, OrderBy for sorting, and Select for projection",
+        "Include eagerly loads related entities; chain ThenInclude for nested relationships",
+        "Select with DTOs is more efficient than Include when you only need specific columns",
+        "Always use Skip and Take with OrderBy for pagination on large datasets",
+        "Queries are not executed until enumerated — deferred execution lets you compose dynamically"
+      ],
+      "takeaway": "LINQ is the primary interface for all database queries in EF Core. Mastering filtering, projection, eager loading, and pagination techniques ensures your queries are both correct and performant."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Querying with EF Core",
+      "url": "https://learn.microsoft.com/en-us/ef/core/querying/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comprehensive guide to LINQ querying, loading related data, and executing raw SQL in EF Core."
+    },
+    {
+      "title": "Eager Loading Related Data",
+      "url": "https://learn.microsoft.com/en-us/ef/core/querying/related-data/eager",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Detailed documentation on Include, ThenInclude, filtered includes, and split queries."
+    }
+  ]
 }

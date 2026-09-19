@@ -4,26 +4,188 @@
   "moduleSlug": "06-dependency-injection",
   "courseSlug": "aspnet-core",
   "title": "Service Lifetimes",
-  "description": "Learn service lifetimes in ASP.NET Core.",
+  "description": "Learn how Transient, Scoped, and Singleton lifetimes control how long services live and how many instances are created.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "lifetimes",
-    "scoped"
+    "scoped",
+    "singleton"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Are Service Lifetimes?"
+    },
+    {
       "type": "paragraph",
-      "text": "Choose between Transient, Scoped, and Singleton lifetimes based on state needs."
+      "text": "When you register a service in the DI container, you also choose its lifetime. The lifetime determines when a new instance is created and how long it is kept. ASP.NET Core supports three lifetimes: Transient, Scoped, and Singleton. Choosing the right one is critical for correctness, performance, and avoiding memory leaks."
+    },
+    {
+      "type": "paragraph",
+      "text": "A Transient service gets a new instance every time it is requested. A Scoped service gets one instance per HTTP request. A Singleton service gets one instance for the entire lifetime of the application."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Lifetime Mismatches Cause Bugs",
+      "text": "If a Singleton depends on a Scoped service, the Singleton captures the Scoped instance from the first request and reuses it forever. This can cause cross-request data leakage. Always match lifetimes carefully."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Transient Lifetime"
+    },
+    {
+      "type": "paragraph",
+      "text": "Transient services are created each time they are requested. They are lightweight and stateless by design. Because a new instance is built for every injection point, you do not need to worry about shared state or thread safety."
+    },
+    {
+      "type": "paragraph",
+      "text": "Use Transient for lightweight services with no state, such as validators, formatters, or utility classes that perform calculations."
     },
     {
       "type": "example",
+      "title": "Registering a Transient Service",
+      "content": "Each request for INotifier creates a new EmailNotifier.",
       "language": "csharp",
-      "code": "builder.Services.AddTransient<INotifier, EmailNotifier>();\nbuilder.Services.AddScoped<IShoppingCart, ShoppingCart>();\nbuilder.Services.AddSingleton<ICache, MemoryCache>();"
+      "code": "public interface INotifier { Task SendAsync(string message); }\npublic class EmailNotifier : INotifier\n{\n    private readonly SmtpClient _client;\n    public EmailNotifier(SmtpClient client) => _client = client;\n    public async Task SendAsync(string message) => await _client.SendMailAsync(message);\n}\n\n// Registration\nbuilder.Services.AddTransient<INotifier, EmailNotifier>();\n\n// Usage in a controller\npublic class FeedbackController(INotifier notifier) : Controller\n{\n    public async Task<IActionResult> Submit(string feedback)\n    {\n        await notifier.SendAsync(feedback); // new instance here\n        await notifier.SendAsync(feedback); // another new instance\n        return Ok();\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Scoped Lifetime"
+    },
+    {
+      "type": "paragraph",
+      "text": "Scoped services are created once per HTTP request. If two controllers or services request the same scoped service during the same request, they receive the same instance. When the request ends, the instance is disposed if it implements IDisposable."
+    },
+    {
+      "type": "paragraph",
+      "text": "The most common scoped service is the database context. Entity Framework Core DbContext is registered as scoped because it tracks entity changes during a single request and should not be shared across requests."
+    },
+    {
+      "type": "example",
+      "title": "Registering a Scoped DbContext",
+      "content": "One DbContext instance per request.",
+      "language": "csharp",
+      "code": "builder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"Default\")));\n\n// Inside a request, all services that inject AppDbContext share one instance:\npublic class OrdersController(AppDbContext db) : Controller\n{\n    public async Task<IActionResult> Index()\n    {\n        var orders = await db.Orders.ToListAsync(); // uses the scoped db\n        return View(orders);\n    }\n}\n\npublic class ProductsController(AppDbContext db) : Controller\n{\n    public async Task<IActionResult> Index()\n    {\n        var products = await db.Products.ToListAsync(); // same scoped db\n        return View(products);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Singleton Lifetime"
+    },
+    {
+      "type": "paragraph",
+      "text": "Singleton services are created once when the container first resolves them, and the same instance is reused for every request until the application shuts down. They must be thread-safe because multiple requests can access them simultaneously."
+    },
+    {
+      "type": "paragraph",
+      "text": "Use Singleton for stateless services, caches, configuration providers, or logging services. Never register a DbContext or any service that holds request-specific state as Singleton."
+    },
+    {
+      "type": "example",
+      "title": "Registering a Singleton Cache",
+      "content": "A cache is a great example of a singleton because it is shared across all requests.",
+      "language": "csharp",
+      "code": "public interface ICacheService { T Get<T>(string key); void Set<T>(string key, T value); }\npublic class InMemoryCacheService : ICacheService\n{\n    private readonly MemoryCache _cache = new MemoryCache(new MemoryCacheOptions());\n    public T Get<T>(string key) => _cache.Get<T>(key);\n    public void Set<T>(string key, T value) => _cache.Set(key, value);\n}\n\n// Registration\nbuilder.Services.AddSingleton<ICacheService, InMemoryCacheService>();\n\n// Every request shares the same cache instance:\npublic class WeatherController(ICacheService cache) : Controller\n{\n    public IActionResult Forecast()\n    {\n        var forecast = cache.Get<Forecast>(\"today\");\n        if (forecast == null)\n        {\n            forecast = _weatherService.GetToday();\n            cache.Set(\"today\", forecast);\n        }\n        return Ok(forecast);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Choosing the Right Lifetime"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Lifetime Decision Guide",
+      "items": [
+        "Use Transient for lightweight, stateless services that do not hold data between calls.",
+        "Use Scoped for services that should be shared within a single request, such as DbContext.",
+        "Use Singleton for services that are expensive to create, stateless, or intentionally shared across all requests.",
+        "Avoid injecting Scoped services into Singletons, because the Singleton captures a request-specific instance.",
+        "Avoid injecting Singletons into Scoped services unless the Singleton is thread-safe and does not store request state."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Transient",
+          "definition": "A service lifetime where a new instance is created every time the service is requested."
+        },
+        {
+          "term": "Scoped",
+          "definition": "A service lifetime where one instance is created per HTTP request and shared within that request."
+        },
+        {
+          "term": "Singleton",
+          "definition": "A service lifetime where one instance is created for the entire application and reused for every request."
+        },
+        {
+          "term": "Service Collection",
+          "definition": "The IServiceCollection where services are registered at startup with their lifetimes."
+        },
+        {
+          "term": "Thread Safety",
+          "definition": "The property of code that behaves correctly when accessed by multiple threads simultaneously, required for Singletons."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Choose and Register Service Lifetimes",
+      "description": "Analyze a set of services and decide which lifetime each one needs.",
+      "steps": [
+        "Review these services: ILogger, AppDbContext, IEmailSender, ICache, IStringHasher.",
+        "Register each service in Program.cs with the appropriate lifetime.",
+        "Create a simple controller that injects each service and logs a message.",
+        "Run the application and use logging or breakpoints to verify that Scoped services are reused within a single request.",
+        "Attempt to inject a Scoped service into a Singleton and observe the runtime exception or warning."
+      ],
+      "expectedOutcome": "You will understand which services belong in which lifetime and why mixing lifetimes carelessly causes errors."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Service Lifetimes",
+      "items": [
+        {
+          "text": "I can describe the difference between Transient, Scoped, and Singleton.",
+          "hint": "New per request, new per injection, one per app."
+        },
+        {
+          "text": "I know which lifetime to use for DbContext.",
+          "hint": "Scoped, because it tracks changes within a single request."
+        },
+        {
+          "text": "I understand the risk of injecting a Scoped service into a Singleton.",
+          "hint": "The Singleton captures a request-specific instance and reuses it across requests."
+        },
+        {
+          "text": "I can explain why Singleton services must be thread-safe.",
+          "hint": "Multiple requests can access the same instance concurrently."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Transient creates a new instance on every request.",
+        "Scoped creates one instance per HTTP request.",
+        "Singleton creates one instance for the entire application.",
+        "DbContext should always be Scoped.",
+        "Singleton services must be thread-safe because they are shared across requests."
+      ],
+      "takeaway": "Service lifetimes control object creation and sharing in ASP.NET Core. Choosing the right lifetime prevents bugs, memory leaks, and hard-to-reproduce race conditions."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "di-basics",
+    "constructor-injection"
+  ],
   "technology": null,
   "furtherReading": []
 }

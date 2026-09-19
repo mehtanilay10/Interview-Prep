@@ -4,26 +4,225 @@
   "moduleSlug": "07-middleware-pipeline",
   "courseSlug": "aspnet-core",
   "title": "Built-in Middleware",
-  "description": "Learn built-in middleware in ASP.NET Core.",
+  "description": "Explore the essential built-in middleware components that ASP.NET Core provides out of the box, including routing, static files, authentication, and authorization.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "built-in",
-    "routing"
+    "routing",
+    "static-files",
+    "authentication"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is Built-in Middleware?"
+    },
+    {
       "type": "paragraph",
-      "text": "Use UseRouting, UseAuthentication, UseAuthorization, and UseStaticFiles."
+      "text": "ASP.NET Core ships with a rich set of built-in middleware components that handle common web application concerns without requiring you to write them from scratch. These include routing, static file serving, authentication, authorization, HTTPS redirection, and more."
+    },
+    {
+      "type": "paragraph",
+      "text": "Each built-in middleware is added to the pipeline via extension methods on WebApplication, such as UseRouting(), UseStaticFiles(), and UseAuthentication(). Learning when and how to use these components is foundational to building production-ready applications."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Essential Built-in Middleware"
+    },
+    {
+      "type": "paragraph",
+      "text": "The most commonly used built-in middleware components and their purposes are described below. Each one plays a specific role in processing incoming requests."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Common built-in middleware components",
+      "items": [
+        "UseHttpsRedirection — Redirects HTTP requests to HTTPS automatically",
+        "UseStaticFiles — Enables serving static files like HTML, CSS, JavaScript, and images from wwwroot",
+        "UseRouting — Adds route matching to the pipeline so URLs can be mapped to endpoints",
+        "UseAuthentication — Determines the current user's identity using configured authentication schemes",
+        "UseAuthorization — Enforces access policies to determine whether the current user can access a resource",
+        "UseCors — Enables Cross-Origin Resource Sharing to allow requests from different origins",
+        "UseSession — Adds support for user sessions stored in memory or distributed cache"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Note: Some middleware are mutually dependent",
+      "text": "UseRouting must come before UseAuthentication and UseAuthorization because those components need to know which endpoint the request matched. Meanwhile, UseEndpoints or MapControllers must come after authentication and authorization so the policy checks run first."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring the Standard Pipeline"
+    },
+    {
+      "type": "paragraph",
+      "text": "A typical ASP.NET Core application registers middleware in a specific order to ensure correct behavior. The minimal API hosting model in .NET 6+ provides a clean way to configure the pipeline directly in Program.cs."
     },
     {
       "type": "example",
+      "title": "Standard middleware configuration in Program.cs",
+      "content": "This shows the typical ordering of middleware in an ASP.NET Core application that uses controllers and authentication.",
       "language": "csharp",
-      "code": "app.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();"
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddControllers();\nbuilder.Services.AddRazorPages();\nbuilder.Services.AddHttpContextAccessor();\n\nvar app = builder.Build();\n\n// Error handling — catch exceptions from everything downstream\nif (!app.Environment.IsDevelopment())\n{\n    app.UseExceptionHandler(\"/Home/Error\");\n    app.UseHsts();\n}\n\n// HTTPS enforcement\napp.UseHttpsRedirection();\n\n// Static files from wwwroot\napp.UseStaticFiles();\n\n// Routing — must come before auth\napp.UseRouting();\n\n// Authentication — must come before authorization\napp.UseAuthentication();\napp.UseAuthorization();\n\n// Map endpoints\napp.MapControllers();\napp.MapRazorPages();\n\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "In this configuration, each middleware has a specific job. If you remove UseRouting(), authentication and authorization will not work correctly because they rely on route data to evaluate policies. If you forget UseAuthentication(), the authorization middleware will always see an anonymous user."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "UseStaticFiles Deep Dive"
+    },
+    {
+      "type": "paragraph",
+      "text": "The UseStaticFiles middleware enables the application to serve static assets directly from the file system. By default, it looks in the wwwroot folder of your project. Without this middleware, requests for .css, .js, and image files will return 404 errors."
+    },
+    {
+      "type": "example",
+      "title": "Configuring static files with options",
+      "content": "You can customize how static files are served, including setting cache headers and serving files from multiple locations.",
+      "language": "csharp",
+      "code": "app.UseStaticFiles(new StaticFileOptions\n{\n    OnPrepareResponse = ctx =>\n    {\n        const int durationInSeconds = 60 * 60 * 24; // 1 day\n        ctx.Context.Response.Headers.CacheControl = $\n            \"public,max-age={durationInSeconds}\";\n    }\n});\n\n// Serve files from a second folder (e.g., uploaded user content)\napp.UseStaticFiles(new StaticFileOptions\n{\n    FileProvider = new PhysicalFileProvider(\n        Path.Combine(builder.Environment.ContentRootPath, \"UserUploads\")),\n    RequestPath = \"/uploads\"\n});"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Static files are served before routing",
+      "text": "Static file requests are matched against the file system before routing. This means a request to '/css/site.css' will return the file directly if it exists, bypassing your controllers entirely. This is more efficient but can be surprising if you expected a controller route to handle it."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "UseRouting and UseEndpoints"
+    },
+    {
+      "type": "paragraph",
+      "text": "Routing in ASP.NET Core is split into two middleware components. UseRouting adds route matching capabilities to the pipeline. Then endpoint routing, which happens inside UseEndpoints or via MapControllerRoute, actually maps the matched route to a specific handler."
+    },
+    {
+      "type": "paragraph",
+      "text": "In .NET 6 and later, the MapControllers() and MapRazorPages() methods combine routing and endpoint mapping into a single step. This is why you see app.UseRouting() followed by app.MapControllers() — the routing middleware sets up the route table, and the Map methods define the endpoints."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Do not mix old and new patterns",
+      "text": "If you use app.MapControllers(), do not also call app.UseEndpoints(). UseEndpoints is from the older endpoint routing pattern and should not be mixed with the newer Map* methods in the same application."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "UseStaticFiles",
+          "definition": "Middleware that enables serving static files from the file system, typically the wwwroot folder."
+        },
+        {
+          "term": "UseRouting",
+          "definition": "Middleware that adds route matching to the pipeline, enabling URL-to-endpoint resolution."
+        },
+        {
+          "term": "UseAuthentication",
+          "definition": "Middleware that establishes the current user's identity using configured authentication handlers."
+        },
+        {
+          "term": "UseAuthorization",
+          "definition": "Middleware that enforces access policies, deciding if the current user can access a resource."
+        },
+        {
+          "term": "Terminal middleware",
+          "definition": "Middleware that produces a response without calling next(), effectively ending the pipeline."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Adding CORS middleware",
+      "content": "CORS must be configured early in the pipeline to handle preflight requests correctly.",
+      "language": "csharp",
+      "code": "builder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AllowFrontend\", policy =>\n    {\n        policy.WithOrigins(\"https://myapp.com\", \"https://admin.myapp.com\")\n              .AllowAnyHeader()\n              .AllowAnyMethod()\n              .AllowCredentials();\n    });\n});\n\nvar app = builder.Build();\n\napp.UseCors(\"AllowFrontend\"); // place before UseAuthorization\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "exercise",
+      "title": "Configure the Complete Pipeline",
+      "description": "Set up a new ASP.NET Core project with the full middleware pipeline including static files, routing, authentication, and authorization.",
+      "steps": [
+        "Create a new MVC project: 'dotnet new mvc -n PipelineDemo'",
+        "Add the Microsoft.AspNetCore.Authentication.Cookies NuGet package",
+        "In Program.cs, register AddControllers, AddRazorPages, and AddAuthentication with Cookie authentication",
+        "Add middleware in the correct order: HSTS, HTTPS redirection, static files, routing, authentication, authorization, then MapControllers and MapRazorPages",
+        "Add a CORS policy named 'DevClient' allowing origin http://localhost:3000 with any header and method",
+        "Register UseCors before UseAuthorization and run the app, then verify a request to any static file in wwwroot succeeds"
+      ],
+      "expectedOutcome": "The application runs without errors. Static files are served directly from wwwroot, controllers handle API routes, the CORS policy is active, and the middleware ordering follows best practices."
+    },
+    {
+      "type": "checklist",
+      "title": "Built-in Middleware Checklist",
+      "items": [
+        {
+          "text": "I can list at least six built-in ASP.NET Core middleware components",
+          "hint": "Think about static files, routing, auth, CORS, HTTPS, and sessions."
+        },
+        {
+          "text": "I understand why UseRouting must come before UseAuthentication",
+          "hint": "Auth and authorization middleware inspect route metadata to make decisions."
+        },
+        {
+          "text": "I can configure UseStaticFiles with custom options",
+          "hint": "StaticFileOptions lets you set cache headers and alternate file providers."
+        },
+        {
+          "text": "I know the difference between UseRouting and MapControllers",
+          "hint": "UseRouting enables matching; MapControllers defines the actual endpoints."
+        },
+        {
+          "text": "I can explain what short-circuiting means in the context of static files",
+          "hint": "If a static file exists, UseStaticFiles returns it without hitting a controller."
+        },
+        {
+          "text": "I can add CORS middleware with the correct ordering",
+          "hint": "CORS should be registered before UseAuthorization so preflight requests are handled."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Built-in Middleware Summary",
+      "points": [
+        "ASP.NET Core provides many built-in middleware components for common web tasks",
+        "UseHttpsRedirection enforces secure connections in production",
+        "UseStaticFiles serves static assets directly from the file system",
+        "UseRouting enables the URL-to-endpoint matching system",
+        "UseAuthentication and UseAuthorization handle identity and access control",
+        "Middleware ordering determines the request processing sequence and must follow documented rules"
+      ],
+      "takeaway": "Built-in middleware components handle most common web application needs. Knowing which middleware to use and where to place them in the pipeline is a core skill for every ASP.NET Core developer."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Built-in Middleware in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation listing all built-in middleware with configuration examples."
+    },
+    {
+      "title": "Static Files Middleware",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/static-web-assets",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Deep dive into serving and configuring static files in ASP.NET Core."
+    }
+  ]
 }
