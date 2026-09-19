@@ -1395,6 +1395,51 @@ import dotnetLesson33 from "../courses/dotnet-nuget-packages/messaging-events/ha
 import dotnetLesson34 from "../courses/dotnet-nuget-packages/messaging-events/quartz.json";
 import dotnetLesson35 from "../courses/dotnet-nuget-packages/messaging-events/cronos.json";
 import dotnetLesson36 from "../courses/dotnet-nuget-packages/messaging-events/background-service.json";
+import dotnetLesson37 from "../courses/dotnet-nuget-packages/cloud-integration/azure-storage-blobs.json";
+import dotnetLesson38 from "../courses/dotnet-nuget-packages/cloud-integration/amazon-s3.json";
+import dotnetLesson39 from "../courses/dotnet-nuget-packages/cloud-integration/azure-identity.json";
+import dotnetLesson40 from "../courses/dotnet-nuget-packages/cloud-integration/azure-keyvault.json";
+import dotnetLesson41 from "../courses/dotnet-nuget-packages/cloud-integration/aws-sdk-core.json";
+import dotnetLesson42 from "../courses/dotnet-nuget-packages/cloud-integration/azure-servicebus.json";
+import dotnetLesson43 from "../courses/dotnet-nuget-packages/cloud-integration/azure-event-hubs.json";
+import dotnetLesson44 from "../courses/dotnet-nuget-packages/cloud-integration/minio.json";
+import dotnetLesson45 from "../courses/dotnet-nuget-packages/api-documentation-swagger/swashbuckle.json";
+import dotnetLesson46 from "../courses/dotnet-nuget-packages/api-documentation-swagger/nspec.json";
+import dotnetLesson47 from "../courses/dotnet-nuget-packages/api-documentation-swagger/openapi-generator.json";
+import dotnetLesson48 from "../courses/dotnet-nuget-packages/api-documentation-swagger/microsoft-openapi.json";
+import dotnetLesson49 from "../courses/dotnet-nuget-packages/api-documentation-swagger/swashbuckle-aspnetcore.json";
+import dotnetLesson50 from "../courses/dotnet-nuget-packages/advanced-patterns/system-threading-channels.json";
+import dotnetLesson51 from "../courses/dotnet-nuget-packages/advanced-patterns/memorystream.json";
+import dotnetLesson52 from "../courses/dotnet-nuget-packages/advanced-patterns/system-io-pipelines.json";
+import dotnetLesson53 from "../courses/dotnet-nuget-packages/advanced-patterns/source-generators.json";
+import dotnetLesson54 from "../courses/dotnet-nuget-packages/advanced-patterns/roslyn-analyzers.json";
+import dotnetLesson55 from "../courses/dotnet-nuget-packages/advanced-patterns/spectre-console.json";
+import dotnetLesson56 from "../courses/dotnet-nuget-packages/advanced-patterns/benchmark-dotnet.json";
+import dotnetLesson57 from "../courses/dotnet-nuget-packages/advanced-patterns/system-text-json-source-gen.json";
+import dotnetLesson701 from "../courses/dotnet-nuget-packages/07-testing-quality/xunit.json";
+import dotnetLesson702 from "../courses/dotnet-nuget-packages/07-testing-quality/nunit.json";
+import dotnetLesson703 from "../courses/dotnet-nuget-packages/07-testing-quality/mstest.json";
+import dotnetLesson704 from "../courses/dotnet-nuget-packages/07-testing-quality/fluent-assertions.json";
+import dotnetLesson705 from "../courses/dotnet-nuget-packages/07-testing-quality/moq.json";
+import dotnetLesson706 from "../courses/dotnet-nuget-packages/07-testing-quality/nsubstitute.json";
+import dotnetLesson707 from "../courses/dotnet-nuget-packages/07-testing-quality/autofixture.json";
+import dotnetLesson708 from "../courses/dotnet-nuget-packages/07-testing-quality/bogus.json";
+import dotnetLesson801 from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt.json";
+import dotnetLesson802 from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt-net.json";
+import dotnetLesson803 from "../courses/dotnet-nuget-packages/08-security-cryptography/data-protection.json";
+import dotnetLesson804 from "../courses/dotnet-nuget-packages/08-security-cryptography/jwt.json";
+import dotnetLesson805 from "../courses/dotnet-nuget-packages/08-security-cryptography/identity-model.json";
+import dotnetLesson806 from "../courses/dotnet-nuget-packages/08-security-cryptography/sharpcompress.json";
+import dotnetLesson807 from "../courses/dotnet-nuget-packages/08-security-cryptography/password-validator.json";
+import dotnetLesson901 from "../courses/dotnet-nuget-packages/09-utilities-helpers/fluent-email.json";
+import dotnetLesson902 from "../courses/dotnet-nuget-packages/09-utilities-helpers/mailkit.json";
+import dotnetLesson903 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sendgrid.json";
+import dotnetLesson904 from "../courses/dotnet-nuget-packages/09-utilities-helpers/humanizer.json";
+import dotnetLesson905 from "../courses/dotnet-nuget-packages/09-utilities-helpers/jsonpatch.json";
+import dotnetLesson906 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sharpcompress.json";
+import dotnetLesson907 from "../courses/dotnet-nuget-packages/09-utilities-helpers/figgle.json";
+import dotnetLesson908 from "../courses/dotnet-nuget-packages/09-utilities-helpers/more-linq.json";
+
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -2761,6 +2806,27 @@ const rawLessonsPart2: any[] = [
 	dotnetLesson34,
 	dotnetLesson35,
 	dotnetLesson36,
+	dotnetLesson37,
+	dotnetLesson38,
+	dotnetLesson39,
+	dotnetLesson40,
+	dotnetLesson41,
+	dotnetLesson42,
+	dotnetLesson43,
+	dotnetLesson44,
+	dotnetLesson45,
+	dotnetLesson46,
+	dotnetLesson47,
+	dotnetLesson48,
+	dotnetLesson49,
+	dotnetLesson50,
+	dotnetLesson51,
+	dotnetLesson52,
+	dotnetLesson53,
+	dotnetLesson54,
+	dotnetLesson55,
+	dotnetLesson56,
+	dotnetLesson57,
 	systemDesignReactLesson1,
 	systemDesignReactLesson2,
 	systemDesignReactLesson3,
