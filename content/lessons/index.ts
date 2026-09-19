@@ -179,73 +179,65 @@ import devOpsLesson15 from "../courses/devops/06-ci-cd-modern-tools/02-gitlab-ci
 import devOpsLesson16 from "../courses/devops/02-docker-advanced/03-docker-security.json";
 import devOpsLesson17 from "../courses/devops/04-kubernetes-advanced/03-k8s-monitoring-observability.json";
 
-import aspLesson1 from "../courses/aspnet-core/01-getting-started-aspnet-core-mvc/first-aspnet-core-10-0-mvc-application.json";
-import aspLesson2 from "../courses/aspnet-core/01-getting-started-aspnet-core-mvc/first-crud-application-aspnet-core-mvc.json";
-import aspLesson3 from "../courses/aspnet-core/01-getting-started-aspnet-core-mvc/introduction-to-aspnet-core-mvc.json";
-import aspLesson4 from "../courses/aspnet-core/01-getting-started-aspnet-core-mvc/learn-aspnet-core-examples-codes.json";
-import aspLesson40 from "../courses/aspnet-core/01-getting-started-aspnet-core-mvc/setting-up-development-environment.json";
-import aspLesson5 from "../courses/aspnet-core/02-controllers-routing/actions-in-aspnet-core.json";
-import aspLesson6 from "../courses/aspnet-core/02-controllers-routing/aspnet-core-convention-based-routing.json";
-import aspLesson7 from "../courses/aspnet-core/02-controllers-routing/controllers-in-aspnet-core.json";
-import aspLesson38 from "../courses/aspnet-core/02-controllers-routing/attribute-routing-aspnet-core.json";
-import aspLesson39 from "../courses/aspnet-core/02-controllers-routing/route-parameters-constraints-aspnet-core.json";
-import aspLesson8 from "../courses/aspnet-core/03-model-binding-validation/advanced-model-binding-concepts.json";
-import aspLesson9 from "../courses/aspnet-core/03-model-binding-validation/model-binding-aspnet-core-beginner-advanced.json";
-import aspLesson10 from "../courses/aspnet-core/03-model-binding-validation/model-validation-aspnet-core-beginner-expert.json";
-import aspLesson41 from "../courses/aspnet-core/03-model-binding-validation/data-annotation-attributes-client-side-validation.json";
-import aspLesson11 from "../courses/aspnet-core/04-views-tag-helpers/built-in-tag-helpers.json";
-import aspLesson12 from "../courses/aspnet-core/04-views-tag-helpers/custom-tag-helper.json";
-import aspLesson13 from "../courses/aspnet-core/04-views-tag-helpers/introduction-to-tag-helpers.json";
-import aspLesson14 from "../courses/aspnet-core/04-views-tag-helpers/views-in-aspnet-core.json";
-import aspLesson15 from "../courses/aspnet-core/05-dependency-injection-configuration/aspnet-core-configurations-program-middleware-appsettings.json";
-import aspLesson16 from "../courses/aspnet-core/05-dependency-injection-configuration/dependency-injection-aspnet-core.json";
-import aspLesson42 from "../courses/aspnet-core/05-dependency-injection-configuration/service-lifetimes-scoped-transient-singleton.json";
-import aspLesson43 from "../courses/aspnet-core/05-dependency-injection-configuration/options-pattern-strongly-typed-configuration.json";
-import aspLesson44 from "../courses/aspnet-core/05-dependency-injection-configuration/di-in-views-and-action-methods.json";
-import aspLesson17 from "../courses/aspnet-core/06-filters/aspnet-core-filters-dependency-injection-global-filters.json";
-import aspLesson18 from "../courses/aspnet-core/06-filters/filters-aspnet-core-beginner-expert.json";
-import aspLesson19 from "../courses/aspnet-core/07-web-api/call-web-api-aspnet-core-net10.json";
-import aspLesson20 from "../courses/aspnet-core/07-web-api/call-web-api-javascript-xmlhttprequest.json";
-import aspLesson21 from "../courses/aspnet-core/07-web-api/call-web-api-jquery-aspnet-core.json";
-import aspLesson22 from "../courses/aspnet-core/07-web-api/create-web-apis-aspnet-core-restful-pattern.json";
-import aspLesson45 from "../courses/aspnet-core/07-web-api/introduction-to-rest-api-concepts.json";
-import aspLesson46 from "../courses/aspnet-core/07-web-api/test-web-api-postman-curl.json";
-import aspLesson23 from "../courses/aspnet-core/08-authentication-identity/add-custom-user-properties-aspnet-core-identity.json";
-import aspLesson24 from "../courses/aspnet-core/08-authentication-identity/authentication-of-users-aspnet-core-identity.json";
-import aspLesson25 from "../courses/aspnet-core/08-authentication-identity/create-read-update-delete-users-aspnet-core-identity.json";
-import aspLesson26 from "../courses/aspnet-core/08-authentication-identity/implement-cookie-authentication-aspnet-core.json";
-import aspLesson27 from "../courses/aspnet-core/08-authentication-identity/integrate-google-login-aspnet-core-identity.json";
-import aspLesson28 from "../courses/aspnet-core/08-authentication-identity/setup-configure-aspnet-core-identity.json";
-import aspLesson29 from "../courses/aspnet-core/08-authentication-identity/username-email-password-policy-aspnet-core-identity.json";
-import aspLesson30 from "../courses/aspnet-core/08-authentication-identity/work-with-claims-aspnet-core-identity.json";
-import aspLesson31 from "../courses/aspnet-core/08-authentication-identity/work-with-policies-aspnet-core-identity.json";
-import aspLesson32 from "../courses/aspnet-core/08-authentication-identity/work-with-roles-aspnet-core-identity.json";
-import aspLesson33 from "../courses/aspnet-core/09-localization-globalization/globalization-localization-resource-files.json";
-import aspLesson34 from "../courses/aspnet-core/09-localization-globalization/localization-portable-object-po-files.json";
-import aspLesson35 from "../courses/aspnet-core/09-localization-globalization/use-globalization-localization-aspnet-core.json";
-import aspLesson47 from "../courses/aspnet-core/09-localization-globalization/introduction-to-globalization-localization-concepts.json";
-import aspLesson48 from "../courses/aspnet-core/09-localization-globalization/localize-validation-messages-data-annotations.json";
-import aspLesson57 from "../courses/aspnet-core/09-localization-globalization/testing-strategies-localized-apps.json";
-import aspLesson36 from "../courses/aspnet-core/10-ado-net-data-access/learn-ado-net-crud-operations-aspnet-core.json";
-import aspLesson49 from "../courses/aspnet-core/10-ado-net-data-access/setting-up-ado-net-project.json";
-import aspLesson50 from "../courses/aspnet-core/10-ado-net-data-access/reading-data-ado-net.json";
-import aspLesson51 from "../courses/aspnet-core/10-ado-net-data-access/crud-operations-ado-net.json";
-import aspLesson52 from "../courses/aspnet-core/10-ado-net-data-access/parameterized-queries-and-security.json";
-import aspLesson37 from "../courses/aspnet-core/11-cors-cross-origin/enable-cors-aspnet-core.json";
-import aspLesson53 from "../courses/aspnet-core/11-cors-cross-origin/01-understanding-cors-same-origin-policy.json";
-import aspLesson54 from "../courses/aspnet-core/11-cors-cross-origin/03-cors-policies-named-policies.json";
-import aspLesson55 from "../courses/aspnet-core/11-cors-cross-origin/04-cors-preflight-requests.json";
-import aspLesson56 from "../courses/aspnet-core/11-cors-cross-origin/05-cors-best-practices-troubleshooting.json";
-import aspLesson67 from "../courses/aspnet-core/12-whats-new-dotnet-10/openapi-31-yaml-support.json";
-import aspLesson58 from "../courses/aspnet-core/12-whats-new-dotnet-10/new-json-patch-implementation.json";
-import aspLesson59 from "../courses/aspnet-core/12-whats-new-dotnet-10/typed-results-controllers.json";
-import aspLesson60 from "../courses/aspnet-core/12-whats-new-dotnet-10/validation-minimal-apis.json";
-import aspLesson61 from "../courses/aspnet-core/12-whats-new-dotnet-10/server-sent-events.json";
-import aspLesson62 from "../courses/aspnet-core/12-whats-new-dotnet-10/passkey-authentication.json";
-import aspLesson63 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/cookie-login-redirects-api-endpoints.json";
-import aspLesson64 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/mvc-api-analyzers-deprecated.json";
-import aspLesson65 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/razor-runtime-compilation-obsolete.json";
-import aspLesson66 from "../courses/aspnet-core/13-dotnet-10-breaking-changes/json-pipe-reader-deserialization.json";
+import lessonAspnetCore01gettingstartedwhatisaspnetcore from "../courses/aspnet-core/01-getting-started/what-is-aspnet-core.json";
+import lessonAspnetCore01gettingstartedsettingupenvironment from "../courses/aspnet-core/01-getting-started/setting-up-environment.json";
+import lessonAspnetCore01gettingstartedcreatingfirstproject from "../courses/aspnet-core/01-getting-started/creating-first-project.json";
+import lessonAspnetCore01gettingstartedunderstandingprojectstructure from "../courses/aspnet-core/01-getting-started/understanding-project-structure.json";
+import lessonAspnetCore01gettingstartedrunninganddebugging from "../courses/aspnet-core/01-getting-started/running-and-debugging.json";
+import lessonAspnetCore02mvcfundamentalsmvcarchitecture from "../courses/aspnet-core/02-mvc-fundamentals/mvc-architecture.json";
+import lessonAspnetCore02mvcfundamentalscontrollersandactions from "../courses/aspnet-core/02-mvc-fundamentals/controllers-and-actions.json";
+import lessonAspnetCore02mvcfundamentalsviewsandtemplates from "../courses/aspnet-core/02-mvc-fundamentals/views-and-templates.json";
+import lessonAspnetCore02mvcfundamentalsmodelsandviewdata from "../courses/aspnet-core/02-mvc-fundamentals/models-and-viewdata.json";
+import lessonAspnetCore02mvcfundamentalshandlinguserinput from "../courses/aspnet-core/02-mvc-fundamentals/handling-user-input.json";
+import lessonAspnetCore03routingurlsroutingbasics from "../courses/aspnet-core/03-routing-urls/routing-basics.json";
+import lessonAspnetCore03routingurlsattributerouting from "../courses/aspnet-core/03-routing-urls/attribute-routing.json";
+import lessonAspnetCore03routingurlsrouteconstraints from "../courses/aspnet-core/03-routing-urls/route-constraints.json";
+import lessonAspnetCore03routingurlsurlgeneration from "../courses/aspnet-core/03-routing-urls/url-generation.json";
+import lessonAspnetCore03routingurlsarearouting from "../courses/aspnet-core/03-routing-urls/area-routing.json";
+import lessonAspnetCore04modelbindingvalidationmodelbindingoverview from "../courses/aspnet-core/04-model-binding-validation/model-binding-overview.json";
+import lessonAspnetCore04modelbindingvalidationbindingsources from "../courses/aspnet-core/04-model-binding-validation/binding-sources.json";
+import lessonAspnetCore04modelbindingvalidationvalidationattributes from "../courses/aspnet-core/04-model-binding-validation/validation-attributes.json";
+import lessonAspnetCore04modelbindingvalidationcustomvalidation from "../courses/aspnet-core/04-model-binding-validation/custom-validation.json";
+import lessonAspnetCore04modelbindingvalidationclientsidevalidation from "../courses/aspnet-core/04-model-binding-validation/client-side-validation.json";
+import lessonAspnetCore05razorviewsrazorsyntax from "../courses/aspnet-core/05-razor-views/razor-syntax.json";
+import lessonAspnetCore05razorviewslayoutsandpartials from "../courses/aspnet-core/05-razor-views/layouts-and-partials.json";
+import lessonAspnetCore05razorviewsviewcomponents from "../courses/aspnet-core/05-razor-views/view-components.json";
+import lessonAspnetCore05razorviewstaghelpers from "../courses/aspnet-core/05-razor-views/tag-helpers.json";
+import lessonAspnetCore06dependencyinjectiondibasics from "../courses/aspnet-core/06-dependency-injection/di-basics.json";
+import lessonAspnetCore06dependencyinjectionservicelifetimes from "../courses/aspnet-core/06-dependency-injection/service-lifetimes.json";
+import lessonAspnetCore06dependencyinjectionconstructorinjection from "../courses/aspnet-core/06-dependency-injection/constructor-injection.json";
+import lessonAspnetCore06dependencyinjectionconfiguringservices from "../courses/aspnet-core/06-dependency-injection/configuring-services.json";
+import lessonAspnetCore06dependencyinjectionadvanceddipatterns from "../courses/aspnet-core/06-dependency-injection/advanced-di-patterns.json";
+import lessonAspnetCore07middlewarepipelinemiddlewareconcepts from "../courses/aspnet-core/07-middleware-pipeline/middleware-concepts.json";
+import lessonAspnetCore07middlewarepipelinebuiltinmiddleware from "../courses/aspnet-core/07-middleware-pipeline/built-in-middleware.json";
+import lessonAspnetCore07middlewarepipelinecustommiddleware from "../courses/aspnet-core/07-middleware-pipeline/custom-middleware.json";
+import lessonAspnetCore07middlewarepipelineexceptionhandling from "../courses/aspnet-core/07-middleware-pipeline/exception-handling.json";
+import lessonAspnetCore07middlewarepipelinestaticfilesandcaching from "../courses/aspnet-core/07-middleware-pipeline/static-files-and-caching.json";
+import lessonAspnetCore08entityframeworkcoreefcoreintroduction from "../courses/aspnet-core/08-entity-framework-core/efcore-introduction.json";
+import lessonAspnetCore08entityframeworkcoredbcontextandmigrations from "../courses/aspnet-core/08-entity-framework-core/dbcontext-and-migrations.json";
+import lessonAspnetCore08entityframeworkcorequeryingwithlinq from "../courses/aspnet-core/08-entity-framework-core/querying-with-linq.json";
+import lessonAspnetCore08entityframeworkcorerelationshipsandconfigurations from "../courses/aspnet-core/08-entity-framework-core/relationships-and-configurations.json";
+import lessonAspnetCore08entityframeworkcoreperformanceoptimization from "../courses/aspnet-core/08-entity-framework-core/performance-optimization.json";
+import lessonAspnetCore09authenticationauthorizationauthbasics from "../courses/aspnet-core/09-authentication-authorization/auth-basics.json";
+import lessonAspnetCore09authenticationauthorizationidentitysetup from "../courses/aspnet-core/09-authentication-authorization/identity-setup.json";
+import lessonAspnetCore09authenticationauthorizationjwttokens from "../courses/aspnet-core/09-authentication-authorization/jwt-tokens.json";
+import lessonAspnetCore09authenticationauthorizationrolebasedaccess from "../courses/aspnet-core/09-authentication-authorization/role-based-access.json";
+import lessonAspnetCore09authenticationauthorizationpolicybasedauthorization from "../courses/aspnet-core/09-authentication-authorization/policy-based-authorization.json";
+import lessonAspnetCore10webapirestrestprinciples from "../courses/aspnet-core/10-web-api-rest/rest-principles.json";
+import lessonAspnetCore10webapirestapicontrollers from "../courses/aspnet-core/10-web-api-rest/api-controllers.json";
+import lessonAspnetCore10webapiresthttpmethodsandstatuscodes from "../courses/aspnet-core/10-web-api-rest/http-methods-and-status-codes.json";
+import lessonAspnetCore10webapirestversioninganddocumentation from "../courses/aspnet-core/10-web-api-rest/versioning-and-documentation.json";
+import lessonAspnetCore10webapirestswaggerandopenapi from "../courses/aspnet-core/10-web-api-rest/swagger-and-openapi.json";
+import lessonAspnetCore11testingdebuggingtestingfundamentals from "../courses/aspnet-core/11-testing-debugging/testing-fundamentals.json";
+import lessonAspnetCore11testingdebuggingunittestingcontrollers from "../courses/aspnet-core/11-testing-debugging/unit-testing-controllers.json";
+import lessonAspnetCore11testingdebuggingintegrationtesting from "../courses/aspnet-core/11-testing-debugging/integration-testing.json";
+import lessonAspnetCore11testingdebuggingdebuggingtechniques from "../courses/aspnet-core/11-testing-debugging/debugging-techniques.json";
+import lessonAspnetCore11testingdebuggingloggingandmonitoring from "../courses/aspnet-core/11-testing-debugging/logging-and-monitoring.json";
+import lessonAspnetCore12deploymentproductiondeploymentoptions from "../courses/aspnet-core/12-deployment-production/deployment-options.json";
+import lessonAspnetCore12deploymentproductiondockercontainerization from "../courses/aspnet-core/12-deployment-production/docker-containerization.json";
+import lessonAspnetCore12deploymentproductionclouddeployment from "../courses/aspnet-core/12-deployment-production/cloud-deployment.json";
+import lessonAspnetCore12deploymentproductionperformancetuning from "../courses/aspnet-core/12-deployment-production/performance-tuning.json";
+import lessonAspnetCore12deploymentproductionmonitoringandalerting from "../courses/aspnet-core/12-deployment-production/monitoring-and-alerting.json";
 
 import linqLesson1 from "../courses/linq/01-getting-started-linq/learn-linq-step-by-step.json";
 import linqLesson2 from "../courses/linq/01-getting-started-linq/linq-api-in-net.json";
@@ -1358,6 +1350,108 @@ import systemDesignDevopsLesson1 from "../problems/system-design/devops-system-d
 import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-design/kubernetes-multi-env-architecture.json";
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
 
+
+import dotnetLesson1 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/what-is-nuget.json";
+import dotnetLesson2 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/installing-packages.json";
+import dotnetLesson3 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/creating-packages.json";
+import dotnetLesson4 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/nuget-config.json";
+import dotnetLesson5 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-options.json";
+import dotnetLesson6 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-logging.json";
+import dotnetLesson7 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-configuration.json";
+import dotnetLesson8 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-dependencyinjection.json";
+import dotnetLesson9 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-mvc.json";
+import dotnetLesson10 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-authentication.json";
+import dotnetLesson11 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-authorization.json";
+import dotnetLesson12 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-cors.json";
+import dotnetLesson13 from "../courses/dotnet-nuget-packages/04-database-data-access/entity-framework-core.json";
+import dotnetLesson14 from "../courses/dotnet-nuget-packages/04-database-data-access/dapper.json";
+import dotnetLesson15 from "../courses/dotnet-nuget-packages/04-database-data-access/npgsql.json";
+import dotnetLesson16 from "../courses/dotnet-nuget-packages/04-database-data-access/mysqlconnector.json";
+import dotnetLesson17 from "../courses/dotnet-nuget-packages/04-database-data-access/sqlclient.json";
+import dotnetLesson18 from "../courses/dotnet-nuget-packages/04-database-data-access/redis.json";
+import dotnetLesson19 from "../courses/dotnet-nuget-packages/04-database-data-access/stackexchange-redis.json";
+import dotnetLesson20 from "../courses/dotnet-nuget-packages/04-database-data-access/mongodb-driver.json";
+import dotnetLesson21 from "../courses/dotnet-nuget-packages/05-serialization-mapping/system-text-json.json";
+import dotnetLesson22 from "../courses/dotnet-nuget-packages/05-serialization-mapping/newtonsoft-json.json";
+import dotnetLesson23 from "../courses/dotnet-nuget-packages/05-serialization-mapping/yamldotnet.json";
+import dotnetLesson24 from "../courses/dotnet-nuget-packages/05-serialization-mapping/automapper.json";
+import dotnetLesson25 from "../courses/dotnet-nuget-packages/05-serialization-mapping/mapster.json";
+import dotnetLesson26 from "../courses/dotnet-nuget-packages/05-serialization-mapping/messagepack.json";
+import dotnetLesson27 from "../courses/dotnet-nuget-packages/05-serialization-mapping/protobuf.json";
+import dotnetLesson28 from "../courses/dotnet-nuget-packages/05-serialization-mapping/csvhelper.json";
+import dotnetLesson29 from "../courses/dotnet-nuget-packages/06-messaging-events/masstransit.json";
+import dotnetLesson30 from "../courses/dotnet-nuget-packages/06-messaging-events/rabbitmq-client.json";
+import dotnetLesson31 from "../courses/dotnet-nuget-packages/06-messaging-events/rebus.json";
+import dotnetLesson32 from "../courses/dotnet-nuget-packages/06-messaging-events/mediatr.json";
+import dotnetLesson33 from "../courses/dotnet-nuget-packages/06-messaging-events/hangfire.json";
+import dotnetLesson34 from "../courses/dotnet-nuget-packages/06-messaging-events/quartz.json";
+import dotnetLesson35 from "../courses/dotnet-nuget-packages/06-messaging-events/cronos.json";
+import dotnetLesson36 from "../courses/dotnet-nuget-packages/06-messaging-events/background-service.json";
+import dotnetLesson37 from "../courses/dotnet-nuget-packages/cloud-integration/azure-storage-blobs.json";
+import dotnetLesson38 from "../courses/dotnet-nuget-packages/cloud-integration/amazon-s3.json";
+import dotnetLesson39 from "../courses/dotnet-nuget-packages/cloud-integration/azure-identity.json";
+import dotnetLesson40 from "../courses/dotnet-nuget-packages/cloud-integration/azure-keyvault.json";
+import dotnetLesson41 from "../courses/dotnet-nuget-packages/cloud-integration/aws-sdk-core.json";
+import dotnetLesson42 from "../courses/dotnet-nuget-packages/cloud-integration/azure-servicebus.json";
+import dotnetLesson43 from "../courses/dotnet-nuget-packages/cloud-integration/azure-event-hubs.json";
+import dotnetLesson44 from "../courses/dotnet-nuget-packages/cloud-integration/minio.json";
+import dotnetLesson45 from "../courses/dotnet-nuget-packages/api-documentation-swagger/swashbuckle.json";
+import dotnetLesson46 from "../courses/dotnet-nuget-packages/api-documentation-swagger/nspec.json";
+import dotnetLesson47 from "../courses/dotnet-nuget-packages/api-documentation-swagger/openapi-generator.json";
+import dotnetLesson48 from "../courses/dotnet-nuget-packages/api-documentation-swagger/microsoft-openapi.json";
+import dotnetLesson49 from "../courses/dotnet-nuget-packages/api-documentation-swagger/swashbuckle-aspnetcore.json";
+import dotnetLesson50 from "../courses/dotnet-nuget-packages/advanced-patterns/system-threading-channels.json";
+import dotnetLesson51 from "../courses/dotnet-nuget-packages/advanced-patterns/memorystream.json";
+import dotnetLesson52 from "../courses/dotnet-nuget-packages/advanced-patterns/system-io-pipelines.json";
+import dotnetLesson53 from "../courses/dotnet-nuget-packages/advanced-patterns/source-generators.json";
+import dotnetLesson54 from "../courses/dotnet-nuget-packages/advanced-patterns/roslyn-analyzers.json";
+import dotnetLesson55 from "../courses/dotnet-nuget-packages/advanced-patterns/spectre-console.json";
+import dotnetLesson56 from "../courses/dotnet-nuget-packages/advanced-patterns/benchmark-dotnet.json";
+import dotnetLesson57 from "../courses/dotnet-nuget-packages/advanced-patterns/system-text-json-source-gen.json";
+import dotnetLesson701 from "../courses/dotnet-nuget-packages/07-testing-quality/xunit.json";
+import dotnetLesson702 from "../courses/dotnet-nuget-packages/07-testing-quality/nunit.json";
+import dotnetLesson703 from "../courses/dotnet-nuget-packages/07-testing-quality/mstest.json";
+import dotnetLesson704 from "../courses/dotnet-nuget-packages/07-testing-quality/fluent-assertions.json";
+import dotnetLesson705 from "../courses/dotnet-nuget-packages/07-testing-quality/moq.json";
+import dotnetLesson706 from "../courses/dotnet-nuget-packages/07-testing-quality/nsubstitute.json";
+import dotnetLesson707 from "../courses/dotnet-nuget-packages/07-testing-quality/autofixture.json";
+import dotnetLesson708 from "../courses/dotnet-nuget-packages/07-testing-quality/bogus.json";
+import dotnetLesson801 from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt.json";
+import dotnetLesson802 from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt-net.json";
+import dotnetLesson803 from "../courses/dotnet-nuget-packages/08-security-cryptography/data-protection.json";
+import dotnetLesson804 from "../courses/dotnet-nuget-packages/08-security-cryptography/jwt.json";
+import dotnetLesson805 from "../courses/dotnet-nuget-packages/08-security-cryptography/identity-model.json";
+import dotnetLesson806 from "../courses/dotnet-nuget-packages/08-security-cryptography/sharpcompress.json";
+import dotnetLesson807 from "../courses/dotnet-nuget-packages/08-security-cryptography/password-validator.json";
+import dotnetLesson901 from "../courses/dotnet-nuget-packages/09-utilities-helpers/fluent-email.json";
+import dotnetLesson902 from "../courses/dotnet-nuget-packages/09-utilities-helpers/mailkit.json";
+import dotnetLesson903 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sendgrid.json";
+import dotnetLesson904 from "../courses/dotnet-nuget-packages/09-utilities-helpers/humanizer.json";
+import dotnetLesson905 from "../courses/dotnet-nuget-packages/09-utilities-helpers/jsonpatch.json";
+import dotnetLesson906 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sharpcompress.json";
+import dotnetLesson907 from "../courses/dotnet-nuget-packages/09-utilities-helpers/figgle.json";
+import dotnetLesson908 from "../courses/dotnet-nuget-packages/09-utilities-helpers/more-linq.json";
+import nugetLesson1 from "../courses/dotnet-nuget-packages/logging-monitoring/serilog.json";
+import nugetLesson2 from "../courses/dotnet-nuget-packages/logging-monitoring/nlog.json";
+import nugetLesson3 from "../courses/dotnet-nuget-packages/logging-monitoring/log4net.json";
+import nugetLesson4 from "../courses/dotnet-nuget-packages/logging-monitoring/seq.json";
+import nugetLesson5 from "../courses/dotnet-nuget-packages/logging-monitoring/elasticsearch.json";
+import nugetLesson6 from "../courses/dotnet-nuget-packages/logging-monitoring/prometheus.json";
+import nugetLesson7 from "../courses/dotnet-nuget-packages/logging-monitoring/application-insights.json";
+import nugetLesson8 from "../courses/dotnet-nuget-packages/logging-monitoring/opentelemetry.json";
+import nugetLesson9 from "../courses/dotnet-nuget-packages/validation-authorization/fluentvalidation.json";
+import nugetLesson10 from "../courses/dotnet-nuget-packages/validation-authorization/dataannotations.json";
+import nugetLesson11 from "../courses/dotnet-nuget-packages/validation-authorization/identityserver.json";
+import nugetLesson12 from "../courses/dotnet-nuget-packages/validation-authorization/openiddict.json";
+import nugetLesson13 from "../courses/dotnet-nuget-packages/validation-authorization/jwtbearer.json";
+import nugetLesson14 from "../courses/dotnet-nuget-packages/validation-authorization/policy-server.json";
+import nugetLesson15 from "../courses/dotnet-nuget-packages/http-clients-resilience/refit.json";
+import nugetLesson16 from "../courses/dotnet-nuget-packages/http-clients-resilience/flurl.json";
+import nugetLesson17 from "../courses/dotnet-nuget-packages/http-clients-resilience/restsharp.json";
+import nugetLesson18 from "../courses/dotnet-nuget-packages/http-clients-resilience/polly.json";
+import nugetLesson19 from "../courses/dotnet-nuget-packages/http-clients-resilience/polly-simmy.json";
+import nugetLesson20 from "../courses/dotnet-nuget-packages/http-clients-resilience/httpclientfactory.json";
+
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -1519,73 +1613,65 @@ const rawLessonsPart1: any[] = [
 	sqlLesson158,
 	sqlLesson159,
 	sqlLesson160,
-	aspLesson1,
-	aspLesson2,
-	aspLesson3,
-	aspLesson4,
-	aspLesson40,
-	aspLesson5,
-	aspLesson6,
-	aspLesson7,
-	aspLesson38,
-	aspLesson39,
-	aspLesson8,
-	aspLesson9,
-	aspLesson10,
-	aspLesson41,
-	aspLesson11,
-	aspLesson12,
-	aspLesson13,
-	aspLesson14,
-	aspLesson15,
-	aspLesson16,
-	aspLesson42,
-	aspLesson43,
-	aspLesson44,
-	aspLesson17,
-	aspLesson18,
-	aspLesson19,
-	aspLesson20,
-	aspLesson21,
-	aspLesson22,
-	aspLesson45,
-	aspLesson46,
-	aspLesson23,
-	aspLesson24,
-	aspLesson25,
-	aspLesson26,
-	aspLesson27,
-	aspLesson28,
-	aspLesson29,
-	aspLesson30,
-	aspLesson31,
-	aspLesson32,
-	aspLesson33,
-	aspLesson34,
-	aspLesson35,
-	aspLesson47,
-	aspLesson48,
-	aspLesson57,
-	aspLesson36,
-	aspLesson49,
-	aspLesson50,
-	aspLesson51,
-	aspLesson52,
-	aspLesson37,
-	aspLesson53,
-	aspLesson54,
-	aspLesson55,
-	aspLesson56,
-	aspLesson67,
-	aspLesson58,
-	aspLesson59,
-	aspLesson60,
-	aspLesson61,
-	aspLesson62,
-	aspLesson63,
-	aspLesson64,
-	aspLesson65,
-	aspLesson66,
+	lessonAspnetCore01gettingstartedwhatisaspnetcore,
+	lessonAspnetCore01gettingstartedsettingupenvironment,
+	lessonAspnetCore01gettingstartedcreatingfirstproject,
+	lessonAspnetCore01gettingstartedunderstandingprojectstructure,
+	lessonAspnetCore01gettingstartedrunninganddebugging,
+	lessonAspnetCore02mvcfundamentalsmvcarchitecture,
+	lessonAspnetCore02mvcfundamentalscontrollersandactions,
+	lessonAspnetCore02mvcfundamentalsviewsandtemplates,
+	lessonAspnetCore02mvcfundamentalsmodelsandviewdata,
+	lessonAspnetCore02mvcfundamentalshandlinguserinput,
+	lessonAspnetCore03routingurlsroutingbasics,
+	lessonAspnetCore03routingurlsattributerouting,
+	lessonAspnetCore03routingurlsrouteconstraints,
+	lessonAspnetCore03routingurlsurlgeneration,
+	lessonAspnetCore03routingurlsarearouting,
+	lessonAspnetCore04modelbindingvalidationmodelbindingoverview,
+	lessonAspnetCore04modelbindingvalidationbindingsources,
+	lessonAspnetCore04modelbindingvalidationvalidationattributes,
+	lessonAspnetCore04modelbindingvalidationcustomvalidation,
+	lessonAspnetCore04modelbindingvalidationclientsidevalidation,
+	lessonAspnetCore05razorviewsrazorsyntax,
+	lessonAspnetCore05razorviewslayoutsandpartials,
+	lessonAspnetCore05razorviewsviewcomponents,
+	lessonAspnetCore05razorviewstaghelpers,
+	lessonAspnetCore06dependencyinjectiondibasics,
+	lessonAspnetCore06dependencyinjectionservicelifetimes,
+	lessonAspnetCore06dependencyinjectionconstructorinjection,
+	lessonAspnetCore06dependencyinjectionconfiguringservices,
+	lessonAspnetCore06dependencyinjectionadvanceddipatterns,
+	lessonAspnetCore07middlewarepipelinemiddlewareconcepts,
+	lessonAspnetCore07middlewarepipelinebuiltinmiddleware,
+	lessonAspnetCore07middlewarepipelinecustommiddleware,
+	lessonAspnetCore07middlewarepipelineexceptionhandling,
+	lessonAspnetCore07middlewarepipelinestaticfilesandcaching,
+	lessonAspnetCore08entityframeworkcoreefcoreintroduction,
+	lessonAspnetCore08entityframeworkcoredbcontextandmigrations,
+	lessonAspnetCore08entityframeworkcorequeryingwithlinq,
+	lessonAspnetCore08entityframeworkcorerelationshipsandconfigurations,
+	lessonAspnetCore08entityframeworkcoreperformanceoptimization,
+	lessonAspnetCore09authenticationauthorizationauthbasics,
+	lessonAspnetCore09authenticationauthorizationidentitysetup,
+	lessonAspnetCore09authenticationauthorizationjwttokens,
+	lessonAspnetCore09authenticationauthorizationrolebasedaccess,
+	lessonAspnetCore09authenticationauthorizationpolicybasedauthorization,
+	lessonAspnetCore10webapirestrestprinciples,
+	lessonAspnetCore10webapirestapicontrollers,
+	lessonAspnetCore10webapiresthttpmethodsandstatuscodes,
+	lessonAspnetCore10webapirestversioninganddocumentation,
+	lessonAspnetCore10webapirestswaggerandopenapi,
+	lessonAspnetCore11testingdebuggingtestingfundamentals,
+	lessonAspnetCore11testingdebuggingunittestingcontrollers,
+	lessonAspnetCore11testingdebuggingintegrationtesting,
+	lessonAspnetCore11testingdebuggingdebuggingtechniques,
+	lessonAspnetCore11testingdebuggingloggingandmonitoring,
+	lessonAspnetCore12deploymentproductiondeploymentoptions,
+	lessonAspnetCore12deploymentproductiondockercontainerization,
+	lessonAspnetCore12deploymentproductionclouddeployment,
+	lessonAspnetCore12deploymentproductionperformancetuning,
+	lessonAspnetCore12deploymentproductionmonitoringandalerting,
 	linqLesson1,
 	linqLesson2,
 	linqLesson3,
@@ -2688,6 +2774,106 @@ const rawLessonsPart2: any[] = [
 	sqlProblemsLesson48,
 	sqlProblemsLesson49,
 	sqlProblemsLesson50,
+	dotnetLesson1,
+	dotnetLesson2,
+	dotnetLesson3,
+	dotnetLesson4,
+	dotnetLesson5,
+	dotnetLesson6,
+	dotnetLesson7,
+	dotnetLesson8,
+	dotnetLesson9,
+	dotnetLesson10,
+	dotnetLesson11,
+	dotnetLesson12,
+	dotnetLesson13,
+	dotnetLesson14,
+	dotnetLesson15,
+	dotnetLesson16,
+	dotnetLesson17,
+	dotnetLesson18,
+	dotnetLesson19,
+	dotnetLesson20,
+	dotnetLesson21,
+	dotnetLesson22,
+	dotnetLesson23,
+	dotnetLesson24,
+	dotnetLesson25,
+	dotnetLesson26,
+	dotnetLesson27,
+	dotnetLesson28,
+	dotnetLesson29,
+	dotnetLesson30,
+	dotnetLesson31,
+	dotnetLesson32,
+	dotnetLesson33,
+	dotnetLesson34,
+	dotnetLesson35,
+	dotnetLesson36,
+	dotnetLesson37,
+	dotnetLesson38,
+	dotnetLesson39,
+	dotnetLesson40,
+	dotnetLesson41,
+	dotnetLesson42,
+	dotnetLesson43,
+	dotnetLesson44,
+	dotnetLesson45,
+	dotnetLesson46,
+	dotnetLesson47,
+	dotnetLesson48,
+	dotnetLesson49,
+	dotnetLesson50,
+	dotnetLesson51,
+	dotnetLesson52,
+	dotnetLesson53,
+	dotnetLesson54,
+	dotnetLesson55,
+	dotnetLesson56,
+	dotnetLesson57,
+	dotnetLesson701,
+	dotnetLesson702,
+	dotnetLesson703,
+	dotnetLesson704,
+	dotnetLesson705,
+	dotnetLesson706,
+	dotnetLesson707,
+	dotnetLesson708,
+	dotnetLesson801,
+	dotnetLesson802,
+	dotnetLesson803,
+	dotnetLesson804,
+	dotnetLesson805,
+	dotnetLesson806,
+	dotnetLesson807,
+	dotnetLesson901,
+	dotnetLesson902,
+	dotnetLesson903,
+	dotnetLesson904,
+	dotnetLesson905,
+	dotnetLesson906,
+	dotnetLesson907,
+	dotnetLesson908,
+	nugetLesson1,
+	nugetLesson2,
+	nugetLesson3,
+	nugetLesson4,
+	nugetLesson5,
+	nugetLesson6,
+	nugetLesson7,
+	nugetLesson8,
+	nugetLesson9,
+	nugetLesson10,
+	nugetLesson11,
+	nugetLesson12,
+	nugetLesson13,
+	nugetLesson14,
+	nugetLesson15,
+	nugetLesson16,
+	nugetLesson17,
+	nugetLesson18,
+	nugetLesson19,
+	nugetLesson20,
 	systemDesignReactLesson1,
 	systemDesignReactLesson2,
 	systemDesignReactLesson3,
@@ -2697,6 +2883,29 @@ const rawLessonsPart2: any[] = [
 	systemDesignDevopsLesson1,
 	systemDesignDevopsLesson2,
 	systemDesignDevopsLesson3,
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];
