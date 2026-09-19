@@ -239,20 +239,23 @@ import dotnetModule13 from "../courses/dotnet-nuget-packages/http-clients-resili
 import dotnetModule14 from "../courses/dotnet-nuget-packages/logging-monitoring/content.json";
 import dotnetModule15 from "../courses/dotnet-nuget-packages/validation-authorization/content.json";
 
-import yarnModule1 from "../courses/yarn-npm-packages/01-package-managers/content.json";
-import yarnModule2 from "../courses/yarn-npm-packages/02-build-tools/content.json";
-import yarnModule3 from "../courses/yarn-npm-packages/03-testing-libraries/content.json";
-import yarnModule4 from "../courses/yarn-npm-packages/04-styling/content.json";
-import yarnModule5 from "../courses/yarn-npm-packages/05-state-management/content.json";
-import yarnModule6 from "../courses/yarn-npm-packages/06-routing/content.json";
+import yarnModule1 from "../courses/yarn-npm-packages/yarn-npm-fundamentals/content.json";
+import yarnModule2 from "../courses/yarn-npm-packages/frontend-frameworks/content.json";
+import yarnModule3 from "../courses/yarn-npm-packages/build-tools/content.json";
+import yarnModule4 from "../courses/yarn-npm-packages/styling/content.json";
+import yarnModule5 from "../courses/yarn-npm-packages/state-management/content.json";
+import yarnModule6 from "../courses/yarn-npm-packages/routing/content.json";
 import yarnModule7 from "../courses/yarn-npm-packages/http-clients/content.json";
 import yarnModule8 from "../courses/yarn-npm-packages/testing/content.json";
 import yarnModule9 from "../courses/yarn-npm-packages/utilities/content.json";
-import yarnModule10 from "../courses/yarn-npm-packages/react-hooks-patterns/content.json";
-import yarnModule11 from "../courses/yarn-npm-packages/react-performance/content.json";
-import yarnModule12 from "../courses/yarn-npm-packages/react-forms-input/content.json";
-import yarnModule13 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
-import yarnModule14 from "../courses/yarn-npm-packages/react-testing/content.json";
+import yarnModule10 from "../courses/yarn-npm-packages/forms/content.json";
+import yarnModule11 from "../courses/yarn-npm-packages/animation/content.json";
+import yarnModule12 from "../courses/yarn-npm-packages/advanced-patterns/content.json";
+import yarnModule13 from "../courses/yarn-npm-packages/react-hooks-patterns/content.json";
+import yarnModule14 from "../courses/yarn-npm-packages/react-performance/content.json";
+import yarnModule15 from "../courses/yarn-npm-packages/react-forms-input/content.json";
+import yarnModule16 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
+import yarnModule17 from "../courses/yarn-npm-packages/react-testing/content.json";
 
 const rawModules = [
 	sqlModule1,
@@ -534,6 +537,9 @@ const rawModules = [
 	yarnModule12,
 	yarnModule13,
 	yarnModule14,
+	yarnModule15,
+	yarnModule16,
+	yarnModule17,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];
