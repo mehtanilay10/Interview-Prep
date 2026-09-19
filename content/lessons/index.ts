@@ -1359,42 +1359,42 @@ import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-d
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
 
 
-import dotnetLesson1 from "../courses/dotnet-nuget-packages/nuget-fundamentals/what-is-nuget.json";
-import dotnetLesson2 from "../courses/dotnet-nuget-packages/nuget-fundamentals/installing-packages.json";
-import dotnetLesson3 from "../courses/dotnet-nuget-packages/nuget-fundamentals/creating-packages.json";
-import dotnetLesson4 from "../courses/dotnet-nuget-packages/nuget-fundamentals/nuget-config.json";
-import dotnetLesson5 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-options.json";
-import dotnetLesson6 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-logging.json";
-import dotnetLesson7 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-configuration.json";
-import dotnetLesson8 from "../courses/dotnet-nuget-packages/core-extensions/microsoft-extensions-dependencyinjection.json";
-import dotnetLesson9 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-mvc.json";
-import dotnetLesson10 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-authentication.json";
-import dotnetLesson11 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-authorization.json";
-import dotnetLesson12 from "../courses/dotnet-nuget-packages/aspnet-web/microsoft-aspnetcore-cors.json";
-import dotnetLesson13 from "../courses/dotnet-nuget-packages/database-data-access/entity-framework-core.json";
-import dotnetLesson14 from "../courses/dotnet-nuget-packages/database-data-access/dapper.json";
-import dotnetLesson15 from "../courses/dotnet-nuget-packages/database-data-access/npgsql.json";
-import dotnetLesson16 from "../courses/dotnet-nuget-packages/database-data-access/mysqlconnector.json";
-import dotnetLesson17 from "../courses/dotnet-nuget-packages/database-data-access/sqlclient.json";
-import dotnetLesson18 from "../courses/dotnet-nuget-packages/database-data-access/redis.json";
-import dotnetLesson19 from "../courses/dotnet-nuget-packages/database-data-access/stackexchange-redis.json";
-import dotnetLesson20 from "../courses/dotnet-nuget-packages/database-data-access/mongodb-driver.json";
-import dotnetLesson21 from "../courses/dotnet-nuget-packages/serialization-mapping/system-text-json.json";
-import dotnetLesson22 from "../courses/dotnet-nuget-packages/serialization-mapping/newtonsoft-json.json";
-import dotnetLesson23 from "../courses/dotnet-nuget-packages/serialization-mapping/yamldotnet.json";
-import dotnetLesson24 from "../courses/dotnet-nuget-packages/serialization-mapping/automapper.json";
-import dotnetLesson25 from "../courses/dotnet-nuget-packages/serialization-mapping/mapster.json";
-import dotnetLesson26 from "../courses/dotnet-nuget-packages/serialization-mapping/messagepack.json";
-import dotnetLesson27 from "../courses/dotnet-nuget-packages/serialization-mapping/protobuf.json";
-import dotnetLesson28 from "../courses/dotnet-nuget-packages/serialization-mapping/csvhelper.json";
-import dotnetLesson29 from "../courses/dotnet-nuget-packages/messaging-events/masstransit.json";
-import dotnetLesson30 from "../courses/dotnet-nuget-packages/messaging-events/rabbitmq-client.json";
-import dotnetLesson31 from "../courses/dotnet-nuget-packages/messaging-events/rebus.json";
-import dotnetLesson32 from "../courses/dotnet-nuget-packages/messaging-events/mediatr.json";
-import dotnetLesson33 from "../courses/dotnet-nuget-packages/messaging-events/hangfire.json";
-import dotnetLesson34 from "../courses/dotnet-nuget-packages/messaging-events/quartz.json";
-import dotnetLesson35 from "../courses/dotnet-nuget-packages/messaging-events/cronos.json";
-import dotnetLesson36 from "../courses/dotnet-nuget-packages/messaging-events/background-service.json";
+import dotnetLesson1 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/what-is-nuget.json";
+import dotnetLesson2 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/installing-packages.json";
+import dotnetLesson3 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/creating-packages.json";
+import dotnetLesson4 from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/nuget-config.json";
+import dotnetLesson5 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-options.json";
+import dotnetLesson6 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-logging.json";
+import dotnetLesson7 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-configuration.json";
+import dotnetLesson8 from "../courses/dotnet-nuget-packages/02-core-extensions/microsoft-extensions-dependencyinjection.json";
+import dotnetLesson9 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-mvc.json";
+import dotnetLesson10 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-authentication.json";
+import dotnetLesson11 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-authorization.json";
+import dotnetLesson12 from "../courses/dotnet-nuget-packages/03-aspnet-web/microsoft-aspnetcore-cors.json";
+import dotnetLesson13 from "../courses/dotnet-nuget-packages/04-database-data-access/entity-framework-core.json";
+import dotnetLesson14 from "../courses/dotnet-nuget-packages/04-database-data-access/dapper.json";
+import dotnetLesson15 from "../courses/dotnet-nuget-packages/04-database-data-access/npgsql.json";
+import dotnetLesson16 from "../courses/dotnet-nuget-packages/04-database-data-access/mysqlconnector.json";
+import dotnetLesson17 from "../courses/dotnet-nuget-packages/04-database-data-access/sqlclient.json";
+import dotnetLesson18 from "../courses/dotnet-nuget-packages/04-database-data-access/redis.json";
+import dotnetLesson19 from "../courses/dotnet-nuget-packages/04-database-data-access/stackexchange-redis.json";
+import dotnetLesson20 from "../courses/dotnet-nuget-packages/04-database-data-access/mongodb-driver.json";
+import dotnetLesson21 from "../courses/dotnet-nuget-packages/05-serialization-mapping/system-text-json.json";
+import dotnetLesson22 from "../courses/dotnet-nuget-packages/05-serialization-mapping/newtonsoft-json.json";
+import dotnetLesson23 from "../courses/dotnet-nuget-packages/05-serialization-mapping/yamldotnet.json";
+import dotnetLesson24 from "../courses/dotnet-nuget-packages/05-serialization-mapping/automapper.json";
+import dotnetLesson25 from "../courses/dotnet-nuget-packages/05-serialization-mapping/mapster.json";
+import dotnetLesson26 from "../courses/dotnet-nuget-packages/05-serialization-mapping/messagepack.json";
+import dotnetLesson27 from "../courses/dotnet-nuget-packages/05-serialization-mapping/protobuf.json";
+import dotnetLesson28 from "../courses/dotnet-nuget-packages/05-serialization-mapping/csvhelper.json";
+import dotnetLesson29 from "../courses/dotnet-nuget-packages/06-messaging-events/masstransit.json";
+import dotnetLesson30 from "../courses/dotnet-nuget-packages/06-messaging-events/rabbitmq-client.json";
+import dotnetLesson31 from "../courses/dotnet-nuget-packages/06-messaging-events/rebus.json";
+import dotnetLesson32 from "../courses/dotnet-nuget-packages/06-messaging-events/mediatr.json";
+import dotnetLesson33 from "../courses/dotnet-nuget-packages/06-messaging-events/hangfire.json";
+import dotnetLesson34 from "../courses/dotnet-nuget-packages/06-messaging-events/quartz.json";
+import dotnetLesson35 from "../courses/dotnet-nuget-packages/06-messaging-events/cronos.json";
+import dotnetLesson36 from "../courses/dotnet-nuget-packages/06-messaging-events/background-service.json";
 import dotnetLesson37 from "../courses/dotnet-nuget-packages/cloud-integration/azure-storage-blobs.json";
 import dotnetLesson38 from "../courses/dotnet-nuget-packages/cloud-integration/amazon-s3.json";
 import dotnetLesson39 from "../courses/dotnet-nuget-packages/cloud-integration/azure-identity.json";
@@ -2870,6 +2870,26 @@ const rawLessonsPart2: any[] = [
 	dotnetLesson906,
 	dotnetLesson907,
 	dotnetLesson908,
+	nugetLesson1,
+	nugetLesson2,
+	nugetLesson3,
+	nugetLesson4,
+	nugetLesson5,
+	nugetLesson6,
+	nugetLesson7,
+	nugetLesson8,
+	nugetLesson9,
+	nugetLesson10,
+	nugetLesson11,
+	nugetLesson12,
+	nugetLesson13,
+	nugetLesson14,
+	nugetLesson15,
+	nugetLesson16,
+	nugetLesson17,
+	nugetLesson18,
+	nugetLesson19,
+	nugetLesson20,
 	systemDesignReactLesson1,
 	systemDesignReactLesson2,
 	systemDesignReactLesson3,
