@@ -1,0 +1,114 @@
+{
+  "id": "lesson-sd-aspnet-06",
+  "slug": "aspnet-background-jobs-processing",
+  "moduleSlug": "aspnet-system-design",
+  "courseSlug": "system-design",
+  "title": "Design Background Job Processing in ASP.NET Core",
+  "description": "Offload long-running work from HTTP requests using hosted services, queues, and external job processors.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["aspnet-core", "background-jobs", "hosted-services", "queues", "hangfire"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Users upload large CSV files for processing. Parsing takes 30+ seconds. Design a system that does not block the web request and survives app restarts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: In-Memory BackgroundService"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use BackgroundService for lightweight, in-process background work. Simple but loses jobs on restart and does not scale across instances."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BackgroundService with Channel",
+        "language": "csharp",
+        "code": "public class CsvProcessingService : BackgroundService\n{\n    private readonly Channel<CsvJob> _channel;\n    private readonly ILogger<CsvProcessingService> _logger;\n\n    public CsvProcessingService(ILogger<CsvProcessingService> logger)\n    {\n        _logger = logger;\n        _channel = Channel.CreateUnbounded<CsvJob>();\n    }\n\n    public async Task EnqueueAsync(CsvJob job)\n    {\n        await _channel.Writer.WriteAsync(job);\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        await foreach (var job in _channel.Reader.ReadAllAsync(stoppingToken))\n        {\n            try\n            {\n                await ProcessCsvAsync(job, stoppingToken);\n                job.ReportSuccess();\n            }\n            catch (Exception ex)\n            {\n                _logger.LogError(ex, \"Failed to process job {JobId}\", job.Id);\n                job.ReportFailure();\n            }\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: External Job Processor"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hangfire or a message broker like RabbitMQ/Kafka survives restarts, supports retries, and provides a dashboard for monitoring."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hangfire Integration",
+        "language": "csharp",
+        "code": "builder.Services.AddHangfire(config =>\n    config.UseSqlServerStorage(builder.Configuration.GetConnectionString(\"Hangfire\")));\nbuilder.Services.AddHangfireServer(options =>\n{\n    options.WorkerCount = Environment.ProcessorCount * 5;\n    options.Queues = new[] { \"csv\", \"email\", \"report\" };\n});\n\n// Enqueue from controller\n[HttpPost]\npublic IActionResult Upload(IFormFile file)\n{\n    var jobId = BackgroundJob.Enqueue(() => _service.ProcessCsvAsync(file.FileName));\n    return Accepted(new { jobId });\n}\n\n// Recurring job\nRecurringJob.AddOrUpdate(\n    \"daily-report\",\n    () => _reportService.GenerateDailyReport(),\n    Cron.Daily);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 3: Message Broker + Worker Service"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Separate the web API from the worker. The API publishes messages to RabbitMQ or Kafka. A standalone worker service consumes them."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RabbitMQ Producer and Consumer",
+        "language": "csharp",
+        "code": "// API - Producer\npublic class CsvController : ControllerBase\n{\n    private readonly IRabbitMQProducer _producer;\n\n    [HttpPost]\n    public IActionResult Upload(IFormFile file)\n    {\n        var message = new CsvUploadMessage { FileName = file.FileName };\n        _producer.Publish(message, exchange: \"jobs\", routingKey: \"csv.process\");\n        return Accepted();\n    }\n}\n\n// Worker Service - Consumer\npublic class CsvWorker : BackgroundService\n{\n    private readonly IRabbitMQConsumer _consumer;\n\n    protected override async Task ExecuteAsync(CancellationToken ct)\n    {\n        await _consumer.Consume<CsvUploadMessage>(\n            queue: \"csv-jobs\",\n            onMessage: async msg => await ProcessCsvAsync(msg, ct));\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "When to Use What",
+        "text": "Use BackgroundService for simple fire-and-forget within the same app. Use Hangfire when you need retries, persistence, and monitoring. Use a message broker for large-scale, multi-service decoupled systems."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "BackgroundService is simplest but not durable across restarts",
+          "Hangfire adds persistence, retries, and a dashboard with minimal code",
+          "Message brokers decouple producers from consumers completely",
+          "Always separate concerns: web API should not do heavy processing inline",
+          "Use Channels for in-process producer-consumer patterns"
+        ],
+        "takeaway": "Offloading work from HTTP requests keeps your API responsive and scalable. Choose the simplest tool that meets your durability and observability needs."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

@@ -1,0 +1,140 @@
+{
+  "id": "lesson-sd-aspnet-08",
+  "slug": "aspnet-api-gateway-grpc",
+  "moduleSlug": "aspnet-system-design",
+  "courseSlug": "system-design",
+  "title": "Design an API Gateway with ASP.NET Core and gRPC",
+  "description": "Use YARP or Ocelot as an API gateway and gRPC for efficient internal service communication.",
+  "order": 8,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["aspnet-core", "api-gateway", "yarp", "grpc", "reverse-proxy"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You have 8 microservices. Clients need a single endpoint. Design an API gateway that routes, authenticates, and transforms requests."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Use an API Gateway"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An API Gateway sits between clients and services. It centralizes cross-cutting concerns like authentication, logging, rate limiting, and request transformation."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Gateway Responsibilities",
+        "items": [
+          "**Routing**: Map public endpoints to internal services",
+          "**Authentication**: Validate JWT or cookies once at the edge",
+          "**Rate Limiting**: Protect downstream services from abuse",
+          "**Request/Response Transformation**: Translate between HTTP and gRPC",
+          "**Load Balancing**: Distribute across service instances"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: YARP Reverse Proxy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "YARP (Yet Another Reverse Proxy) is Microsoft's production-ready reverse proxy for ASP.NET Core. It supports dynamic configuration, transforms, and load balancing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "YARP Configuration",
+        "language": "csharp",
+        "code": "builder.Services.AddReverseProxy()\n    .LoadFromConfig(builder.Configuration.GetSection(\"ReverseProxy\"));\n\napp.MapReverseProxy();\n\n// appsettings.json\n{\n  \"ReverseProxy\": {\n    \"Routes\": {\n      \"orders-route\": {\n        \"ClusterId\": \"orders-cluster\",\n        \"Match\": { \"Path\": \"/api/orders/{**catch-all}\" }\n      }\n    },\n    \"Clusters\": {\n      \"orders-cluster\": {\n        \"Destinations\": {\n          \"orders-1\": { \"Address\": \"https://orders:5001/\" },\n          \"orders-2\": { \"Address\": \"https://orders:5002/\" }\n        }\n      }\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: gRPC for Internal Communication"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "gRPC uses HTTP/2 and Protocol Buffers. It is faster and more strongly typed than REST for internal service-to-service calls."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "gRPC Service and Client",
+        "language": "csharp",
+        "code": "// OrderService.proto\nsyntax = \"proto3\";\noption csharp_namespace = \"Orders\";\n\nservice OrderService {\n    rpc GetOrder (GetOrderRequest) returns (OrderResponse);\n    rpc CreateOrder (CreateOrderRequest) returns (OrderResponse);\n}\n\nmessage GetOrderRequest { int32 id = 1; }\nmessage OrderResponse { int32 id = 1; string status = 2; }\n\n// Generated client usage\npublic class OrdersGrpcClient\n{\n    private readonly OrderService.OrderServiceClient _client;\n\n    public OrdersGrpcClient(OrderService.OrderServiceClient client)\n    {\n        _client = client;\n    }\n\n    public async Task<OrderResponse> GetOrderAsync(int id)\n    {\n        return await _client.GetOrderAsync(new GetOrderRequest { Id = id });\n    }\n}\n\n// Program.cs\nbuilder.Services.AddGrpcClient<OrderService.OrderServiceClient>(options =>\n    options.Address = new Uri(\"https://orders:5001\"));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Gateway Authentication Flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The gateway validates the JWT once. It then forwards claims to internal services via headers. Internal services trust the gateway and skip authentication."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JWT Validation at the Gateway",
+        "language": "csharp",
+        "code": "builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.Authority = \"https://identity.example.com\";\n        options.Audience = \"gateway\";\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidateAudience = true,\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true\n        };\n    });\n\n// Forward claims to downstream services\napp.Use(async (context, next) =>\n{\n    if (context.User.Identity?.IsAuthenticated == true)\n    {\n        context.Request.Headers[\"X-User-Id\"] = context.User.FindFirst(\"sub\")?.Value ?? \"\";\n        context.Request.Headers[\"X-User-Email\"] = context.User.FindFirst(\"email\")?.Value ?? \"\";\n    }\n    await next();\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Gateway Pattern Trade-offs",
+        "text": "A gateway centralizes cross-cutting concerns but adds latency and a single point of failure. Use clustering and health checks to make it resilient."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "YARP is the recommended reverse proxy for ASP.NET Core",
+          "Gateways centralize auth, logging, and rate limiting",
+          "gRPC is more efficient than REST for internal service calls",
+          "Forward authenticated user info via headers to downstream services",
+          "Always make the gateway stateless so it can scale horizontally"
+        ],
+        "takeaway": "An API gateway simplifies client integration and protects internal services. Combine it with gRPC for efficient, strongly-typed internal communication."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

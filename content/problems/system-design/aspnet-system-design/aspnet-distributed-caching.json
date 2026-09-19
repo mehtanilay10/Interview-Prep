@@ -1,0 +1,126 @@
+{
+  "id": "lesson-sd-aspnet-04",
+  "slug": "aspnet-distributed-caching",
+  "moduleSlug": "aspnet-system-design",
+  "courseSlug": "system-design",
+  "title": "Design Distributed Caching for ASP.NET Core",
+  "description": "Use Redis, SQL Server cache, or in-memory cache to scale ASP.NET Core applications under high load.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["aspnet-core", "caching", "redis", "performance", "distributed-systems"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your API repeatedly queries the same product catalog data. Database load is growing. Design a caching layer that works across multiple server instances."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: In-Memory Cache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Fast but local to a single server. Does not share state across instances. Good for single-instance apps or data that does not need to be consistent across servers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "In-Memory Cache Registration",
+        "language": "csharp",
+        "code": "builder.Services.AddMemoryCache();\n\npublic class ProductService\n{\n    private readonly IMemoryCache _cache;\n\n    public ProductService(IMemoryCache cache)\n    {\n        _cache = cache;\n    }\n\n    public async Task<Product> GetProductAsync(int id)\n    {\n        return await _cache.GetOrCreateAsync(id, async entry =>\n        {\n            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);\n            return await _db.Products.FindAsync(id);\n        });\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: Distributed Cache with Redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Shared across all instances. Survives app restarts. Supports expiration, pub/sub, and clustering. Best choice for multi-instance deployments."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis Distributed Cache",
+        "language": "csharp",
+        "code": "builder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n    options.InstanceName = \"ProductCache:\";\n});\n\n// Response caching middleware\napp.UseResponseCaching();\n\n// Cache profiles\nbuilder.Services.AddResponseCaching(options =>\n{\n    options.MaximumBodySize = 1024;\n    options.UseCaseSensitivePaths = false;\n});\n\n// Controller-level cache\n[ResponseCache(Duration = 60, VaryByQueryKeys = new[] { \"category\" })]\n[HttpGet]\npublic async Task<IActionResult> GetProducts([FromQuery] string category)\n{\n    var products = await _service.GetByCategoryAsync(category);\n    return Ok(products);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache-Aside vs Write-Through"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choose the right strategy based on read/write ratio and consistency requirements."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Caching Strategies",
+        "items": [
+          "**Cache-Aside**: App checks cache first, falls back to DB, then populates cache. Most common pattern.",
+          "**Write-Through**: App writes to cache and DB simultaneously. Stronger consistency but more complex.",
+          "**Write-Behind**: App writes to cache, cache asynchronously flushes to DB. Fast but risk of data loss.",
+          "**Refresh-Ahead**: Proactively refresh cache before expiration. Good for hot data."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cache Invalidation",
+        "text": "The hardest part of caching is knowing when to remove stale data. Use cache keys with version segments, TTLs, and explicit invalidation on writes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache Key Versioning",
+        "language": "csharp",
+        "code": "// Versioned cache key allows bulk invalidation\nstring key = $\"products:v2:category:{categoryId}:page:{page}\";\n\n// Invalidate all product caches on update\nawait _cache.RemoveAsync(\"products:v2:*\");\n\n// Or use a version number stored in cache\nawait _cache.SetAsync(\"products:version\", 2, TimeSpan.FromHours(1));"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use Redis for multi-instance apps requiring shared cache state",
+          "IMemoryCache is faster but local to a single server",
+          "Cache-Aside is the simplest and most common pattern",
+          "Always set TTLs to prevent stale data from living forever",
+          "Version your cache keys to make invalidation manageable"
+        ],
+        "takeaway": "Caching is one of the most effective ways to scale ASP.NET Core, but choose the right strategy for your consistency and deployment needs."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

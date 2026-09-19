@@ -1348,6 +1348,11 @@ import systemDesignReactLesson3 from "../problems/system-design/react-system-des
 import systemDesignAspnetLesson1 from "../problems/system-design/aspnet-system-design/scalable-aspnet-api-design.json";
 import systemDesignAspnetLesson2 from "../problems/system-design/aspnet-system-design/aspnet-microservices-communication.json";
 import systemDesignAspnetLesson3 from "../problems/system-design/aspnet-system-design/aspnet-messaging-event-driven.json";
+import systemDesignAspnetLesson4 from "../problems/system-design/aspnet-system-design/aspnet-distributed-caching.json";
+import systemDesignAspnetLesson5 from "../problems/system-design/aspnet-system-design/aspnet-resilience-circuit-breaker.json";
+import systemDesignAspnetLesson6 from "../problems/system-design/aspnet-system-design/aspnet-background-jobs-processing.json";
+import systemDesignAspnetLesson7 from "../problems/system-design/aspnet-system-design/aspnet-database-scaling.json";
+import systemDesignAspnetLesson8 from "../problems/system-design/aspnet-system-design/aspnet-api-gateway-grpc.json";
 import systemDesignDevopsLesson1 from "../problems/system-design/devops-system-design/enterprise-cicd-pipeline-design.json";
 import systemDesignDevopsLesson2 from "../problems/system-design/devops-system-design/kubernetes-multi-env-architecture.json";
 import systemDesignDevopsLesson3 from "../problems/system-design/devops-system-design/observability-platform-design.json";
@@ -3000,6 +3005,11 @@ const rawLessonsPart2: any[] = [
 	systemDesignAspnetLesson1,
 	systemDesignAspnetLesson2,
 	systemDesignAspnetLesson3,
+	systemDesignAspnetLesson4,
+	systemDesignAspnetLesson5,
+	systemDesignAspnetLesson6,
+	systemDesignAspnetLesson7,
+	systemDesignAspnetLesson8,
 	systemDesignDevopsLesson1,
 	systemDesignDevopsLesson2,
 	systemDesignDevopsLesson3,

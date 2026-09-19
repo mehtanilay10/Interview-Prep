@@ -1,0 +1,127 @@
+{
+  "id": "lesson-sd-aspnet-07",
+  "slug": "aspnet-database-scaling",
+  "moduleSlug": "aspnet-system-design",
+  "courseSlug": "system-design",
+  "title": "Design Database Scaling for ASP.NET Core Applications",
+  "description": "Scale data access with read replicas, sharding, CQRS, and connection pooling in EF Core.",
+  "order": 7,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["aspnet-core", "database", "ef-core", "caching", "scalability"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your application has 100k concurrent users. The primary database is saturated. Design data access patterns that scale without compromising data integrity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: Read Replicas"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Route read-heavy queries to replicas. Keep writes on the primary. Works well when reads vastly outnumber writes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "EF Core with Read Replicas",
+        "language": "csharp",
+        "code": "public interface IAppDbContext\n{\n    DbSet<Product> Products { get; }\n    DbSet<Order> Orders { get; }\n    Task<int> SaveChangesAsync(CancellationToken ct = default);\n}\n\npublic class AppDbContext : DbContext, IAppDbContext\n{\n    private readonly string _connectionString;\n\n    public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration config)\n        : base(options)\n    {\n        _connectionString = config.GetConnectionString(\"Primary\");\n    }\n}\n\n// Read-only context for replicas\npublic class ReadOnlyAppDbContext : AppDbContext\n{\n    public ReadOnlyAppDbContext(DbContextOptions<ReadOnlyAppDbContext> options, IConfiguration config)\n        : base(options, config)\n    {\n    }\n}\n\n// Registration\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"Primary\")));\n\nbuilder.Services.AddDbContext<ReadOnlyAppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"ReadReplica\")));\n\n// Use read-only context for queries\npublic async Task<IEnumerable<Product>> GetProductsAsync()\n{\n    await using var context = _serviceProvider.GetRequiredService<ReadOnlyAppDbContext>();\n    return await context.Products.AsNoTracking().ToListAsync();\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: CQRS with Separate Models"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Command Query Responsibility Segregation uses separate models for reads and writes. Reads can use denormalized views or document stores."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CQRS Pattern",
+        "language": "csharp",
+        "code": "// Write side - normalized, enforced by domain rules\npublic class CreateOrderCommand : IRequest<Order>\n{\n    public int CustomerId { get; set; }\n    public List<OrderItemDto> Items { get; set; }\n}\n\npublic class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Order>\n{\n    private readonly AppDbContext _writeContext;\n\n    public async Task<Order> Handle(CreateOrderCommand request, CancellationToken ct)\n    {\n        var order = new Order { CustomerId = request.CustomerId };\n        _writeContext.Orders.Add(order);\n        await _writeContext.SaveChangesAsync(ct);\n        return order;\n    }\n}\n\n// Read side - optimized for queries\npublic class GetOrderQuery : IRequest<OrderSummary>\n{\n    public int OrderId { get; set; }\n}\n\npublic class GetOrderHandler : IRequestHandler<GetOrderQuery, OrderSummary>\n{\n    private readonly ReadOnlyAppDbContext _readContext;\n\n    public async Task<OrderSummary> Handle(GetOrderQuery request, CancellationToken ct)\n    {\n        return await _readContext.OrderSummaries\n            .AsNoTracking()\n            .FirstOrDefaultAsync(o => o.Id == request.OrderId, ct);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Connection Pooling and EF Core Performance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core adds overhead. Minimize it with connection pooling, compiled queries, and batching."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "EF Core Performance Tips",
+        "items": [
+          "Use `AsNoTracking()` for read-only queries",
+          "Use compiled queries for frequently executed queries",
+          "Batch operations with `AddRange` and `SaveChangesAsync`",
+          "Use `ExecuteUpdate` / `ExecuteDelete` to avoid loading entities",
+          "Pool DbContext instances with `AddDbContextPool`"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Compiled Query Example",
+        "language": "csharp",
+        "code": "private static readonly Func<AppDbContext, int, Task<Product?>> _getProductById =\n    EF.CompileAsyncQuery((AppDbContext ctx, int id) =>\n        ctx.Products.AsNoTracking().FirstOrDefault(p => p.Id == id));\n\npublic async Task<Product?> GetProductFastAsync(int id)\n{\n    return await _getProductById(_context, id);\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Scaling Read-Heavy Systems",
+        "text": "Most web applications are read-heavy. Separating reads from writes using read replicas or CQRS gives you the biggest scaling win with the least complexity."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Read replicas distribute query load away from the primary",
+          "CQRS optimizes reads and writes independently",
+          "EF Core performance depends on tracking behavior and query shape",
+          "Connection pooling reduces connection overhead",
+          "Compiled queries eliminate LINQ translation cost on repeated calls"
+        ],
+        "takeaway": "Database scaling is often the bottleneck. Combine read replicas, CQRS, and EF Core optimizations to handle high-throughput ASP.NET Core applications."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

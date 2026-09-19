@@ -1,0 +1,106 @@
+{
+  "id": "lesson-sd-aspnet-05",
+  "slug": "aspnet-resilience-circuit-breaker",
+  "moduleSlug": "aspnet-system-design",
+  "courseSlug": "system-design",
+  "title": "Design Resilience Patterns for ASP.NET Core",
+  "description": "Use Polly for retries, circuit breakers, timeouts, and fallback policies in distributed systems.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["aspnet-core", "polly", "resilience", "circuit-breaker", "retry"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your ASP.NET Core service calls three downstream APIs. One is frequently unavailable. Design resilience so failures do not cascade."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core Resilience Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Resilience patterns protect your system from downstream failures. Polly is the standard library for implementing these in .NET."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Polly Policies",
+        "items": [
+          "**Retry**: Re-execute failed operations with backoff",
+          "**Circuit Breaker**: Stop calling a failing service after N failures",
+          "**Timeout**: Fail fast if an operation takes too long",
+          "**Fallback**: Return cached or default data when the real call fails",
+          "**Bulkhead**: Limit concurrent calls to protect resources"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Polly Resilience Pipeline",
+        "language": "csharp",
+        "code": "builder.Services.AddHttpClient<IOrderService, OrderService>()\n    .AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(3)))\n    .AddPolicyHandler(RetryPolicy<HttpResponseMessage>\n        .Handle<HttpRequestException>()\n        .WaitAndRetryAsync(3, retry => TimeSpan.FromSeconds(Math.Pow(2, retry))))\n    .AddPolicyHandler(CircuitBreakerPolicy<HttpResponseMessage>\n        .Handle<HttpRequestException>()\n        .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));\n\n// Fallback example\nvar fallback = Policy<HttpResponseMessage>\n    .Handle<HttpRequestException>()\n    .Or<TimeoutRejectedException>()\n    .FallbackAsync(\n        fallbackAction: _ => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)\n        {\n            Content = new StringContent(\"\\{\\\"cached\\\":true\\}\")\n        }),\n        onFallbackAsync: ex => Task.CompletedTask);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Circuit Breaker States"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A circuit breaker has three states: Closed (normal), Open (failing fast), and Half-Open (testing recovery)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Circuit Breaker Monitoring",
+        "language": "csharp",
+        "code": "public class CircuitBreakerHealthCheck : IHealthCheck\n{\n    private readonly IResiliencePipelineProvider<string> _provider;\n\n    public CircuitBreakerHealthCheck(IResiliencePipelineProvider<string> provider)\n    {\n        _provider = provider;\n    }\n\n    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)\n    {\n        var pipeline = _provider.GetPipeline(\"order-service-pipeline\");\n        // Inspect circuit breaker state if exposed\n        var isHealthy = await pipeline.ExecuteAsync(() => Task.FromResult(true));\n        return isHealthy\n            ? HealthCheckResult.Healthy()\n            : HealthCheckResult.Unhealthy(\"Circuit breaker is open\");\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Resilience Best Practice",
+        "text": "Apply resilience at the boundary of your system: HTTP clients, message consumers, and database calls. Do not sprinkle try/catch everywhere."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Polly provides production-grade resilience policies for .NET",
+          "Retry with exponential backoff handles transient failures",
+          "Circuit breakers prevent cascading failures across services",
+          "Timeout policies protect threads from hanging indefinitely",
+          "Fallbacks give users degraded but functional responses"
+        ],
+        "takeaway": "Resilience is not optional in distributed systems. Polly makes it straightforward to add retries, circuit breakers, and timeouts to ASP.NET Core HTTP clients."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}
