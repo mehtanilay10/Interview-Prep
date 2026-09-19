@@ -239,6 +239,16 @@ import dotnetModule13 from "../courses/dotnet-nuget-packages/http-clients-resili
 import dotnetModule14 from "../courses/dotnet-nuget-packages/logging-monitoring/content.json";
 import dotnetModule15 from "../courses/dotnet-nuget-packages/validation-authorization/content.json";
 
+import yarnModule1 from "../courses/yarn-npm-packages/01-package-managers/content.json";
+import yarnModule2 from "../courses/yarn-npm-packages/02-build-tools/content.json";
+import yarnModule3 from "../courses/yarn-npm-packages/03-testing-libraries/content.json";
+import yarnModule4 from "../courses/yarn-npm-packages/04-styling/content.json";
+import yarnModule5 from "../courses/yarn-npm-packages/05-state-management/content.json";
+import yarnModule6 from "../courses/yarn-npm-packages/06-routing/content.json";
+import yarnModule7 from "../courses/yarn-npm-packages/http-clients/content.json";
+import yarnModule8 from "../courses/yarn-npm-packages/testing/content.json";
+import yarnModule9 from "../courses/yarn-npm-packages/utilities/content.json";
+
 const rawModules = [
 	sqlModule1,
 	sqlModule2,
@@ -497,6 +507,15 @@ const rawModules = [
 	systemDesignModule1,
 	systemDesignModule2,
 	systemDesignModule3,
+	yarnModule1,
+	yarnModule2,
+	yarnModule3,
+	yarnModule4,
+	yarnModule5,
+	yarnModule6,
+	yarnModule7,
+	yarnModule8,
+	yarnModule9,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];

@@ -24,11 +24,12 @@ import devOpsCourse from "./devops/content.json";
 import azureCourse from "./azure/content.json";
 import awsCourse from "./aws/content.json";
 import dotnetNugetPackagesCourse from "./dotnet-nuget-packages/content.json";
+import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";
 import csharpProblemsCourse from "../problems/csharp/content.json";
 import sqlProblemsCourse from "../problems/sql/content.json";
 import systemDesignProblemsCourse from "../problems/system-design/content.json";
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse];
+const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 
