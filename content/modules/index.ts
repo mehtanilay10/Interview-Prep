@@ -257,6 +257,31 @@ import yarnModule15 from "../courses/yarn-npm-packages/react-forms-input/content
 import yarnModule16 from "../courses/yarn-npm-packages/react-data-fetching/content.json";
 import yarnModule17 from "../courses/yarn-npm-packages/react-testing/content.json";
 
+import lldModule1 from "../problems/lld/airbnb-booking/content.json";
+import lldModule2 from "../problems/lld/amazon-ecommerce/content.json";
+import lldModule3 from "../problems/lld/atm-machine/content.json";
+import lldModule4 from "../problems/lld/banking-app/content.json";
+import lldModule5 from "../problems/lld/elevator-system/content.json";
+import lldModule6 from "../problems/lld/facebook-news-feed/content.json";
+import lldModule7 from "../problems/lld/food-delivery/content.json";
+import lldModule8 from "../problems/lld/google-drive-storage/content.json";
+import lldModule9 from "../problems/lld/hotel-management/content.json";
+import lldModule10 from "../problems/lld/instagram-photo-sharing/content.json";
+import lldModule11 from "../problems/lld/library-management/content.json";
+import lldModule12 from "../problems/lld/linkedin-professional/content.json";
+import lldModule13 from "../problems/lld/movie-ticket-booking/content.json";
+import lldModule14 from "../problems/lld/netflix-streaming/content.json";
+import lldModule15 from "../problems/lld/parking-lot-system/content.json";
+import lldModule16 from "../problems/lld/payment-gateway/content.json";
+import lldModule17 from "../problems/lld/slack-messaging/content.json";
+import lldModule18 from "../problems/lld/spotify-music/content.json";
+import lldModule19 from "../problems/lld/tic-tac-toe-game/content.json";
+import lldModule20 from "../problems/lld/twitter-social/content.json";
+import lldModule21 from "../problems/lld/uber-ride-sharing/content.json";
+import lldModule22 from "../problems/lld/vending-machine/content.json";
+import lldModule23 from "../problems/lld/whatsapp-chat/content.json";
+import lldModule24 from "../problems/lld/youtube-video/content.json";
+import lldModule25 from "../problems/lld/zoom-conferencing/content.json";
 const rawModules = [
 	sqlModule1,
 	sqlModule2,
@@ -467,6 +492,31 @@ const rawModules = [
 	azureProblemsModule6,
 	azureProblemsModule7,
 	azureProblemsModule8,
+	lldModule1,
+	lldModule2,
+	lldModule3,
+	lldModule4,
+	lldModule5,
+	lldModule6,
+	lldModule7,
+	lldModule8,
+	lldModule9,
+	lldModule10,
+	lldModule11,
+	lldModule12,
+	lldModule13,
+	lldModule14,
+	lldModule15,
+	lldModule16,
+	lldModule17,
+	lldModule18,
+	lldModule19,
+	lldModule20,
+	lldModule21,
+	lldModule22,
+	lldModule23,
+	lldModule24,
+	lldModule25,
 	dotnetModule1,
 	dotnetModule2,
 	dotnetModule3,

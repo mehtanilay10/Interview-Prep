@@ -1574,6 +1574,56 @@ import yarnLesson88 from "../courses/yarn-npm-packages/react-testing/vitest-reac
 import yarnLesson89 from "../courses/yarn-npm-packages/react-testing/cypress-component.json";
 import yarnLesson90 from "../courses/yarn-npm-packages/react-testing/testing-hooks.json";
 
+import lldLesson1 from "../problems/lld/airbnb-booking/airbnb-advanced.json";
+import lldLesson2 from "../problems/lld/airbnb-booking/airbnb-basic.json";
+import lldLesson3 from "../problems/lld/amazon-ecommerce/amazon-advanced.json";
+import lldLesson4 from "../problems/lld/amazon-ecommerce/amazon-basic.json";
+import lldLesson5 from "../problems/lld/atm-machine/atm-advanced.json";
+import lldLesson6 from "../problems/lld/atm-machine/atm-basic.json";
+import lldLesson7 from "../problems/lld/banking-app/banking-advanced.json";
+import lldLesson8 from "../problems/lld/banking-app/banking-basic.json";
+import lldLesson9 from "../problems/lld/elevator-system/elevator-basic.json";
+import lldLesson10 from "../problems/lld/elevator-system/elevator-scheduling.json";
+import lldLesson11 from "../problems/lld/facebook-news-feed/news-feed-advanced.json";
+import lldLesson12 from "../problems/lld/facebook-news-feed/news-feed-basic.json";
+import lldLesson13 from "../problems/lld/food-delivery/food-advanced.json";
+import lldLesson14 from "../problems/lld/food-delivery/food-basic.json";
+import lldLesson15 from "../problems/lld/google-drive-storage/drive-advanced.json";
+import lldLesson16 from "../problems/lld/google-drive-storage/drive-basic.json";
+import lldLesson17 from "../problems/lld/hotel-management/hotel-advanced.json";
+import lldLesson18 from "../problems/lld/hotel-management/hotel-basic.json";
+import lldLesson19 from "../problems/lld/instagram-photo-sharing/instagram-advanced.json";
+import lldLesson20 from "../problems/lld/instagram-photo-sharing/instagram-basic.json";
+import lldLesson21 from "../problems/lld/library-management/library-advanced.json";
+import lldLesson22 from "../problems/lld/library-management/library-basic.json";
+import lldLesson23 from "../problems/lld/linkedin-professional/linkedin-advanced.json";
+import lldLesson24 from "../problems/lld/linkedin-professional/linkedin-basic.json";
+import lldLesson25 from "../problems/lld/movie-ticket-booking/movie-advanced.json";
+import lldLesson26 from "../problems/lld/movie-ticket-booking/movie-basic.json";
+import lldLesson27 from "../problems/lld/netflix-streaming/netflix-advanced.json";
+import lldLesson28 from "../problems/lld/netflix-streaming/netflix-basic.json";
+import lldLesson29 from "../problems/lld/parking-lot-system/parking-lot-advanced.json";
+import lldLesson30 from "../problems/lld/parking-lot-system/parking-lot-basic.json";
+import lldLesson31 from "../problems/lld/payment-gateway/payment-advanced.json";
+import lldLesson32 from "../problems/lld/payment-gateway/payment-basic.json";
+import lldLesson33 from "../problems/lld/slack-messaging/slack-advanced.json";
+import lldLesson34 from "../problems/lld/slack-messaging/slack-basic.json";
+import lldLesson35 from "../problems/lld/spotify-music/spotify-advanced.json";
+import lldLesson36 from "../problems/lld/spotify-music/spotify-basic.json";
+import lldLesson37 from "../problems/lld/tic-tac-toe-game/tictactoe-advanced.json";
+import lldLesson38 from "../problems/lld/tic-tac-toe-game/tictactoe-basic.json";
+import lldLesson39 from "../problems/lld/twitter-social/twitter-advanced.json";
+import lldLesson40 from "../problems/lld/twitter-social/twitter-basic.json";
+import lldLesson41 from "../problems/lld/uber-ride-sharing/uber-advanced.json";
+import lldLesson42 from "../problems/lld/uber-ride-sharing/uber-basic.json";
+import lldLesson43 from "../problems/lld/vending-machine/vending-advanced.json";
+import lldLesson44 from "../problems/lld/vending-machine/vending-basic.json";
+import lldLesson45 from "../problems/lld/whatsapp-chat/chat-advanced.json";
+import lldLesson46 from "../problems/lld/whatsapp-chat/chat-basic.json";
+import lldLesson47 from "../problems/lld/youtube-video/youtube-advanced.json";
+import lldLesson48 from "../problems/lld/youtube-video/youtube-basic.json";
+import lldLesson49 from "../problems/lld/zoom-conferencing/zoom-advanced.json";
+import lldLesson50 from "../problems/lld/zoom-conferencing/zoom-basic.json";
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -3127,6 +3177,56 @@ const rawLessonsPart2: any[] = [
 	yarnLesson88,
 	yarnLesson89,
 	yarnLesson90,
+	lldLesson1,
+	lldLesson2,
+	lldLesson3,
+	lldLesson4,
+	lldLesson5,
+	lldLesson6,
+	lldLesson7,
+	lldLesson8,
+	lldLesson9,
+	lldLesson10,
+	lldLesson11,
+	lldLesson12,
+	lldLesson13,
+	lldLesson14,
+	lldLesson15,
+	lldLesson16,
+	lldLesson17,
+	lldLesson18,
+	lldLesson19,
+	lldLesson20,
+	lldLesson21,
+	lldLesson22,
+	lldLesson23,
+	lldLesson24,
+	lldLesson25,
+	lldLesson26,
+	lldLesson27,
+	lldLesson28,
+	lldLesson29,
+	lldLesson30,
+	lldLesson31,
+	lldLesson32,
+	lldLesson33,
+	lldLesson34,
+	lldLesson35,
+	lldLesson36,
+	lldLesson37,
+	lldLesson38,
+	lldLesson39,
+	lldLesson40,
+	lldLesson41,
+	lldLesson42,
+	lldLesson43,
+	lldLesson44,
+	lldLesson45,
+	lldLesson46,
+	lldLesson47,
+	lldLesson48,
+	lldLesson49,
+	lldLesson50,
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];

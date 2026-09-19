@@ -1,0 +1,102 @@
+{
+  "id": "lesson-lld-fb-02",
+  "slug": "news-feed-advanced",
+  "moduleSlug": "facebook-news-feed",
+  "courseSlug": "lld-problems",
+  "title": "News Feed: Caching, Pagination, and Real-time Updates",
+  "description": "Add Redis caching, cursor-based pagination, and push-based feed updates.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "lld",
+    "facebook",
+    "caching",
+    "pagination",
+    "real-time"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Generating a feed for 1 billion users is expensive. Design caching, pagination, and real-time updates so the feed feels instant."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: Fan-out on Write (Push Model)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a user creates a post, push it to all followers' pre-built feeds. Read is O(1) from cache. Write is O(followers)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fan-out on Write with Redis",
+        "language": "csharp",
+        "code": "public class FeedFanoutService\n{\n    private readonly IDatabase _redis;\n\n    public async Task PublishPostAsync(Post post)\n    {\n        var author = _users[post.AuthorId];\n        foreach (var followerId in author.Following)\n        {\n            var key = $\"feed:{followerId}\";\n            await _redis.ListRightPushAsync(key, JsonSerializer.Serialize(post));\n            await _redis.ListTrimAsync(key, 0, 999); // keep last 1000 posts\n        }\n    }\n\n    public async Task<IEnumerable<Post>> GetFeedAsync(Guid userId, int page, int pageSize)\n    {\n        var key = $\"feed:{userId}\";\n        var start = (page - 1) * pageSize;\n        var posts = await _redis.ListRangeAsync(key, start, start + pageSize - 1);\n        return posts.Select(p => JsonSerializer.Deserialize<Post>(p)!);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: Fan-out on Read (Pull Model)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a user requests their feed, fetch recent posts from all followed users on demand. Simpler but slower for users with many followings."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Push vs Pull Comparison",
+        "items": [
+          "**Push (Fan-out on Write)**: Fast reads, expensive writes for celebrities with millions of followers.",
+          "**Pull (Fan-out on Read)**: Slow reads, simple writes. Better for users with few followings.",
+          "**Hybrid**: Push for normal users, pull for celebrity followers (inverted fan-out).",
+          "**Cache warming**: Pre-generate feeds during low-traffic hours."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The Celebrity Problem",
+        "text": "A user with 50 million followers would trigger 50 million writes per post. The hybrid approach solves this: push to normal followers, and let celebrity followers pull the post when they load their feed."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Push model makes reads O(1) from Redis",
+          "Pull model is simpler but O(followings) per read",
+          "Hybrid balances write cost and read latency",
+          "Cursor-based pagination is more stable than offset-based"
+        ],
+        "takeaway": "Feed scalability is a caching and fan-out problem. Choose push, pull, or hybrid based on your average follower count distribution."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}
