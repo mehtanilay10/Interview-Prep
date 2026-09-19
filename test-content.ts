@@ -38,6 +38,8 @@ assert(Array.isArray(problemCourses), 'getProblemCourses returns an array');
 assert(problemCourses.some(c => c.slug === 'csharp-problems'), 'getProblemCourses includes csharp-problems');
 assert(problemCourses.some(c => c.slug === 'sql-problems'), 'getProblemCourses includes sql-problems');
 assert(problemCourses.some(c => c.slug === 'system-design'), 'getProblemCourses includes system-design');
+assert(problemCourses.some(c => c.slug === 'azure-problems'), 'getProblemCourses includes azure-problems');
+assert(problemCourses.some(c => c.slug === 'lld-problems'), 'getProblemCourses includes lld-problems');
 
 // Test getLessonsForCourse
 const csharpLessons = getLessonsForCourse('csharp-problems');
@@ -54,6 +56,16 @@ const systemDesignLessons = getLessonsForCourse('system-design');
 assert(Array.isArray(systemDesignLessons), 'getLessonsForCourse returns an array for system-design');
 assert(systemDesignLessons.length > 0, 'getLessonsForCourse returns lessons for system-design');
 assert(systemDesignLessons.every(l => l.courseSlug === 'system-design'), 'All returned lessons belong to system-design');
+
+const azureLessons = getLessonsForCourse('azure-problems');
+assert(Array.isArray(azureLessons), 'getLessonsForCourse returns an array for azure-problems');
+assert(azureLessons.length > 0, 'getLessonsForCourse returns lessons for azure-problems');
+assert(azureLessons.every(l => l.courseSlug === 'azure-problems'), 'All returned lessons belong to azure-problems');
+
+const lldLessons = getLessonsForCourse('lld-problems');
+assert(Array.isArray(lldLessons), 'getLessonsForCourse returns an array for lld-problems');
+assert(lldLessons.length > 0, 'getLessonsForCourse returns lessons for lld-problems');
+assert(lldLessons.every(l => l.courseSlug === 'lld-problems'), 'All returned lessons belong to lld-problems');
 
 // Test search for problems
 const problemSearch = searchAll('array');

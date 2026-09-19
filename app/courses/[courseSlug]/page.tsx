@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function CourseDetailPage({ params }: Params) {
   const { courseSlug } = await params;
   const course = getCourseBySlug(courseSlug);
-  if (!course) notFound();
+  if (!course || course.category === 'problems') notFound();
 
   const allModules = getModulesForCourse(courseSlug);
 

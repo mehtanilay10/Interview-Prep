@@ -80,6 +80,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { slug: 'sql', label: 'SQL Problems' },
     { slug: 'system-design', label: 'System Design Problems' },
     { slug: 'azure-problems', label: 'Azure Problems' },
+    { slug: 'lld-problems', label: 'Low Level Design Problems' },
   ];
 
   for (const course of problemCourses) {

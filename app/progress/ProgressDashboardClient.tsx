@@ -17,7 +17,7 @@ import {
   StickyNote,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
-import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, modules } from '@/lib/content';
+import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, modules, isProblemCourseSlug } from '@/lib/content';
 import type { Lesson, Course, Module } from '@/types';
 
 interface LessonProgress {
@@ -87,7 +87,7 @@ function resolveLesson(note: LessonNote): { title: string; href: string } {
     if (note.courseSlug === 'interview-qa') {
       return { title: lesson.title, href: `/interview-questions/${note.moduleSlug}/${note.lessonSlug}` };
     }
-    if (note.courseSlug === 'csharp-problems' || note.courseSlug === 'sql-problems' || note.courseSlug === 'system-design') {
+    if (isProblemCourseSlug(note.courseSlug)) {
       return { title: lesson.title, href: `/problems/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
     }
     return { title: lesson.title, href: `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
@@ -190,7 +190,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
   }, []);
 
   const totalProblemsCount = useMemo(() => {
-    return lessons.filter((l) => l.courseSlug === 'csharp-problems' || l.courseSlug === 'sql-problems' || l.courseSlug === 'system-design').length;
+    return lessons.filter((l) => isProblemCourseSlug(l.courseSlug)).length;
   }, []);
 
   const totalInterviewCount = useMemo(() => {
@@ -566,7 +566,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                     href={
                       course.courseSlug === 'interview-qa'
                         ? '/interview-questions'
-                        : course.courseSlug === 'csharp-problems' || course.courseSlug === 'sql-problems' || course.courseSlug === 'system-design'
+                        : isProblemCourseSlug(course.courseSlug)
                           ? `/problems/${course.courseSlug}`
                           : `/courses/${course.courseSlug}`
                     }

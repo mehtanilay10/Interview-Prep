@@ -61,7 +61,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
   const lesson = getLessonBySlug(lessonSlug, courseSlug);
   const mod = getModuleBySlug(moduleSlug);
 
-  if (!course || !lesson || !mod) notFound();
+  if (!course || !lesson || !mod || course.category === 'problems') notFound();
 
   const courseModules = getModulesForCourse(courseSlug);
   const moduleLessons = getLessonsForModule(moduleSlug, courseSlug);

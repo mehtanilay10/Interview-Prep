@@ -244,9 +244,15 @@ export function searchAll(query: string): SearchResult[] {
   return scored.slice(0, 10).map((s) => s.result);
 }
 
+const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems']);
+
+export function isProblemCourseSlug(slug: string): boolean {
+  return PROBLEM_COURSE_SLUGS.has(slug);
+}
+
 export function getSearchResultHref(result: SearchResult): string {
   if (result.type === 'lesson') {
-    if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems' || result.courseSlug === 'system-design') {
+    if (isProblemCourseSlug(result.courseSlug)) {
       return `/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
     }
     if (result.courseSlug === 'interview-qa' && result.technology) {
@@ -260,14 +266,14 @@ export function getSearchResultHref(result: SearchResult): string {
     if (result.courseSlug === 'cheatsheet') {
       return `/cheatsheet/${result.slug}`;
     }
-    if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems' || result.courseSlug === 'system-design') {
+    if (isProblemCourseSlug(result.courseSlug)) {
       return `/problems/${result.courseSlug}/${result.slug}`;
     }
     return `/courses/${result.courseSlug}/${result.slug}`;
   }
 
   if (result.type === 'course') {
-    if (result.slug === 'csharp-problems' || result.slug === 'sql-problems' || result.slug === 'system-design') {
+    if (isProblemCourseSlug(result.slug)) {
       return `/problems/${result.slug}`;
     }
     return `/courses/${result.slug}`;
