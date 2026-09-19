@@ -72,7 +72,7 @@ export default function CoursesPage() {
                         <p className="text-sm text-fg-muted">{course.subtitle}</p>
                       </div>
                     </div>
-                    <p className="mb-4 text-sm leading-relaxed text-fg-muted">
+                    <p className="mb-4 text-sm leading-relaxed text-fg-muted line-clamp-4">
                       {course.description}
                     </p>
                     <div className="mt-auto flex flex-wrap items-center gap-4 text-xs text-fg-subtle">
