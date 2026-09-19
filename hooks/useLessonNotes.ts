@@ -81,9 +81,13 @@ export function useLessonNotes() {
     }
   }, [isLoggedOut]);
 
-  const activeNotes = isLoggedIn && serverNotes
-    ? Object.fromEntries(serverNotes.map((n) => [`${n.courseSlug}:${n.moduleSlug}:${n.lessonSlug}`, n]))
-    : {};
+  const activeNotes = useMemo(
+    () =>
+      isLoggedIn && serverNotes
+        ? Object.fromEntries(serverNotes.map((n) => [`${n.courseSlug}:${n.moduleSlug}:${n.lessonSlug}`, n]))
+        : {},
+    [isLoggedIn, serverNotes]
+  );
 
   const getNote = useCallback(
     (courseSlug: string, moduleSlug: string, lessonSlug: string): LessonNote | undefined => {

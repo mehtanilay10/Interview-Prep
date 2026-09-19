@@ -345,7 +345,7 @@ export interface BookmarkItem {
 // ── Search ───────────────────────────────────────────────────────────────────
 
 export interface SearchResult {
-  type: 'lesson' | 'module' | 'concept';
+  type: 'lesson' | 'module' | 'course' | 'cheatsheet';
   slug: string;
   title: string;
   description: string;

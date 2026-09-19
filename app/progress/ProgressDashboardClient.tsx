@@ -58,6 +58,7 @@ interface CourseProgressInfo {
   completedCount: number;
   totalCount: number;
   percent: number;
+  estimatedMinutesRemaining: number;
 }
 
 type TabId = 'overview' | 'completed' | 'bookmarks' | 'notes' | 'courses';
@@ -86,7 +87,7 @@ function resolveLesson(note: LessonNote): { title: string; href: string } {
     if (note.courseSlug === 'interview-qa') {
       return { title: lesson.title, href: `/interview-questions/${note.moduleSlug}/${note.lessonSlug}` };
     }
-    if (note.courseSlug === 'csharp-problems' || note.courseSlug === 'sql-problems') {
+    if (note.courseSlug === 'csharp-problems' || note.courseSlug === 'sql-problems' || note.courseSlug === 'system-design') {
       return { title: lesson.title, href: `/problems/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
     }
     return { title: lesson.title, href: `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
@@ -108,6 +109,15 @@ function getCourseForModule(moduleSlug: string): { courseSlug: string; courseTit
   const course = courses.find((c) => c.slug === mod.courseSlug);
   if (!course) return null;
   return { courseSlug: course.slug, courseTitle: course.title };
+}
+
+function getProgressColor(percent: number) {
+  if (percent === 0) return { bar: 'bg-canvas-inset', text: 'text-fg-muted', badge: 'bg-canvas-inset text-fg-muted', label: 'Not started' };
+  if (percent < 25) return { bar: 'bg-severe-emphasis', text: 'text-severe-fg', badge: 'bg-severe-muted text-severe-fg', label: 'Just started' };
+  if (percent < 50) return { bar: 'bg-attention-emphasis', text: 'text-attention-fg', badge: 'bg-attention-muted text-attention-fg', label: 'In progress' };
+  if (percent < 75) return { bar: 'bg-accent-emphasis', text: 'text-accent-fg', badge: 'bg-accent-muted text-accent-fg', label: 'Good progress' };
+  if (percent < 100) return { bar: 'bg-done-emphasis', text: 'text-done-fg', badge: 'bg-done-muted text-done-fg', label: 'Almost done' };
+  return { bar: 'bg-success-emphasis', text: 'text-success-fg', badge: 'bg-success-muted text-success-fg', label: 'Completed' };
 }
 
 export function ProgressDashboardClient({ user }: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } }) {
@@ -180,7 +190,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
   }, []);
 
   const totalProblemsCount = useMemo(() => {
-    return lessons.filter((l) => l.courseSlug === 'csharp-problems' || l.courseSlug === 'sql-problems').length;
+    return lessons.filter((l) => l.courseSlug === 'csharp-problems' || l.courseSlug === 'sql-problems' || l.courseSlug === 'system-design').length;
   }, []);
 
   const totalInterviewCount = useMemo(() => {
@@ -194,7 +204,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
   }, [lessonsCompleted, problemsCompleted, interviewCompleted, totalLessonsCount, totalProblemsCount, totalInterviewCount]);
 
   const courseProgressList = useMemo<CourseProgressInfo[]>(() => {
-    const courseMap = new Map<string, { title: string; completed: Set<string>; total: number }>();
+    const courseMap = new Map<string, { title: string; completed: Set<string>; total: number; totalMinutes: number; completedMinutes: number }>();
 
     for (const [cat, catProgress] of Object.entries(progress)) {
       for (const item of catProgress.completedLessons) {
@@ -203,11 +213,16 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
         const existing = courseMap.get(courseInfo.courseSlug);
         if (existing) {
           existing.completed.add(`${item.moduleSlug}:${item.lessonSlug}`);
+          const lesson = lessons.find((l) => l.slug === item.lessonSlug && l.moduleSlug === item.moduleSlug);
+          if (lesson) existing.completedMinutes += lesson.estimatedMinutes;
         } else {
+          const lesson = lessons.find((l) => l.slug === item.lessonSlug && l.moduleSlug === item.moduleSlug);
           courseMap.set(courseInfo.courseSlug, {
             title: courseInfo.courseTitle,
             completed: new Set([`${item.moduleSlug}:${item.lessonSlug}`]),
             total: 0,
+            totalMinutes: 0,
+            completedMinutes: lesson ? lesson.estimatedMinutes : 0,
           });
         }
       }
@@ -216,27 +231,41 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
     for (const course of courses) {
       const courseLessons = getLessonsForCourse(course.slug);
       const existing = courseMap.get(course.slug);
+      const totalMinutes = courseLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
       if (existing) {
         existing.total = courseLessons.length;
+        existing.totalMinutes = totalMinutes;
+        existing.completedMinutes = courseLessons
+          .filter((l) => existing.completed.has(`${l.moduleSlug}:${l.slug}`))
+          .reduce((sum, l) => sum + l.estimatedMinutes, 0);
       } else {
         courseMap.set(course.slug, {
           title: course.title,
           completed: new Set(),
           total: courseLessons.length,
+          totalMinutes,
+          completedMinutes: 0,
         });
       }
     }
 
-    const interviewTotal = lessons.filter((l) => l.courseSlug === 'interview-qa').length;
-    if (interviewTotal > 0) {
+    const interviewLessons = lessons.filter((l) => l.courseSlug === 'interview-qa');
+    const interviewTotalMinutes = interviewLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
+    if (interviewLessons.length > 0) {
       const existing = courseMap.get('interview-qa');
       if (existing) {
-        existing.total = interviewTotal;
+        existing.total = interviewLessons.length;
+        existing.totalMinutes = interviewTotalMinutes;
+        existing.completedMinutes = interviewLessons
+          .filter((l) => existing.completed.has(`${l.moduleSlug}:${l.slug}`))
+          .reduce((sum, l) => sum + l.estimatedMinutes, 0);
       } else {
         courseMap.set('interview-qa', {
           title: 'Technical Interview Questions',
           completed: new Set(),
-          total: interviewTotal,
+          total: interviewLessons.length,
+          totalMinutes: interviewTotalMinutes,
+          completedMinutes: 0,
         });
       }
     }
@@ -248,6 +277,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
         completedCount: data.completed.size,
         totalCount: data.total,
         percent: data.total > 0 ? Math.round((data.completed.size / data.total) * 100) : 0,
+        estimatedMinutesRemaining: Math.max(0, data.totalMinutes - data.completedMinutes),
       }))
       .filter((c) => c.totalCount > 0)
       .sort((a, b) => b.percent - a.percent);
@@ -527,36 +557,56 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
           {courseProgressList.length === 0 ? (
             <p className="text-sm text-fg-muted">No course progress yet. Start learning!</p>
           ) : (
-            <div className="space-y-4">
-              {courseProgressList.map((course) => (
-                <Link
-                  key={course.courseSlug}
-                  href={
-                    course.courseSlug === 'interview-qa'
-                      ? '/interview-questions'
-                      : course.courseSlug === 'csharp-problems' || course.courseSlug === 'sql-problems'
-                        ? `/problems/${course.courseSlug}`
-                        : `/courses/${course.courseSlug}`
-                  }
-                  className="block rounded-lg border border-border bg-canvas-subtle p-4 transition-colors hover:border-accent-fg"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-fg-default">{course.courseTitle}</p>
-                    <span className="text-xs text-fg-muted">{course.completedCount}/{course.totalCount}</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-canvas-inset">
-                    <div
-                      className="h-full rounded-full bg-success-emphasis transition-all duration-500"
-                      style={{ width: `${course.percent}%` }}
-                      role="progressbar"
-                      aria-valuenow={course.percent}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={`${course.percent}% of ${course.courseTitle} completed`}
-                    />
-                  </div>
-                </Link>
-              ))}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {courseProgressList.map((course) => {
+                const colors = getProgressColor(course.percent);
+                return (
+                  <Link
+                    key={course.courseSlug}
+                    href={
+                      course.courseSlug === 'interview-qa'
+                        ? '/interview-questions'
+                        : course.courseSlug === 'csharp-problems' || course.courseSlug === 'sql-problems' || course.courseSlug === 'system-design'
+                          ? `/problems/${course.courseSlug}`
+                          : `/courses/${course.courseSlug}`
+                    }
+                    className="group block rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-fg-default truncate group-hover:text-accent-fg transition-colors">{course.courseTitle}</p>
+                        <p className="mt-1 text-xs text-fg-muted">
+                          {course.completedCount} of {course.totalCount} lessons completed
+                        </p>
+                      </div>
+                      <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', colors.badge)}>
+                        {course.percent}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-canvas-inset">
+                      <div
+                        className={cn('h-full rounded-full transition-all duration-500', colors.bar)}
+                        style={{ width: `${course.percent}%` }}
+                        role="progressbar"
+                        aria-valuenow={course.percent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${course.percent}% of ${course.courseTitle} completed`}
+                      />
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className={cn('text-xs font-medium', colors.text)}>
+                        {colors.label}
+                      </span>
+                      <span className="text-xs text-fg-subtle">
+                        {course.estimatedMinutesRemaining} min left
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

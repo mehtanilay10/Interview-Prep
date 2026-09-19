@@ -1,13 +1,19 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Search, BookOpen, Clock } from 'lucide-react';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { formatMinutes } from '@/lib/utils';
+import { getSearchResultHref } from '@/lib/content';
 import type { SearchResult } from '@/types';
+
+const TYPE_LABEL: Record<string, string> = {
+  lesson: 'Lesson',
+  module: 'Module',
+  course: 'Course',
+  cheatsheet: 'Cheatsheet',
+};
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -46,8 +52,8 @@ export default function SearchPage() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <SectionHeader
         eyebrow="Search"
-        title="Find lessons and modules"
-        description="Search across all courses and interview questions."
+        title="Find lessons, modules, and courses"
+        description="Search across all courses, problems, cheat sheets, and interview questions."
         titleAs="h1"
       />
 
@@ -69,19 +75,7 @@ export default function SearchPage() {
       ) : (
         <div className="space-y-4">
           {results.map((result) => {
-            let href: string;
-            if (result.type === 'lesson') {
-              if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems') {
-                href = `/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
-              } else if (result.courseSlug === 'interview-qa' && result.technology) {
-                const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
-                href = `/interview-questions/${techSlug}/${result.slug}`;
-              } else {
-                href = `/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
-              }
-            } else {
-              href = `/courses/${result.courseSlug}/${result.moduleSlug}`;
-            }
+            const href = getSearchResultHref(result);
 
             return (
               <Link
@@ -110,7 +104,7 @@ export default function SearchPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 text-xs text-fg-subtle">
-                  <span className="capitalize">{result.type}</span>
+                  <span className="capitalize">{TYPE_LABEL[result.type] || result.type}</span>
                   {result.difficulty && (
                     <span className="rounded-full border border-border bg-canvas-subtle px-2 py-0.5 text-xs text-fg-subtle capitalize">
                       {result.difficulty}

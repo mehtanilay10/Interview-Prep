@@ -15,8 +15,9 @@ export const metadata: Metadata = buildMetadata({
 export default function ProblemsPage() {
   const csharpCourse = getCourseBySlug('csharp-problems');
   const sqlCourse = getCourseBySlug('sql-problems');
+  const systemDesignCourse = getCourseBySlug('system-design');
 
-  const courses = [csharpCourse, sqlCourse].filter(Boolean) as Course[];
+  const courses = [csharpCourse, sqlCourse, systemDesignCourse].filter(Boolean) as Course[];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">

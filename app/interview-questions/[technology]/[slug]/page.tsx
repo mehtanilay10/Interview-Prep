@@ -123,6 +123,7 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
           category="interviewQuestions"
         >
           <LessonNotesButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} />
+          <OfflineSaveButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
         </LessonActions>
         <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
           {lesson.title}
@@ -134,10 +135,6 @@ export default async function InterviewLessonDetailPage({ params }: { params: Pr
         <ContentBlockRenderer blocks={lesson.blocks} />
       </div>
 
-      {/* Offline save */}
-      <div className="mt-4">
-        <OfflineSaveButton courseSlug="interview-qa" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
-      </div>
 
       <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
         {prev ? (

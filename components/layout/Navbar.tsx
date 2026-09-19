@@ -8,6 +8,7 @@ import { Menu, X, Search, LogOut, User } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
+import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
 import { cn } from "@/lib/utils";
 import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
@@ -26,17 +27,14 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { data: session, status } = useSession();
   const isLoggedIn = status === 'authenticated';
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = new FormData(e.currentTarget).get("q")?.toString().trim() ?? "";
-    if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
-      setMobileOpen(false);
-    }
+  const handleSearch = (q: string) => {
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+    setMobileOpen(false);
   };
 
   useEffect(() => {
@@ -81,19 +79,21 @@ export function Navbar() {
               </Link>
             );
           })}
-          <form onSubmit={handleSearch} className="relative ml-2">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
-            <input
+          <div
+            className={cn(
+              "relative ml-2 transition-all duration-300 ease-in-out",
+              searchFocused ? "w-72 lg:w-80" : "w-44 lg:w-56"
+            )}
+          >
+            <SearchSuggestions
               ref={searchInputRef}
-              type="search"
-              name="q"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search…"
-              className="h-9 w-48 rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm text-fg-default placeholder:text-fg-subtle transition-colors focus:border-accent-fg focus:outline-none focus:ring-2 focus:ring-accent-fg/20 md:w-64"
-              aria-label="Search lessons and modules"
+              onChange={setSearchQuery}
+              onSearch={handleSearch}
+              placeholder="Search lessons, modules, topics..."
+              size="sm"
             />
-          </form>
+          </div>
         </nav>
 
         <div className="flex items-center gap-1">
@@ -163,20 +163,14 @@ export function Navbar() {
         >
           <nav className="flex flex-col gap-1 px-4 py-3" aria-label="Mobile navigation">
             <PWAInstallButton className="mb-2" />
-            <form onSubmit={handleSearch} className="mb-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
-                <input
-                  type="search"
-                  name="q"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search lessons and modules..."
-                  className="w-full rounded-lg border border-border bg-canvas pl-9 pr-3 py-2 text-sm text-fg-default placeholder:text-fg-subtle focus:border-accent-fg focus:outline-none focus:ring-2 focus:ring-accent-fg/20"
-                  aria-label="Search lessons and modules"
-                />
-              </div>
-            </form>
+            <SearchSuggestions
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onSearch={handleSearch}
+              placeholder="Search lessons, modules, topics..."
+              className="mb-2"
+              size="sm"
+            />
             {NAV_LINKS.map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (

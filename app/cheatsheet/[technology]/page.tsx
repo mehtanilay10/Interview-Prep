@@ -110,16 +110,13 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ tec
         category="lessons"
       >
         <LessonNotesButton courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} />
+        <OfflineSaveButton courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
       </LessonActions>
 
       <div id="cheatsheet-content" className="prose prose-slate dark:prose-invert max-w-none">
         <ContentBlockRenderer blocks={lesson.blocks} />
       </div>
 
-      {/* Offline save */}
-      <div className="mt-4">
-        <OfflineSaveButton courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />
-      </div>
     </div>
     </NotesModalProvider>
   );

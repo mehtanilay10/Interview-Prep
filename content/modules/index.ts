@@ -464,6 +464,9 @@ const rawModules = [
 	awsModule18,
 	awsModule19,
 	awsModule20,
+	systemDesignModule1,
+	systemDesignModule2,
+	systemDesignModule3,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];

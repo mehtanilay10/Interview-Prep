@@ -15,7 +15,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className={cn('flex min-w-0 flex-wrap items-center gap-1 text-xs text-fg-muted', className)}
+      className={cn('flex min-w-0 items-center gap-1 overflow-x-auto text-xs text-fg-muted sm:flex-wrap', className)}
     >
       <Link
         href="/"
@@ -24,9 +24,9 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
         <Home className="h-3 w-3" aria-hidden="true" />
         <span className="sr-only">Home</span>
       </Link>
-      {/* On mobile show only last two items to avoid overflow */}
+      {/* Show all breadcrumb items on mobile via horizontal scroll */}
       {middleItems.map((item, idx) => (
-        <span key={idx} className={cn('flex items-center gap-1', idx < middleItems.length - 1 && 'hidden sm:flex')}>
+        <span key={idx} className="flex items-center gap-1 shrink-0">
           <ChevronRight className="h-3 w-3 shrink-0 text-fg-subtle" aria-hidden="true" />
           {item.href ? (
             <Link
@@ -43,7 +43,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
         </span>
       ))}
       {lastItem && (
-        <span className="flex min-w-0 items-center gap-1">
+        <span className="flex items-center gap-1 shrink-0">
           <ChevronRight className="h-3 w-3 shrink-0 text-fg-subtle" aria-hidden="true" />
           {lastItem.href ? (
             <Link

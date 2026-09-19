@@ -119,6 +119,7 @@ export default async function ProblemDetailPage({ params }: Params) {
           <header className="mb-8">
             <LessonActions lesson={lesson} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems">
               <LessonNotesButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
+              <OfflineSaveButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} title={lesson.title} />
             </LessonActions>
             <h1 className="mb-2 text-2xl font-bold leading-snug text-fg-default sm:text-3xl">
               {lesson.title}
@@ -158,10 +159,6 @@ export default async function ProblemDetailPage({ params }: Params) {
             <ContentBlockRenderer blocks={lesson.blocks} />
           </div>
 
-          {/* Offline save */}
-          <div className="mt-4">
-            <OfflineSaveButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} title={lesson.title} />
-          </div>
 
           {/* Further reading */}
           {lesson.furtherReading && lesson.furtherReading.length > 0 && (

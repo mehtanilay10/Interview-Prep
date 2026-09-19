@@ -22,12 +22,15 @@ export function NotesModal({ isOpen, onClose, courseSlug, moduleSlug, lessonSlug
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const getNoteRef = useRef(getNote);
+  getNoteRef.current = getNote;
+
   useEffect(() => {
     if (!isOpen) return;
-    const note = getNote(courseSlug, moduleSlug, lessonSlug);
+    const note = getNoteRef.current(courseSlug, moduleSlug, lessonSlug);
     setContent(note?.content ?? '');
     setSaveStatus('idle');
-  }, [isOpen, courseSlug, moduleSlug, lessonSlug, getNote]);
+  }, [isOpen, courseSlug, moduleSlug, lessonSlug]);
 
   useEffect(() => {
     if (!isOpen) return;

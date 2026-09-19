@@ -7,6 +7,7 @@
 import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
+import cheatsheetContent from '@/content/cheatsheet/content.json';
 import type {
   Module,
   Lesson,
@@ -146,52 +147,137 @@ export function extractTOC(blocks: ContentBlock[]): TocEntry[] {
 
 // ── Full-text search ──────────────────────────────────────────────────────────
 
+function scoreText(text: string, q: string): number {
+  const lower = text.toLowerCase();
+  if (!lower.includes(q)) return 0;
+  if (lower === q) return 10;
+  if (lower.startsWith(q)) return 5;
+  return 1;
+}
+
 export function searchAll(query: string): SearchResult[] {
   if (!query.trim()) return [];
   const q = query.toLowerCase();
-  const results: SearchResult[] = [];
+  const scored: { result: SearchResult; score: number }[] = [];
 
   // Search lessons
   for (const lesson of lessons) {
-    if (
-      lesson.title.toLowerCase().includes(q) ||
-      lesson.description.toLowerCase().includes(q) ||
-      lesson.tags.some((t) => t.includes(q))
-    ) {
-      results.push({
-        type: 'lesson',
-        slug: lesson.slug,
-        title: lesson.title,
-        description: lesson.description,
-        courseSlug: lesson.courseSlug,
-        moduleSlug: lesson.moduleSlug,
-        difficulty: lesson.difficulty,
-        tags: lesson.tags,
-        technology: lesson.technology,
+    const titleScore = scoreText(lesson.title, q) * 3;
+    const descScore = scoreText(lesson.description, q);
+    const tagScore = lesson.tags.reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+
+    if (titleScore > 0 || descScore > 0 || tagScore > 0) {
+      scored.push({
+        result: {
+          type: 'lesson',
+          slug: lesson.slug,
+          title: lesson.title,
+          description: lesson.description,
+          courseSlug: lesson.courseSlug,
+          moduleSlug: lesson.moduleSlug,
+          difficulty: lesson.difficulty,
+          tags: lesson.tags,
+          technology: lesson.technology,
+        },
+        score: titleScore + descScore + tagScore,
       });
     }
   }
 
   // Search modules
   for (const mod of modules) {
-    if (
-      mod.title.toLowerCase().includes(q) ||
-      mod.description.toLowerCase().includes(q) ||
-      mod.tags.some((t) => t.includes(q))
-    ) {
-      results.push({
-        type: 'module',
-        slug: mod.slug,
-        title: mod.title,
-        description: mod.description,
-        courseSlug: mod.courseSlug,
-        difficulty: mod.difficulty,
-        tags: mod.tags,
+    const titleScore = scoreText(mod.title, q) * 3;
+    const descScore = scoreText(mod.description, q);
+    const tagScore = mod.tags.reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+
+    if (titleScore > 0 || descScore > 0 || tagScore > 0) {
+      scored.push({
+        result: {
+          type: 'module',
+          slug: mod.slug,
+          title: mod.title,
+          description: mod.description,
+          courseSlug: mod.courseSlug,
+          difficulty: mod.difficulty,
+          tags: mod.tags,
+        },
+        score: titleScore + descScore + tagScore,
       });
     }
   }
 
-  return results;
+  // Search courses
+  for (const course of courses) {
+    const titleScore = scoreText(course.title, q) * 3;
+    const descScore = scoreText(course.description, q);
+
+    if (titleScore > 0 || descScore > 0) {
+      scored.push({
+        result: {
+          type: 'course',
+          slug: course.slug,
+          title: course.title,
+          description: course.description,
+        },
+        score: titleScore + descScore,
+      });
+    }
+  }
+
+  // Search cheatsheet section
+  const csTitleScore = scoreText(cheatsheetContent.title, q) * 3;
+  const csDescScore = scoreText(cheatsheetContent.description, q);
+
+  if (csTitleScore > 0 || csDescScore > 0) {
+    scored.push({
+      result: {
+        type: 'cheatsheet',
+        slug: cheatsheetContent.slug,
+        title: cheatsheetContent.title,
+        description: cheatsheetContent.description,
+      },
+      score: csTitleScore + csDescScore,
+    });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 10).map((s) => s.result);
+}
+
+export function getSearchResultHref(result: SearchResult): string {
+  if (result.type === 'lesson') {
+    if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems' || result.courseSlug === 'system-design') {
+      return `/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+    }
+    if (result.courseSlug === 'interview-qa' && result.technology) {
+      const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
+      return `/interview-questions/${techSlug}/${result.slug}`;
+    }
+    return `/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+  }
+
+  if (result.type === 'module') {
+    if (result.courseSlug === 'cheatsheet') {
+      return `/cheatsheet/${result.slug}`;
+    }
+    if (result.courseSlug === 'csharp-problems' || result.courseSlug === 'sql-problems' || result.courseSlug === 'system-design') {
+      return `/problems/${result.courseSlug}/${result.slug}`;
+    }
+    return `/courses/${result.courseSlug}/${result.slug}`;
+  }
+
+  if (result.type === 'course') {
+    if (result.slug === 'csharp-problems' || result.slug === 'sql-problems' || result.slug === 'system-design') {
+      return `/problems/${result.slug}`;
+    }
+    return `/courses/${result.slug}`;
+  }
+
+  if (result.type === 'cheatsheet') {
+    return '/cheatsheet';
+  }
+
+  return '/';
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────

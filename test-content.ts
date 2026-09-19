@@ -37,6 +37,7 @@ const problemCourses = getProblemCourses();
 assert(Array.isArray(problemCourses), 'getProblemCourses returns an array');
 assert(problemCourses.some(c => c.slug === 'csharp-problems'), 'getProblemCourses includes csharp-problems');
 assert(problemCourses.some(c => c.slug === 'sql-problems'), 'getProblemCourses includes sql-problems');
+assert(problemCourses.some(c => c.slug === 'system-design'), 'getProblemCourses includes system-design');
 
 // Test getLessonsForCourse
 const csharpLessons = getLessonsForCourse('csharp-problems');
@@ -48,6 +49,11 @@ const sqlLessons = getLessonsForCourse('sql-problems');
 assert(Array.isArray(sqlLessons), 'getLessonsForCourse returns an array for sql-problems');
 assert(sqlLessons.length > 0, 'getLessonsForCourse returns lessons for sql-problems');
 assert(sqlLessons.every(l => l.courseSlug === 'sql-problems'), 'All returned lessons belong to sql-problems');
+
+const systemDesignLessons = getLessonsForCourse('system-design');
+assert(Array.isArray(systemDesignLessons), 'getLessonsForCourse returns an array for system-design');
+assert(systemDesignLessons.length > 0, 'getLessonsForCourse returns lessons for system-design');
+assert(systemDesignLessons.every(l => l.courseSlug === 'system-design'), 'All returned lessons belong to system-design');
 
 // Test search for problems
 const problemSearch = searchAll('array');
