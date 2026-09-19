@@ -27,14 +27,16 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { data: session, status } = useSession();
   const isLoggedIn = status === 'authenticated';
 
   const handleSearch = (q: string) => {
     router.push(`/search?q=${encodeURIComponent(q)}`);
     setMobileOpen(false);
+    setSearchMode(false);
   };
 
   useEffect(() => {
@@ -45,11 +47,32 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
+    if (!searchMode) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSearchMode(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [searchMode]);
+
+  useEffect(() => {
     registerShortcut('/', 'Focus search', () => {
+      if (!searchMode) setSearchMode(true);
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
     });
-  }, []);
+  }, [searchMode]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [userMenuOpen]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
@@ -70,36 +93,54 @@ export function Navbar() {
           <span className="text-base">Interview Prep</span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
-          {NAV_LINKS.map((link) => {
-            const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-            return (
-              <Link key={link.href} href={link.href} className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas-subtle hover:text-fg-default")} aria-current={isActive ? "page" : undefined}>
-                {link.label}
-              </Link>
-            );
-          })}
-          <div
-            className={cn(
-              "relative ml-2 transition-all duration-300 ease-in-out",
-              searchFocused ? "w-72 lg:w-80" : "w-44 lg:w-56"
-            )}
-          >
-            <SearchSuggestions
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={setSearchQuery}
-              onSearch={handleSearch}
-              placeholder="Search lessons, modules, topics..."
-              size="sm"
-            />
+        {searchMode ? (
+          <div className="hidden flex-1 items-center md:flex">
+            <div className="relative w-full max-w-2xl transition-all duration-300 ease-in-out">
+              <SearchSuggestions
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={setSearchQuery}
+                onSearch={handleSearch}
+                placeholder="Search lessons, modules, topics..."
+                size="md"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchMode(false)}
+              className="ml-3 flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+              aria-label="Close search"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Cancel</span>
+            </button>
           </div>
-        </nav>
+        ) : (
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
+            {NAV_LINKS.map((link) => {
+              const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+              return (
+                <Link key={link.href} href={link.href} className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas-subtle hover:text-fg-default")} aria-current={isActive ? "page" : undefined}>
+                  {link.label}
+                </Link>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setSearchMode(true)}
+              className="ml-2 flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+              aria-label="Open search"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden lg:inline">Search</span>
+            </button>
+          </nav>
+        )}
 
         <div className="flex items-center gap-1">
           <ThemeToggle />
           {isLoggedIn && session?.user ? (
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen((o) => !o)}
                 className="flex items-center gap-2 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
