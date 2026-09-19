@@ -10,10 +10,9 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Avoid hydration mismatch — only render after client mount
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {
@@ -25,7 +24,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     );
   }
 
-  const isDark = theme === 'dark';
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <button

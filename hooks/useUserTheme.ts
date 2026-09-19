@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 
@@ -33,20 +33,15 @@ async function syncThemeToServer(theme: Theme): Promise<void> {
 
 export function useUserTheme() {
   const { data: session, status } = useSession();
-  const { theme: resolvedTheme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const isLoggedIn = status === 'authenticated';
   const isLoggedOut = status === 'unauthenticated';
 
-  const [localTheme, setLocalTheme] = useState<Theme>('system');
   const [serverTheme, setServerTheme] = useState<Theme | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') {
-      setLocalTheme(stored);
-    }
   }, []);
 
   useEffect(() => {
@@ -66,23 +61,25 @@ export function useUserTheme() {
     }
   }, [isLoggedIn, serverTheme]);
 
-  const activeTheme = isLoggedIn && serverTheme ? serverTheme : localTheme;
-
   const updateTheme = useCallback(
     (theme: Theme) => {
       if (isLoggedIn) {
         setServerTheme(theme);
-      } else {
-        setLocalTheme(theme);
-        localStorage.setItem(STORAGE_KEY, theme);
       }
       setTheme(theme);
+      if (isLoggedOut) {
+        try {
+          localStorage.setItem(STORAGE_KEY, theme);
+        } catch {
+          // ignore storage errors
+        }
+      }
     },
-    [isLoggedIn, setTheme]
+    [isLoggedIn, isLoggedOut, setTheme]
   );
 
   return {
-    theme: activeTheme,
+    theme: isLoggedIn ? (serverTheme ?? 'system') : 'system',
     setTheme: updateTheme,
     mounted,
     isLoggedIn,

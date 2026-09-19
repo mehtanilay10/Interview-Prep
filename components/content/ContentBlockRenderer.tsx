@@ -75,7 +75,7 @@ interface ContentBlockRendererProps {
 }
 
 function CustomCodeBlock({ code, language }: { code: string; language?: string }) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -84,7 +84,7 @@ function CustomCodeBlock({ code, language }: { code: string; language?: string }
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const shikiTheme = theme === 'dark' ? 'github-dark' : 'github-light';
+  const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
 
   return (
     <div className="overflow-hidden rounded-xl border border-border shadow-sm">
