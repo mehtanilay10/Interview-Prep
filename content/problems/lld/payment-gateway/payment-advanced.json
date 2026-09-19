@@ -1,0 +1,64 @@
+{
+  "id": "lesson-lld-payment-02",
+  "slug": "payment-advanced",
+  "moduleSlug": "payment-gateway",
+  "courseSlug": "lld-problems",
+  "title": "Payment Gateway: Refunds, Webhooks, and Idempotency",
+  "description": "Design refund flows, webhook retries, and idempotent payment APIs.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "lld",
+    "payment-gateway",
+    "refunds",
+    "webhooks",
+    "idempotency"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Extend the payment gateway with partial and full refunds, webhook delivery with retries, and idempotency keys to prevent duplicate charges."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Refund and Webhook Delivery",
+        "language": "csharp",
+        "code": "public class RefundService\n{\n    public Refund ProcessRefund(Payment payment, decimal? amount = null)\n    {\n        if (payment.Status != PaymentStatus.Captured)\n            throw new InvalidOperationException(\"Cannot refund uncaptured payment\");\n\n        var refundAmount = amount ?? payment.Amount;\n        if (refundAmount > payment.Amount)\n            throw new ArgumentException(\"Refund exceeds payment\");\n\n        var refund = new Refund\n        {\n            PaymentId = payment.Id,\n            Amount = refundAmount,\n            Status = RefundStatus.Processed\n        };\n        return refund;\n    }\n}\n\npublic class WebhookService\n{\n    private readonly Dictionary<string, int> _retryCount = new();\n\n    public async Task DeliverAsync(string url, object payload)\n    {\n        string idempotencyKey = payload.IdempotencyKey;\n        if (_retryCount.GetValueOrDefault(idempotencyKey) >= 5)\n        {\n            await _deadLetterQueue.EnqueueAsync(payload);\n            return;\n        }\n\n        try\n        {\n            await _httpClient.PostAsync(url, content);\n            _retryCount.Remove(idempotencyKey);\n        }\n        catch\n        {\n            _retryCount[idempotencyKey] = _retryCount.GetValueOrDefault(idempotencyKey) + 1;\n            await _delayProvider.Delay(CalculateBackoff(_retryCount[idempotencyKey]));\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Webhook reliability",
+        "text": "Webhooks fail. Always retry with exponential backoff, move to a dead-letter queue after 5 failures, and expose a webhook retry endpoint for merchants."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Refund is a first-class entity linked to Payment",
+          "Partial refunds track remaining refundable amount",
+          "Webhooks need idempotency keys and retry logic",
+          "Dead-letter queue captures permanent failures"
+        ],
+        "takeaway": "Payment gateways are never just about charging cards. Refunds, webhooks, and idempotency are what make them reliable at scale."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}
