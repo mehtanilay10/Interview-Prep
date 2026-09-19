@@ -91,7 +91,7 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, serverBookmarks]);
 
   useEffect(() => {
     if (!isLoggedIn || !serverBookmarksRef.current || isInitialLoad) return;
