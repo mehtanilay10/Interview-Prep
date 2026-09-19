@@ -4,26 +4,261 @@
   "moduleSlug": "02-mvc-fundamentals",
   "courseSlug": "aspnet-core",
   "title": "Models, ViewData, and ViewBag",
-  "description": "Learn models, viewdata, and viewbag in ASP.NET Core.",
+  "description": "Understand how models represent data in ASP.NET Core MVC, and learn when and how to use ViewData and ViewBag for passing supplementary data from controllers to views.",
   "order": 4,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "models",
-    "viewdata"
+    "viewdata",
+    "viewbag",
+    "data-transfer"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Pass data from controllers to views using strongly-typed models or ViewData/ViewBag."
+      "text": "In the MVC pattern, **models** represent your application's data and business rules. A model is simply a C# class with properties — sometimes called a **Plain Old CLR Object (POCO)** because it does not depend on ASP.NET Core or any specific framework."
+    },
+    {
+      "type": "paragraph",
+      "text": "When a controller needs to send data to a view, it has three options: pass a strongly typed model, use `ViewData` (a dictionary), or use `ViewBag` (a dynamic wrapper around `ViewData`). Each approach has different tradeoffs."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Defining a Model"
+    },
+    {
+      "type": "paragraph",
+      "text": "A model class is a plain C# class that represents an entity in your application. It contains properties that describe the data, and optionally methods that implement business logic or validation."
     },
     {
       "type": "example",
+      "title": "A Product model class",
+      "content": "A simple model class with properties representing a product.",
       "language": "csharp",
-      "code": "public IActionResult Details(int id)\n{\n    var product = _repo.GetById(id);\n    return View(product); // strongly typed\n}"
+      "code": "namespace MyFirstApp.Models\n{\n    public class Product\n    {\n        public int Id { get; set; }\n        public string Name { get; set; } = string.Empty;\n        public string Description { get; set; } = string.Empty;\n        public decimal Price { get; set; }\n        public int StockQuantity { get; set; }\n        public bool IsAvailable => StockQuantity > 0;\n        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;\n\n        // Computed property — no backing field needed\n        public string DisplayPrice => Price.ToString(\"C\");\n    }\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Computed properties",
+      "text": "C# lets you define properties without a backing field using expression-bodied members (`=>`). The `IsAvailable` and `DisplayPrice` properties are computed on demand — they do not store data, they calculate it from other properties."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Passing a Strongly Typed Model to a View"
+    },
+    {
+      "type": "paragraph",
+      "text": "The most common way to pass data to a view is with a strongly typed model. The controller creates or retrieves the model object and passes it to `View(model)`. The view declares the type with `@model` and accesses properties directly."
+    },
+    {
+      "type": "example",
+      "title": "Controller passing a model to a view",
+      "content": "Pass a Product model from the controller to the Details view.",
+      "language": "csharp",
+      "code": "public class ProductsController : Controller\n{\n    private static readonly List<Product> _products = new()\n    {\n        new Product { Id = 1, Name = \"Laptop\", Price = 999.99m, StockQuantity = 15 },\n        new Product { Id = 2, Name = \"Coffee Mug\", Price = 12.50m, StockQuantity = 100 }\n    };\n\n    public IActionResult Details(int id)\n    {\n        var product = _products.FirstOrDefault(p => p.Id == id);\n\n        if (product == null)\n        {\n            return NotFound();\n        }\n\n        // Pass the Product object as the model\n        return View(product);\n    }\n}"
+    },
+    {
+      "type": "example",
+      "title": "View receiving the strongly typed model",
+      "content": "The Details.cshtml view declares the model type and uses it to render the product.",
+      "language": "csharp",
+      "code": "@model MyFirstApp.Models.Product\n\n<h1>@Model.Name</h1>\n<p>@Model.Description</p>\n<p><strong>Price:</strong> @Model.DisplayPrice</p>\n<p><strong>In stock:</strong> @(Model.IsAvailable ? \"Yes\" : \"No\")</p>\n<p><strong>Added:</strong> @Model.CreatedAt.ToShortDateString()</p>"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Using ViewData"
+    },
+    {
+      "type": "paragraph",
+      "text": "`ViewData` is a dictionary (`Dictionary<string, object>`) that lives for the duration of a single request. It is useful for passing small supplementary values that do not warrant a dedicated model property, such as a page title or a notification message."
+    },
+    {
+      "type": "example",
+      "title": "Using ViewData for a page title",
+      "content": "Set ViewData in the controller and read it in the view.",
+      "language": "csharp",
+      "code": "// In the controller\npublic IActionResult Details(int id)\n{\n    var product = _products.FirstOrDefault(p => p.Id == id);\n    if (product == null) return NotFound();\n\n    ViewData[\"PageTitle\"] = $\"Product: {product.Name}\";\n    ViewData[\"ShowBanner\"] = true;\n\n    return View(product);\n}\n\n<!-- In the view -->\n<h2>@ViewData[\"PageTitle\"]</h2>\n\n@if ((bool)ViewData[\"ShowBanner\"])\n{\n    <div class=\"banner\">Special offer!</div>\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "ViewData values must be cast",
+      "text": "Because `ViewData` stores values as `object`, you must cast them to the correct type when reading them back. Forgetting to cast will cause runtime errors."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Using ViewBag"
+    },
+    {
+      "type": "paragraph",
+      "text": "`ViewBag` is a dynamic wrapper around `ViewData`. It provides the same functionality but with a cleaner syntax — no casting required when reading values."
+    },
+    {
+      "type": "example",
+      "title": "Using ViewBag for supplementary data",
+      "content": "Set ViewBag values in the controller and read them without casting in the view.",
+      "language": "csharp",
+      "code": "// In the controller\npublic IActionResult Details(int id)\n{\n    var product = _products.FirstOrDefault(p => p.Id == id);\n    if (product == null) return NotFound();\n\n    ViewBag.PageTitle = $\"Product: {product.Name}\";\n    ViewBag.ShowBanner = true;\n    ViewBag.RelatedProducts = _products.Where(p => p.Id != id).Take(3);\n\n    return View(product);\n}\n\n<!-- In the view -->\n<h2>@ViewBag.PageTitle</h2>\n\n@if (ViewBag.ShowBanner)\n{\n    <div class=\"banner\">Special offer!</div>\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "Since `ViewBag` and `ViewData` share the same underlying dictionary, setting `ViewBag.Title = \"Hi\"` is the same as setting `ViewData[\"Title\"] = \"Hi\"`. They are two syntaxes for the same data store."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Comparing the Three Approaches"
+    },
+    {
+      "type": "comparison-cards",
+      "title": "Strongly Typed Model vs. ViewData vs. ViewBag",
+      "cards": [
+        {
+          "title": "Strongly Typed Model",
+          "description": "Pass a typed object to View(model). The view declares @model for full compile-time safety.",
+          "pros": [
+            "Full IntelliSense and compile-time checking",
+            "Self-documenting — the view declares what data it needs",
+            "Easiest to refactor safely"
+          ],
+          "cons": [
+            "Requires a model class (extra file)",
+            "Less convenient for one-off values"
+          ]
+        },
+        {
+          "title": "ViewData",
+          "description": "A Dictionary<string, object> for passing data. Values are stored as objects and require casting.",
+          "pros": [
+            "No model class needed",
+            "Good for simple one-off values like titles"
+          ],
+          "cons": [
+            "No compile-time checking",
+            "Requires casting when reading",
+            "Typos in keys cause runtime errors"
+          ]
+        },
+        {
+          "title": "ViewBag",
+          "description": "A dynamic wrapper around ViewData. Same data store with cleaner syntax and no casting.",
+          "pros": [
+            "Cleaner syntax than ViewData",
+            "No model class needed",
+            "Convenient for supplementary values"
+          ],
+          "cons": [
+            "No compile-time checking",
+            "Typos cause runtime errors",
+            "Harder to refactor safely"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Choosing the Right Approach"
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to use each",
+      "items": [
+        "**Strongly typed model** — Use for the primary data displayed on a page (the product, the order, the user profile)",
+        "**ViewBag** — Use for supplementary values like page titles, notification messages, or flags",
+        "**ViewData** — Use when you need a dictionary-like collection of values, but ViewBag is usually preferred"
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "POCO",
+          "definition": "Plain Old CLR Object — a simple C# class without dependencies on specific frameworks. Models are typically POCOs for maximum flexibility."
+        },
+        {
+          "term": "ViewData",
+          "definition": "A Dictionary<string, object> that passes data from controller to view for the duration of a single HTTP request. Values must be cast when read."
+        },
+        {
+          "term": "ViewBag",
+          "definition": "A dynamic wrapper around ViewData that provides the same functionality with cleaner syntax and no casting required."
+        },
+        {
+          "term": "Strongly Typed View",
+          "definition": "A view that declares @model with a specific type, enabling IntelliSense, compile-time checking, and safer code."
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "Models and ViewData Checklist",
+      "items": [
+        {
+          "text": "I can create a POCO model class with properties and a computed property",
+          "hint": "Use get/set properties; computed properties use => without a backing field"
+        },
+        {
+          "text": "I can pass a model from a controller to a view using return View(model)",
+          "hint": "The model becomes available as @Model in the view"
+        },
+        {
+          "text": "I can use ViewBag to pass supplementary data (like a page title) to a view",
+          "hint": "Set ViewBag.PageTitle = \"...\" in the controller, read @ViewBag.PageTitle in the view"
+        },
+        {
+          "text": "I can explain when to use a strongly typed model vs. ViewBag",
+          "hint": "Strongly typed for primary page data; ViewBag for small supplementary values like titles"
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Pass Data to a View Three Ways",
+      "description": "Practice using strongly typed models, ViewBag, and ViewData in the same controller action.",
+      "steps": [
+        "In ProductsController, create a new action called `Summary(int id)`",
+        "Retrieve a product by ID from the static list, or return NotFound()",
+        "Pass the product as a strongly typed model using `return View(product)`",
+        "Set `ViewBag.PageTitle` to the product name in the same action",
+        "Set `ViewData[\"ItemCount\"]` to the total number of products in the list",
+        "Create `Summary.cshtml` in Views/Products that reads the model, ViewBag.PageTitle, and ViewData[\"ItemCount\"]",
+        "Run the app and visit `/Products/Summary/1` to confirm all three data sources appear"
+      ],
+      "expectedOutcome": "The Summary page displays the product name from the model, a page title from ViewBag, and the total item count from ViewData — all three data-passing methods working together."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Models are plain C# classes (POCOs) that represent application data and business rules",
+        "Strongly typed views use @model to declare the expected data type, enabling IntelliSense and compile-time safety",
+        "ViewData is a Dictionary<string, object> for passing supplementary data between controller and view",
+        "ViewBag is a dynamic wrapper around ViewData with cleaner syntax and no casting",
+        "ViewBag and ViewData share the same underlying dictionary — they are two syntaxes for the same data",
+        "Prefer strongly typed models for primary page data; use ViewBag for simple supplementary values"
+      ],
+      "takeaway": "Passing data from controllers to views is fundamental to every ASP.NET Core application. Strongly typed models provide the best developer experience, while ViewBag and ViewData offer convenient shortcuts for simpler scenarios."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "views-and-templates",
+    "handling-user-input"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Models in ASP.NET Core MVC",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/models",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official guide to models, model binding, and validation in ASP.NET Core MVC."
+    }
+  ]
 }

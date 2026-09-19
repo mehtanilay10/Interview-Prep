@@ -4,26 +4,193 @@
   "moduleSlug": "05-razor-views",
   "courseSlug": "aspnet-core",
   "title": "View Components",
-  "description": "Learn view components in ASP.NET Core.",
+  "description": "Encapsulate rendering logic and data fetching into reusable units with view components.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "view-components",
-    "reusability"
+    "reusability",
+    "rendering"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is a View Component?"
+    },
+    {
       "type": "paragraph",
-      "text": "View Components encapsulate rendering logic and data fetching in one unit."
+      "text": "A view component is a class paired with a Razor view that renders a self-contained chunk of UI. Unlike partial views, view components can run their own C# logic, access services through dependency injection, and return a fully prepared model to the view."
+    },
+    {
+      "type": "paragraph",
+      "text": "Use view components when a UI piece needs logic or data that the parent page does not have. Examples include a shopping cart summary, a recent posts sidebar, or a weather widget. Each of these needs its own data fetch and rendering rules."
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "View Components vs Partial Views",
+      "text": "A partial view receives data from its parent and renders it. A view component fetches its own data, processes it, and then renders. If your snippet needs a database call, use a view component."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Anatomy of a View Component"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every view component has two required pieces: a class that derives from ViewComponent and a Razor view that renders the HTML. The class name must end with ViewComponent, and the view lives in the Views/Shared/Components/<ComponentName>/Default.cshtml folder by convention."
     },
     {
       "type": "example",
+      "title": "A Simple View Component Class",
+      "content": "This component fetches recent posts from the database.",
       "language": "csharp",
-      "code": "public class RecentPostsViewComponent : ViewComponent\n{\n    private readonly BlogContext _db;\n    public RecentPostsViewComponent(BlogContext db) => _db = db;\n\n    public async Task<IViewComponentResult> InvokeAsync(int count)\n    {\n        var posts = await _db.Posts.Take(count).ToListAsync();\n        return View(posts);\n    }\n}"
+      "code": "using Microsoft.AspNetCore.Mvc;\n\npublic class RecentPostsViewComponent : ViewComponent\n{\n    private readonly BlogContext _db;\n\n    public RecentPostsViewComponent(BlogContext db)\n    {\n        _db = db;\n    }\n\n    public async Task<IViewComponentResult> InvokeAsync(int count = 5)\n{\n        var posts = await _db.Posts\n            .OrderByDescending(p => p.PublishedAt)\n            .Take(count)\n            .ToListAsync();\n\n        return View(posts);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The InvokeAsync method is the entry point. It accepts parameters from the caller, fetches or computes data, and returns IViewComponentResult. The most common return type is View(model), which renders the component's Razor view with the supplied model."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "The View Component View"
+    },
+    {
+      "type": "paragraph",
+      "text": "The view for a view component does not use the @page directive and does not need an @model directive if the type is obvious. It receives the model passed to the View() method. The file path follows the convention Views/Shared/Components/<ComponentName>/Default.cshtml."
+    },
+    {
+      "type": "example",
+      "title": "RecentPosts View",
+      "content": "This view renders the posts returned by the view component.",
+      "language": "csharp",
+      "code": "@model IEnumerable<Post>\n\n<div class=\"recent-posts\">\n    <h4>Recent Posts</h4>\n    <ul>\n@foreach (var post in Model)\n{\n        <li>\n            <a asp-controller=\"Blog\"\n               asp-action=\"Post\"\n               asp-route-slug=\"@post.Slug\">\n                @post.Title\n            </a>\n            <small>@post.PublishedAt.ToString(\"MMM d, yyyy\")</small>\n        </li>\n}\n    </ul>\n</div>"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Invoking a View Component"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can invoke a view component from a view, a layout, or another view component using the Component.InvokeAsync helper or the view component tag helper. The tag helper syntax is cleaner and supports IntelliSense."
+    },
+    {
+      "type": "example",
+      "title": "Invoking a View Component in a Layout",
+      "content": "Call the view component from any view or layout.",
+      "language": "csharp",
+      "code": "<h3>Latest News</h3>\n@await Component.InvokeAsync(\"RecentPosts\", new { count = 3 })\n\n<!-- Or using the tag helper syntax -->\n<vc:recent-posts count=\"3\"></vc:recent-posts>"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Component.InvokeAsync method takes the component name without the ViewComponent suffix and an anonymous object with the parameters. The tag helper converts kebab-case names to the corresponding C# parameter names automatically."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "When to Use View Components"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Good Use Cases",
+      "items": [
+        "A shopping cart summary that needs to query the cart service.",
+        "A login panel that checks whether the user is authenticated.",
+        "A navigation menu that depends on the user's role.",
+        "A dashboard widget that aggregates data from multiple repositories."
+      ]
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to Avoid View Components",
+      "items": [
+        "When the data is already prepared by the parent page or view model.",
+        "When the UI fragment is purely presentational and has no logic.",
+        "When the same content can be achieved more simply with a partial view."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "View Component",
+          "definition": "A self-contained class and view that encapsulates rendering logic and data fetching for a reusable UI piece."
+        },
+        {
+          "term": "InvokeAsync",
+          "definition": "The method on a view component class that receives parameters, fetches data, and returns IViewComponentResult."
+        },
+        {
+          "term": "IViewComponentResult",
+          "definition": "The return type of InvokeAsync, typically a View result that renders a Razor view with a model."
+        },
+        {
+          "term": "Component.InvokeAsync",
+          "definition": "A helper method used inside views to call a view component by name and pass parameters."
+        },
+        {
+          "term": "Dependency Injection",
+          "definition": "The mechanism by which view components receive services like database contexts or loggers through constructor parameters."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Build a Category Menu View Component",
+      "description": "Create a view component that displays a list of product categories from the database.",
+      "steps": [
+        "Create a CategoryMenuViewComponent class in the ViewComponents folder.",
+        "Inject a repository or DbContext into the constructor.",
+        "In InvokeAsync, fetch all categories ordered by name and return them as a view model.",
+        "Create the view at Views/Shared/Components/CategoryMenu/Default.cshtml.",
+        "Render a <ul> of category links using asp-controller and asp-action tag helpers.",
+        "Invoke the component from the shared _Layout.cshtml and verify it appears on every page."
+      ],
+      "expectedOutcome": "A reusable category menu that pulls its own data and renders consistently across the entire site."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: View Components",
+      "items": [
+        {
+          "text": "I know when to choose a view component over a partial view.",
+          "hint": "Use a view component when the UI piece needs its own logic or data."
+        },
+        {
+          "text": "I can create a view component class with InvokeAsync.",
+          "hint": "Derive from ViewComponent and accept parameters in InvokeAsync."
+        },
+        {
+          "text": "I know the convention for the view component view path.",
+          "hint": "Views/Shared/Components/<Name>/Default.cshtml"
+        },
+        {
+          "text": "I can invoke a view component using both Component.InvokeAsync and the tag helper.",
+          "hint": "Tag helper syntax is <vc:name params=\"...\"></vc:name>"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "View components are reusable units of UI with their own logic and data access.",
+        "The class derives from ViewComponent and exposes InvokeAsync.",
+        "The view lives in Views/Shared/Components/<Name>/Default.cshtml.",
+        "You can invoke view components with Component.InvokeAsync or the vc: tag helper.",
+        "Use view components when a UI fragment needs its own service dependencies or database calls."
+      ],
+      "takeaway": "View components give you the reusability of partial views with the power of controller-like logic. They are ideal for self-contained widgets that need their own data."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "layouts-and-partials",
+    "tag-helpers"
+  ],
   "technology": null,
   "furtherReading": []
 }

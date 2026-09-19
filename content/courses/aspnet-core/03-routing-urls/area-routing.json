@@ -4,26 +4,248 @@
   "moduleSlug": "03-routing-urls",
   "courseSlug": "aspnet-core",
   "title": "Area Routing",
-  "description": "Learn area routing in ASP.NET Core.",
+  "description": "Learn how to organize large ASP.NET Core applications using Areas. Understand the folder structure, area route patterns, and how Areas help separate features like Admin, Blog, and API into self-contained modules.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 7,
+  "estimatedMinutes": 25,
   "tags": [
     "areas",
-    "organization"
+    "organization",
+    "modules"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Organize large apps with Areas for separate feature sets."
+      "text": "As an ASP.NET Core application grows, you may find yourself with dozens of controllers and hundreds of views. **Areas** provide a way to partition a large application into smaller, self-contained functional groups — each with its own controllers, views, and route configuration."
+    },
+    {
+      "type": "paragraph",
+      "text": "Common uses for areas include separating an **Admin** section from the public-facing site, organizing a multi-tenant application, or isolating a set of related features like **Blog** or **Store**."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is an Area?"
+    },
+    {
+      "type": "paragraph",
+      "text": "An Area is a logical grouping of controllers, views, models, and routes within your application. Each area has its own folder under the main `Areas/` directory, and its own route configuration that includes the area name as a URL segment."
     },
     {
       "type": "example",
+      "title": "Area folder structure",
+      "content": "The folder layout for an application with an Admin area.",
+      "language": "text",
+      "code": "MyFirstApp/\n├── Controllers/          # Root-level controllers (HomeController)\n├── Views/                 # Root-level views\n├── Areas/\n│   └── Admin/\n│       ├── Controllers/\n│       │   └── DashboardController.cs\n│       ├── Views/\n│       │   └── Dashboard/\n│       │       └── Index.cshtml\n│       └── AdminAreaRegistration.cs  (optional)\n└── Program.cs"
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Areas are optional",
+      "text": "Small to medium applications rarely need areas. Use them when you have a clear functional grouping (admin panel, blog, store) that justifies the extra folder structure. For simple applications, stick with a flat controller structure."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Enabling Areas in Program.cs"
+    },
+    {
+      "type": "paragraph",
+      "text": "Areas require two things: the controllers must have the `[Area]` attribute, and the routing system must include an area-aware route pattern. The area route uses the `{area:exists}` constraint to match only requests that include an area segment."
+    },
+    {
+      "type": "example",
+      "title": "Area route configuration",
+      "content": "Add area-aware routing to Program.cs and apply the [Area] attribute to controllers.",
       "language": "csharp",
-      "code": "app.MapControllerRoute(\n    name: \"areas\",\n    pattern: \"{area:exists}/{controller=Home}/{action=Index}/{id?}\");"
+      "code": "// Program.cs\nvar builder = WebApplication.CreateBuilder(args);\nbuilder.Services.AddControllersWithViews();\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthorization();\n\n// Area route — must come BEFORE the default route\napp.MapControllerRoute(\n    name: \"areas\",\n    pattern: \"{area:exists}/{controller=Home}/{action=Index}/{id?}\");\n\n// Default route for root-level controllers\napp.MapControllerRoute(\n    name: \"default\",\n    pattern: \"{controller=Home}/{action=Index}/{id?}\");\n\napp.Run();\n\n// Areas/Admin/Controllers/DashboardController.cs\nusing Microsoft.AspNetCore.Mvc;\n\nnamespace MyFirstApp.Areas.Admin.Controllers;\n\n[Area(\"Admin\")]\npublic class DashboardController : Controller\n{\n    public IActionResult Index() => View();\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The `{area:exists}` constraint ensures the route only matches when an area name is present in the URL. The area route must come before the default route because the routing system uses first-match semantics."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "How Area URLs Are Structured"
+    },
+    {
+      "type": "paragraph",
+      "text": "With the area route pattern `{area:exists}/{controller=Home}/{action=Index}/{id?}`, the URL `/Admin/Dashboard/Index` maps to `AdminArea` → `DashboardController` → `Index()` action. The area name becomes the first URL segment."
+    },
+    {
+      "type": "bullet-list",
+      "title": "URL to area mapping examples",
+      "items": [
+        "`/Admin/Dashboard` → Admin area, DashboardController, Index() action",
+        "`/Admin/Dashboard/Users` → Admin area, DashboardController, Users() action",
+        "`/Admin/Dashboard/Users/5` → Admin area, DashboardController, Users(5)",
+        "`/Products/Details/5` → Root level, ProductsController, Details(5) — no area"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Area Views Location"
+    },
+    {
+      "type": "paragraph",
+      "text": "Views for area controllers live in `Areas/[AreaName]/Views/[ControllerName]/`. The view lookup follows the same convention as root-level views, but scoped to the area. The default layout is still `Views/Shared/_Layout.cshtml` unless you specify a different layout."
+    },
+    {
+      "type": "example",
+      "title": "Area view with a different layout",
+      "content": "Override the default layout for an Admin area view to use an admin-specific layout.",
+      "language": "csharp",
+      "code": "@model MyFirstApp.Areas.Admin.ViewModels.DashboardViewModel\n@{ Layout = \"~/Areas/Admin/Views/Shared/_AdminLayout.cshtml\"; }\n\n<h1>Admin Dashboard</h1>\n<p>Welcome, @User.Identity.Name</p>"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Linking Between Areas"
+    },
+    {
+      "type": "paragraph",
+      "text": "When generating links to actions in a different area, you need to specify the area name in the route values. Failing to do so will generate a link to the same area, which may not exist."
+    },
+    {
+      "type": "example",
+      "title": "Linking from root to an area action",
+      "content": "Use Url.Action with the area route value to generate links to area controllers.",
+      "language": "csharp",
+      "code": "@* Link from a root view to the Admin Dashboard *@\n<a href=\"@Url.Action(\"Index\", \"Dashboard\", new { area = \"Admin\" })\">\n    Admin Dashboard\n</a>\n<!-- Generates: /Admin/Dashboard -->\n\n@* Link from Admin area back to the home page (root level) *@\n<a href=\"@Url.Action(\"Index\", \"Home\", new { area = \"\" })\">\n    Back to Site\n</a>\n<!-- Generates: / (empty area = root level) -->"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Area links in the same area",
+      "text": "When linking between two actions within the same area, you do not need to specify the area name — it is implied by the current request. Only specify `area = \"...\"` when crossing area boundaries."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Area Authorization"
+    },
+    {
+      "type": "paragraph",
+      "text": "Areas are an excellent place to apply authorization policies. You can use `[Authorize]` on the entire area controller or individual actions to restrict access to authenticated or admin users."
+    },
+    {
+      "type": "example",
+      "title": "Securing an entire area",
+      "content": "Apply [Authorize] to all controllers in an area by adding it to the controller base class or using a convention.",
+      "language": "csharp",
+      "code": "[Area(\"Admin\")]\n[Authorize(Roles = \"Admin\")]\npublic class DashboardController : Controller\n{\n    // Only users in the \"Admin\" role can access any action in this controller\n    public IActionResult Index() => View();\n\n    public IActionResult Users() => View();\n}\n\n// Alternatively, apply to a specific action only\npublic class ProductsController : Controller\n{\n    [Authorize(Roles = \"Admin\")]\n    public IActionResult Delete(int id) => View(model: id);\n\n    public IActionResult List() => View(); // accessible to everyone\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "When to Use Areas"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Good candidates for areas",
+      "items": [
+        "**Admin panel** — Separate admin controllers, views, and authorization from the public site",
+        "**Multi-tenant apps** — Each tenant gets its own area with isolated controllers and views",
+        "**Large feature modules** — Isolate a complex feature (Blog, Store, Forum) to keep controllers manageable",
+        "**API versioning** — Separate v1 and v2 API controllers into different areas for cleaner organization"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Do not overuse areas",
+      "text": "Areas add complexity. For small applications with a handful of controllers, a flat structure is simpler and easier to navigate. Introduce areas only when the folder structure becomes genuinely hard to manage."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Area",
+          "definition": "A functional grouping within an ASP.NET Core application with its own controllers, views, and route configuration. Areas help organize large applications."
+        },
+        {
+          "term": "Area Route",
+          "definition": "A route pattern that includes the area segment (e.g., {area:exists}/{controller}/{action}) to match URLs that target a specific area."
+        },
+        {
+          "term": "Area Attribute",
+          "definition": "The [Area(\"AreaName\")] attribute applied to controllers to specify which area they belong to."
+        },
+        {
+          "term": "{area:exists}",
+          "definition": "A route constraint that matches only when an area name is present in the URL. Used to distinguish area routes from root-level routes."
+        }
+      ]
+    },
+    {
+      "type": "checklist",
+      "title": "Area Routing Checklist",
+      "items": [
+        {
+          "text": "I have created an Areas/[AreaName] folder structure with Controllers and Views subfolders",
+          "hint": "Areas/Admin/Controllers/ and Areas/Admin/Views/"
+        },
+        {
+          "text": "I have applied [Area(\"AreaName\")] to controllers in the area",
+          "hint": "[Area(\"Admin\")] on the controller class"
+        },
+        {
+          "text": "I have added the area route pattern {area:exists}/{controller}/{action}/{id?} before the default route",
+          "hint": "Area routes must come BEFORE the default route in Program.cs"
+        },
+        {
+          "text": "I can generate a link from a root view to an area action",
+          "hint": "Url.Action(\"Index\", \"Dashboard\", new { area = \"Admin\" })"
+        },
+        {
+          "text": "I understand when areas are appropriate and when a flat structure is better",
+          "hint": "Use areas for Admin panels, multi-tenant apps, or large feature modules"
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Create an Admin Area",
+      "description": "Organize your application by creating an Admin area with its own controllers, views, and route configuration.",
+      "steps": [
+        "Create the folder structure: `Areas/Admin/Controllers/` and `Areas/Admin/Views/Dashboard/`",
+        "Create `DashboardController.cs` in the Admin Controllers folder with [Area(\"Admin\")] attribute",
+        "Add an `Index()` action that returns a simple view with an Admin heading",
+        "Create `Index.cshtml` in the Admin Views/Dashboard folder with admin page content",
+        "Update Program.cs to add the area route `{area:exists}/{controller=Home}/{action=Index}/{id?}` BEFORE the default route",
+        "Run the app and visit `/Admin/Dashboard` to confirm the Admin area loads",
+        "Add a link in the root Home page that points to the Admin Dashboard using `Url.Action(\"Index\", \"Dashboard\", new { area = \"Admin\" })`"
+      ],
+      "expectedOutcome": "Visiting `/Admin/Dashboard` renders the Admin area's Dashboard/Index view. The link from the root Home page correctly navigates to the Admin Dashboard. The Admin area is visually or functionally distinct from the root application."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Areas partition a large application into self-contained functional groups with their own controllers and views",
+        "Enable areas with `{area:exists}/{controller}/{action}/{id?}` in Program.cs, before the default route",
+        "Apply [Area(\"AreaName\")] to controllers to assign them to a specific area",
+        "Area views live in `Areas/[AreaName]/Views/[Controller]/` following the same convention as root views",
+        "Cross-area links require specifying the area name: `Url.Action(\"Action\", \"Controller\", new { area = \"AreaName\" })`",
+        "Use areas for Admin panels, multi-tenant apps, and large feature modules — not for small applications"
+      ],
+      "takeaway": "Areas provide a clean organizational structure for large ASP.NET Core applications. By separating features into isolated modules with their own controllers, views, and routes, areas keep your codebase manageable as it grows."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "url-generation",
+    "routing-basics"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Areas in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/areas",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official guide to creating and organizing areas in ASP.NET Core MVC applications."
+    }
+  ]
 }

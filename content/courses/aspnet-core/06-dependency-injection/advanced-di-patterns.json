@@ -4,26 +4,186 @@
   "moduleSlug": "06-dependency-injection",
   "courseSlug": "aspnet-core",
   "title": "Advanced DI Patterns",
-  "description": "Learn advanced di patterns in ASP.NET Core.",
+  "description": "Explore advanced dependency injection techniques including factories, keyed services, and decorators.",
   "order": 5,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
   "tags": [
     "advanced",
-    "factories"
+    "factories",
+    "decorators"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "When Basic DI Is Not Enough"
+    },
+    {
       "type": "paragraph",
-      "text": "Use factory patterns and keyed services for complex scenarios."
+      "text": "Basic DI works wonderfully when each service has one implementation and a straightforward lifetime. But real applications sometimes need more flexibility: choosing an implementation at runtime, creating services on demand, or wrapping services with additional behavior. Advanced DI patterns address these needs without abandoning the core principles."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Advanced Does Not Mean Complicated",
+      "text": "You can build large applications with only Transient, Scoped, and Singleton. Advanced patterns are tools for specific problems. Use them when you need them, not because they seem clever."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Factory Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "A factory is a service that creates other services. Instead of injecting a service directly, you inject a factory that knows how to build it. Factories are useful when the implementation to create depends on runtime information, such as a user selection or configuration value."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core supports factory registration through AddTransient with a factory delegate. You can also inject IServiceProvider and call CreateScope or GetRequiredService manually, but that is generally discouraged because it hides dependencies."
     },
     {
       "type": "example",
+      "title": "Factory Registration",
+      "content": "Use a factory to select an implementation at runtime.",
       "language": "csharp",
-      "code": "builder.Services.AddKeyedScoped<INotifier, EmailNotifier>(\"email\");\nbuilder.Services.AddKeyedScoped<INotifier, SmsNotifier>(\"sms\");\n\npublic class NotificationController(IKeyedServiceProvider provider) : Controller\n{\n    public void Send(string key) => provider.GetRequiredKeyedService<INotifier>(key).Send(\"msg\");\n}"
+      "code": "public interface INotifier { Task SendAsync(string message); }\npublic class EmailNotifier : INotifier\n{\n    private readonly SmtpClient _client;\n    public EmailNotifier(SmtpClient client) => _client = client;\n    public async Task SendAsync(string message) => await _client.SendMailAsync(message);\n}\n\npublic class SmsNotifier : INotifier\n{\n    private readonly SmsClient _client;\n    public SmsNotifier(SmsClient client) => _client = client;\n    public async Task SendAsync(string message) => await _client.SendAsync(message);\n}\n\n// Register multiple implementations\nbuilder.Services.AddTransient<EmailNotifier>();\nbuilder.Services.AddTransient<SmsNotifier>();\n\n// Factory that chooses based on a setting\nbuilder.Services.AddTransient<INotifier>(sp =>\n{\n    var config = sp.GetRequiredService<IConfiguration>();\n    var channel = config[\"NotificationChannel\"];\n    return channel == \"sms\"\n        ? sp.GetRequiredService<SmsNotifier>()\n        : sp.GetRequiredService<EmailNotifier>();\n});\n\npublic class NotificationService(INotifier notifier)\n{\n    public async Task NotifyAsync(string message) => await notifier.SendAsync(message);\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Keyed Services"
+    },
+    {
+      "type": "paragraph",
+      "text": "Keyed services let you register multiple implementations of the same interface and distinguish them by a key. This is cleaner than using factory delegates because the registration stays declarative, and the consumer can request a specific implementation by key."
+    },
+    {
+      "type": "example",
+      "title": "Keyed Service Registration",
+      "content": "Register multiple INotifier implementations with keys.",
+      "language": "csharp",
+      "code": "builder.Services.AddKeyedScoped<INotifier, EmailNotifier>(\"email\");\nbuilder.Services.AddKeyedScoped<INotifier, SmsNotifier>(\"sms\");\nbuilder.Services.AddKeyedScoped<INotifier, PushNotifier>(\"push\");\n\n// Consume with IKeyedServiceProvider\npublic class NotificationController(IKeyedServiceProvider provider) : Controller\n{\n    public async Task<IActionResult> Send(string channel, string message)\n    {\n        var notifier = provider.GetRequiredKeyedService<INotifier>(channel);\n        await notifier.SendAsync(message);\n        return Ok();\n    }\n}\n\n// Call with: /api/notification/send?channel=sms&message=Hello"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Keyed Services Require Modern .NET",
+      "text": "Keyed services were introduced in .NET 8. If you are using an earlier version, use factory delegates or named options instead."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Decorator Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "The decorator pattern wraps a service with another service that adds behavior. For example, you might want to log every call to a repository, cache the results of a service, or add retry logic around an HTTP client. Decorators let you add this behavior without changing the original service."
+    },
+    {
+      "type": "paragraph",
+      "text": "You register the decorator using TryAddEnumerable or by explicitly adding the decorator after the base service. The container resolves the decorator when the base service is requested."
+    },
+    {
+      "type": "example",
+      "title": "Decorating a Repository with Caching",
+      "content": "A caching decorator wraps a repository and stores results in memory.",
+      "language": "csharp",
+      "code": "public interface IProductRepository\n{\n    Task<Product> GetByIdAsync(int id);\n    Task<List<Product>> GetAllAsync();\n}\n\npublic class EfProductRepository : IProductRepository\n{\n    private readonly AppDbContext _db;\n    public EfProductRepository(AppDbContext db) => _db = db;\n    public async Task<Product> GetByIdAsync(int id) => await _db.Products.FindAsync(id);\n    public async Task<List<Product>> GetAllAsync() => await _db.Products.ToListAsync();\n}\n\npublic class CachingProductRepository : IProductRepository\n{\n    private readonly IProductRepository _inner;\n    private readonly ICacheService _cache;\n\n    public CachingProductRepository(IProductRepository inner, ICacheService cache)\n    {\n        _inner = inner;\n        _cache = cache;\n    }\n\n    public async Task<Product> GetByIdAsync(int id)\n    {\n        return await _cache.GetOrCreateAsync(\n            \"product-\" + id,\n            async () => await _inner.GetByIdAsync(id));\n    }\n\n    public async Task<List<Product>> GetAllAsync() => await _inner.GetAllAsync();\n}\n\n// Registration\nbuilder.Services.AddScoped<IProductRepository, EfProductRepository>();\nbuilder.Services.Decorate<IProductRepository, CachingProductRepository>();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Choosing an Advanced Pattern"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Pattern Selection Guide",
+      "items": [
+        "Use a factory when the implementation to create depends on runtime data.",
+        "Use keyed services when you need multiple named implementations of the same interface.",
+        "Use decorators when you want to add cross-cutting concerns like caching, logging, or retries.",
+        "Use IServiceProvider manually only as a last resort; it hides dependencies and makes testing harder."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Factory",
+          "definition": "A service or delegate that creates other services, often based on runtime parameters."
+        },
+        {
+          "term": "Keyed Service",
+          "definition": "A service registered with a string or object key that distinguishes it from other implementations of the same interface."
+        },
+        {
+          "term": "IKeyedServiceProvider",
+          "definition": "The service used to resolve keyed services by their key at runtime."
+        },
+        {
+          "term": "Decorator",
+          "definition": "A service that wraps another service of the same type to add behavior without modifying the inner service."
+        },
+        {
+          "term": "Cross-Cutting Concern",
+          "definition": "A behavior such as logging, caching, or validation that applies to many parts of an application."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Add a Logging Decorator",
+      "description": "Wrap an existing service with a decorator that logs every method call.",
+      "steps": [
+        "Create an IProductService interface with SearchAsync and GetByIdAsync methods.",
+        "Implement a ProductService that returns dummy data or queries a DbContext.",
+        "Create a LoggingProductService decorator that wraps IProductService.",
+        "In the decorator, log the method name, parameters, and return value using ILogger.",
+        "Register the base service and then decorate it in Program.cs.",
+        "Inject the decorated service into a controller and verify that every call appears in the logs."
+      ],
+      "expectedOutcome": "You will have a working decorator that adds logging to an existing service without changing the service itself."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Advanced DI Patterns",
+      "items": [
+        {
+          "text": "I know when to use a factory instead of direct injection.",
+          "hint": "When the implementation depends on runtime data."
+        },
+        {
+          "text": "I can register and resolve a keyed service.",
+          "hint": "Use AddKeyedScoped and IKeyedServiceProvider."
+        },
+        {
+          "text": "I understand how a decorator wraps an existing service.",
+          "hint": "It implements the same interface and delegates to an inner instance."
+        },
+        {
+          "text": "I can explain a real-world use case for a decorator.",
+          "hint": "Caching, logging, and retries are common examples."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Factories create services dynamically based on runtime conditions.",
+        "Keyed services let you register and resolve multiple implementations of the same interface.",
+        "Decorators wrap services to add cross-cutting behavior without modifying the inner service.",
+        "Advanced patterns are optional; basic DI covers most applications.",
+        "Use advanced patterns only when they solve a concrete problem."
+      ],
+      "takeaway": "Advanced DI patterns give you the tools to handle complex scenarios while staying within the DI container. They are not required for every project, but knowing them prevents you from reinventing the wheel when you do need them."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "configuring-services",
+    "service-lifetimes"
+  ],
   "technology": null,
   "furtherReading": []
 }

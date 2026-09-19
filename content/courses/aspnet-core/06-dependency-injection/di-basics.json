@@ -4,26 +4,182 @@
   "moduleSlug": "06-dependency-injection",
   "courseSlug": "aspnet-core",
   "title": "Dependency Injection Basics",
-  "description": "Learn dependency injection basics in ASP.NET Core.",
+  "description": "Understand the core ideas behind dependency injection and why it makes your applications easier to test and maintain.",
   "order": 1,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "di",
-    "ioc"
+    "ioc",
+    "architecture"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "What Is Dependency Injection?"
+    },
+    {
       "type": "paragraph",
-      "text": "DI lets you inject dependencies rather than creating them inside classes."
+      "text": "Dependency Injection, or DI, is a design pattern that removes the responsibility of creating dependencies from a class. Instead of a class building its own tools, the tools are handed to it from the outside. The class simply declares what it needs, and an external system provides it."
+    },
+    {
+      "type": "paragraph",
+      "text": "In ASP.NET Core, the framework itself acts as that external system. When a controller is created, the framework looks at its constructor, sees what services it needs, and provides instances automatically. This process is called Inversion of Control, or IoC, because the control over object creation is inverted from the class to the framework."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "A Simple Analogy",
+      "text": "Think of a chef in a kitchen. Without DI, the chef grows their own vegetables, mills their own flour, and forges their own pots. With DI, the kitchen manager hands the chef pre-prepared ingredients and tools. The chef focuses on cooking, and the manager handles provisioning."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Problem Without DI"
+    },
+    {
+      "type": "paragraph",
+      "text": "Before DI, a common pattern was to create dependencies inside the class that uses them. This is called tight coupling. It makes the class hard to test because you cannot replace the dependency with a fake for unit tests. It also makes the class rigid because changing the dependency implementation means changing the class itself."
     },
     {
       "type": "example",
+      "title": "Tightly Coupled Code",
+      "content": "Creating dependencies inside the class couples it to a specific implementation.",
       "language": "csharp",
-      "code": "public class OrdersController : Controller\n{\n    private readonly IOrderRepository _repo;\n    public OrdersController(IOrderRepository repo) => _repo = repo;\n}"
+      "code": "public class OrderService\n{\n    private readonly SqlOrderRepository _repo = new SqlOrderRepository();\n\n    public async Task PlaceOrder(Order order)\n    {\n        await _repo.SaveAsync(order);\n        await _emailSender.SendConfirmationAsync(order);\n    }\n}\n\n// Problems:\n// - Cannot test OrderService without a real database connection\n// - Cannot swap SqlOrderRepository for InMemoryOrderRepository\n// - OrderService decides how dependencies are created"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The DI Solution"
+    },
+    {
+      "type": "paragraph",
+      "text": "With DI, the class receives its dependencies through the constructor. It depends on abstractions, typically interfaces, rather than concrete classes. This means the class does not care which implementation it receives; it only cares that the implementation follows the agreed-upon contract."
+    },
+    {
+      "type": "paragraph",
+      "text": "The framework maintains a collection of registered services. When it needs to create a controller, it scans the constructor, finds the required interfaces, resolves implementations from the collection, and passes them in. This all happens transparently."
+    },
+    {
+      "type": "example",
+      "title": "Loosely Coupled Code with DI",
+      "content": "Dependencies are received through the constructor, not created internally.",
+      "language": "csharp",
+      "code": "public interface IOrderRepository { Task SaveAsync(Order order); }\npublic interface IEmailSender { Task SendConfirmationAsync(Order order); }\n\npublic class SqlOrderRepository : IOrderRepository\n{\n    private readonly AppDbContext _db;\n    public SqlOrderRepository(AppDbContext db) => _db = db;\n    public async Task SaveAsync(Order order) => _db.Orders.Add(order);\n}\n\npublic class OrderService\n{\n    private readonly IOrderRepository _repo;\n    private readonly IEmailSender _emailSender;\n\n    public OrderService(IOrderRepository repo, IEmailSender emailSender)\n    {\n        _repo = repo;\n        _emailSender = emailSender;\n    }\n\n    public async Task PlaceOrder(Order order)\n    {\n        await _repo.SaveAsync(order);\n        await _emailSender.SendConfirmationAsync(order);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "Notice that OrderService no longer knows about SqlOrderRepository or any email sender implementation. It only knows the interfaces. In a unit test, you can pass a fake repository and a fake email sender. In production, the framework provides the real implementations."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Key Benefits of DI"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Why Use Dependency Injection",
+      "items": [
+        "Testability: Replace real services with fakes or mocks in unit tests.",
+        "Flexibility: Swap implementations without changing the consuming class.",
+        "Maintainability: Dependencies are explicit in the constructor, making code easier to understand.",
+        "Lifetime Management: The framework controls whether services are reused or recreated.",
+        "Decoupling: Classes depend on abstractions, not concrete implementations."
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+        "text": "Built-in DI in ASP.NET Core"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core includes a built-in IoC container. You register services in Program.cs using methods like AddScoped, AddTransient, and AddSingleton. The container is then responsible for constructing controllers, view components, and any other classes that request dependencies."
+    },
+    {
+      "type": "paragraph",
+      "text": "You rarely interact with the container directly. Instead, you declare what your class needs, register the implementations once at startup, and let the framework handle the rest. This convention-over-configuration approach keeps your code clean and your composition root simple."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Dependency Injection",
+          "definition": "A pattern where a class receives its dependencies from an external source rather than creating them itself."
+        },
+        {
+          "term": "Inversion of Control (IoC)",
+          "definition": "A design principle where the framework or container controls object creation and wiring, rather than the objects themselves."
+        },
+        {
+          "term": "Service",
+          "definition": "A registered object in the DI container that can be injected into other classes."
+        },
+        {
+          "term": "Interface",
+          "definition": "A contract that defines the methods and properties a class must implement, enabling loose coupling."
+        },
+        {
+          "term": "Tight Coupling",
+          "definition": "A design where a class depends directly on concrete implementations, making it hard to change or test."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Refactor to Constructor Injection",
+      "description": "Take a tightly coupled class and introduce constructor injection to make it testable.",
+      "steps": [
+        "Create a ProductService class that directly instantiates a ProductRepository and an EmailService inside its methods.",
+        "Identify the two external dependencies the class uses.",
+        "Create interfaces IProductRepository and IEmailNotificationService that expose the methods you need.",
+        "Change ProductService to accept those interfaces through its constructor.",
+        "Remove the direct instantiation from inside the class.",
+        "Write a simple unit test that passes fake implementations and verifies PlaceOrder calls both dependencies."
+      ],
+      "expectedOutcome": "ProductService will depend on abstractions, and you will be able to test it without a real database or email server."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: DI Basics",
+      "items": [
+        {
+          "text": "I can explain what dependency injection means in one paragraph.",
+          "hint": "A class receives its dependencies from an external source instead of creating them itself."
+        },
+        {
+          "text": "I know the difference between tight coupling and loose coupling.",
+          "hint": "Tight coupling uses concrete classes; loose coupling uses interfaces."
+        },
+        {
+          "text": "I can refactor a class to receive dependencies through its constructor.",
+          "hint": "Accept interfaces in the constructor and assign them to readonly fields."
+        },
+        {
+          "text": "I understand why DI improves unit testing.",
+          "hint": "You can pass fake or mock implementations in place of real services."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "DI hands dependencies to a class from the outside instead of letting the class create them.",
+        "It removes tight coupling and replaces it with dependency on abstractions.",
+        "ASP.NET Core includes a built-in container that manages service lifetimes and injection.",
+        "Constructor injection is the most common and recommended pattern.",
+        "DI makes code more testable, flexible, and maintainable."
+      ],
+      "takeaway": "Dependency injection is not a framework feature you use occasionally; it is a mindset. Once you start designing classes that declare their needs, your entire architecture becomes cleaner and easier to work with."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "service-lifetimes",
+    "constructor-injection"
+  ],
   "technology": null,
   "furtherReading": []
 }

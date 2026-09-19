@@ -4,26 +4,229 @@
   "moduleSlug": "09-authentication-authorization",
   "courseSlug": "aspnet-core",
   "title": "Authentication and Authorization Basics",
-  "description": "Learn authentication and authorization basics in ASP.NET Core.",
+  "description": "Understand the fundamental difference between authentication (who you are) and authorization (what you can do), and learn how ASP.NET Core's built-in security system handles both.",
   "order": 1,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 28,
   "tags": [
     "security",
-    "auth"
+    "auth",
+    "identity"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Authentication vs. Authorization"
+    },
+    {
       "type": "paragraph",
-      "text": "Authentication verifies identity; authorization controls access."
+      "text": "Security in web applications comes down to two distinct questions: Who are you? and What are you allowed to do? Authentication answers the first question by verifying identity. Authorization answers the second by controlling access to resources."
+    },
+    {
+      "type": "paragraph",
+      "text": "Think of it like a hotel. Authentication is the front desk checking your ID and issuing a key card. Authorization is the key card determining which rooms you can unlock. Both are necessary — knowing who someone is does not automatically grant them access to everything."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Important: Authentication always comes first",
+      "text": "ASP.NET Core processes authentication before authorization. The authentication system determines the user's identity, and the authorization system checks what that identity is permitted to do. Never swap this order — authorization depends on authentication having already run."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Authentication Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "When a user logs into an application, they provide credentials — typically a username and password. The authentication system validates these credentials against a user store. If valid, it issues a token or cookie that represents the user's identity. Every subsequent request includes this token, allowing the application to recognize the user without asking for credentials again."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core supports multiple authentication methods called schemes. The most common are cookie authentication for browser-based applications and JWT bearer authentication for APIs. You can configure multiple schemes and choose which one to use per endpoint."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Common authentication schemes",
+      "items": [
+        "Cookie authentication — Stores identity in an encrypted HTTP cookie for browser-based apps",
+        "JWT Bearer — Uses signed JSON Web Tokens sent in the Authorization header for APIs",
+        "OAuth 2.0 / OpenID Connect — Delegates authentication to external providers like Google or Microsoft",
+        "API Key — Simple key-based authentication for machine-to-machine communication"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "How Authorization Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "Authorization determines whether an authenticated user can access a specific resource or perform a specific action. ASP.NET Core provides a policy-based authorization system that evaluates rules defined in code. These rules can check roles, claims, or custom requirements."
+    },
+    {
+      "type": "paragraph",
+      "text": "The simplest form of authorization is role-based: users in the 'Admin' role can access admin pages, while regular users cannot. More advanced scenarios use policies that combine multiple requirements, such as requiring both a specific role and a minimum age claim."
     },
     {
       "type": "example",
+      "title": "Cookie authentication configuration",
+      "content": "Configuring cookie authentication with login and access denied paths.",
       "language": "csharp",
-      "code": "builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)\n    .AddCookie(options =>\n    {\n        options.LoginPath = \"/Account/Login\";\n        options.AccessDeniedPath = \"/Account/AccessDenied\";\n    });"
+      "code": "builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)\n    .AddCookie(options =>\n    {\n        options.LoginPath = \"/Account/Login\";\n        options.AccessDeniedPath = \"/Account/AccessDenied\";\n        options.ExpireTimeSpan = TimeSpan.FromHours(8);\n        options.SlidingExpiration = true;\n    });\n\nvar app = builder.Build();\napp.UseHttpsRedirection();\napp.UseStaticFiles();\napp.UseRouting();\napp.UseAuthentication(); // must come before UseAuthorization\napp.UseAuthorization();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "In this configuration, CookieAuthenticationDefaults.AuthenticationScheme sets 'Cookies' as the default scheme. When a user visits a protected page without being logged in, ASP.NET Core redirects them to '/Account/Login'. After a successful login, a cookie is issued that authenticates subsequent requests automatically."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "The [Authorize] Attribute"
+    },
+    {
+      "type": "paragraph",
+      "text": "The [Authorize] attribute is the most common way to enforce authorization in controllers and Razor Pages. When applied to a controller or action, it requires the user to be authenticated. You can add parameters to restrict access to specific roles, policies, or authentication schemes."
+    },
+    {
+      "type": "example",
+      "title": "Using the [Authorize] attribute",
+      "content": "Different ways to apply authorization at the controller and action level.",
+      "language": "csharp",
+      "code": "// Require authentication for all actions in this controller\n[Authorize]\npublic class DashboardController : Controller\n{\n    public IActionResult Index() => View();\n}\n\n// Allow anonymous access to a specific action\n[Authorize]\npublic class ProductsController : Controller\n{\n    [AllowAnonymous]\n    public IActionResult List() => View();\n\n    // Require Admin role for this action\n    [Authorize(Roles = \"Admin\")]\n    public IActionResult Manage() => View();\n\n    // Require a specific policy\n    [Authorize(Policy = \"RequireEmailVerified\")]\n    public IActionResult Settings() => View();\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The [AllowAnonymous] attribute overrides [Authorize] on the same action or controller. This is useful when a controller is generally protected but has a few public endpoints like a product listing page."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Global authorization policy",
+      "text": "You can make [Authorize] the default for all controllers by adding a global authorization filter in Program.cs: options.Filters.Add(new AuthorizeFilter()). Use [AllowAnonymous] to opt out for specific actions."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Claims-Based Identity"
+    },
+    {
+      "type": "paragraph",
+      "text": "Modern ASP.NET Core identity systems are built around claims. A claim is a statement about a user, such as 'email is user@example.com' or 'role is Admin'. The user's identity is a collection of claims issued during authentication."
+    },
+    {
+      "type": "paragraph",
+      "text": "Claims are flexible because they are not limited to a fixed schema. A user can have claims for their department, clearance level, subscription tier, or any other attribute your application needs. Authorization policies evaluate these claims to make access decisions."
+    },
+    {
+      "type": "example",
+      "title": "Reading user claims in a controller",
+      "content": "Accessing claims from the authenticated user in a controller action.",
+      "language": "csharp",
+      "code": "[Authorize]\npublic class AccountController : Controller\n{\n    public IActionResult Profile()\n    {\n        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        var email = User.FindFirst(ClaimTypes.Email)?.Value;\n        var name = User.FindFirst(ClaimTypes.Name)?.Value;\n        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();\n\n        ViewBag.UserId = userId;\n        ViewBag.Email = email;\n        ViewBag.Name = name;\n        ViewBag.Roles = roles;\n        return View();\n    }\n}"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Authentication",
+          "definition": "The process of verifying a user's identity, typically through credentials like username/password, tokens, or external providers."
+        },
+        {
+          "term": "Authorization",
+          "definition": "The process of determining whether an authenticated user has permission to access a resource or perform an action."
+        },
+        {
+          "term": "Claims",
+          "definition": "Statements about a user such as name, email, or role. The user's identity is a collection of claims."
+        },
+        {
+          "term": "Authentication scheme",
+          "definition": "A named configuration that defines how authentication is performed, such as 'Cookies' or 'JwtBearer'."
+        },
+        {
+          "term": "[Authorize] attribute",
+          "definition": "An attribute applied to controllers or actions that requires the user to meet specific authentication or authorization requirements."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Configure Cookie Authentication",
+      "description": "Set up cookie authentication in an ASP.NET Core MVC application, protect a controller with [Authorize], and test the login flow.",
+      "steps": [
+        "Create a new MVC project: 'dotnet new mvc -n AuthBasicsDemo'",
+        "Install the Microsoft.AspNetCore.Authentication.Cookies NuGet package",
+        "In Program.cs, add AddAuthentication with CookieAuthenticationDefaults.AuthenticationScheme and configure LoginPath and AccessDeniedPath",
+        "Add app.UseAuthentication() and app.UseAuthorization() to the pipeline",
+        "Create an AccountController with Login and Logout actions",
+        "In the Login GET action, return a simple login view with email and password fields",
+        "In the Login POST action, validate the credentials (for testing, accept any non-empty values), call SignInAsync, and redirect to the home page",
+        "Add [Authorize] to a DashboardController and verify that unauthenticated users are redirected to login"
+      ],
+      "expectedOutcome": "Visiting /Dashboard without logging in redirects to /Account/Login. After submitting the login form, the user is authenticated and can access the dashboard. Logging out clears the authentication cookie and redirects to the home page."
+    },
+    {
+      "type": "checklist",
+      "title": "Authentication and Authorization Basics Checklist",
+      "items": [
+        {
+          "text": "I can explain the difference between authentication and authorization",
+          "hint": "Authentication verifies identity; authorization controls access."
+        },
+        {
+          "text": "I understand why UseAuthentication must come before UseAuthorization",
+          "hint": "Authorization needs the user's identity to be established first."
+        },
+        {
+          "text": "I can configure cookie authentication in Program.cs",
+          "hint": "Use AddCookie with LoginPath and AccessDeniedPath options."
+        },
+        {
+          "text": "I can apply [Authorize] to protect controllers and actions",
+          "hint": "Apply [Authorize] at the controller level for full protection."
+        },
+        {
+          "text": "I understand what claims are and how they represent user identity",
+          "hint": "Claims are key-value pairs describing the user, like email and role."
+        },
+        {
+          "text": "I can read user claims in a controller using User.FindFirst",
+          "hint": "Use ClaimTypes.NameIdentifier for the user ID and ClaimTypes.Email for the email."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Authentication and Authorization Summary",
+      "points": [
+        "Authentication verifies identity; authorization controls access to resources",
+        "Cookie authentication stores identity in encrypted HTTP cookies for browser apps",
+        "JWT bearer authentication uses tokens in the Authorization header for APIs",
+        "UseAuthentication must always be registered before UseAuthorization in the pipeline",
+        "[Authorize] protects controllers and actions; [AllowAnonymous] overrides it",
+        "Claims are the building blocks of identity in ASP.NET Core, representing user attributes"
+      ],
+      "takeaway": "Understanding the distinction between authentication and authorization is fundamental to building secure applications. ASP.NET Core provides a unified, policy-based system that handles both concerns with minimal boilerplate."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "ASP.NET Core Authentication Overview",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authentication/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official introduction to authentication schemes, configuration, and providers."
+    },
+    {
+      "title": "ASP.NET Core Authorization Overview",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comprehensive guide to the authorization system including roles, policies, and resource-based checks."
+    }
+  ]
 }

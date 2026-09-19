@@ -4,26 +4,235 @@
   "moduleSlug": "12-deployment-production",
   "courseSlug": "aspnet-core",
   "title": "Docker Containerization",
-  "description": "Learn docker containerization in ASP.NET Core.",
+  "description": "Package your ASP.NET Core application into a Docker container for consistent, repeatable deployments across any environment. Learn multi-stage Dockerfiles, container image optimization, and how to run and manage containers in development and production.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 35,
   "tags": [
     "docker",
-    "containers"
+    "containers",
+    "devops"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Containerize your app for consistent deployment."
+      "text": "Docker containers package an application and all its dependencies — runtime, libraries, configuration, and code — into a single, portable image. The same container image that runs on your development machine runs identically in production, eliminating the 'it works on my machine' problem that plagues traditional deployments."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core is an excellent fit for containers because it is cross-platform, has a small footprint, and supports multi-stage Docker builds that keep final images lean. A production-ready ASP.NET Core Docker image can be under 200MB, compared to over 1GB for a traditional server installation."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "How Docker Works"
+    },
+    {
+      "type": "paragraph",
+      "text": "A Docker image is a read-only template containing your application code, the .NET runtime, and any system-level dependencies. A Docker container is a running instance of an image. Multiple containers can run from the same image, each isolated from the others. Images are versioned and stored in registries like Docker Hub or Azure Container Registry."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Images and Containers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Think of a Docker image as a blueprint and a container as a house built from that blueprint. You can build an image once and run as many containers as you need from it. If you update the application, you build a new image version. Containers from the old image continue running until you replace them."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Layers and Caching"
+    },
+    {
+      "type": "paragraph",
+      "text": "Docker images are built in layers. Each instruction in a Dockerfile creates a new layer. Docker caches each layer, so if only your application code changed but the base image and dependency restore step did not, Docker reuses the cached layers. This makes subsequent builds dramatically faster."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Order Your Dockerfile for Cache Efficiency",
+      "text": "Put instructions that change rarely (base image, dependency restore) first. Put instructions that change often (copying source code) last. This maximizes Docker layer caching and keeps build times short."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Multi-Stage Docker Builds"
+    },
+    {
+      "type": "paragraph",
+      "text": "Multi-stage builds are the key to keeping Docker images small. The build stage uses the full .NET SDK image to compile and publish your application. The runtime stage uses the much smaller ASP.NET runtime image and copies only the published output from the build stage. The SDK image — hundreds of megabytes — never appears in the final image."
     },
     {
       "type": "example",
-      "language": "csharp",
-      "code": "FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base\nWORKDIR /app\nEXPOSE 8080\n\nFROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY [\"MyApp.csproj\", \"./\"]\nRUN dotnet restore \"./MyApp.csproj\"\nCOPY . .\nRUN dotnet build -c Release -o /app/build\n\nFROM build AS publish\nRUN dotnet publish -c Release -o /app/publish\n\nFROM base AS final\nWORKDIR /app\nCOPY --from=publish /app/publish .\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]"
+      "title": "Optimized Multi-Stage Dockerfile for ASP.NET Core",
+      "content": "A production-ready Dockerfile using multi-stage builds to create a minimal runtime image.",
+      "language": "dockerfile",
+      "code": "# Stage 1: Build — uses the full SDK image\nFROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\n\n# Copy project file and restore dependencies (cached layer)\nCOPY [\"MyApp.csproj\", \"./\"]\nRUN dotnet restore \"./MyApp.csproj\"\n\n# Copy remaining source and build\nCOPY . .\nRUN dotnet build -c Release -o /app/build\n\n# Publish the app\nRUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false\n\n# Stage 2: Runtime — uses the minimal runtime image\nFROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime\nWORKDIR /app\n\n# Create a non-root user for security\nRUN addgroup -g 1001 -S appgroup && \\\n    adduser -u 1001 -S appuser -G appgroup\n\n# Copy published output from the build stage\nCOPY --from=build /app/publish .\n\n# Set ownership and switch to non-root user\nRUN chown -R appuser:appgroup /app\nUSER appuser\n\n# Expose the application port\nEXPOSE 8080\n\n# Set environment variables\nENV ASPNETCORE_URLS=http://+:8080\nENV ASPNETCORE_ENVIRONMENT=Production\n\n# Start the application\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Docker Image Optimization"
+    },
+    {
+      "type": "paragraph",
+      "text": "Smaller images deploy faster, download faster, and use less disk space. Several techniques reduce image size: use the Alpine Linux variant of the runtime image, set UseAppHost=false during publish to avoid embedding a native executable, and use .dockerignore to exclude unnecessary files from the build context."
+    },
+    {
+      "type": "example",
+      "title": ".dockerignore File for ASP.NET Core Projects",
+      "content": "A .dockerignore file that excludes build artifacts, git files, and IDE configurations from the Docker build context.",
+      "language": "dockerfile",
+      "code": "# Build artifacts\nbin/\nobj/\n\n# IDE files\n.vscode/\n.idea/\n*.user\n*.suo\n*.sln.docstates\n\n# Git\ngit\ngitignore\n.git/\n.gitattributes\n\n# Docker files\nDockerfile\n.dockerignore\n\n# Test and docs (not needed in runtime image)\ntests/\n**/*.Tests.csproj\ndocs/\nREADME.md\n\n# npm / node (if frontend assets are pre-built)\nnode_modules/\nwwwroot/dist/  # if pre-built locally, rebuild in container instead"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Running Containers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Once you have built an image, you run it as a container. Docker run creates a new container from the image. You can map ports from the host to the container, mount volumes for persistent data, set environment variables, and control resource limits. In development, Docker Compose simplifies running multiple containers — your API, database, and Redis together."
+    },
+    {
+      "type": "example",
+      "title": "Building and Running the Container",
+      "content": "Commands to build the Docker image and run it as a container with port mapping and environment variables.",
+      "language": "bash",
+      "code": "# Build the Docker image and tag it\n docker build -t myapp:latest .\n\n# Run the container, mapping port 8080 on the host to 8080 in the container\ndocker run --rm -d \\\n  --name myapp \\\n  -p 8080:8080 \\\n  -e \"ASPNETCORE_ENVIRONMENT=Production\" \\\n  -e \"ConnectionStrings__Default=...\" \\\n  myapp:latest\n\n# Check the container is running\ndocker ps\n\n# View the container logs\ndocker logs myapp\n\n# Stop and remove the container\ndocker stop myapp && docker rm myapp"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Docker Compose for Multi-Service Development"
+    },
+    {
+      "type": "paragraph",
+      "text": "Docker Compose defines and runs multi-container applications with a single YAML file. You can define your API container, a SQL Server container, and a Redis container together, with shared networks and volumes. This is the standard way to run a complete development environment with Docker."
+    },
+    {
+      "type": "example",
+      "title": "Docker Compose for ASP.NET Core + SQL Server",
+      "content": "A docker-compose.yml file defining an API service and a SQL Server database service.",
+      "language": "yaml",
+      "code": "version: '3.8'\n\nservices:\n  api:\n    build:\n      context: .\n      dockerfile: MyApp/Dockerfile\n    ports:\n      - \"8080:8080\"\n    environment:\n      - ASPNETCORE_ENVIRONMENT=Development\n      - ConnectionStrings__Default=Server=db;Database=MyAppDb;User Id=sa;Password=YourStrong@Passw0rd;\n    depends_on:\n      - db\n    volumes:\n      - ./MyApp:/app  # Live-reload source code during development\n\n  db:\n    image: mcr.microsoft.com/mssql/server:2022-latest\n    environment:\n      - SA_PASSWORD=YourStrong@Passw0rd\n      - ACCEPT_EULA=Y\n    ports:\n      - \"1433:1433\"\n    volumes:\n      - sqldata:/var/opt/mssql\n\nvolumes:\n  sqldata:"
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Docker Containerization",
+      "terms": [
+        {
+          "term": "Docker Image",
+          "definition": "A read-only template containing an application, its runtime, and dependencies. Built from a Dockerfile."
+        },
+        {
+          "term": "Docker Container",
+          "definition": "A running instance of a Docker image — an isolated process with its own filesystem, network, and resources."
+        },
+        {
+          "term": "Multi-Stage Build",
+          "definition": "A Dockerfile technique using multiple FROM statements to compile in one image and copy only the output to a minimal runtime image."
+        },
+        {
+          "term": "Docker Layer",
+          "definition": "An immutable filesystem layer in a Docker image. Docker caches layers to speed up rebuilds when earlier instructions have not changed."
+        },
+        {
+          "term": "Docker Compose",
+          "definition": "A tool for defining and running multi-container applications using a YAML configuration file."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Use Non-Root Users in Containers",
+      "text": "Running your application as a non-root user inside the container is a security best practice. The official ASP.NET Core Alpine images support creating and switching to a non-root user in your Dockerfile. This limits the blast radius if your application is compromised."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Docker Containerization",
+      "points": [
+        "Docker images package an application and its dependencies into a portable, versioned artifact",
+        "Multi-stage Docker builds separate the build stage (full SDK) from the runtime stage (minimal runtime image)",
+        "Layer caching makes subsequent Docker builds fast when source code has not changed",
+        "The Alpine Linux variant of the ASP.NET runtime image produces the smallest possible production images",
+        ".dockerignore prevents unnecessary files from being included in the Docker build context",
+        "Docker Compose defines multi-service applications — API, database, cache — in a single YAML file"
+      ],
+      "takeaway": "Docker containers make deployment consistent from development to production. A multi-stage Dockerfile with the Alpine runtime image gives you a small, secure, and fast-to-deploy artifact that runs identically everywhere. Combine it with Docker Compose for a complete local development environment."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Create a Production-Ready Dockerfile",
+      "description": "Write an optimized multi-stage Dockerfile for an ASP.NET Core API and test it locally.",
+      "steps": [
+        "Create a .dockerignore file excluding bin/, obj/, .git/, .vscode/, and test projects",
+        "Create a multi-stage Dockerfile with a build stage using mcr.microsoft.com/dotnet/sdk:8.0-alpine",
+        "Create a runtime stage using mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+        "Add a non-root user in the runtime stage and set USER to that user",
+        "Set ASPNETCORE_URLS and ASPNETCORE_ENVIRONMENT environment variables in the runtime stage",
+        "Build the image with docker build -t myapp:1.0 .",
+        "Run the container with docker run --rm -p 8080:8080 myapp:1.0 and confirm it responds"
+      ],
+      "expectedOutcome": "A working Dockerfile that builds an image under 200MB, runs as a non-root user, and serves the API on port 8080. The container responds correctly to HTTP requests, and the build completes without warnings."
+    },
+    {
+      "type": "checklist",
+      "title": "Docker Containerization Checklist",
+      "items": [
+        {
+          "text": "I can explain what a Docker image and container are",
+          "hint": "Image = blueprint/template. Container = running instance of an image."
+        },
+        {
+          "text": "I understand why multi-stage builds produce smaller images",
+          "hint": "The SDK (large) is only in the build stage. The runtime (small) is the only thing in the final image."
+        },
+        {
+          "text": "I know why Dockerfile instruction order matters for caching",
+          "hint": "Instructions that rarely change go first. Instructions that change often (COPY . .) go last."
+        },
+        {
+          "text": "I can write a .dockerignore file to speed up builds",
+          "hint": "Exclude bin/, obj/, .git/, IDE files, and anything not needed at runtime."
+        },
+        {
+          "text": "I understand why running as a non-root user in containers is a security best practice",
+          "hint": "If the app is compromised, a non-root user limits the attacker's ability to damage the container or host."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "deployment-options",
+        "cloud-deployment"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Containerize an ASP.NET Core App",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/docker"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "deployment-options",
+    "cloud-deployment"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Containerize an ASP.NET Core App",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/docker"
+    }
+  ]
 }

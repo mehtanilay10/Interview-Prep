@@ -4,26 +4,205 @@
   "moduleSlug": "04-model-binding-validation",
   "courseSlug": "aspnet-core",
   "title": "Binding Sources",
-  "description": "Learn binding sources in ASP.NET Core.",
+  "description": "Learn how to control where ASP.NET Core reads parameter values from using binding source attributes.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "binding",
-    "sources"
+    "sources",
+    "attributes"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Default Binding Behavior"
+    },
+    {
       "type": "paragraph",
-      "text": "Control where values are bound from using [FromBody], [FromQuery], and [FromRoute]."
+      "text": "By default, model binding uses a predictable order to find values for your action parameters. For complex types, it checks form data first, then the request body. For simple types, it checks route data and the query string."
+    },
+    {
+      "type": "paragraph",
+      "text": "This default behavior works well for traditional form posts, but modern APIs often send JSON in the request body. In those cases, you need to tell the framework exactly where to look. That is what binding source attributes do."
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Complex Types and Simple Types",
+      "text": "A complex type is any class or struct with multiple properties. A simple type is a primitive like int, string, Guid, or DateTime. Model binding treats them differently because simple types cannot be bound recursively from form fields."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Available Binding Source Attributes"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core provides four main binding source attributes. Each one tells the framework to look in a specific location for the parameter value. You can apply these attributes to individual parameters or to entire model properties."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Binding Source Attributes",
+      "items": [
+        "[FromQuery] - Reads values from the URL query string.",
+        "[FromRoute] - Reads values from the route data (for example, URL segments like /products/5).",
+        "[FromForm] - Reads values from posted form fields.",
+        "[FromBody] - Reads values from the request body, typically for JSON or XML APIs."
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Using [FromBody] for APIs"
+    },
+    {
+      "type": "paragraph",
+      "text": "The most common binding source attribute in modern API development is [FromBody]. When a client sends a JSON payload, you use [FromBody] to tell model binding to deserialize the request body into your parameter type."
+    },
+    {
+      "type": "paragraph",
+      "text": "You can only apply [FromBody] to one parameter per action because the request body stream can only be read once. If you need multiple objects from the body, create a wrapper class that contains all the properties you need."
     },
     {
       "type": "example",
+      "title": "Binding Order from Route and Body",
+      "content": "Here the Order object comes from the JSON body, and notify comes from the query string.",
       "language": "csharp",
-      "code": "[HttpPost]\npublic IActionResult Create([FromBody] Order order, [FromQuery] bool notify)\n{\n    // order from JSON body, notify from query string\n    return Ok();\n}"
+      "code": "public class OrderDto\n{\n    public int Id { get; set; }\n    public string ProductName { get; set; }\n    public decimal Amount { get; set; }\n}\n\n[HttpPost(\"/api/orders\")]\npublic IActionResult Create([FromBody] OrderDto order, [FromQuery] bool notify)\n{\n    // order is read from the JSON request body\n    // notify is read from the query string, e.g. /api/orders?notify=true\n\n    if (notify)\n    {\n        _notifier.Send(\"New order received\");\n    }\n\n    return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Combining Multiple Sources"
+    },
+    {
+      "type": "paragraph",
+      "text": "Real-world actions often need values from more than one place. For example, an edit action might get the product ID from the route and the updated values from the form body. You can freely mix binding source attributes in the same action."
+    },
+    {
+      "type": "example",
+      "title": "Binding ID from Route and Data from Body",
+      "content": "This pattern is common in REST APIs where the URL identifies the resource and the body contains the changes.",
+      "language": "csharp",
+      "code": "public class UpdateProductRequest\n{\n    public string Name { get; set; }\n    public decimal Price { get; set; }\n}\n\n[HttpPut(\"/api/products/{id}\")]\npublic IActionResult Update([FromRoute] int id, [FromBody] UpdateProductRequest request)\n{\n    var product = _repo.GetById(id);\n    if (product == null) return NotFound();\n\n    product.Name = request.Name;\n    product.Price = request.Price;\n    _repo.Save(product);\n\n    return NoContent();\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Reading the Body Only Once",
+      "text": "The request body stream is forward-only and can only be read once per request. If you need to read it multiple times (for logging, for example), enable buffering in middleware before model binding runs."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "When to Use Each Source"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Choosing a Binding Source",
+      "items": [
+        "Use [FromRoute] for IDs that identify a resource in the URL, such as /products/42.",
+        "Use [FromQuery] for optional filters, pagination, or search terms that do not change server state.",
+        "Use [FromForm] for traditional HTML form posts with application/x-www-form-urlencoded or multipart/form-data content.",
+        "Use [FromBody] for JSON or XML APIs that send data in the request body."
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Property-Level Binding Sources"
+    },
+    {
+      "type": "paragraph",
+      "text": "Binding source attributes are not limited to action parameters. You can also place them on individual properties of a complex type. This is useful when a single model receives values from different sources."
+    },
+    {
+      "type": "example",
+      "title": "Property-Level Binding Sources",
+      "content": "Each property can specify its own binding source.",
+      "language": "csharp",
+      "code": "public class SearchQuery\n{\n    [FromRoute]\n    public int CategoryId { get; set; }\n\n    [FromQuery]\n    public string Keyword { get; set; }\n\n    [FromQuery]\n    public int Page { get; set; } = 1;\n}\n\n// Route: /categories/5/search?keyword=shoes&page=2\n[HttpGet(\"/categories/{categoryId}/search\")]\npublic IActionResult Search(SearchQuery query)\n{\n    // query.CategoryId = 5 from route\n    // query.Keyword = \"shoes\" from query string\n    // query.Page = 2 from query string\n    return Ok(_repo.Search(query));\n}"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Binding Source",
+          "definition": "The specific location in an HTTP request from which a parameter or property gets its value."
+        },
+        {
+          "term": "Request Body",
+          "definition": "The payload portion of an HTTP request, commonly used for JSON or XML data in APIs."
+        },
+        {
+          "term": "Query String",
+          "definition": "The portion of a URL after the question mark that contains key-value pairs, e.g. ?page=2&sort=name."
+        },
+        {
+          "term": "Route Data",
+          "definition": "Values extracted from the URL path by route templates, such as the id in /products/42."
+        },
+        {
+          "term": "Form Data",
+          "definition": "Values submitted from an HTML form, either as URL-encoded fields or multipart file uploads."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Mix Route and Query Binding",
+      "description": "Create an API action that reads an ID from the route and a search term from the query string.",
+      "steps": [
+        "Create a ProductsController with a Search action.",
+        "Add a route template that includes a categoryId route parameter.",
+        "Accept a SearchQuery model and apply [FromRoute] to CategoryId and [FromQuery] to Keyword and Page.",
+        "Create the SearchQuery class with the correct properties and attributes.",
+        "Write a LINQ query that filters products by category and keyword.",
+        "Test the endpoint with a browser or curl: /api/products/search/3?keyword=laptop&page=1"
+      ],
+      "expectedOutcome": "You will confirm that route and query values are bound to the correct properties and that the search returns filtered results."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Binding Sources",
+      "items": [
+        {
+          "text": "I know the default binding order for complex types.",
+          "hint": "Form data first, then the request body."
+        },
+        {
+          "text": "I can explain why [FromBody] is limited to one parameter per action.",
+          "hint": "The request body stream can only be read once."
+        },
+        {
+          "text": "I can apply [FromRoute] and [FromQuery] to different properties in the same model.",
+          "hint": "Place the attribute on the property, not just the parameter."
+        },
+        {
+          "text": "I understand when to use each binding source attribute.",
+          "hint": "Route for resource IDs, query for filters, body for JSON payloads."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Binding source attributes control exactly where model binding reads values from.",
+        "[FromBody] is used for JSON API payloads and can only appear once per action.",
+        "[FromRoute], [FromQuery], and [FromForm] can be freely combined.",
+        "You can place attributes on action parameters or on model properties.",
+        "Property-level attributes are useful when a single model receives values from multiple sources."
+      ],
+      "takeaway": "Being explicit about binding sources makes your API behavior predictable, easier to document, and simpler to test."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "model-binding-overview",
+    "validation-attributes"
+  ],
   "technology": null,
   "furtherReading": []
 }

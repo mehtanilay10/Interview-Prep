@@ -4,26 +4,233 @@
   "moduleSlug": "09-authentication-authorization",
   "courseSlug": "aspnet-core",
   "title": "Policy-Based Authorization",
-  "description": "Learn policy-based authorization in ASP.NET Core.",
+  "description": "Implement fine-grained authorization using policies, custom requirements, and handlers to build complex access rules beyond simple role checks.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 32,
   "tags": [
     "policies",
-    "claims"
+    "claims",
+    "requirements"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Beyond Roles: Why Policies?"
+    },
+    {
       "type": "paragraph",
-      "text": "Build fine-grained authorization with policies, requirements, and handlers."
+      "text": "Roles are great for simple scenarios, but real-world applications often need more nuanced access control. What if only senior employees in the HR department can view salary data? What if a user must have a verified email and be at least 18 years old? Policies let you express these complex rules in code."
+    },
+    {
+      "type": "paragraph",
+      "text": "Policy-based authorization uses a requirement-handler pattern. A requirement is a simple class that describes what must be true for access to be granted. A handler is a class that evaluates the requirement against the current user's claims and context. Multiple handlers can evaluate the same requirement, and multiple requirements can be combined into a single policy."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "The requirement-handler pattern",
+      "text": "Think of a requirement as a question: 'Is this user old enough?' The handler is the logic that answers the question by inspecting the user's claims. A policy is a collection of requirements that must all pass for access to be granted."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Built-in Requirements"
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core ships with several built-in requirement types that cover common authorization scenarios without requiring custom code. These include role requirements, claim requirements, and authentication scheme requirements."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Built-in policy requirements",
+      "items": [
+        "RequireRole — Requires the user to be in one of the specified roles",
+        "RequireClaim — Requires the user to have a specific claim with an optional value",
+        "RequireAuthenticatedUser — Requires any authenticated user, equivalent to [Authorize]",
+        "RequireAssertion — Inline custom logic using a delegate function",
+        "RequireName — Requires the user name to match a specific value"
+      ]
     },
     {
       "type": "example",
+      "title": "Policies using built-in requirements",
+      "content": "Registering policies with role and claim requirements in Program.cs.",
       "language": "csharp",
-      "code": "public class MinimumAgeRequirement : IAuthorizationRequirement\n{\n    public int MinimumAge { get; }\n    public MinimumAgeRequirement(int age) => MinimumAge = age;\n}\n\npublic class MinimumAgeHandler : AuthorizationHandler<MinimumAgeRequirement>\n{\n    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, MinimumAgeRequirement requirement)\n    {\n        var ageClaim = context.User.FindFirst(c => c.Type == ClaimTypes.DateOfBirth);\n        if (ageClaim != null && DateTime.TryParse(ageClaim.Value, out var dob))\n        {\n            var age = DateTime.Today.Year - dob.Year;\n            if (age >= requirement.MinimumAge)\n                context.Succeed(requirement);\n        }\n        return Task.CompletedTask;\n    }\n}"
+      "code": "builder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"AdminsOnly\", policy =>\n        policy.RequireRole(\"Admin\"));\n\n    options.AddPolicy(\"ManagementAccess\", policy =>\n        policy.RequireRole(\"Admin\", \"Manager\", \"HR\"));\n\n    options.AddPolicy(\"VerifiedEmailOnly\", policy =>\n        policy.RequireClaim(\"email_verified\", \"true\"));\n\n    options.AddPolicy(\"HasPhoneNumber\", policy =>\n        policy.RequireClaim(ClaimTypes.PhoneNumber));\n\n    options.AddPolicy(\"SeniorHR\", policy =>\n    {\n        policy.RequireRole(\"HR\");\n        policy.RequireClaim(\"department\", \"Human Resources\");\n        policy.RequireClaim(\"years_of_service\", \"5\", \"10\", \"15\");\n    });\n});"
+    },
+    {
+      "type": "paragraph",
+      "text": "In this configuration, 'SeniorHR' requires all three conditions to be true: the user must be in the HR role, have a department claim matching 'Human Resources', and have a years_of_service claim of 5, 10, or 15. All requirements in a policy must pass for access to be granted."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Custom Authorization Requirements and Handlers"
+    },
+    {
+      "type": "paragraph",
+      "text": "When built-in requirements are not enough, you can create custom requirements and handlers. A requirement is a simple class that implements IAuthorizationRequirement. A handler is a class that inherits from AuthorizationHandler<TRequirement> and contains the evaluation logic."
+    },
+    {
+      "type": "paragraph",
+      "text": "This pattern is powerful because it separates the authorization rule from where it is used. You can define a MinimumAgeRequirement once and reuse it across multiple policies or controllers."
+    },
+    {
+      "type": "example",
+      "title": "Custom minimum age requirement and handler",
+      "content": "A complete custom requirement and handler that checks if the user meets a minimum age.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.Authorization;\nusing System.Security.Claims;\n\n// The requirement — describes what must be true\npublic class MinimumAgeRequirement : IAuthorizationRequirement\n{\n    public int MinimumAge { get; }\n    public MinimumAgeRequirement(int minimumAge) => MinimumAge = minimumAge;\n}\n\n// The handler — evaluates the requirement against the current user\npublic class MinimumAgeHandler : AuthorizationHandler<MinimumAgeRequirement>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        MinimumAgeRequirement requirement)\n    {\n        // Look for the date of birth claim\n        var dobClaim = context.User.FindFirst(c => c.Type == ClaimTypes.DateOfBirth);\n        if (dobClaim == null)\n        {\n            return Task.CompletedTask; // no DOB claim — requirement not met\n        }\n\n        if (DateTime.TryParse(dobClaim.Value, out var dateOfBirth))\n        {\n            var age = DateTime.Today.Year - dateOfBirth.Year;\n            if (age >= requirement.MinimumAge)\n            {\n                context.Succeed(requirement); // mark requirement as satisfied\n            }\n        }\n\n        return Task.CompletedTask;\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The MinimumAgeRequirement class simply holds the minimum age value. The MinimumAgeHandler does the actual work: it finds the DateOfBirth claim, calculates the user's age, and calls context.Succeed(requirement) if the user is old enough. If the claim is missing or the age is too low, the handler does nothing, and the requirement is not met."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Registering Custom Handlers"
+    },
+    {
+      "type": "paragraph",
+      "text": "After creating the requirement and handler classes, you register the handler in Program.cs and add a policy that uses the requirement. The handler is resolved from the dependency injection container, so you can inject services into the handler's constructor."
+    },
+    {
+      "type": "example",
+      "title": "Registering the custom handler and policy",
+      "content": "Wiring up the MinimumAgeHandler and creating a policy that requires users to be at least 21.",
+      "language": "csharp",
+      "code": "builder.Services.AddScoped<IAuthorizationHandler, MinimumAgeHandler>();\n\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"MustBeAdult\", policy =>\n        policy.Requirements.Add(new MinimumAgeRequirement(21)));\n});\n\n// Use the policy on a controller\n[Authorize(Policy = \"MustBeAdult\")]\npublic IActionResult PurchaseAlcohol() => View();"
+    },
+    {
+      "type": "paragraph",
+      "text": "The IAuthorizationHandler interface is registered as scoped so a new handler is created per request. When a user accesses the PurchaseAlcohol action, the authorization system creates a MinimumAgeRequirement with a minimum age of 21, passes it to the MinimumAgeHandler, and grants or denies access based on the result."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Resource-Based Authorization"
+    },
+    {
+      "type": "paragraph",
+      "text": "Sometimes authorization depends on the specific resource being accessed, not just the user's identity. For example, a user can edit their own posts but not other users' posts. Resource-based authorization lets you make authorization decisions inside your controller or service using IAuthorizationService."
+    },
+    {
+      "type": "example",
+      "title": "Resource-based authorization for a blog post",
+      "content": "Checking if the current user can edit a specific blog post.",
+      "language": "csharp",
+      "code": "public class BlogPost\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string AuthorId { get; set; } = string.Empty;\n}\n\npublic class BlogOperations\n{\n    private readonly IAuthorizationService _authService;\n\n    public BlogOperations(IAuthorizationService authService)\n    {\n        _authService = authService;\n    }\n\n    public async Task<bool> CanEditPostAsync(ClaimsPrincipal user, BlogPost post)\n    {\n        var result = await _authService.AuthorizeAsync(user, post, \"EditPost\");\n        return result.Succeeded;\n    }\n}\n\n// Handler for the EditPost resource requirement\npublic class EditPostHandler : AuthorizationHandler<OperationAuthorizationRequirement, BlogPost>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        OperationAuthorizationRequirement requirement,\n        BlogPost post)\n    {\n        if (context.User.IsInRole(\"Admin\"))\n        {\n            context.Succeed(requirement);\n            return Task.CompletedTask;\n        }\n\n        if (context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value == post.AuthorId)\n        {\n            context.Succeed(requirement);\n        }\n\n        return Task.CompletedTask;\n    }\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Combine policy and resource authorization",
+      "text": "Use [Authorize(Policy)] for broad access rules and IAuthorizationService.AuthorizeAsync for resource-specific checks within your business logic. This gives you defense in depth — a user must pass both the policy and the resource check."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Authorization policy",
+          "definition": "A named set of requirements that must all pass for a user to access a resource."
+        },
+        {
+          "term": "IAuthorizationRequirement",
+          "definition": "A marker interface for authorization requirements. A policy can contain multiple requirements."
+        },
+        {
+          "term": "AuthorizationHandler<TRequirement>",
+          "definition": "A class that evaluates an IAuthorizationRequirement and calls context.Succeed() if the user meets it."
+        },
+        {
+          "term": "Resource-based authorization",
+          "definition": "Authorization decisions made at runtime based on both the user and the specific resource being accessed."
+        },
+        {
+          "term": "IAuthorizationService",
+          "definition": "A service that performs authorization checks programmatically, supporting both policy-based and resource-based checks."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Create a Custom Age Requirement Handler",
+      "description": "Build a custom authorization requirement that enforces a minimum age, register it as a policy, and test it with users of different ages.",
+      "steps": [
+        "Create a new ASP.NET Core project with Identity and JWT authentication",
+        "Create a MinimumAgeRequirement class implementing IAuthorizationRequirement with a MinimumAge property",
+        "Create a MinimumAgeHandler class inheriting from AuthorizationHandler<MinimumAgeRequirement>",
+        "In the handler, find the ClaimTypes.DateOfBirth claim, calculate the user's age, and call context.Succeed if age >= MinimumAge",
+        "Register the handler with AddScoped<IAuthorizationHandler, MinimumAgeHandler> in Program.cs",
+        "Register a policy named 'MustBeAdult' using policy.Requirements.Add(new MinimumAgeRequirement(18))",
+        "Create a protected controller action with [Authorize(Policy = \"MustBeAdult\")]",
+        "Test with two users: one with a DateOfBirth claim showing age 25, and one showing age 16 — verify only the 25-year-old can access the endpoint"
+      ],
+      "expectedOutcome": "The endpoint returns 200 OK for the 25-year-old user and 403 Forbidden for the 16-year-old user. The custom handler correctly calculates age from the DateOfBirth claim and enforces the minimum age requirement."
+    },
+    {
+      "type": "checklist",
+      "title": "Policy-Based Authorization Checklist",
+      "items": [
+        {
+          "text": "I can explain why policies are more flexible than simple role checks",
+          "hint": "Policies combine multiple requirements like roles, claims, and custom logic."
+        },
+        {
+          "text": "I can use built-in requirements like RequireRole and RequireClaim",
+          "hint": "Use policy.RequireRole() and policy.RequireClaim() inside AddPolicy."
+        },
+        {
+          "text": "I can create a custom IAuthorizationRequirement class",
+          "hint": "Implement the empty IAuthorizationRequirement interface with your requirement data."
+        },
+        {
+          "text": "I can write an AuthorizationHandler that evaluates a custom requirement",
+          "hint": "Inherit from AuthorizationHandler<TRequirement> and call context.Succeed when the requirement is met."
+        },
+        {
+          "text": "I can register custom handlers in Program.cs",
+          "hint": "Use AddScoped<IAuthorizationHandler, YourHandler>() and add the requirement to a policy."
+        },
+        {
+          "text": "I understand resource-based authorization with IAuthorizationService",
+          "hint": "Use AuthorizeAsync(user, resource, policyName) when access depends on the specific resource."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Policy-Based Authorization Summary",
+      "points": [
+        "Policies combine multiple requirements for fine-grained, reusable access rules",
+        "Built-in requirements include RequireRole, RequireClaim, and RequireAssertion",
+        "Custom requirements implement IAuthorizationRequirement and carry rule data",
+        "Custom handlers inherit from AuthorizationHandler<TRequirement> and evaluate the rule",
+        "Handlers are registered as scoped services and resolved per request",
+        "Resource-based authorization handles access rules that depend on both user and resource"
+      ],
+      "takeaway": "Policy-based authorization is the most powerful and flexible authorization mechanism in ASP.NET Core. It scales from simple role checks to complex business rules while keeping authorization logic centralized and testable."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Policy-Based Authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/policies",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on creating and using authorization policies with requirements and handlers."
+    },
+    {
+      "title": "Custom Authorization Policies",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/customize",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to writing custom authorization handlers, requirements, and resource-based checks."
+    }
+  ]
 }

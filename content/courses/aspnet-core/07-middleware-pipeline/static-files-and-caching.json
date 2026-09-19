@@ -4,26 +4,243 @@
   "moduleSlug": "07-middleware-pipeline",
   "courseSlug": "aspnet-core",
   "title": "Static Files and Caching",
-  "description": "Learn static files and caching in ASP.NET Core.",
+  "description": "Learn to serve static assets efficiently in ASP.NET Core using UseStaticFiles, configure cache headers for browser and CDN caching, and implement response caching for dynamic content.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 7,
+  "estimatedMinutes": 28,
   "tags": [
     "static-files",
-    "caching"
+    "caching",
+    "performance"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Serving Static Files"
+    },
+    {
       "type": "paragraph",
-      "text": "Serve static assets efficiently and enable response caching."
+      "text": "Static files are client-side assets like CSS stylesheets, JavaScript bundles, images, and fonts. By default, ASP.NET Core serves these files from the wwwroot folder in your project. The UseStaticFiles middleware is what makes this possible — without it, requests for static assets return 404 errors."
+    },
+    {
+      "type": "paragraph",
+      "text": "Static files are served directly by the web server without going through the MVC or Razor Pages pipeline. This makes them extremely fast to serve and is one reason ASP.NET Core performs so well for both dynamic and static content."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Default Static File Configuration"
+    },
+    {
+      "type": "paragraph",
+      "text": "The simplest way to enable static files is to call app.UseStaticFiles() with no parameters. This serves files from wwwroot with default options, including no cache headers."
     },
     {
       "type": "example",
+      "title": "Basic static file configuration",
+      "content": "Enable static file serving with default options.",
       "language": "csharp",
-      "code": "app.UseStaticFiles(new StaticFileOptions\n{\n    OnPrepareResponse = ctx =>\n    {\n        ctx.Context.Response.Headers.CacheControl = \"public,max-age=86400\";\n    }\n});"
+      "code": "var builder = WebApplication.CreateBuilder(args);\nvar app = builder.Build();\n\napp.UseStaticFiles(); // serves from wwwroot by default\n\napp.MapGet(\"/\", () => \"Hello World!\");\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "With this configuration, a file at wwwroot/css/site.css is accessible at the URL '/css/site.css'. The middleware maps the URL path directly to the file system path under wwwroot."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "info": "The wwwroot folder",
+      "text": "Any file placed in wwwroot is publicly accessible by default. Never store secrets, configuration files, or sensitive data in wwwroot. Files in this folder are meant to be served directly to clients."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Setting Cache-Control Headers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Browser caching reduces load times for repeat visitors and reduces bandwidth costs. You control caching behavior through HTTP cache headers, primarily the Cache-Control header. Static files that rarely change — like hashed CSS bundles and versioned JavaScript — should be cached aggressively."
+    },
+    {
+      "type": "example",
+      "title": "Configuring cache headers for static files",
+      "content": "Set a long cache duration for static assets using StaticFileOptions.",
+      "language": "csharp",
+      "code": "app.UseStaticFiles(new StaticFileOptions\n{\n    OnPrepareResponse = ctx =>\n    {\n        const int durationInSeconds = 60 * 60 * 24 * 365; // 1 year\n        ctx.Context.Response.Headers.CacheControl = $\n            \"public,max-age={durationInSeconds}\";\n    }\n});"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Cache-Control header 'public,max-age=31536000' tells browsers and CDNs that this response can be cached for one year. When you need to force an update, use cache busting techniques like appending a content hash to the filename, for example 'site.abc123.css'. The URL changes when the content changes, so browsers fetch the new file."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Tip: Use content hashes for cache busting",
+      "text": "Bundlers and build tools like Webpack, Vite, or Gulp can append a hash based on file content to filenames. When the file changes, the hash changes, producing a new URL that bypasses the cache."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Serving Files from Multiple Locations"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can serve static files from multiple directories by adding additional StaticFileOptions with custom FileProvider instances. This is useful when you need to serve user-uploaded files or files managed by another system."
+    },
+    {
+      "type": "example",
+      "title": "Serving files from a custom directory",
+      "content": "Configure a second static file source for user uploads at the '/uploads' URL path.",
+      "language": "csharp",
+      "code": "var uploadsPath = Path.Combine(\n    builder.Environment.ContentRootPath, \"UserUploads\");\n\nif (!Directory.Exists(uploadsPath))\n{\n    Directory.CreateDirectory(uploadsPath);\n}\n\napp.UseStaticFiles(new StaticFileOptions\n{\n    FileProvider = new PhysicalFileProvider(uploadsPath),\n    RequestPath = \"/uploads\"\n});\n\n// Now /uploads/myphoto.jpg maps to UserUploads/myphoto.jpg"
+    },
+    {
+      "type": "paragraph",
+      "text": "The PhysicalFileProvider points the middleware at the custom directory, and RequestPath defines the URL prefix. A request to '/uploads/report.pdf' will serve the file from 'UserUploads/report.pdf' on disk."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Response Caching for Dynamic Content"
+    },
+    {
+      "type": "paragraph",
+      "text": "For dynamic content generated by controllers or Razor Pages, you can use the Response Caching Middleware. Unlike static file caching, response caching stores the full HTTP response — headers and body — so the middleware can return a cached copy without hitting your controller code."
+    },
+    {
+      "type": "paragraph",
+      "text": "Response caching is controlled by HTTP cache headers like Cache-Control on both the server and client. The middleware respects these headers to determine what can be cached and for how long."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring Response Caching"
+    },
+    {
+      "type": "paragraph",
+      "text": "To enable response caching, register the service and add the middleware. Controllers and pages then opt into caching by setting cache profiles or decorating actions with cache attributes."
+    },
+    {
+      "type": "example",
+      "title": "Enabling response caching with a cache profile",
+      "content": "Configure response caching services and a cache profile, then apply it to a controller.",
+      "language": "csharp",
+      "code": "// Program.cs\nbuilder.Services.AddControllers(options =>\n{\n    options.CacheProfiles.Add(\"ShortLived\", new CacheProfile\n    {\n        Duration = TimeSpan.FromSeconds(30).TotalSeconds,\n        Location = ResponseCacheLocation.Client,\n        NoStore = false\n    });\n});\n\nbuilder.Services.AddResponseCaching();\n\nvar app = builder.Build();\napp.UseResponseCaching();\napp.MapControllers();\napp.Run();\n\n// ProductsController.cs\n[ResponseCache(CacheProfileName = \"ShortLived\")]\n[HttpGet]\npublic IActionResult GetFeatured()\n{\n    var products = _repo.GetFeatured();\n    return Ok(products);\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Important: Response caching requires Vary headers",
+      "text": "If your response varies based on query parameters, headers, or user identity, make sure to set the Vary response header accordingly. Without proper Vary headers, the response cache might serve the wrong content to different users."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "UseStaticFiles",
+          "definition": "Middleware that serves static files from the file system, typically the wwwroot folder."
+        },
+        {
+          "term": "StaticFileOptions",
+          "definition": "Configuration options for UseStaticFiles, including OnPrepareResponse for custom headers and alternate FileProviders."
+        },
+        {
+          "term": "Cache-Control",
+          "definition": "An HTTP response header that specifies browser and CDN caching directives like max-age and public."
+        },
+        {
+          "term": "Response Caching Middleware",
+          "definition": "Middleware that caches full HTTP responses in server memory to avoid re-executing controller logic."
+        },
+        {
+          "term": "Cache busting",
+          "definition": "A technique that changes a resource URL (usually via content hash) to force browsers to fetch an updated file."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Vary header for response caching",
+      "content": "Ensure cached responses vary correctly when query parameters affect the output.",
+      "language": "csharp",
+      "code": "[ResponseCache(Duration = 60, VaryByQueryKeys = new[] { \"category\", \"page\" })]\n[HttpGet(\"/api/products\")]\npublic IActionResult GetProducts(string category, int page)\n{\n    var results = _repo.GetProducts(category, page);\n    return Ok(results);\n}"
+    },
+    {
+      "type": "exercise",
+      "title": "Configure Static Files and Response Caching",
+      "description": "Set up static file serving with cache headers and add response caching to a dynamic controller action.",
+      "steps": [
+        "Create a new MVC project: 'dotnet new mvc -n StaticCachingDemo'",
+        "Add a 'products.jpg' image to wwwroot/images and a 'site.css' file to wwwroot/css",
+        "Configure UseStaticFiles with OnPrepareResponse to set Cache-Control to 'public,max-age=86400' (1 day)",
+        "Register AddResponseCaching in the service collection and add app.UseResponseCaching() to the pipeline",
+        "Add a ProductsController with a GetFeatured action decorated with [ResponseCache(Duration = 30)]",
+        "Add a new cache profile named 'ProductsCache' with a 60-second duration",
+        "Run the app, verify that navigating to /images/products.jpg returns a Cache-Control header, and use curl -I to confirm the header is present"
+      ],
+      "expectedOutcome": "Static file requests return with a Cache-Control header showing max-age=86400. The dynamic GetFeatured action is cached for 30 seconds, verified by repeated requests returning the same response without controller execution."
+    },
+    {
+      "type": "checklist",
+      "title": "Static Files and Caching Checklist",
+      "items": [
+        {
+          "text": "I can enable static file serving in an ASP.NET Core application",
+          "hint": "Call app.UseStaticFiles() in the middleware pipeline."
+        },
+        {
+          "text": "I understand the role of the wwwroot folder",
+          "hint": "wwwroot is the default root for publicly accessible static files."
+        },
+        {
+          "text": "I can configure Cache-Control headers for static files",
+          "hint": "Use StaticFileOptions with OnPrepareResponse to set headers."
+        },
+        {
+          "text": "I can serve files from a custom directory using PhysicalFileProvider",
+          "hint": "Combine PhysicalFileProvider with RequestPath for custom static file locations."
+        },
+        {
+          "text": "I understand the difference between static file caching and response caching",
+          "hint": "Static file caching is for wwwroot assets; response caching is for dynamic controller output."
+        },
+        {
+          "text": "I can apply response caching to a controller action using attributes",
+          "hint": "Use [ResponseCache] with Duration, CacheProfileName, and VaryByQueryKeys."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Static Files and Caching Summary",
+      "points": [
+        "UseStaticFiles serves static assets from wwwroot or custom directories via FileProvider",
+        "Cache-Control headers control how long browsers and CDNs cache static files",
+        "Long cache durations paired with content-hash filenames provide optimal performance",
+        "Response Caching Middleware caches full HTTP responses from dynamic endpoints",
+        "Cache profiles centralize caching configuration for reuse across controllers",
+        "Always set Vary headers when cached responses depend on query parameters or user data"
+      ],
+      "takeaway": "Properly configured static file serving and caching dramatically improve application performance by reducing server load and response times. Combining long-lived static file caching with short-lived response caching for dynamic content provides the best user experience."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Static Web Assets in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/static-web-assets",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comprehensive guide to serving, configuring, and caching static files in ASP.NET Core."
+    },
+    {
+      "title": "Response Caching in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/response",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Documentation on the response caching middleware and cache profiles."
+    }
+  ]
 }

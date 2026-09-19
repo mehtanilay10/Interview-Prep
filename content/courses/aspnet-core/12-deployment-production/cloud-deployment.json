@@ -4,26 +4,236 @@
   "moduleSlug": "12-deployment-production",
   "courseSlug": "aspnet-core",
   "title": "Cloud Deployment",
-  "description": "Learn cloud deployment in ASP.NET Core.",
+  "description": "Deploy your ASP.NET Core application to the cloud using Azure App Service and Azure CLI. Learn to create resource groups, provision App Service plans, deploy with Git or ZIP deploy, and use deployment slots for safe releases.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 35,
   "tags": [
     "cloud",
-    "azure"
+    "azure",
+    "app-service"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Deploy to Azure App Service or AWS Elastic Beanstalk."
+      "text": "Cloud deployment moves your application from a server you manage to a platform managed by a cloud provider. Azure App Service is Microsoft's managed platform for web applications. You deploy your code, and Azure handles the operating system, runtime updates, scaling, SSL certificates, and high availability. This lets you focus on your application rather than infrastructure."
+    },
+    {
+      "type": "paragraph",
+      "text": "Azure App Service supports ASP.NET Core natively. You can deploy via Git, ZIP deploy, Docker containers, or directly from Visual Studio. The platform automatically detects your application type, provisions the runtime, and starts it. You can scale up (more powerful VMs) or scale out (more instances) with a single API call or portal click."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Azure Resource Hierarchy"
+    },
+    {
+      "type": "paragraph",
+      "text": "Azure organizes resources into a hierarchy. A Resource Group is a logical container that holds related resources. An App Service Plan defines the compute resources (CPU, memory, VM size) that your apps run on. Multiple apps can share a single App Service Plan, splitting the cost. The Web App is your actual application running inside the plan."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Azure App Service Resource Hierarchy",
+      "items": [
+        {
+          "text": "Subscription: Your billing boundary — all Azure resources belong to a subscription"
+        },
+        {
+          "text": "Resource Group: A logical container for related resources — one app, its database, and storage"
+        },
+        {
+          "text": "App Service Plan: Defines the compute tier (Free, Basic, Standard, Premium) and VM size"
+        },
+        {
+          "text": "Web App: Your actual ASP.NET Core application running on the plan"
+        },
+        {
+          "text": "Deployment Slot: A staging environment for the same app — swap slots with zero downtime"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Provisioning with Azure CLI"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Azure CLI is a cross-platform command-line tool for managing Azure resources. You can script the entire infrastructure setup — resource groups, app service plans, web apps, databases — making your deployment reproducible and suitable for CI/CD pipelines."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Install Azure CLI",
+      "text": "Install Azure CLI from https://learn.microsoft.com/en-us/cli/azure/install-azure-cli. Once installed, run az login to authenticate with your Azure account before running deployment commands."
     },
     {
       "type": "example",
-      "language": "csharp",
-      "code": "# Azure CLI example\naz group create --name MyResourceGroup --location eastus\naz appservice plan create --name MyPlan --resource-group MyResourceGroup --sku B1\naz webapp create --name MyWebApp --plan MyPlan --resource-group MyResourceGroup"
+      "title": "Deploying an ASP.NET Core App with Azure CLI",
+      "content": "Complete Azure CLI commands to create a resource group, app service plan, web app, and deploy your application.",
+      "language": "bash",
+      "code": "# 1. Log in to Azure (opens a browser window)\naz login\n\n# 2. Create a resource group (a logical container for resources)\naz group create \\\n  --name MyResourceGroup \\\n  --location eastus\n\n# 3. Create an App Service Plan (defines compute tier)\naz appservice plan create \\\n  --name MyAppPlan \\\n  --resource-group MyResourceGroup \\\n  --sku B1 \\\n  --is-linux\n\n# 4. Create the Web App\naz webapp create \\\n  --name MyWebApp12345 \\\n  --resource-group MyResourceGroup \\\n  --plan MyAppPlan \\\n  --runtime \"DOTNETCORE:8.0\"\n\n# 5. Deploy using ZIP deploy (publish locally first)\ndotnet publish MyApp.csproj --configuration Release --output ./publish\ncd publish\nzip -r ../app.zip .\naz webapp deploy \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --src-path ../app.zip \\\n  --type zip\n\n# 6. Configure an app setting (connection string)\naz webapp config connection-string set \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --connection-string-type SQLAzure \\\n  --settings DefaultConnection=\"Server=tcp:...;...\""
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Deployment Slots"
+    },
+    {
+      "type": "paragraph",
+      "text": "Deployment slots are live applications with their own hostnames, deployed alongside your production app. You deploy to a staging slot, test it thoroughly, and then swap it with the production slot. The swap operation is near-instantaneous and warms up the new code before it receives live traffic, minimizing downtime."
+    },
+    {
+      "type": "example",
+      "title": "Creating and Swapping Deployment Slots",
+      "content": "Using Azure CLI to create a staging slot and swap it into production.",
+      "language": "bash",
+      "code": "# Create a staging deployment slot\naz webapp deployment slot create \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --slot staging\n\n# Deploy to staging (not production)\naz webapp deploy \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --slot staging \\\n  --src-path ./app.zip \\\n  --type zip\n\n# Configure slot-specific settings (e.g., connection strings)\naz webapp config connection-string set \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --slot staging \\\n  --connection-string-type SQLAzure \\\n  --settings DefaultConnection=\"Server=staging-db;...\"\n\n# Swap staging into production (zero-downtime swap)\naz webapp deployment slot swap \\\n  --resource-group MyResourceGroup \\\n  --name MyWebApp12345 \\\n  --slot staging \\\n  --target-slot production\n\n# After the swap, the old production code is in 'staging'\n# If something goes wrong, swap back to roll back instantly"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Application Settings and Connection Strings"
+    },
+    {
+      "type": "paragraph",
+      "text": "Azure App Service stores configuration in Application Settings and Connection Strings. These are injected as environment variables into your application at runtime, overriding appsettings.json values. This is where you store secrets — database connection strings, API keys, third-party credentials — without committing them to source control."
+    },
+    {
+      "type": "paragraph",
+      "text": "Connection strings in App Service are encrypted at rest and injected using the standard ASP.NET Core connection string configuration key. Slot settings can be marked as 'sticky' so they do not swap between slots — essential for keeping production and staging databases separate."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "CI/CD with GitHub Actions"
+    },
+    {
+      "type": "paragraph",
+      "text": "Continuous Integration and Continuous Deployment (CI/CD) automates the process of building, testing, and deploying your application whenever code changes. Azure App Service integrates with GitHub Actions, providing a pre-built workflow that triggers on every push to your main branch."
+    },
+    {
+      "type": "example",
+      "title": "GitHub Actions Workflow for Azure Deployment",
+      "content": "A GitHub Actions YAML workflow that builds and deploys an ASP.NET Core app to Azure App Service on every push to main.",
+      "language": "yaml",
+      "code": "name: Build and Deploy to Azure\n\non:\n  push:\n    branches: [ main ]\n\njobs:\n  build-and-deploy:\n    runs-on: ubuntu-latest\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Set up .NET\n        uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: '8.0.x'\n\n      - name: Restore dependencies\n        run: dotnet restore MyApp.csproj\n\n      - name: Build\n        run: dotnet build MyApp.csproj --configuration Release --no-restore\n\n      - name: Test\n        run: dotnet test MyApp.csproj --configuration Release --no-build\n\n      - name: Publish\n        run: dotnet publish MyApp.csproj --configuration Release --output ./publish\n\n      - name: Deploy to Azure Web App\n        uses: azure/webapps-deploy@v3\n        with:\n          app-name: MyWebApp12345\n          slot-name: staging\n          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}\n          package: ./publish"
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Cloud Deployment",
+      "terms": [
+        {
+          "term": "Azure App Service",
+          "definition": "A managed cloud platform for hosting web applications, APIs, and mobile backends with built-in scaling and SSL."
+        },
+        {
+          "term": "Resource Group",
+          "definition": "A logical container in Azure that groups related resources for management, billing, and access control."
+        },
+        {
+          "term": "App Service Plan",
+          "definition": "Defines the compute resources (CPU, memory, pricing tier) for one or more Azure App Service apps."
+        },
+        {
+          "term": "Deployment Slot",
+          "definition": "A staging environment for an Azure Web App that can be swapped with production for zero-downtime releases."
+        },
+        {
+          "term": "ZIP Deploy",
+          "definition": "An Azure deployment method that uploads a ZIP file of your published application and deploys it directly."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Always Use Deployment Slots for Production",
+      "text": "Deploying directly to production is risky. Use a staging slot to validate the deployment before swapping. If something goes wrong after the swap, you can swap back to the previous version in seconds."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Cloud Deployment",
+      "points": [
+        "Azure App Service is a managed PaaS platform that handles infrastructure, runtime, and scaling for you",
+        "Azure CLI scripts make your deployment reproducible and suitable for automation",
+        "App Service Plans define compute resources — multiple apps can share one plan to reduce cost",
+        "Deployment slots provide zero-downtime releases with instant rollback via slot swapping",
+        "Application Settings and Connection Strings inject configuration as environment variables at runtime",
+        "GitHub Actions automate CI/CD — build, test, and deploy on every code change without manual steps"
+      ],
+      "takeaway": "Cloud deployment removes the operational burden from your team. Azure App Service handles servers, runtime updates, SSL, and scaling. Combined with deployment slots and CI/CD, you can ship code confidently and roll back instantly if something breaks."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Deploy to Azure App Service with a Staging Slot",
+      "description": "Provision an Azure App Service instance and deploy an application using a staging slot for safe releases.",
+      "steps": [
+        "Authenticate with Azure using az login",
+        "Create a resource group named InterviewPrep-RG in the East US region",
+        "Create a Linux App Service Plan named InterviewPrep-Plan in the B1 tier",
+        "Create a Web App named interview-prep-api-[your-initials] with .NET 8 runtime",
+        "Publish your ASP.NET Core app locally using dotnet publish",
+        "Create a ZIP file of the published output and deploy it using az webapp deploy",
+        "Create a staging deployment slot and deploy a code change to it first",
+        "Swap the staging slot into production and confirm the app is live"
+      ],
+      "expectedOutcome": "A live ASP.NET Core API running on Azure App Service. A staging slot was used to validate the deployment before swapping to production. The app is accessible via its Azure-provided URL."
+    },
+    {
+      "type": "checklist",
+      "title": "Cloud Deployment Checklist",
+      "items": [
+        {
+          "text": "I can explain the Azure resource hierarchy (subscription, resource group, plan, web app)",
+          "hint": "A resource group holds related resources. An App Service Plan defines compute. A Web App runs your code."
+        },
+        {
+          "text": "I can provision resources using Azure CLI commands",
+          "hint": "az group create, az appservice plan create, az webapp create."
+        },
+        {
+          "text": "I understand what deployment slots are and why they matter",
+          "hint": "Slots are staging environments. Deploy to staging, test, then swap with zero downtime."
+        },
+        {
+          "text": "I know the difference between ZIP deploy and Git deploy",
+          "hint": "ZIP deploy uploads a packaged artifact. Git deploy pushes source code for the platform to build."
+        },
+        {
+          "text": "I can describe how GitHub Actions automates CI/CD for Azure App Service",
+          "hint": "A GitHub Actions workflow builds, tests, and deploys automatically on every push to the main branch."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "deployment-options",
+        "docker-containerization"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Deploy ASP.NET Core to Azure App Service",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/publish-to-azure-webapp-using-cli"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "deployment-options",
+    "docker-containerization"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Deploy ASP.NET Core to Azure App Service",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/publish-to-azure-webapp-using-cli"
+    }
+  ]
 }

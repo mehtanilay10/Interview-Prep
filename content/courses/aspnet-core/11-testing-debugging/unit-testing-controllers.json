@@ -4,26 +4,240 @@
   "moduleSlug": "11-testing-debugging",
   "courseSlug": "aspnet-core",
   "title": "Unit Testing Controllers",
-  "description": "Learn unit testing controllers in ASP.NET Core.",
+  "description": "Learn to unit test ASP.NET Core API controllers using Moq to mock dependencies, inject test doubles, and assert ActionResult types. Understand how to verify that controllers return the correct status codes and response bodies without hitting a real database.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "unit-testing",
-    "controllers"
+    "controllers",
+    "moq"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Mock dependencies and assert controller results."
+      "text": "Unit testing a controller means testing just the controller's logic — routing, action results, and interaction with its dependencies — without starting the full web server or touching a real database. The trick is replacing real services with test doubles (mocks) that return predictable data."
+    },
+    {
+      "type": "paragraph",
+      "text": "Moq is the most widely used mocking library in the .NET ecosystem. It lets you create mock objects that stand in for real interfaces, define what they should return when called, and verify that they were called with the expected arguments. Combined with xUnit, Moq lets you test controllers thoroughly with very little setup code."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Mock Dependencies?"
+    },
+    {
+      "type": "paragraph",
+      "text": "A controller's constructor takes services like IProductService. In production, the DI container passes a real implementation that connects to a database. In a unit test, you do not want a real database — you want a mock that returns a known result instantly. Mocking keeps unit tests fast, deterministic, and independent of external infrastructure."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "What Makes a Good Unit Test?",
+      "text": "A unit test should be fast (run in milliseconds), repeatable (same result every time), isolated (no dependencies on other tests or external systems), and self-checking (it knows whether it passed or failed without human inspection). Mocking is the primary tool for achieving all four."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Setting Up Moq"
+    },
+    {
+      "type": "paragraph",
+      "text": "Install the Moq and Microsoft.AspNetCore.Mvc NuGet packages in your test project. Microsoft.AspNetCore.Mvc provides the ControllerBase class and ActionResult types needed to assert controller behavior. Your test project should reference both the main project and these testing packages."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Writing Your First Controller Unit Test"
+    },
+    {
+      "type": "paragraph",
+      "text": "The pattern for testing a controller is: create a mock of the service dependency, create the controller with the mock injected, call the action method, then assert on the result. The result is an ActionResult<T> that wraps both the status code and the response body."
     },
     {
       "type": "example",
+      "title": "Unit Testing a ProductsController Get Action",
+      "content": "A complete unit test that mocks IProductService and verifies the controller returns 200 OK with the correct product.",
       "language": "csharp",
-      "code": "[Fact]\npublic async Task Get_ReturnsOk_WithProduct()\n{\n    var mock = new Mock<IProductService>();\n    mock.Setup(s => s.GetAsync(1)).ReturnsAsync(new Product { Id = 1 });\n\n    var controller = new ProductsController(mock.Object);\n    var result = await controller.Get(1);\n\n    var ok = Assert.IsType<OkObjectResult>(result.Result);\n    var product = Assert.IsType<Product>(ok.Value);\n    Assert.Equal(1, product.Id);\n}"
+      "code": "using Xunit;\nusing Moq;\nusing Microsoft.AspNetCore.Mvc;\nusing Api.Controllers;\nusing Api.Services;\nusing Api.Models;\n\npublic class ProductsControllerTests\n{\n    [Fact]\n    public async Task GetById_WhenProductExists_ReturnsOkWithProduct()\n    {\n        // Arrange\n        var productId = 42;\n        var expectedProduct = new ProductDto\n        {\n            Id = productId,\n            Name = \"Wireless Headphones\",\n            Price = 79.99m\n        };\n\n        var mockService = new Mock<IProductService>();\n        mockService\n            .Setup(s => s.GetByIdAsync(productId))\n            .ReturnsAsync(expectedProduct);\n\n        var controller = new ProductsController(mockService.Object);\n\n        // Act\n        var result = await controller.GetById(productId);\n\n        // Assert\n        var okResult = Assert.IsType<OkObjectResult>(result.Result);\n        var returnedProduct = Assert.IsType<ProductDto>(okResult.Value);\n        Assert.Equal(productId, returnedProduct.Id);\n        Assert.Equal(\"Wireless Headphones\", returnedProduct.Name);\n    }\n\n    [Fact]\n    public async Task GetById_WhenProductMissing_ReturnsNotFound()\n    {\n        // Arrange\n        var mockService = new Mock<IProductService>();\n        mockService\n            .Setup(s => s.GetByIdAsync(It.IsAny<int>()))\n            .ReturnsAsync((ProductDto?)null);\n\n        var controller = new ProductsController(mockService.Object);\n\n        // Act\n        var result = await controller.GetById(999);\n\n        // Assert\n        Assert.IsType<NotFoundResult>(result.Result);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Asserting on ActionResult Types"
+    },
+    {
+      "type": "paragraph",
+      "text": "ActionResult<T> can hold several different result types depending on what the action returned. You need to cast the Result property to the correct type to inspect the status code and body. Common types you will assert against include OkObjectResult (200), NotFoundResult (404), CreatedAtActionResult (201), and BadRequestResult (400)."
+    },
+    {
+      "type": "paragraph",
+      "text": "Use Assert.IsType<T> to cast and verify the result type in one step. If the result is a different type, the assertion fails. For OkObjectResult, you can then access the Value property to inspect the returned data."
+    },
+    {
+      "type": "example",
+      "title": "Asserting Different ActionResult Types",
+      "content": "A reference for asserting the most common ActionResult types returned by API controllers.",
+      "language": "csharp",
+      "code": "// 200 OK with data\nvar okResult = Assert.IsType<OkObjectResult>(actionResult.Result);\nvar data = Assert.IsType<ProductDto>(okResult.Value);\n\n// 404 Not Found\nvar notFound = Assert.IsType<NotFoundResult>(actionResult.Result);\n\n// 201 Created\nvar created = Assert.IsType<CreatedAtActionResult>(actionResult.Result);\nAssert.Equal(\"GetById\", created.ActionName);\nAssert.Equal(42, created.RouteValues![\"id\"]);\n\n// 400 Bad Request\nvar badRequest = Assert.IsType<BadRequestResult>(actionResult.Result);\n\n// 204 No Content\nvar noContent = Assert.IsType<NoContentResult>(actionResult.Result);"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Verifying Mock Interactions"
+    },
+    {
+      "type": "paragraph",
+      "text": "Moq can verify that a mock's method was called with specific arguments. This is useful when your controller should call a service method under certain conditions. Use Verify() to assert that an interaction happened, and VerifyNoOtherCalls() to ensure no unexpected interactions occurred."
+    },
+    {
+      "type": "example",
+      "title": "Verifying Mock Method Calls",
+      "content": "Using Moq's Verify method to confirm that the service was called with the correct arguments.",
+      "language": "csharp",
+      "code": "[Fact]\npublic async Task Delete_WhenCalled_CallsServiceWithCorrectId()\n{\n    // Arrange\n    var mockService = new Mock<IProductService>();\n    var controller = new ProductsController(mockService.Object);\n\n    // Act\n    var result = await controller.Delete(42);\n\n    // Assert — verify the service was called exactly once with id=42\n    mockService.Verify(\n        s => s.DeleteAsync(42),\n        Times.Once\n    );\n\n    // Also verify the result\n    Assert.IsType<NoContentResult>(result);\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Testing Model Validation Failures"
+    },
+    {
+      "type": "paragraph",
+      "text": "With [ApiController], invalid model state automatically triggers a 400 response. You can test this by creating a DTO instance with invalid data and verifying that the controller returns BadRequest without calling the service."
+    },
+    {
+      "type": "example",
+      "title": "Testing Automatic Model Validation",
+      "content": "Verifying that [ApiController] rejects invalid input before the action body runs.",
+      "language": "csharp",
+      "code": "[Fact]\npublic async Task Create_WithInvalidDto_ReturnsBadRequest()\n{\n    // Arrange\n    var mockService = new Mock<IProductService>();\n    var controller = new ProductsController(mockService.Object);\n\n    // Create an invalid DTO (empty name fails [Required])\n    var invalidDto = new CreateProductDto\n    {\n        Name = \"\",          // [Required] fails\n        Price = -10,         // [Range] fails\n        CategoryId = 0\n    };\n\n    // Act\n    var result = await controller.Create(invalidDto);\n\n    // Assert — [ApiController] returns 400 automatically\n    var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);\n    Assert.NotNull(badRequest.Value);\n\n    // Verify the service was NEVER called because validation failed\n    mockService.Verify(\n        s => s.CreateAsync(It.IsAny<CreateProductDto>()),\n        Times.Never\n    );\n}"
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Unit Testing Controllers",
+      "terms": [
+        {
+          "term": "Mock",
+          "definition": "A test double that replaces a real dependency, configured to return specific values for testing."
+        },
+        {
+          "term": "Moq",
+          "definition": "A popular .NET mocking library that creates mock objects from interfaces and verifies their interactions."
+        },
+        {
+          "term": "ActionResult<T>",
+          "definition": "A wrapper type that carries both an HTTP status code and an optional typed value returned by a controller action."
+        },
+        {
+          "term": "Setup",
+          "definition": "A Moq configuration call that defines what a mock method should return when called with specific arguments."
+        },
+        {
+          "term": "Verify",
+          "definition": "A Moq assertion that confirms a mock method was called the expected number of times with the expected arguments."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Keep Controllers Testable",
+      "text": "Controllers that depend on concrete classes (not interfaces) or create their own dependencies are hard to unit test. Always inject dependencies through interfaces via constructor injection. This is not just a testing concern — it is a core software design principle called dependency inversion."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Unit Testing Controllers",
+      "points": [
+        "Moq creates mock objects that replace real services in controller unit tests",
+        "Inject the mock into the controller's constructor, just like the real service",
+        "Assert on ActionResult<T>.Result to check the HTTP status code returned",
+        "Use Assert.IsType<OkObjectResult>, NotFoundResult, etc. to verify specific outcomes",
+        "Use mock.Verify() to confirm the controller called the right service methods",
+        "VerifyNoOtherCalls() ensures the controller did not call any unexpected methods"
+      ],
+      "takeaway": "Unit testing controllers is straightforward when you inject dependencies through interfaces. Moq handles the rest — set up return values, call the action, assert on the result. The pattern is consistent across every controller you test."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Unit Test a Complete CategoriesController",
+      "description": "Write a full set of unit tests for a CategoriesController using Moq to mock ICategoryService.",
+      "steps": [
+        "Create a CategoriesController that takes ICategoryService in its constructor",
+        "Write a test for GetAll that returns 200 OK with a list of categories",
+        "Write a test for GetById that returns 200 OK when a category exists",
+        "Write a test for GetById that returns 404 Not Found when the category is null",
+        "Write a test for Create that returns 201 Created with the correct Location header",
+        "Write a test for Delete that verifies the service DeleteAsync is called with the correct ID",
+        "Run all tests and confirm every one passes"
+      ],
+      "expectedOutcome": "Six unit tests covering the main CRUD actions. Each test uses Moq to mock the service, calls the controller action, and asserts on the returned status code and data. All tests pass consistently."
+    },
+    {
+      "type": "checklist",
+      "title": "Unit Testing Controllers Checklist",
+      "items": [
+        {
+          "text": "I can explain why we mock dependencies when unit testing controllers",
+          "hint": "Real services hit databases and external APIs. Mocks return predictable data instantly."
+        },
+        {
+          "text": "I know how to create a mock with Moq and set up its return values",
+          "hint": "new Mock<IService>().Setup(s => s.Method()).Returns(value)."
+        },
+        {
+          "text": "I can assert that an ActionResult is the correct type",
+          "hint": "Assert.IsType<OkObjectResult>(result.Result) to check the status code."
+        },
+        {
+          "text": "I understand how to verify that a mock method was called",
+          "hint": "mock.Verify(s => s.Method(args), Times.Once) confirms the call happened."
+        },
+        {
+          "text": "I can test that [ApiController] validation rejects bad input without the action running",
+          "hint": "Pass an invalid DTO and assert the result is BadRequest. Verify the service was never called."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "testing-fundamentals",
+        "integration-testing"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Unit Testing Controllers in ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/testing"
+        },
+        {
+          "type": "article",
+          "title": "Moq Quickstart",
+          "url": "https://github.com/moq/moq4/wiki/Quickstart"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "testing-fundamentals",
+    "integration-testing"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Unit Testing Controllers in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/testing"
+    },
+    {
+      "type": "article",
+      "title": "Moq Quickstart",
+      "url": "https://github.com/moq/moq4/wiki/Quickstart"
+    }
+  ]
 }

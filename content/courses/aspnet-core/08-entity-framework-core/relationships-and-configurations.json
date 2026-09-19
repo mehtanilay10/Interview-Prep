@@ -4,26 +4,260 @@
   "moduleSlug": "08-entity-framework-core",
   "courseSlug": "aspnet-core",
   "title": "Relationships and Configurations",
-  "description": "Learn relationships and configurations in ASP.NET Core.",
+  "description": "Configure entity relationships in EF Core including one-to-many, many-to-many, and one-to-one using both data annotations and the fluent API.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 11,
+  "estimatedMinutes": 30,
   "tags": [
     "relationships",
-    "fluent-api"
+    "fluent-api",
+    "data-annotations"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Understanding Entity Relationships"
+    },
+    {
       "type": "paragraph",
-      "text": "Configure one-to-many, many-to-many, and one-to-one relationships."
+      "text": "Relational databases organize data across multiple tables and connect them using foreign keys. In EF Core, these connections are represented as navigation properties on your entity classes. A Product might have a Category navigation property, and a Category might have a Products collection navigation property."
+    },
+    {
+      "type": "paragraph",
+      "text": "EF Core supports three relationship types: one-to-many (one category has many products), many-to-many (many students enroll in many courses), and one-to-one (a user has one profile). Each relationship type requires a different configuration approach."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Navigation properties",
+      "text": "Navigation properties are the C# properties that connect related entities. Reference navigation properties hold a single related entity. Collection navigation properties hold a collection of related entities. EF Core uses these properties to generate foreign keys and JOINs in SQL."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "One-to-Many Relationships"
+    },
+    {
+      "type": "paragraph",
+      "text": "One-to-many is the most common relationship type. One entity is related to many instances of another entity. For example, one Category has many Products. This relationship is configured by placing a reference navigation property on the 'many' side and a collection navigation property on the 'one' side."
     },
     {
       "type": "example",
+      "title": "One-to-many entity classes",
+      "content": "A Category entity with a collection of Products, and a Product entity with a single Category reference.",
       "language": "csharp",
-      "code": "modelBuilder.Entity<Order>()\n    .HasOne(o => o.Customer)\n    .WithMany(c => c.Orders)\n    .HasForeignKey(o => o.CustomerId);"
+      "code": "public class Category\n{\n    public int Id { get; set; }\n    public string Name { get; set; } = string.Empty;\n\n    // Collection navigation property\n    public List<Product> Products { get; set; } = new();\n}\n\npublic class Product\n{\n    public int Id { get; set; }\n    public string Name { get; set; } = string.Empty;\n    public decimal Price { get; set; }\n\n    // Reference navigation property\n    public int CategoryId { get; set; }\n    public Category Category { get; set; } = null!;\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "By convention, EF Core detects the one-to-many relationship because Product has a Category reference and a CategoryId foreign key property. EF Core automatically creates a foreign key column named CategoryId in the Products table. You rarely need explicit configuration for this common pattern."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Configuring Relationships with Fluent API"
+    },
+    {
+      "type": "paragraph",
+      "text": "The Fluent API provides the most powerful and flexible way to configure relationships. It is defined inside the OnModelCreating method of your DbContext using the ModelBuilder. Fluent API configuration overrides conventions and data annotations, giving you complete control over the database schema."
+    },
+    {
+      "type": "example",
+      "title": "Fluent API one-to-many configuration",
+      "content": "Explicitly configuring a one-to-many relationship between Category and Product.",
+      "language": "csharp",
+      "code": "protected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    modelBuilder.Entity<Product>()\n        .HasOne(p => p.Category)\n        .WithMany(c => c.Products)\n        .HasForeignKey(p => p.CategoryId)\n        .OnDelete(DeleteBehavior.Cascade);\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "This configuration explicitly states that Product has one Category, Category has many Products, the foreign key is CategoryId on the Product entity, and deleting a Category should cascade to its Products. The Fluent API reads like a sentence, making it relatively easy to understand the relationship structure."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Delete behavior options",
+      "items": [
+        "Cascade — Deleting the principal also deletes the dependents",
+        "Restrict — Prevents deletion of the principal if dependents exist",
+        "SetNull — Sets the foreign key to null when the principal is deleted",
+        "ClientSetNull — Similar to SetNull but enforced by the client rather than the database"
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Warning: Cascade delete can be dangerous",
+      "text": "Cascade delete will permanently delete all child records when the parent is deleted. In production, consider using Restrict or SetNull for critical data and implement explicit deletion logic in your application code."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Many-to-Many Relationships"
+    },
+    {
+      "type": "paragraph",
+      "text": "Many-to-many relationships connect two entities where each can have many of the other. A Student can enroll in many Courses, and a Course can have many Students. EF Core 5+ supports many-to-many without an explicit join entity class, creating the join table automatically."
+    },
+    {
+      "type": "example",
+      "title": "Many-to-many without explicit join entity",
+      "content": "EF Core automatically creates a StudentCourses join table.",
+      "language": "csharp",
+      "code": "public class Student\n{\n    public int Id { get; set; }\n    public string Name { get; set; } = string.Empty;\n\n    // Collection navigation to the other side\n    public List<Course> Courses { get; set; } = new();\n}\n\npublic class Course\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public int Credits { get; set; }\n\n    public List<Student> Students { get; set; } = new();\n}\n\n// Fluent API configuration (optional — often detected by convention)\nmodelBuilder.Entity<Student>()\n    .HasMany(s => s.Courses)\n    .WithMany(c => c.Students)\n    .UsingEntity<StudentCourse>(\n        j => j.HasOne(sc => sc.Course).WithMany().HasForeignKey(sc => sc.CourseId),\n        j => j.HasOne(sc => sc.Student).WithMany().HasForeignKey(sc => sc.StudentId),\n        j => j.HasKey(sc => new { sc.StudentId, sc.CourseId })\n    );\n\npublic class StudentCourse\n{\n    public int StudentId { get; set; }\n    public Student Student { get; set; } = null!;\n    public int CourseId { get; set; }\n    public Course Course { get; set; } = null!;\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "If you need to store additional data on the relationship itself — like an enrollment date or grade — you must use an explicit join entity class (StudentCourse in the example above). This is called a many-to-many with payload or a join entity."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "One-to-One Relationships"
+    },
+    {
+      "type": "paragraph",
+      "text": "One-to-one relationships are less common but important for scenarios like a User having a single Profile. In EF Core, one-to-one is configured using HasOne/WithOne. One side must be the principal and the other the dependent. The dependent holds the foreign key."
+    },
+    {
+      "type": "example",
+      "title": "One-to-one relationship between User and Profile",
+      "content": "A User entity with one Profile entity, configured with Fluent API.",
+      "language": "csharp",
+      "code": "public class User\n{\n    public int Id { get; set; }\n    public string Email { get; set; } = string.Empty;\n\n    // Reference navigation to the dependent\n    public Profile Profile { get; set; } = null!;\n}\n\npublic class Profile\n{\n    public int Id { get; set; }\n    public string Bio { get; set; } = string.Empty;\n    public string AvatarUrl { get; set; } = string.Empty;\n\n    // Foreign key back to the principal\n    public int UserId { get; set; }\n    public User User { get; set; } = null!;\n}\n\nmodelBuilder.Entity<User>()\n    .HasOne(u => u.Profile)\n    .WithOne(p => p.User)\n    .HasForeignKey<Profile>(p => p.UserId);"
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Note: Which entity is the principal?",
+      "text": "The principal entity is the one that exists independently. The dependent entity holds the foreign key. In the User/Profile example, User is the principal and Profile is the dependent because Profile cannot exist without a User."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Data Annotations vs Fluent API"
+    },
+    {
+      "type": "paragraph",
+      "text": "EF Core supports two ways to configure your entity model: data annotations (attributes on entity classes) and the Fluent API (code in OnModelCreating). Data annotations are simpler but limited. The Fluent API is more powerful and can configure everything data annotations can, plus more."
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to use each approach",
+      "items": [
+        "Use data annotations for simple constraints like [Required], [MaxLength], and [Key]",
+        "Use Fluent API for relationship configuration, composite keys, and table/column naming",
+        "Fluent API overrides data annotations when both are present",
+        "Keep all configuration in one place by using Fluent API consistently for complex models"
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Data annotations on entity classes",
+      "content": "Using attributes for simple configuration directly on the entity class.",
+      "language": "csharp",
+      "code": "using System.ComponentModel.DataAnnotations;\nusing System.ComponentModel.DataAnnotations.Schema;\n\npublic class Product\n{\n    [Key]\n    public int Id { get; set; }\n\n    [Required]\n    [MaxLength(200)]\n    public string Name { get; set; } = string.Empty;\n\n    [Column(TypeName = \"decimal(10,2)\")]\n    public decimal Price { get; set; }\n\n    [ForeignKey(\"Category\")]\n    public int CategoryId { get; set; }\n\n    public Category Category { get; set; } = null!;\n}"
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Navigation property",
+          "definition": "A property on an entity that references a related entity, either as a single reference or a collection."
+        },
+        {
+          "term": "Foreign key",
+          "definition": "A column in a table that references the primary key of another table, establishing a relationship."
+        },
+        {
+          "term": "Fluent API",
+          "definition": "A code-based configuration system in EF Core that provides the most flexibility for defining entity mappings and relationships."
+        },
+        {
+          "term": "Principal and dependent",
+          "definition": "In a relationship, the principal entity is the one that exists independently; the dependent holds the foreign key."
+        },
+        {
+          "term": "Join entity",
+          "definition": "An entity that represents the link table in a many-to-many relationship, optionally carrying additional payload data."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Configure One-to-Many and Many-to-Many Relationships",
+      "description": "Add relationship configuration to an existing EF Core model using both navigation properties and the Fluent API.",
+      "steps": [
+        "Create a new project with EF Core and SQLite: 'dotnet new console -n RelationshipDemo'",
+        "Define a Student entity with Id, Name, and Email properties",
+        "Define a Course entity with Id, Title, and Credits properties",
+        "Add navigation properties for a many-to-many relationship between Student and Course",
+        "Create an Enrollment join entity with StudentId, CourseId, and EnrollmentDate properties",
+        "Configure all relationships in OnModelCreating using the Fluent API, including the join entity",
+        "In Program.cs, create the database, add 3 students and 2 courses, and create enrollments",
+        "Query a student with their courses and verify the related data is loaded"
+      ],
+      "expectedOutcome": "The database contains Students, Courses, and Enrollments tables with correct foreign keys. Querying a student with Include loads their courses in a single query, and the enrollment join data is accessible."
+    },
+    {
+      "type": "checklist",
+      "title": "Relationships and Configurations Checklist",
+      "items": [
+        {
+          "text": "I can explain the difference between reference and collection navigation properties",
+          "hint": "Reference points to one entity; collection points to many."
+        },
+        {
+          "text": "I can configure a one-to-many relationship using Fluent API",
+          "hint": "Use HasOne/WithMany/HasForeignKey."
+        },
+        {
+          "text": "I understand the principal and dependent roles in a relationship",
+          "hint": "The principal exists independently; the dependent holds the foreign key."
+        },
+        {
+          "text": "I can set up a many-to-many relationship with a join entity",
+          "hint": "Use HasMany/WithMany and optionally UsingEntity for a payload join entity."
+        },
+        {
+          "text": "I can configure a one-to-one relationship",
+          "hint": "Use HasOne/WithOne and HasForeignKey on the dependent side."
+        },
+        {
+          "text": "I know when to use data annotations vs Fluent API",
+          "hint": "Data annotations for simple constraints; Fluent API for relationships and advanced configuration."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Relationships and Configurations Summary",
+      "points": [
+        "Navigation properties connect related entities in C# code and drive database foreign keys",
+        "One-to-many is the most common relationship, configured with HasOne/WithMany",
+        "Many-to-many uses a join table; add a join entity class when you need extra data on the relationship",
+        "One-to-one uses HasOne/WithOne, with one entity as the principal and one as the dependent",
+        "The Fluent API provides complete control over relationship configuration and overrides conventions",
+        "Data annotations are suitable for simple constraints but limited for complex relationship scenarios"
+      ],
+      "takeaway": "Entity relationships are the backbone of any relational data model. Mastering the Fluent API for configuring one-to-many, many-to-many, and one-to-one relationships ensures your database schema matches your domain model accurately."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "EF Core Relationships",
+      "url": "https://learn.microsoft.com/en-us/ef/core/modeling/relationships",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete reference for configuring one-to-many, many-to-many, and one-to-one relationships."
+    },
+    {
+      "title": "Fluent API Configuration",
+      "url": "https://learn.microsoft.com/en-us/ef/core/modeling/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to Fluent API configuration for all aspects of the EF Core data model."
+    }
+  ]
 }

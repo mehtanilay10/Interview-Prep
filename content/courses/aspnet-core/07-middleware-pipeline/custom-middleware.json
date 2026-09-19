@@ -4,26 +4,227 @@
   "moduleSlug": "07-middleware-pipeline",
   "courseSlug": "aspnet-core",
   "title": "Custom Middleware",
-  "description": "Learn custom middleware in ASP.NET Core.",
+  "description": "Learn to write reusable custom middleware classes in ASP.NET Core, configure them with dependency injection, and understand the difference between inline and class-based middleware.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "custom",
-    "middleware"
+    "middleware",
+    "dependency-injection"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Write Custom Middleware?"
+    },
+    {
       "type": "paragraph",
-      "text": "Write reusable middleware classes or inline lambdas."
+      "text": "While built-in middleware handles many common scenarios, you will often need custom logic that is specific to your application. Custom middleware gives you a clean, reusable way to implement cross-cutting concerns like request logging, response compression, tenant resolution, or feature flags."
+    },
+    {
+      "type": "paragraph",
+      "text": "Custom middleware can be written as inline lambdas for simple one-off logic, or as dedicated classes for reusable, testable components. Class-based middleware supports dependency injection, making it the preferred approach for anything beyond trivial logic."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Inline vs Class-Based Middleware"
+    },
+    {
+      "type": "paragraph",
+      "text": "Inline middleware uses a lambda expression passed to app.Use(). It is quick to write and great for small pieces of logic in a single application. However, inline middleware has limitations: it cannot use dependency injection for its dependencies, and it is harder to test in isolation."
+    },
+    {
+      "type": "bullet-list",
+      "title": "When to use each approach",
+      "items": [
+        "Use inline middleware (app.Use) for quick, simple logic that does not require injected services",
+        "Use class-based middleware when you need constructor-injected dependencies like ILogger<T> or IConfiguration",
+        "Use class-based middleware when the logic is complex enough to deserve its own test class",
+        "Use class-based middleware when you want to share the same middleware across multiple projects"
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Writing a Class-Based Middleware"
+    },
+    {
+      "type": "paragraph",
+      "text": "A class-based middleware must accept a RequestDelegate in its constructor and expose a method called InvokeAsync or Invoke that takes an HttpContext and returns a Task. Dependencies are injected through the constructor."
     },
     {
       "type": "example",
+      "title": "Request logging middleware class",
+      "content": "A reusable middleware class that logs request details using ILogger, injected via the constructor.",
       "language": "csharp",
-      "code": "public class RequestLoggingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger _logger;\n    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)\n    {\n        _next = next; _logger = logger;\n    }\n    public async Task InvokeAsync(HttpContext context)\n    {\n        _logger.LogInformation(\"Request: {Path}\", context.Request.Path);\n        await _next(context);\n    }\n}"
+      "code": "public class RequestLoggingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger<RequestLoggingMiddleware> _logger;\n\n    public RequestLoggingMiddleware(\n        RequestDelegate next,\n        ILogger<RequestLoggingMiddleware> logger)\n    {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        _logger.LogInformation(\n            \"Request: {Method} {Path}\",\n            context.Request.Method,\n            context.Request.Path);\n\n        await _next(context);\n\n        _logger.LogInformation(\n            \"Response: {StatusCode} for {Path}\",\n            context.Response.StatusCode,\n            context.Request.Path);\n    }\n}"
+    },
+    {
+      "type": "paragraph",
+      "text": "The constructor receives both the next delegate (injected by the framework) and any other services you need. The InvokeAsync method does the actual work: logging the request before next(), and logging the response status after next() returns."
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Important: Middleware constructor lifetime",
+      "text": "Middleware classes are created once at application startup, not per-request. Any services you inject into the constructor must be safe to share across requests. Do not inject scoped services like DbContext into the middleware constructor — only into InvokeAsync if needed."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Registering Custom Middleware"
+    },
+    {
+      "type": "paragraph",
+      "text": "Once you have a middleware class, you register it in Program.cs using the UseMiddleware<T>() extension method. The framework resolves dependencies from the service provider and passes them to your constructor."
+    },
+    {
+      "type": "example",
+      "title": "Registering custom middleware in Program.cs",
+      "content": "Register the RequestLoggingMiddleware class in the pipeline.",
+      "language": "csharp",
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddTransient<RequestLoggingMiddleware>();\n\nvar app = builder.Build();\n\napp.UseMiddleware<RequestLoggingMiddleware>();\n\napp.MapGet(\"/\", () => \"Hello World!\");\napp.Run();"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you call UseMiddleware<RequestLoggingMiddleware>(), ASP.NET Core automatically resolves RequestDelegate for the constructor. You do not need to manually register RequestDelegate in the service collection."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Info: Middleware activation",
+      "text": "ASP.NET Core uses a special middleware activator that can resolve RequestDelegate and ILogger<T> without explicit registration. Other dependencies like IConfiguration or custom services still need to be registered in the service collection."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Adding Configuration Options"
+    },
+    {
+      "type": "paragraph",
+      "text": "For middleware that needs configuration, you can use the options pattern. Create a class to hold settings, register it with Configure<TOptions>, and inject IOptions<TOptions> into your middleware."
+    },
+    {
+      "type": "example",
+      "title": "Middleware with configuration options",
+      "content": "A rate-limiting middleware that reads allowed requests from configuration.",
+      "language": "csharp",
+      "code": "public class RateLimitOptions\n{\n    public int MaxRequestsPerMinute { get; set; } = 60;\n    public string BlockedPathPrefix { get; set; } = \"/admin\";\n}\n\npublic class RateLimitMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly RateLimitOptions _options;\n    private readonly ILogger<RateLimitMiddleware> _logger;\n    private static readonly Dictionary<string, int> _requestCounts = new();\n\n    public RateLimitMiddleware(\n        RequestDelegate next,\n        IOptions<RateLimitOptions> options,\n        ILogger<RateLimitMiddleware> logger)\n    {\n        _next = next;\n        _options = options.Value;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var key = context.Connection.RemoteIpAddress?.ToString() ?? \"unknown\";\n        var count = _requestCounts.GetValueOrDefault(key);\n\n        if (count >= _options.MaxRequestsPerMinute)\n        {\n            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;\n            await context.Response.WriteAsync(\"Rate limit exceeded.\");\n            return;\n        }\n\n        _requestCounts[key] = count + 1;\n        await _next(context);\n    }\n}\n\n// Registration in Program.cs\nbuilder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection(\"RateLimit\"));\napp.UseMiddleware<RateLimitMiddleware>();"
+    },
+    {
+      "type": "paragraph",
+      "text": "The options pattern decouples your middleware from configuration sources. You can load settings from appsettings.json, environment variables, or any other configuration provider, and the middleware receives them through IOptions<RateLimitOptions>."
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "RequestDelegate",
+          "definition": "A delegate that represents the next middleware in the pipeline. Every middleware receives it as a constructor parameter."
+        },
+        {
+          "term": "InvokeAsync",
+          "definition": "The method on a class-based middleware that processes the request and optionally calls the next delegate."
+        },
+        {
+          "term": "UseMiddleware<T>",
+          "definition": "The extension method that registers a class-based middleware in the pipeline."
+        },
+        {
+          "term": "Options pattern",
+          "definition": "A pattern for binding configuration values to strongly-typed classes, injected via IOptions<T>."
+        },
+        {
+          "term": "Short-circuiting",
+          "definition": "When middleware returns a response without calling next(), stopping the remaining pipeline from executing."
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Middleware that adds a response header",
+      "content": "A simple middleware that injects a custom header into every outgoing response.",
+      "language": "csharp",
+      "code": "public class ResponseHeaderMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger<ResponseHeaderMiddleware> _logger;\n\n    public ResponseHeaderMiddleware(RequestDelegate next, ILogger<ResponseHeaderMiddleware> logger)\n    {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        context.Response.OnStarting(() =>\n        {\n            context.Response.Headers[\"X-App-Version\"] = \"1.0.0\";\n            context.Response.Headers[\"X-Request-Id\"] = Guid.NewGuid().ToString();\n            return Task.CompletedTask;\n        });\n\n        await _next(context);\n    }\n}"
+    },
+    {
+      "type": "exercise",
+      "title": "Create a Correlation ID Middleware",
+      "description": "Build a class-based middleware that generates a unique correlation ID for each request, adds it to the response headers, and logs it alongside the request path.",
+      "steps": [
+        "Create a new ASP.NET Core MVC project named 'CorrelationDemo'",
+        "Add a new class 'CorrelationIdMiddleware' with a constructor accepting RequestDelegate and ILogger<CorrelationIdMiddleware>",
+        "In InvokeAsync, check if the incoming request has an 'X-Correlation-ID' header; if not, generate a new GUID",
+        "Add the correlation ID to context.Response.Headers using OnStarting so it is set before the response is sent",
+        "Log the correlation ID and request path using _logger.LogInformation",
+        "Register the middleware in Program.cs using UseMiddleware<CorrelationIdMiddleware>()",
+        "Run the app and use curl to verify the X-Correlation-ID header appears in every response"
+      ],
+      "expectedOutcome": "Every HTTP response includes an X-Correlation-ID header with a GUID value. The terminal logs show correlation IDs paired with request paths, confirming the middleware is executing correctly."
+    },
+    {
+      "type": "checklist",
+      "title": "Custom Middleware Checklist",
+      "items": [
+        {
+          "text": "I can explain the difference between inline and class-based middleware",
+          "hint": "Inline uses a lambda; class-based is a reusable class with InvokeAsync."
+        },
+        {
+          "text": "I can write a class-based middleware with constructor-injected dependencies",
+          "hint": "The constructor takes RequestDelegate plus any services like ILogger<T>."
+        },
+        {
+          "text": "I know why I should not inject scoped services into the middleware constructor",
+          "hint": "Middleware is a singleton; scoped services are per-request and should be resolved inside InvokeAsync."
+        },
+        {
+          "text": "I can register custom middleware in Program.cs",
+          "hint": "Use app.UseMiddleware<YourMiddlewareClass>() after any required built-in middleware."
+        },
+        {
+          "text": "I understand how the options pattern works with middleware",
+          "hint": "Bind configuration to a class, inject IOptions<YourOptions> into the middleware constructor."
+        },
+        {
+          "text": "I can use context.Response.OnStarting to modify headers before the response is sent",
+          "hint": "OnStarting registers a callback that runs just before the response headers are flushed."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Custom Middleware Summary",
+      "points": [
+        "Custom middleware lets you add application-specific logic to the request pipeline",
+        "Inline middleware is simple but limited — use it for small, self-contained logic",
+        "Class-based middleware supports constructor injection, making it testable and reusable",
+        "Middleware classes are singletons; only inject singleton or transient services in the constructor",
+        "Use the options pattern with IOptions<T> to make middleware configurable",
+        "Response.OnStarting lets you modify headers at the last possible moment before the response is sent"
+      ],
+      "takeaway": "Custom middleware is the primary mechanism for adding cross-cutting concerns to your ASP.NET Core application. Class-based middleware with dependency injection is the professional approach for anything beyond trivial inline logic."
     }
   ],
   "relatedLessons": [],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Write Custom ASP.NET Core Middleware",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/write",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official guide to writing class-based middleware with dependency injection and options."
+    },
+    {
+      "title": "Middleware Ordering in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/order",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Detailed explanation of middleware ordering and how it affects request processing."
+    }
+  ]
 }

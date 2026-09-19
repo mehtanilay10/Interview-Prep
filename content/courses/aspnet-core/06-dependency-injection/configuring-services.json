@@ -4,26 +4,176 @@
   "moduleSlug": "06-dependency-injection",
   "courseSlug": "aspnet-core",
   "title": "Configuring Services",
-  "description": "Learn configuring services in ASP.NET Core.",
+  "description": "Register services in Program.cs and use the options pattern for clean, centralized configuration.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "services",
-    "configuration"
+    "configuration",
+    "options"
   ],
   "blocks": [
     {
+      "type": "heading",
+      "level": 2,
+      "text": "The Composition Root"
+    },
+    {
       "type": "paragraph",
-      "text": "Register services in Program.cs using IServiceCollection and options pattern."
+      "text": "The composition root is the single place in your application where you wire up services for the DI container. In ASP.NET Core, this is Program.cs. Every service the framework needs to inject must be registered here before the app starts handling requests."
+    },
+    {
+      "type": "paragraph",
+      "text": "Keeping registration in one file makes it easy to see the full picture of your application's dependencies. You can scan Program.cs and understand what services are available, how they are configured, and how long they live."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Register Once, Use Everywhere",
+      "text": "Services registered in Program.cs are available throughout the application. Controllers, view components, middleware, and even other services can receive them through injection."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Registering Services"
+    },
+    {
+      "type": "paragraph",
+      "text": "The IServiceCollection provides extension methods for the three lifetimes: AddTransient, AddScoped, and AddSingleton. Each method accepts a service type and an implementation type. You can also register an existing instance or a factory method for more complex scenarios."
     },
     {
       "type": "example",
+      "title": "Service Registration in Program.cs",
+      "content": "Register repositories, services, and their lifetimes.",
       "language": "csharp",
-      "code": "builder.Services.Configure<EmailSettings>(\n    builder.Configuration.GetSection(\"EmailSettings\"));\n\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"Default\")));"
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Add framework services\nbuilder.Services.AddControllersWithViews();\n\n// Register DbContext (Scoped by default)\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(builder.Configuration.GetConnectionString(\"Default\")));\n\n// Register repositories\nbuilder.Services.AddScoped<IProductRepository, EfProductRepository>();\nbuilder.Services.AddScoped<IOrderRepository, EfOrderRepository>();\n\n// Register application services\nbuilder.Services.AddTransient<IEmailSender, SmtpEmailSender>();\nbuilder.Services.AddSingleton<ICacheService, InMemoryCacheService>();\n\n// Register a singleton from an existing instance\nbuilder.Services.AddSingleton<IClock>(new SystemClock());\n\nvar app = builder.Build();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "The Options Pattern"
+    },
+    {
+      "type": "paragraph",
+      "text": "Hard-coding configuration values inside services is a bad practice. The options pattern solves this by binding configuration sections to strongly typed classes. You register the options in Program.cs, and the framework injects an IOptions<T> or IOptionsMonitor<T> wherever the settings are needed."
+    },
+    {
+      "type": "paragraph",
+      "text": "IOptions<T> provides a snapshot of the settings at the time the service is built. IOptionsMonitor<T> provides a live view that updates when configuration changes, which is useful for reloading settings without restarting the application."
+    },
+    {
+      "type": "example",
+      "title": "Options Pattern Example",
+      "content": "Bind configuration to a strongly typed class and inject it.",
+      "language": "csharp",
+      "code": "// 1. Define the settings class\npublic class EmailSettings\n{\n    public string SmtpHost { get; set; }\n    public int SmtpPort { get; set; }\n    public string FromAddress { get; set; }\n    public bool UseTls { get; set; }\n}\n\n// 2. Register in Program.cs\nbuilder.Services.Configure<EmailSettings>(\n    builder.Configuration.GetSection(\"EmailSettings\"));\n\n// 3. Consume in a service\npublic class SmtpEmailSender : IEmailSender\n{\n    private readonly EmailSettings _settings;\n\n    public SmtpEmailSender(IOptions<EmailSettings> options)\n    {\n        _settings = options.Value;\n    }\n\n    public async Task SendAsync(string to, string subject, string body)\n    {\n        using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort);\n        // ... send email using _settings\n    }\n}\n\n// appsettings.json\n// {\n//   \"EmailSettings\": {\n//     \"SmtpHost\": \"smtp.example.com\",\n//     \"SmtpPort\": 587,\n//     \"FromAddress\": \"noreply@example.com\",\n//     \"UseTls\": true\n//   }\n// }"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Validating Options"
+    },
+    {
+      "type": "paragraph",
+      "text": "You can add validation rules to options classes using data annotations. When the application starts, the framework validates the options against those rules and throws an exception if required values are missing or invalid. This catches misconfiguration early."
+    },
+    {
+      "type": "example",
+      "title": "Validating Options at Startup",
+      "content": "Add data annotations to options classes.",
+      "language": "csharp",
+      "code": "public class PaymentSettings\n{\n    [Required]\n    public string ApiKey { get; set; }\n\n    [Range(1, 100)]\n    public int TimeoutSeconds { get; set; } = 30;\n}\n\n// Register with validation\nbuilder.Services.AddOptions<PaymentSettings>()\n    .Bind(builder.Configuration.GetSection(\"PaymentSettings\"))\n    .ValidateDataAnnotations()\n    .ValidateOnStart();"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Service Registration Methods",
+      "items": [
+        "AddScoped<TService, TImpl>() - Registers a service with scoped lifetime.",
+        "AddTransient<TService, TImpl>() - Registers a service with transient lifetime.",
+        "AddSingleton<TService, TImpl>() - Registers a service with singleton lifetime.",
+        "AddDbContext<T>() - Registers an Entity Framework Core context as scoped.",
+        "Configure<T>(IConfiguration) - Binds a configuration section to an options class."
+      ]
+    },
+    {
+      "type": "key-terms",
+      "terms": [
+        {
+          "term": "Composition Root",
+          "definition": "The single location in an application where services are registered and the DI container is configured."
+        },
+        {
+          "term": "Options Pattern",
+          "definition": "A pattern that binds configuration values to strongly typed classes and injects them via IOptions<T>."
+        },
+        {
+          "term": "IOptionsMonitor<T>",
+          "definition": "A service that provides access to options with the ability to react to changes at runtime."
+        },
+        {
+          "term": "IConfiguration",
+          "definition": "The ASP.NET Core abstraction for reading configuration from appsettings.json, environment variables, and other sources."
+        },
+        {
+          "term": "ValidateOnStart",
+          "definition": "An option that forces the framework to validate options classes when the application starts."
+        }
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Configure Application Settings",
+      "description": "Create a settings class and use the options pattern to inject it into a service.",
+      "steps": [
+        "Create an SmsSettings class with properties for AccountSid, AuthToken, and FromNumber.",
+        "Add the settings section to appsettings.json.",
+        "Register the settings in Program.cs using Configure<SmsSettings>.",
+        "Create an SmsService that injects IOptions<SmsSettings> and reads the values.",
+        "Add data annotations to require AccountSid and validate that Port is between 1 and 65535.",
+        "Run the app and intentionally break a setting to confirm ValidateOnStart catches the error."
+      ],
+      "expectedOutcome": "Your service will receive configuration through strongly typed options, and invalid configuration will fail fast at startup."
+    },
+    {
+      "type": "checklist",
+      "title": "Checklist: Configuring Services",
+      "items": [
+        {
+          "text": "I know where the composition root is in an ASP.NET Core app.",
+          "hint": "Program.cs is where services are registered."
+        },
+        {
+          "text": "I can register a service with a specific lifetime.",
+          "hint": "Use AddScoped, AddTransient, or AddSingleton."
+        },
+        {
+          "text": "I can use the options pattern to inject configuration.",
+          "hint": "Bind a configuration section to a class and inject IOptions<T>."
+        },
+        {
+          "text": "I understand the difference between IOptions<T> and IOptionsMonitor<T>.",
+          "hint": "Snapshot versus live reload."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Summary",
+      "points": [
+        "Program.cs is the composition root where all services are registered.",
+        "Use AddScoped, AddTransient, and AddSingleton to set service lifetimes.",
+        "The options pattern binds configuration to strongly typed classes.",
+        "IOptions<T> gives a snapshot; IOptionsMonitor<T> supports live reload.",
+        "ValidateOnStart catches misconfiguration before the app handles requests."
+      ],
+      "takeaway": "Good service registration makes your application's dependency graph visible and your configuration type-safe. A well-structured Program.cs is the foundation of a healthy ASP.NET Core app."
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "service-lifetimes",
+    "advanced-di-patterns"
+  ],
   "technology": null,
   "furtherReading": []
 }

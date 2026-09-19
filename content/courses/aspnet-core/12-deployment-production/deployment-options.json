@@ -4,26 +4,253 @@
   "moduleSlug": "12-deployment-production",
   "courseSlug": "aspnet-core",
   "title": "Deployment Options",
-  "description": "Learn deployment options in ASP.NET Core.",
+  "description": "Explore the main deployment options for ASP.NET Core applications. Compare self-hosting with Kestrel, IIS on Windows, Nginx reverse proxy on Linux, and cloud platforms like Azure App Service. Learn the publish command and how to choose the right deployment target.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "deployment",
-    "hosting"
+    "hosting",
+    "kestrel",
+    "iis"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Deploy to IIS, Nginx, Docker, or cloud platforms like Azure and AWS."
+      "text": "Deployment is the process of moving your application from a development machine to a production environment where real users can access it. ASP.NET Core is cross-platform and runs on Windows, Linux, and macOS, giving you many hosting options. The right choice depends on your team's expertise, your budget, your scaling requirements, and your existing infrastructure."
+    },
+    {
+      "type": "paragraph",
+      "text": "Before deployment, you must publish your application. Publishing compiles your code, resolves dependencies, and produces a self-contained folder or single-file executable that can run on the target machine without the .NET SDK installed."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Publishing Your Application"
+    },
+    {
+      "type": "paragraph",
+      "text": "The dotnet publish command is the standard way to prepare an ASP.NET Core application for deployment. It produces a deployable output in a specified folder. You can publish as a framework-dependent deployment (smaller, requires .NET runtime on the server) or a self-contained deployment (larger, includes the runtime, runs anywhere)."
     },
     {
       "type": "example",
+      "title": "Publishing an ASP.NET Core Application",
+      "content": "The dotnet publish command with common flags for production-ready output.",
+      "language": "bash",
+      "code": "# Framework-dependent deployment (smaller output, needs .NET runtime on server)\ndotnet publish MyApp.csproj \\\n  --configuration Release \\\n  --output ./publish \\\n  --no-restore\n\n# Self-contained deployment for Linux x64 (larger output, no runtime needed)\ndotnet publish MyApp.csproj \\\n  --configuration Release \\\n  --output ./publish \\\n  --self-contained true \\\n  --runtime linux-x64 \\\n  -p:PublishSingleFile=true \\\n  -p:IncludeNativeLibrariesForSelfExtract=true"
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Framework-Dependent vs Self-Contained",
+      "text": "Framework-dependent deployments are smaller and let you update the .NET runtime independently. Self-contained deployments include the runtime, are larger, and work even if the target machine has no .NET installed. Choose framework-dependent for cloud VMs where you control the runtime, and self-contained for environments where you cannot guarantee runtime availability."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Kestrel: The Built-In Web Server"
+    },
+    {
+      "type": "paragraph",
+      "text": "Kestrel is the cross-platform web server included with ASP.NET Core. It is fast, lightweight, and designed to handle production traffic. In many deployment scenarios — especially Linux containers — Kestrel is the only web server you need. It can serve directly on ports 80 and 443, though in production it is common to place a reverse proxy in front of it."
+    },
+    {
+      "type": "paragraph",
+      "text": "Kestrel has configurable limits for request body size, connection limits, and request timeouts. These limits protect your application from resource exhaustion attacks. In Program.cs, you can configure Kestrel directly using the WebHost or Generic Host configuration APIs."
+    },
+    {
+      "type": "example",
+      "title": "Kestrel Configuration in Program.cs",
+      "content": "Configuring Kestrel limits and HTTPS settings in the application builder.",
       "language": "csharp",
-      "code": "dotnet publish -c Release -o ./publish\n# Deploy ./publish folder to hosting service"
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.WebHost.ConfigureKestrel(options =>\n{\n    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10MB\n    options.Limits.MaxConcurrentConnections = 100;\n    options.Limits.MaxConcurrentUpgradedConnections = 100;\n    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);\n\n    // HTTPS configuration\n    options.ListenLocalhost(5001, listenOptions =>\n    {\n        listenOptions.UseHttps();\n    });\n});\n\nbuilder.Services.AddControllers();\nvar app = builder.Build();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "IIS on Windows"
+    },
+    {
+      "type": "paragraph",
+      "text": "Internet Information Services (IIS) is the traditional Windows web server. ASP.NET Core runs behind IIS using the ASP.NET Core Hosting Bundle, which installs the .NET runtime and the ANCM (ASP.NET Core Module) — a native IIS module that forwards requests to Kestrel. IIS handles process management, Windows authentication, and SSL termination."
+    },
+    {
+      "type": "bullet-list",
+      "title": "IIS Deployment Considerations",
+      "items": [
+        {
+          "text": "Install the ASP.NET Core Hosting Bundle on the target server before deploying"
+        },
+        {
+          "text": "Publish your app to a folder and configure the IIS website to point at it"
+        },
+        {
+          "text": "IIS manages the Kestrel process and restarts it if it crashes (OutOfProcess hosting)"
+        },
+        {
+          "text": "Web.config is generated during publish and tells ANCM how to start your application"
+        },
+        {
+          "text": "Best for organizations with existing Windows infrastructure and IIS expertise"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Nginx as a Reverse Proxy on Linux"
+    },
+    {
+      "type": "paragraph",
+      "text": "On Linux, Nginx is the most common reverse proxy for ASP.NET Core. Nginx listens on ports 80 and 443, handles SSL termination, and forwards requests to Kestrel running on a local port like 5000. This architecture is standard for Linux deployments and gives you battle-tested TLS configuration, static file serving, and load balancing."
+    },
+    {
+      "type": "example",
+      "title": "Nginx Configuration for ASP.NET Core",
+      "content": "A minimal Nginx server block acting as a reverse proxy to a Kestrel process on localhost:5000.",
+      "language": "nginx",
+      "code": "server {\n    listen 80;\n    listen [::]:80;\n    server_name myapp.example.com;\n\n    # Redirect HTTP to HTTPS\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    listen [::]:443 ssl http2;\n    server_name myapp.example.com;\n\n    ssl_certificate     /etc/letsencrypt/live/myapp/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/myapp/privkey.pem;\n\n    # Proxy all requests to Kestrel\n    location / {\n        proxy_pass         http://127.0.0.1:5000;\n        proxy_http_version 1.1;\n        proxy_set_header   Upgrade $http_upgrade;\n        proxy_set_header   Connection keep-alive;\n        proxy_set_header   Host $host;\n        proxy_cache_bypass $http_upgrade;\n        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header   X-Forwarded-Proto $scheme;\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Cloud Platforms"
+    },
+    {
+      "type": "paragraph",
+      "text": "Azure App Service, AWS Elastic Beanstalk, and Google Cloud Run all provide managed hosting for ASP.NET Core. You push your code or Docker image, and the platform handles the infrastructure — scaling, SSL, load balancing, and deployment slots. This is the fastest path to production if you do not want to manage servers."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Cloud Deployment Options at a Glance",
+      "items": [
+        {
+          "text": "Azure App Service: Managed PaaS for .NET apps with built-in scaling, slots, and monitoring. Publish directly from Visual Studio or GitHub Actions."
+        },
+        {
+          "text": "AWS Elastic Beanstalk: Managed EC2-based hosting with auto-scaling groups. Upload a ZIP or Docker image and AWS manages the rest."
+        },
+        {
+          "text": "Azure Container Apps / AWS ECS / Google Cloud Run: Container-based serverless platforms. Ideal if your app is already containerized with Docker."
+        },
+        {
+          "text": "VPS (DigitalOcean, Linode, Vultr): Simple virtual machines where you manage the server yourself. Cheapest option but requires DevOps knowledge."
+        }
+      ]
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Deployment Options",
+      "terms": [
+        {
+          "term": "Kestrel",
+          "definition": "ASP.NET Core's built-in cross-platform web server, capable of serving production traffic directly."
+        },
+        {
+          "term": "dotnet publish",
+          "definition": "The CLI command that compiles and packages an application for deployment to a target environment."
+        },
+        {
+          "term": "Reverse Proxy",
+          "definition": "A server (Nginx, IIS, Apache) that sits in front of your application, handling SSL, routing, and load balancing."
+        },
+        {
+          "term": "Self-Contained Deployment",
+          "definition": "A publish output that includes the .NET runtime, enabling the app to run on machines without .NET installed."
+        },
+        {
+          "term": "Framework-Dependent Deployment",
+          "definition": "A publish output that relies on the .NET runtime being installed on the target machine, resulting in a smaller deployment."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "note",
+      "title": "Start with Kestrel + Nginx",
+      "text": "For most new projects, deploying Kestrel behind Nginx on a Linux VPS or cloud VM is the simplest, most cost-effective starting point. You can migrate to a managed platform like Azure App Service later without rewriting your application."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Deployment Options",
+      "points": [
+        "dotnet publish produces a deployable output — choose framework-dependent or self-contained based on your target",
+        "Kestrel is the built-in, cross-platform web server capable of production workloads",
+        "IIS on Windows uses ANCM to forward requests to Kestrel, managing process lifetime and SSL",
+        "Nginx on Linux acts as a reverse proxy, handling SSL termination and forwarding to Kestrel on a local port",
+        "Cloud platforms (Azure, AWS, GCP) handle infrastructure management at the cost of platform lock-in",
+        "Choose your deployment target based on existing infrastructure, team expertise, and scaling needs"
+      ],
+      "takeaway": "ASP.NET Core gives you flexibility in where and how you deploy. Start simple — Kestrel on Linux with Nginx is a solid production setup that costs little and scales well. Move to managed cloud platforms when you need features like auto-scaling, staging slots, or integrated monitoring."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Publish and Prepare for Deployment",
+      "description": "Publish an ASP.NET Core application and prepare it for deployment to a Linux server with Nginx.",
+      "steps": [
+        "Run dotnet publish with --configuration Release and --output ./publish to create a deployment folder",
+        "Examine the published output — identify the executable, web.config, and dll files",
+        "Run the published application directly with dotnet MyApp.dll and confirm it starts on port 5000",
+        "Write an Nginx server block configuration that listens on port 80 and proxies to localhost:5000",
+        "Test the Nginx configuration with nginx -t and explain what the proxy_set_header directives do",
+        "Describe the steps needed to deploy this to a real Linux server (SSH, file transfer, process manager)"
+      ],
+      "expectedOutcome": "A published application that runs locally, an Nginx configuration ready for production, and a clear understanding of the deployment workflow from development to a Linux server."
+    },
+    {
+      "type": "checklist",
+      "title": "Deployment Options Checklist",
+      "items": [
+        {
+          "text": "I can run dotnet publish and explain what it produces",
+          "hint": "dotnet publish compiles and packages your app. Use --self-contained for no-runtime targets."
+        },
+        {
+          "text": "I understand the difference between framework-dependent and self-contained deployments",
+          "hint": "Framework-dependent is smaller. Self-contained includes the runtime and works anywhere."
+        },
+        {
+          "text": "I can describe Kestrel's role and when it needs a reverse proxy",
+          "hint": "Kestrel serves HTTP. A reverse proxy (Nginx/IIS) in front handles SSL, static files, and load balancing."
+        },
+        {
+          "text": "I know how IIS works with ASP.NET Core through ANCM",
+          "hint": "ANCM forwards IIS requests to Kestrel. IIS handles process lifetime, auth, and SSL."
+        },
+        {
+          "text": "I can explain the trade-offs between a VPS and a managed cloud platform",
+          "hint": "VPS is cheaper but you manage everything. Cloud platforms handle ops but cost more and add lock-in."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "docker-containerization",
+        "cloud-deployment"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Host and Deploy ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "docker-containerization",
+    "cloud-deployment"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Host and Deploy ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy"
+    }
+  ]
 }

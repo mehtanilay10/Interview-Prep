@@ -4,26 +4,280 @@
   "moduleSlug": "11-testing-debugging",
   "courseSlug": "aspnet-core",
   "title": "Logging and Monitoring",
-  "description": "Learn logging and monitoring in ASP.NET Core.",
+  "description": "Use ASP.NET Core's built-in logging framework with structured messages, scopes, and log levels to diagnose production issues. Learn to configure logging providers, write meaningful log entries, and set up monitoring for health and performance.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 9,
+  "estimatedMinutes": 30,
   "tags": [
     "logging",
-    "monitoring"
+    "monitoring",
+    "diagnostics"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Use built-in logging with scopes and structured messages."
+      "text": "Logging is the practice of recording events and state information from your application as it runs. In production, where you cannot attach a debugger, logs are your primary window into what the application is doing. Well-structured logs let you reconstruct what happened before a crash, track performance trends, and identify errors before users report them."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core includes a built-in logging abstraction (ILogger) that supports multiple providers: console, debug, EventLog, EventSource, and third-party providers like Serilog and Seq. You inject ILogger into any service or controller and write messages at different severity levels — from Trace for deep diagnostics to Critical for application-breaking failures."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Log Levels and When to Use Them"
+    },
+    {
+      "type": "paragraph",
+      "text": "Log levels let you control the verbosity of your application's output. In development, you might log everything at the Debug level to see detailed execution traces. In production, you typically log at Information or higher to reduce noise and storage costs. Knowing which level to use for each message is a skill that comes with practice."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Log Levels and Their Purpose",
+      "items": [
+        {
+          "text": "Trace: The most verbose level, for detailed diagnostic information useful only during active debugging"
+        },
+        {
+          "text": "Debug: Detailed information for debugging, typically only enabled during development"
+        },
+        {
+          "text": "Information: General operational events marking normal application flow — the default production level"
+        },
+        {
+          "text": "Warning: Unexpected events that are not errors but may require attention — degraded performance, retry attempts"
+        },
+        {
+          "text": "Error: Failures that impact the current operation but do not stop the application — a failed API call, a validation error"
+        },
+        {
+          "text": "Critical: Application-breaking failures requiring immediate attention — out-of-memory, database connection loss"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Structured Logging"
+    },
+    {
+      "type": "paragraph",
+      "text": "Structured logging means embedding data as named properties rather than concatenating values into strings. Instead of logging 'Product 42 not found', you log 'Product {ProductId} not found' with ProductId as a separate property. Structured logs are searchable, filterable, and analyzable — string logs are not."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Why Structured Logging Matters",
+      "text": "With string logs, finding every error involving product ID 42 requires scanning every message. With structured logs, you can run a single query like 'where ProductId = 42 and Level >= Error'. The difference between hours and seconds when investigating production issues."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Injecting and Using ILogger"
+    },
+    {
+      "type": "paragraph",
+      "text": "ILogger is injected through constructor injection, just like any other service. The generic ILogger<T> variant automatically includes the class name in the log category, making it easy to filter logs by which component produced them. You call LogInformation, LogWarning, LogError, etc. with a message template and named arguments."
     },
     {
       "type": "example",
+      "title": "Using ILogger in a Service Class",
+      "content": "A complete service class demonstrating structured logging at different levels with scopes.",
       "language": "csharp",
-      "code": "public class ProductService(ILogger<ProductService> logger)\n{\n    public async Task<Product> GetAsync(int id)\n    {\n        using logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"ProductId\"] = id\n        })\n        {\n            logger.LogInformation(\"Fetching product {ProductId}\", id);\n            return await _repo.GetAsync(id);\n        }\n    }\n}"
+      "code": "using Microsoft.Extensions.Logging;\n\npublic class ProductService(\n    ILogger<ProductService> logger,\n    IProductRepository repository)\n{\n    public async Task<Product?> GetByIdAsync(int id)\n    {\n        using (logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"ProductId\"] = id,\n            [\"Operation\"] = \"GetById\"\n        }))\n        {\n            logger.LogInformation(\"Fetching product {ProductId}\", id);\n\n            try\n            {\n                var product = await repository.GetByIdAsync(id);\n\n                if (product is null)\n                {\n                    logger.LogWarning(\"Product {ProductId} not found in database\", id);\n                    return null;\n                }\n\n                logger.LogInformation(\"Product {ProductId} retrieved: {ProductName}\",\n                    id, product.Name);\n                return product;\n            }\n            catch (Exception ex)\n            {\n                logger.LogError(ex,\n                    \"Failed to fetch product {ProductId}: {ErrorMessage}\",\n                    id, ex.Message);\n                throw;\n            }\n        }\n    }\n}\n\n// All log entries within the scope include\n// ProductId and Operation as structured properties"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Logging Scopes"
+    },
+    {
+      "type": "paragraph",
+      "text": "Scopes add contextual properties to every log message written within them. Using BeginScope, you can attach request-specific data like a correlation ID, user ID, or product ID to all log messages produced during that operation. This makes it possible to filter all logs from a single request in a log viewer."
+    },
+    {
+      "type": "paragraph",
+      "text": "In ASP.NET Core, the framework automatically creates a scope for each HTTP request that includes the request path and trace identifier. You can add your own scopes in middleware or services to enrich this with business context."
+    },
+    {
+      "type": "example",
+      "title": "Middleware Adding a Request Scope",
+      "content": "A custom middleware that adds a correlation ID scope to every request for end-to-end log tracing.",
+      "language": "csharp",
+      "code": "public class CorrelationIdMiddleware(RequestDelegate next, ILogger<CorrelationIdMiddleware> logger)\n{\n    public async Task InvokeAsync(HttpContext context)\n    {\n        // Read or generate a correlation ID\n        var correlationId = context.Request.Headers[\n            \"X-Correlation-ID\"].FirstOrDefault()\n            ?? Guid.NewGuid().ToString();\n\n        // Add it to the response headers so clients can track requests\n        context.Response.Headers[\"X-Correlation-ID\"] = correlationId;\n\n        // Create a scope that includes the correlation ID\n        using (logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"CorrelationId\"] = correlationId,\n            [\"Path\"] = context.Request.Path\n        }))\n        {\n            logger.LogInformation(\"Incoming request: {Method} {Path}\",\n                context.Request.Method,\n                context.Request.Path);\n\n            // Continue down the middleware pipeline\n            await next(context);\n\n            logger.LogInformation(\"Response status: {StatusCode}\",\n                context.Response.StatusCode);\n        }\n    }\n}\n\n// Register in Program.cs:\n// app.UseMiddleware<CorrelationIdMiddleware>();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Configuring Logging Providers"
+    },
+    {
+      "type": "paragraph",
+      "text": "Logging providers determine where log messages are written. The built-in Console provider writes to the terminal, which is useful in containers and CI/CD. The Debug provider writes to the Visual Studio output window. For production, you typically configure a third-party provider like Serilog (writing to files, Seq, or Elasticsearch) or the built-in Azure App Service logging."
+    },
+    {
+      "type": "example",
+      "title": "Logging Configuration in Program.cs",
+      "content": "Configuring minimum log levels per category and adding a console provider in Program.cs.",
+      "language": "csharp",
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\n// Configure minimum log levels per category\nbuilder.Logging.ClearProviders();\nbuilder.Logging.AddConsole();\n\nbuilder.Logging.AddFilter(\n    \"Microsoft\",                         // Microsoft.* categories\n    LogLevel.Warning);                    // Only warnings and above\n\nbuilder.Logging.AddFilter(\n    \"Microsoft.Hosting.Lifetime\",        // Host lifetime logs\n    LogLevel.Information);                // Show informational messages\n\nbuilder.Logging.AddFilter(\n    \"MyApp\",                             // Your application namespace\n    LogLevel.Debug);                      // Show debug and above for your code\n\nvar app = builder.Build();\napp.MapControllers();\napp.Run();\n\n// In appsettings.json you can also configure logging:\n// {\n//   \"Logging\": {\n//     \"LogLevel\": {\n//       \"Default\": \"Information\",\n//       \"Microsoft\": \"Warning\",\n//       \"MyApp\": \"Debug\"\n//     }\n//   }\n// }"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Monitoring in Production"
+    },
+    {
+      "type": "paragraph",
+      "text": "Logging tells you what happened. Monitoring tells you whether anything is wrong right now. Monitoring systems collect metrics — response times, error rates, CPU usage, memory consumption — and alert you when thresholds are breached. In production, monitoring is essential for detecting outages before users report them."
+    },
+    {
+      "type": "bullet-list",
+      "title": "Key Metrics to Monitor in Production",
+      "items": [
+        {
+          "text": "Request latency: How long API responses take — sudden increases indicate performance problems"
+        },
+        {
+          "text": "Error rate: Percentage of requests returning 4xx or 5xx — spikes indicate bugs or infrastructure issues"
+        },
+        {
+          "text": "Request volume: Total requests per minute — drops may indicate upstream failures"
+        },
+        {
+          "text": "Database query time: Slow queries can cascade into timeouts and 500 errors"
+        },
+        {
+          "text": "Memory and CPU usage: Resource exhaustion causes degraded performance or crashes"
+        },
+        {
+          "text": "Health check status: Automated probes that verify the application and its dependencies are operational"
+        }
+      ]
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Logging and Monitoring",
+      "terms": [
+        {
+          "term": "ILogger",
+          "definition": "ASP.NET Core's built-in logging abstraction — inject it into any class to write structured log messages."
+        },
+        {
+          "term": "Structured Logging",
+          "definition": "Logging with named placeholders (e.g., {ProductId}) that can be queried and filtered in log analysis tools."
+        },
+        {
+          "term": "Log Scope",
+          "definition": "A contextual boundary that attaches properties to every log message written within it, using BeginScope."
+        },
+        {
+          "term": "Log Level",
+          "definition": "The severity of a log message (Trace, Debug, Information, Warning, Error, Critical) used to control output verbosity."
+        },
+        {
+          "term": "Correlation ID",
+          "definition": "A unique identifier attached to a request that links all log messages from that request together across services."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Never Log Sensitive Data",
+      "text": "Passwords, credit card numbers, social security numbers, and API keys must never appear in logs. Logs are often stored in plain text and accessed by many systems. Scrub sensitive fields before logging request bodies or user input."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Logging and Monitoring",
+      "points": [
+        "ILogger<T> is injected via constructor and supports structured message templates with named placeholders",
+        "Log levels (Trace through Critical) control verbosity — use Information in production, Debug in development",
+        "Structured logging stores data as searchable properties, not concatenated strings",
+        "Log scopes attach contextual properties (correlation ID, user ID) to every message within a block",
+        "Logging providers (Console, Debug, Serilog, Seq) determine where messages are written",
+        "Monitoring complements logging by collecting metrics and alerting on production health indicators"
+      ],
+      "takeaway": "Logging is your primary forensic tool when something goes wrong in production. Write structured messages with meaningful scopes, choose log levels carefully, and pair logging with a monitoring system that alerts you before users notice a problem."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Add Comprehensive Logging to a Service",
+      "description": "Instrument an existing service with structured logging at appropriate levels, including scopes and error handling.",
+      "steps": [
+        "Inject ILogger<ProductService> into your service constructor using the generic form",
+        "Add a LogInformation entry at the start of the main public method with the operation name and key inputs",
+        "Wrap the method body in a using BeginScope block with operation-specific properties",
+        "Add a LogWarning entry when a resource is not found but the operation can continue",
+        "Add a LogError entry in the catch block that includes the exception object and relevant context",
+        "Add a LogInformation entry on successful completion with the result summary"
+      ],
+      "expectedOutcome": "A fully instrumented service with log entries at Information, Warning, and Error levels. Every log entry uses structured placeholders. Scopes ensure all messages from a single operation share a correlation context. Log output is meaningful and actionable for debugging production issues."
+    },
+    {
+      "type": "checklist",
+      "title": "Logging and Monitoring Checklist",
+      "items": [
+        {
+          "text": "I know when to use each log level (Trace, Debug, Information, Warning, Error, Critical)",
+          "hint": "Information for normal flow, Warning for unusual but non-fatal events, Error for operation failures, Critical for app-breaking issues."
+        },
+        {
+          "text": "I can explain why structured logging is better than string concatenation",
+          "hint": "Structured properties ({ProductId}) are searchable and filterable. Concatenated strings require text search."
+        },
+        {
+          "text": "I know how to inject and use ILogger<T> in a service",
+          "hint": "Add ILogger<ProductService> to the constructor. Call logger.LogInformation(\"message {Property}\", value)."
+        },
+        {
+          "text": "I understand what a log scope does and when to use one",
+          "hint": "Scopes attach properties to all messages within a block — use them for request IDs, operation names, or user context."
+        },
+        {
+          "text": "I can describe what monitoring provides beyond logging",
+          "hint": "Logging tells you what happened. Monitoring tells you if something is wrong right now — metrics and alerts."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "debugging-techniques",
+        "monitoring-and-alerting"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Logging in ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/logging"
+        },
+        {
+          "type": "article",
+          "title": "Serilog Structured Logging",
+          "url": "https://serilog.net/"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "debugging-techniques",
+    "monitoring-and-alerting"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Logging in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/logging"
+    },
+    {
+      "type": "article",
+      "title": "Serilog Structured Logging",
+      "url": "https://serilog.net/"
+    }
+  ]
 }

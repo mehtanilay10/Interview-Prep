@@ -203,6 +203,7 @@ import lessonAspnetCore05razorviewsrazorsyntax from "../courses/aspnet-core/05-r
 import lessonAspnetCore05razorviewslayoutsandpartials from "../courses/aspnet-core/05-razor-views/layouts-and-partials.json";
 import lessonAspnetCore05razorviewsviewcomponents from "../courses/aspnet-core/05-razor-views/view-components.json";
 import lessonAspnetCore05razorviewstaghelpers from "../courses/aspnet-core/05-razor-views/tag-helpers.json";
+import lessonAspnetCore05razorviewspartialviews from "../courses/aspnet-core/05-razor-views/partial-views.json";
 import lessonAspnetCore06dependencyinjectiondibasics from "../courses/aspnet-core/06-dependency-injection/di-basics.json";
 import lessonAspnetCore06dependencyinjectionservicelifetimes from "../courses/aspnet-core/06-dependency-injection/service-lifetimes.json";
 import lessonAspnetCore06dependencyinjectionconstructorinjection from "../courses/aspnet-core/06-dependency-injection/constructor-injection.json";
@@ -1501,6 +1502,30 @@ import yarnLesson46 from "../courses/yarn-npm-packages/utilities/zod.json";
 import yarnLesson47 from "../courses/yarn-npm-packages/utilities/axios-retry.json";
 import yarnLesson48 from "../courses/yarn-npm-packages/utilities/clsx.json";
 import yarnLesson49 from "../courses/yarn-npm-packages/utilities/tailwind-merge.json";
+import yarnLesson50 from "../courses/yarn-npm-packages/react-hooks-patterns/use-state-effect.json";
+import yarnLesson51 from "../courses/yarn-npm-packages/react-hooks-patterns/use-context-reducer.json";
+import yarnLesson52 from "../courses/yarn-npm-packages/react-hooks-patterns/use-ref-callback.json";
+import yarnLesson53 from "../courses/yarn-npm-packages/react-hooks-patterns/use-memo-debug.json";
+import yarnLesson54 from "../courses/yarn-npm-packages/react-hooks-patterns/custom-hooks.json";
+import yarnLesson55 from "../courses/yarn-npm-packages/react-performance/react-memoization.json";
+import yarnLesson56 from "../courses/yarn-npm-packages/react-performance/code-splitting.json";
+import yarnLesson57 from "../courses/yarn-npm-packages/react-performance/virtualization.json";
+import yarnLesson58 from "../courses/yarn-npm-packages/react-performance/profiling-debugging.json";
+import yarnLesson59 from "../courses/yarn-npm-packages/react-performance/rendering-optimization.json";
+import yarnLesson60 from "../courses/yarn-npm-packages/react-forms-input/controlled-components.json";
+import yarnLesson61 from "../courses/yarn-npm-packages/react-forms-input/form-validation.json";
+import yarnLesson62 from "../courses/yarn-npm-packages/react-forms-input/react-hook-form.json";
+import yarnLesson63 from "../courses/yarn-npm-packages/react-forms-input/file-upload.json";
+import yarnLesson64 from "../courses/yarn-npm-packages/react-forms-input/multi-step-forms.json";
+import yarnLesson65 from "../courses/yarn-npm-packages/react-data-fetching/fetch-api-basics.json";
+import yarnLesson66 from "../courses/yarn-npm-packages/react-data-fetching/react-query.json";
+import yarnLesson67 from "../courses/yarn-npm-packages/react-data-fetching/swr.json";
+import yarnLesson68 from "../courses/yarn-npm-packages/react-data-fetching/axios-react.json";
+import yarnLesson69 from "../courses/yarn-npm-packages/react-data-fetching/error-boundaries-loading.json";
+import yarnLesson70 from "../courses/yarn-npm-packages/react-testing/react-testing-library.json";
+import yarnLesson71 from "../courses/yarn-npm-packages/react-testing/vitest-react.json";
+import yarnLesson72 from "../courses/yarn-npm-packages/react-testing/cypress-component.json";
+import yarnLesson73 from "../courses/yarn-npm-packages/react-testing/testing-hooks.json";
 
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
@@ -1687,6 +1712,7 @@ const rawLessonsPart1: any[] = [
 	lessonAspnetCore05razorviewslayoutsandpartials,
 	lessonAspnetCore05razorviewsviewcomponents,
 	lessonAspnetCore05razorviewstaghelpers,
+	lessonAspnetCore05razorviewspartialviews,
 	lessonAspnetCore06dependencyinjectiondibasics,
 	lessonAspnetCore06dependencyinjectionservicelifetimes,
 	lessonAspnetCore06dependencyinjectionconstructorinjection,
@@ -2964,6 +2990,30 @@ const rawLessonsPart2: any[] = [
 	yarnLesson29,
 	yarnLesson30,
 	yarnLesson31,
+	yarnLesson50,
+	yarnLesson51,
+	yarnLesson52,
+	yarnLesson53,
+	yarnLesson54,
+	yarnLesson55,
+	yarnLesson56,
+	yarnLesson57,
+	yarnLesson58,
+	yarnLesson59,
+	yarnLesson60,
+	yarnLesson61,
+	yarnLesson62,
+	yarnLesson63,
+	yarnLesson64,
+	yarnLesson65,
+	yarnLesson66,
+	yarnLesson67,
+	yarnLesson68,
+	yarnLesson69,
+	yarnLesson70,
+	yarnLesson71,
+	yarnLesson72,
+	yarnLesson73,
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];

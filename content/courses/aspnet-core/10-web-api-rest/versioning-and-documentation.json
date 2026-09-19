@@ -4,26 +4,270 @@
   "moduleSlug": "10-web-api-rest",
   "courseSlug": "aspnet-core",
   "title": "API Versioning and Documentation",
-  "description": "Learn api versioning and documentation in ASP.NET Core.",
+  "description": "Learn how to version ASP.NET Core APIs so you can evolve your endpoints without breaking existing clients. Explore URL segment, query string, and header-based versioning strategies, and understand how to document your API for other developers.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 11,
+  "estimatedMinutes": 30,
   "tags": [
     "versioning",
-    "documentation"
+    "documentation",
+    "api-design"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Version APIs using URL segments, query strings, or headers."
+      "text": "APIs evolve. New features get added, old ones get deprecated, and data shapes change. Without versioning, every change breaks existing clients. API versioning lets you ship new versions of an endpoint while keeping the old version running for clients that have not migrated yet."
+    },
+    {
+      "type": "paragraph",
+      "text": "ASP.NET Core does not include versioning in the box, but the Microsoft.AspNetCore.Mvc.Versioning NuGet package provides a clean, convention-based approach. Versioning can be expressed through the URL, query string, or request headers — each with trade-offs."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Why Version an API?"
+    },
+    {
+      "type": "paragraph",
+      "text": "Versioning lets you change the contract of an API without forcing all consumers to update simultaneously. A mobile app with a slow rollout might still call version 1 of an endpoint months after version 2 has shipped. Without versioning, you would have to keep every change backward-compatible indefinitely, which becomes impossible for any non-trivial API."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "When to Introduce a New Version"
+    },
+    {
+      "type": "paragraph",
+      "text": "Create a new version when you change the shape of a response, remove a field, rename an endpoint, or change required behavior in a way that breaks existing clients. Minor additions that are backward-compatible — such as adding an optional field — do not require a new version."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Versioning Strategies"
+    },
+    {
+      "type": "paragraph",
+      "text": "The three most common versioning strategies are URL segment versioning, query string versioning, and header-based versioning. Each has different implications for how clients call your API and how you manage routes."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "URL Segment Versioning"
+    },
+    {
+      "type": "paragraph",
+      "text": "The version number appears directly in the URL path: /api/v1/products and /api/v2/products. This is the most visible strategy because the version is part of the address. It is also the easiest for clients to test manually. The downside is that URLs change between versions, which some purists argue violates REST principles."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Query String Versioning"
+    },
+    {
+      "type": "paragraph",
+      "text": "The version is passed as a query parameter: /api/products?api-version=2.0. The base URL stays the same across versions. This keeps routes cleaner but makes the version less visible in logs and debugging tools. It is also easy for clients to forget the parameter."
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Header-Based Versioning"
+    },
+    {
+      "type": "paragraph",
+      "text": "The version is sent in a custom request header, such as X-Api-Version: 2. URLs never change. This is the most RESTful approach from a pure URI design perspective, but it is the hardest for developers to test manually — they need a tool that lets them set custom headers rather than just typing a URL."
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Start with URL Segment Versioning",
+      "text": "URL segment versioning (e.g., /api/v1/products) is the most widely adopted strategy. It is immediately visible in logs, browser history, and debugging tools. You can switch to header-based versioning later if your API matures to that level of sophistication."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Implementing Versioning with the Versioning Package"
+    },
+    {
+      "type": "paragraph",
+      "text": "Install the Microsoft.AspNetCore.Mvc.Versioning package and register it in Program.cs. You then apply the [ApiVersion] attribute to controllers and optionally use [MapToApiVersion] on individual actions when a controller serves multiple versions."
     },
     {
       "type": "example",
+      "title": "Registering API Versioning in Program.cs",
+      "content": "Configure the API Versioning services in the dependency injection container and set default version behavior.",
       "language": "csharp",
-      "code": "builder.Services.AddApiVersioning(options =>\n{\n    options.DefaultApiVersion = new ApiVersion(1, 0);\n    options.AssumeDefaultVersionWhenUnspecified = true;\n    options.ReportApiVersions = true;\n});"
+      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddControllers();\n\n// Register API Versioning services\nbuilder.Services.AddApiVersioning(options =>\n{\n    // Return the supported versions in a response header\n    options.ReportApiVersions = true;\n\n    // Use version 1.0 when the client does not specify a version\n    options.DefaultApiVersion = new ApiVersion(1, 0);\n    options.AssumeDefaultVersionWhenUnspecified = true;\n\n    // Accept versions via URL segment, query string, or header\n    options.ApiVersionReader = ApiVersionReader.Combine(\n        new UrlSegmentApiVersionReader(),\n        new QueryStringApiVersionReader(\"api-version\"),\n        new HeaderApiVersionReader(\"X-Api-Version\")\n    );\n});\n\nvar app = builder.Build();\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "example",
+      "title": "Versioned Controller with Multiple Versions",
+      "content": "A single controller class serving two API versions with different return types to demonstrate how versions diverge over time.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.Mvc;\nusing Microsoft.AspNetCore.Mvc.Versioning;\n\n[ApiController]\n[Route(\"api/v{version:apiVersion}/[controller]\")]\n[ApiVersion(\"1.0\")]\n[ApiVersion(\"2.0\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _v1Service;\n    private readonly IProductServiceV2 _v2Service;\n\n    public ProductsController(\n        IProductService v1Service,\n        IProductServiceV2 v2Service)\n    {\n        _v1Service = v1Service;\n        _v2Service = v2Service;\n    }\n\n    // GET /api/v1/products — returns V1 DTO\n    [HttpGet]\n    [MapToApiVersion(\"1.0\")]\n    public async Task<ActionResult<IEnumerable<ProductV1Dto>>> GetV1()\n        => Ok(await _v1Service.GetAllAsync());\n\n    // GET /api/v2/products — returns V2 DTO with extra fields\n    [HttpGet]\n    [MapToApiVersion(\"2.0\")]\n    public async Task<ActionResult<IEnumerable<ProductV2Dto>>> GetV2()\n        => Ok(await _v2Service.GetAllAsync());\n}\n\n// Supported versions are returned in the API-Supported-Versions response header"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "API Documentation Practices"
+    },
+    {
+      "type": "paragraph",
+      "text": "Good documentation tells other developers what your API does, how to call it, what parameters it expects, and what it returns. Documentation is not a one-time task — it must stay current as the API changes. A documented API with versioning is much easier to maintain than one with a wiki page that gets out of sync."
+    },
+    {
+      "type": "bullet-list",
+      "title": "What Every API Endpoint Should Document",
+      "items": [
+        {
+          "text": "HTTP method and full URL path with any required parameters"
+        },
+        {
+          "text": "Request body schema (field names, types, required vs optional)"
+        },
+        {
+          "text": "Success response: status code, response body schema, and example payload"
+        },
+        {
+          "text": "Error responses: which status codes can be returned and what they mean"
+        },
+        {
+          "text": "Authentication requirements (if any endpoint needs a token or role)"
+        },
+        {
+          "text": "Rate limiting or throttling rules that apply to the endpoint"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Deprecating an API Version"
+    },
+    {
+      "type": "paragraph",
+      "text": "When you are ready to retire an old version, add a Deprecated flag to the version declaration. The versioning library will include this in response headers, signaling to clients that they should migrate. Set a clear deprecation date and communicate it to consumers well in advance."
+    },
+    {
+      "type": "example",
+      "title": "Marking a Version as Deprecated",
+      "content": "Using the Deprecated property to signal that an API version is being phased out.",
+      "language": "csharp",
+      "code": "builder.Services.AddApiVersioning(options =>\n{\n    options.ReportApiVersions = true;\n    options.DefaultApiVersion = new ApiVersion(2, 0);\n    options.AssumeDefaultVersionWhenUnspecified = true;\n});\n\n[ApiController]\n[Route(\"api/v{version:apiVersion}/[controller]\")]\n// Version 1.0 is marked as deprecated\n[ApiVersion(\"1.0\", Deprecated = true)]\n[ApiVersion(\"2.0\")]\npublic class ProductsController : ControllerBase\n{\n    // Clients will see the 'Api-Version' and\n    // 'Deprecated-API-Version' response headers\n    [HttpGet]\n    [MapToApiVersion(\"1.0\")]\n    public async Task<ActionResult<IEnumerable<ProductV1Dto>>> GetV1()\n    {\n        // Still functional, but clients are warned\n        // to migrate to v2.0\n        return Ok(await _v1Service.GetAllAsync());\n    }\n}\n\n// Response headers include:\n// Api-Version: 1.0\n// Deprecated-API-Version: true"
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: API Versioning and Documentation",
+      "terms": [
+        {
+          "term": "API Versioning",
+          "definition": "The practice of maintaining multiple versions of an API so changes do not break existing consumers."
+        },
+        {
+          "term": "URL Segment Versioning",
+          "definition": "Version expressed in the URL path (e.g., /api/v1/products). Most visible and widely adopted strategy."
+        },
+        {
+          "term": "Deprecated",
+          "definition": "A version marked as deprecated signals to clients that it will be removed and they should migrate."
+        },
+        {
+          "term": "API Version Reader",
+          "definition": "The component that determines which version a client is requesting, reading from URL, query string, or headers."
+        },
+        {
+          "term": "MapToApiVersion",
+          "definition": "An attribute that restricts an action method to only respond to requests for a specific API version."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Versioning Is Not Free",
+      "text": "Every version you maintain is code you must test, document, and secure. Avoid creating versions for trivial changes. Only version when you have a breaking change that cannot be handled with optional fields or feature flags."
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: API Versioning and Documentation",
+      "points": [
+        "API versioning lets you evolve endpoints without breaking existing clients",
+        "URL segment versioning puts the version in the path — /api/v1/products — and is the most common approach",
+        "Query string and header versioning keep URLs stable but are less visible for debugging",
+        "Microsoft.AspNetCore.Mvc.Versioning handles version resolution and deprecation signaling",
+        "The [Deprecated = true] flag adds response headers that tell clients to migrate",
+        "Good documentation includes request/response schemas, error codes, and authentication requirements"
+      ],
+      "takeaway": "Versioning is an investment in your API's longevity. Plan for it from the start, choose a strategy your team can maintain, and deprecate old versions deliberately with clear timelines rather than letting them accumulate indefinitely."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Add Versioning to an Existing API",
+      "description": "Take an existing unversioned API controller and add versioning support following best practices.",
+      "steps": [
+        "Add the Microsoft.AspNetCore.Mvc.Versioning NuGet package to your project",
+        "Register AddApiVersioning in Program.cs with ReportApiVersions enabled",
+        "Update the route template to include v{version:apiVersion} in the path",
+        "Add [ApiVersion(\"1.0\")] and [ApiVersion(\"2.0\")] to a controller",
+        "Create a V2 DTO that adds two new optional fields not present in V1",
+        "Add a MapToApiVersion(\"2.0\") action that returns the new DTO",
+        "Test both /api/v1/products and /api/v2/products return different payloads"
+      ],
+      "expectedOutcome": "Two versions of the same endpoint responding at different URLs with different DTO shapes. The API-Supported-Versions response header should list both versions, and calling v1 should return the original shape."
+    },
+    {
+      "type": "checklist",
+      "title": "API Versioning and Documentation Checklist",
+      "items": [
+        {
+          "text": "I understand why API versioning is necessary for long-lived APIs",
+          "hint": "APIs change. Without versioning, every change breaks clients that have not updated yet."
+        },
+        {
+          "text": "I can describe URL segment, query string, and header-based versioning",
+          "hint": "URL: /api/v1/products. Query: /api/products?api-version=1. Header: X-Api-Version: 1."
+        },
+        {
+          "text": "I know how to register AddApiVersioning in Program.cs",
+          "hint": "builder.Services.AddApiVersioning() with options for DefaultApiVersion and ReportApiVersions."
+        },
+        {
+          "text": "I understand what Deprecated = true does",
+          "hint": "It adds a Deprecated-API-Version header to responses, signaling clients to stop using that version."
+        },
+        {
+          "text": "I can list the key elements of good API documentation",
+          "hint": "Method, URL, request schema, response schema, error codes, and auth requirements."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "swagger-and-openapi",
+        "rest-principles"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "ASP.NET Core API Versioning",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/advanced/versioning"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "swagger-and-openapi",
+    "rest-principles"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "ASP.NET Core API Versioning",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/advanced/versioning"
+    }
+  ]
 }

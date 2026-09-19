@@ -4,26 +4,217 @@
   "moduleSlug": "10-web-api-rest",
   "courseSlug": "aspnet-core",
   "title": "Swagger and OpenAPI",
-  "description": "Learn swagger and openapi in ASP.NET Core.",
+  "description": "Generate interactive, self-documenting API documentation with Swashbuckle and OpenAPI. Learn how to configure Swagger UI, add XML comments, and provide a developer-friendly interface for exploring and testing your API endpoints.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 11,
+  "estimatedMinutes": 30,
   "tags": [
     "swagger",
-    "openapi"
+    "openapi",
+    "documentation"
   ],
   "blocks": [
     {
       "type": "paragraph",
-      "text": "Generate interactive API documentation with Swashbuckle."
+      "text": "Swagger is a set of tools for designing, building, and documenting REST APIs. The OpenAPI Specification (formerly Swagger Specification) defines a standard, language-agnostic way to describe an API's endpoints, request/response schemas, authentication methods, and more. In ASP.NET Core, Swashbuckle is the library that generates an OpenAPI document from your controllers and serves an interactive UI for exploring it."
+    },
+    {
+      "type": "paragraph",
+      "text": "With Swagger enabled, anyone — including frontend developers, QA engineers, or external partners — can open a browser page and see every endpoint your API exposes, what parameters it accepts, what it returns, and even try it out with live HTTP requests. This dramatically reduces the friction of API integration."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "OpenAPI Specification"
+    },
+    {
+      "type": "paragraph",
+      "text": "The OpenAPI Specification is a JSON or YAML document that describes an API in a structured, machine-readable format. It covers available paths, HTTP methods, request parameters, request bodies, response schemas, authentication schemes, and more. Swashbuckle generates this document automatically by inspecting your controllers at startup."
     },
     {
       "type": "example",
+      "title": "Simplified OpenAPI Document (JSON)",
+      "content": "A small excerpt of what the auto-generated OpenAPI document looks like — this is what Swagger UI renders into an interactive page.",
+      "language": "json",
+      "code": "{\n  \"openapi\": \"3.0.1\",\n  \"info\": {\n    \"title\": \"Products API\",\n    \"version\": \"v1\"\n  },\n  \"paths\": {\n    \"/api/products\": {\n      \"get\": {\n        \"summary\": \"Get all products\",\n        \"responses\": {\n          \"200\": {\n            \"description\": \"A list of products\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"array\",\n                  \"items\": { \"$ref\": \"#/components/schemas/Product\" }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Adding Swashbuckle to Your Project"
+    },
+    {
+      "type": "paragraph",
+      "text": "Swashbuckle has three main packages: Swashbuckle.AspNetCore provides the core services, Swashbuckle.AspNetCore.Swagger adds the OpenAPI document generation, and Swashbuckle.AspNetCore.SwaggerUI serves the interactive UI. In most cases, installing the meta-package Swashbuckle.AspNetCore is sufficient."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Install the Package",
+      "text": "Run: dotnet add package Swashbuckle.AspNetCore. This installs everything you need: document generation, UI, and the Swagger JSON endpoint."
+    },
+    {
+      "type": "example",
+      "title": "Full Swagger Setup in Program.cs",
+      "content": "Complete Program.cs configuration for Swashbuckle with XML comments and UI customization.",
       "language": "csharp",
-      "code": "builder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\n\nvar app = builder.Build();\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}"
+      "code": "using Microsoft.OpenApi.Models;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddControllers();\n\n// Add Swagger generation services\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen(options =>\n{\n    options.SwaggerDoc(\"v1\", new OpenApiInfo\n    {\n        Title = \"Products API\",\n        Version = \"v1\",\n        Description = \"An API for managing products\",\n        Contact = new OpenApiContact\n        {\n            Name = \"API Team\",\n            Email = \"api@example.com\"\n        }\n    });\n\n    // Include XML comments from the compiled assembly\n    var xmlFile = $\"{Assembly.GetExecutingAssembly().GetName().Name}.xml\";\n    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);\n    if (File.Exists(xmlPath))\n    {\n        options.IncludeXmlComments(xmlPath);\n    }\n});\n\nvar app = builder.Build();\n\n// Enable Swagger JSON endpoint and UI in Development\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI(options =>\n    {\n        options.SwaggerEndpoint(\"/swagger/v1/swagger.json\", \"Products API V1\");\n        options.RoutePrefix = \"swagger\"; // Serve at /swagger\n    });\n}\n\napp.MapControllers();\napp.Run();"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "XML Comments for Richer Documentation"
+    },
+    {
+      "type": "paragraph",
+      "text": "Swashbuckle can pull XML documentation comments from your controller code into the OpenAPI document. This means the summaries and parameter descriptions you write in your code appear in the Swagger UI automatically. To enable this, you need to turn on XML documentation generation in your project file."
+    },
+    {
+      "type": "example",
+      "title": "Controller with XML Documentation Comments",
+      "content": "Writing triple-slash comments on controllers and actions makes Swagger UI much more informative for consumers.",
+      "language": "csharp",
+      "code": "using Microsoft.AspNetCore.Mvc;\n\n/// <summary>\n/// Manages product resources in the catalog.\n/// </summary>\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ProductsController : ControllerBase\n{\n    private readonly IProductService _service;\n\n    /// <summary>\n    /// Creates a new product in the catalog.\n    /// </summary>\n    /// <param name=\"dto\">The product creation data including name, price, and category.</param>\n    /// <returns>The created product with its assigned ID.</returns>\n    /// <response code=\"201\">Returns the newly created product</response>\n    /// <response code=\"400\">If the product data is invalid</response>\n    [HttpPost]\n    public async Task<ActionResult<ProductDto>> Create(CreateProductDto dto)\n    {\n        var created = await _service.CreateAsync(dto);\n        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);\n    }\n\n    /// <summary>\n    /// Retrieves a product by its unique identifier.\n    /// </summary>\n    /// <param name=\"id\">The numeric ID of the product to retrieve.</param>\n    /// <returns>The product if found; 404 if not found.</returns>\n    [HttpGet(\"{id:int}\")]\n    public async Task<ActionResult<ProductDto>> Get(int id)\n    {\n        var product = await _service.GetByIdAsync(id);\n        if (product is null) return NotFound();\n        return Ok(product);\n    }\n}"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Securing Swagger in Production"
+    },
+    {
+      "type": "paragraph",
+      "text": "Swagger exposes your entire API surface — endpoints, schemas, and potentially sensitive details. Never leave Swagger enabled in production without access controls. The standard approach is to gate Swagger behind the development environment, or to add authentication to the Swagger endpoint."
+    },
+    {
+      "type": "callout",
+      "variant": "warning",
+      "title": "Never Expose Swagger in Production Without Protection",
+      "text": "Swagger reveals your API structure to anyone who can access it. If you need Swagger available in staging or production, restrict access using authentication, IP allowlists, or both. Treat it like an admin panel."
+    },
+    {
+      "type": "example",
+      "title": "Adding API Key Authentication to Swagger UI",
+      "content": "Using Swashbuckle's security definition to require an API key for the Try It Out button in Swagger UI.",
+      "language": "csharp",
+      "code": "builder.Services.AddSwaggerGen(options =>\n{\n    options.SwaggerDoc(\"v1\", new OpenApiInfo { Title = \"Products API\", Version = \"v1\" });\n\n    // Define the API key security scheme\n    options.AddSecurityDefinition(\"ApiKey\", new OpenApiSecurityScheme\n    {\n        Description = \"Enter your API key in the field below.\",\n        Name = \"X-Api-Key\",\n        In = ParameterLocation.Header,\n        Type = SecuritySchemeType.ApiKey,\n        Scheme = \"ApiKeyScheme\"\n    });\n\n    // Apply the security requirement globally\n    options.AddSecurityRequirement(new OpenApiSecurityRequirement\n    {\n        {\n            new OpenApiSecurityScheme\n            {\n                Reference = new OpenApiReference\n                {\n                    Type = ReferenceType.SecurityScheme,\n                    Id = \"ApiKey\"\n                }\n            },\n            Array.Empty<string>()\n        }\n    });\n});\n\n// Now Swagger UI shows an 'Authorize' lock icon\n// Users must enter their API key before trying endpoints"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "What Developers Get from Swagger UI"
+    },
+    {
+      "type": "paragraph",
+      "text": "Swagger UI renders the OpenAPI document as a browsable web page. Developers can expand each endpoint to see parameters, request body schemas, and response examples. They can fill in values and click 'Execute' to make a real HTTP request and see the raw response. This turns documentation from a static reference into a live testing environment."
+    },
+    {
+      "type": "key-terms",
+      "title": "Key Terms: Swagger and OpenAPI",
+      "terms": [
+        {
+          "term": "OpenAPI Specification",
+          "definition": "A standard, language-agnostic JSON/YAML format for describing REST APIs — their endpoints, schemas, and behaviors."
+        },
+        {
+          "term": "Swashbuckle",
+          "definition": "A .NET library that generates an OpenAPI document from ASP.NET Core controllers and serves the Swagger UI."
+        },
+        {
+          "term": "Swagger UI",
+          "definition": "An interactive web page that renders the OpenAPI document, allowing developers to browse and test API endpoints."
+        },
+        {
+          "term": "XML Comments",
+          "definition": "Triple-slash documentation comments in C# code that Swashbuckle can extract and include in the OpenAPI document."
+        },
+        {
+          "term": "API Key Security Scheme",
+          "definition": "An OpenAPI security definition that tells Swagger UI to include an API key header in the Try It Out requests."
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary: Swagger and OpenAPI",
+      "points": [
+        "OpenAPI is a standard specification for describing REST APIs in JSON or YAML",
+        "Swashbuckle automatically generates the OpenAPI document by inspecting your controllers",
+        "Swagger UI renders that document as an interactive, browsable API reference",
+        "XML comments in your controller code appear as endpoint descriptions in Swagger UI",
+        "Enable Swagger only in development unless you add access controls for production",
+        "Security scheme definitions let Swagger UI prompt for API keys, making testing seamless"
+      ],
+      "takeaway": "Swagger turns your API into living documentation. With a few lines of configuration, you give every consumer a self-service portal to explore, understand, and test your endpoints — dramatically reducing integration time and support requests."
+    },
+    {
+      "type": "exercise",
+      "title": "Exercise: Configure Swagger UI with Custom Metadata",
+      "description": "Set up Swashbuckle in an ASP.NET Core project with full metadata, XML comments, and API key security.",
+      "steps": [
+        "Install the Swashbuckle.AspNetCore NuGet package",
+        "Enable XML documentation in the .csproj file by setting <GenerateDocumentationFile>true</GenerateDocumentationFile>",
+        "Register AddSwaggerGen with a custom OpenApiInfo block including title, version, and description",
+        "Configure IncludeXmlComments to pull in your XML documentation",
+        "Add a security definition for an API key header called X-Api-Key",
+        "Add a global security requirement so Swagger UI shows the Authorize lock icon",
+        "Run the application and navigate to /swagger to verify the UI loads with your customizations"
+      ],
+      "expectedOutcome": "A fully configured Swagger UI served at /swagger with custom API metadata, endpoint descriptions pulled from XML comments, and an API key authentication prompt ready for the Try It Out feature."
+    },
+    {
+      "type": "checklist",
+      "title": "Swagger and OpenAPI Checklist",
+      "items": [
+        {
+          "text": "I can explain what the OpenAPI Specification is and why it matters",
+          "hint": "OpenAPI is a standard format for describing APIs — tools like Swagger UI read it to render documentation."
+        },
+        {
+          "text": "I know which Swashbuckle packages to install and what each one does",
+          "hint": "Swashbuckle.AspNetCore is the meta-package. It covers document generation and UI rendering."
+        },
+        {
+          "text": "I can set up Swagger UI in Program.cs with a custom info block",
+          "hint": "Use AddSwaggerGen with OpenApiInfo, then UseSwagger and UseSwaggerUI with SwaggerEndpoint."
+        },
+        {
+          "text": "I understand how to enable XML comments in Swagger",
+          "hint": "Set GenerateDocumentationFile in the .csproj, then pass the XML file path to IncludeXmlComments."
+        },
+        {
+          "text": "I know why Swagger should be restricted or disabled in production",
+          "hint": "Swagger exposes your full API surface. In production, protect it with authentication or environment gates."
+        }
+      ]
+    },
+    {
+      "type": "related-lessons",
+      "lessons": [
+        "versioning-and-documentation",
+        "api-controllers"
+      ]
+    },
+    {
+      "type": "further-reading",
+      "items": [
+        {
+          "type": "article",
+          "title": "Swashbuckle and OpenAPI in ASP.NET Core",
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "versioning-and-documentation",
+    "api-controllers"
+  ],
   "technology": null,
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Swashbuckle and OpenAPI in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle"
+    }
+  ]
 }
