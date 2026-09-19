@@ -1439,6 +1439,26 @@ import dotnetLesson905 from "../courses/dotnet-nuget-packages/09-utilities-helpe
 import dotnetLesson906 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sharpcompress.json";
 import dotnetLesson907 from "../courses/dotnet-nuget-packages/09-utilities-helpers/figgle.json";
 import dotnetLesson908 from "../courses/dotnet-nuget-packages/09-utilities-helpers/more-linq.json";
+import nugetLesson1 from "../courses/dotnet-nuget-packages/logging-monitoring/serilog.json";
+import nugetLesson2 from "../courses/dotnet-nuget-packages/logging-monitoring/nlog.json";
+import nugetLesson3 from "../courses/dotnet-nuget-packages/logging-monitoring/log4net.json";
+import nugetLesson4 from "../courses/dotnet-nuget-packages/logging-monitoring/seq.json";
+import nugetLesson5 from "../courses/dotnet-nuget-packages/logging-monitoring/elasticsearch.json";
+import nugetLesson6 from "../courses/dotnet-nuget-packages/logging-monitoring/prometheus.json";
+import nugetLesson7 from "../courses/dotnet-nuget-packages/logging-monitoring/application-insights.json";
+import nugetLesson8 from "../courses/dotnet-nuget-packages/logging-monitoring/opentelemetry.json";
+import nugetLesson9 from "../courses/dotnet-nuget-packages/validation-authorization/fluentvalidation.json";
+import nugetLesson10 from "../courses/dotnet-nuget-packages/validation-authorization/dataannotations.json";
+import nugetLesson11 from "../courses/dotnet-nuget-packages/validation-authorization/identityserver.json";
+import nugetLesson12 from "../courses/dotnet-nuget-packages/validation-authorization/openiddict.json";
+import nugetLesson13 from "../courses/dotnet-nuget-packages/validation-authorization/jwtbearer.json";
+import nugetLesson14 from "../courses/dotnet-nuget-packages/validation-authorization/policy-server.json";
+import nugetLesson15 from "../courses/dotnet-nuget-packages/http-clients-resilience/refit.json";
+import nugetLesson16 from "../courses/dotnet-nuget-packages/http-clients-resilience/flurl.json";
+import nugetLesson17 from "../courses/dotnet-nuget-packages/http-clients-resilience/restsharp.json";
+import nugetLesson18 from "../courses/dotnet-nuget-packages/http-clients-resilience/polly.json";
+import nugetLesson19 from "../courses/dotnet-nuget-packages/http-clients-resilience/polly-simmy.json";
+import nugetLesson20 from "../courses/dotnet-nuget-packages/http-clients-resilience/httpclientfactory.json";
 
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
@@ -2827,6 +2847,29 @@ const rawLessonsPart2: any[] = [
 	dotnetLesson55,
 	dotnetLesson56,
 	dotnetLesson57,
+	dotnetLesson701,
+	dotnetLesson702,
+	dotnetLesson703,
+	dotnetLesson704,
+	dotnetLesson705,
+	dotnetLesson706,
+	dotnetLesson707,
+	dotnetLesson708,
+	dotnetLesson801,
+	dotnetLesson802,
+	dotnetLesson803,
+	dotnetLesson804,
+	dotnetLesson805,
+	dotnetLesson806,
+	dotnetLesson807,
+	dotnetLesson901,
+	dotnetLesson902,
+	dotnetLesson903,
+	dotnetLesson904,
+	dotnetLesson905,
+	dotnetLesson906,
+	dotnetLesson907,
+	dotnetLesson908,
 	systemDesignReactLesson1,
 	systemDesignReactLesson2,
 	systemDesignReactLesson3,
