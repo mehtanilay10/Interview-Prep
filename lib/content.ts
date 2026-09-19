@@ -164,7 +164,7 @@ export function searchAll(query: string): SearchResult[] {
   for (const lesson of lessons) {
     const titleScore = scoreText(lesson.title, q) * 3;
     const descScore = scoreText(lesson.description, q);
-    const tagScore = lesson.tags.reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+    const tagScore = (lesson.tags ?? []).reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
 
     if (titleScore > 0 || descScore > 0 || tagScore > 0) {
       scored.push({
@@ -188,7 +188,7 @@ export function searchAll(query: string): SearchResult[] {
   for (const mod of modules) {
     const titleScore = scoreText(mod.title, q) * 3;
     const descScore = scoreText(mod.description, q);
-    const tagScore = mod.tags.reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+    const tagScore = (mod.tags ?? []).reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
 
     if (titleScore > 0 || descScore > 0 || tagScore > 0) {
       scored.push({

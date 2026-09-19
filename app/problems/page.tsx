@@ -17,8 +17,9 @@ export default function ProblemsPage() {
   const sqlCourse = getCourseBySlug('sql-problems');
   const systemDesignCourse = getCourseBySlug('system-design');
   const azureProblemsCourse = getCourseBySlug('azure-problems');
+  const lldCourse = getCourseBySlug('lld-problems');
 
-  const courses = [csharpCourse, sqlCourse, systemDesignCourse, azureProblemsCourse].filter(Boolean) as Course[];
+  const courses = [csharpCourse, sqlCourse, systemDesignCourse, azureProblemsCourse, lldCourse].filter(Boolean) as Course[];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
