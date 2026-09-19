@@ -150,7 +150,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, serverProgress]);
 
   useEffect(() => {
     if (!isLoggedIn || !serverProgressRef.current || isInitialLoad) return;
