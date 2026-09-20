@@ -244,7 +244,7 @@ export function searchAll(query: string): SearchResult[] {
   return scored.slice(0, 10).map((s) => s.result);
 }
 
-const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems']);
+const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems', 'hld-problems']);
 
 export function isProblemCourseSlug(slug: string | undefined): boolean {
   return slug !== undefined && PROBLEM_COURSE_SLUGS.has(slug);

@@ -282,6 +282,31 @@ import lldModule22 from "../problems/lld/vending-machine/content.json";
 import lldModule23 from "../problems/lld/whatsapp-chat/content.json";
 import lldModule24 from "../problems/lld/youtube-video/content.json";
 import lldModule25 from "../problems/lld/zoom-conferencing/content.json";
+import hldModule1 from "../problems/hld/airbnb-booking-hld/content.json";
+import hldModule2 from "../problems/hld/amazon-ecommerce-hld/content.json";
+import hldModule3 from "../problems/hld/chat-system-hld/content.json";
+import hldModule4 from "../problems/hld/dropbox-storage/content.json";
+import hldModule5 from "../problems/hld/ecommerce-hld/content.json";
+import hldModule6 from "../problems/hld/food-delivery-hld/content.json";
+import hldModule7 from "../problems/hld/google-search/content.json";
+import hldModule8 from "../problems/hld/instagram-feed/content.json";
+import hldModule9 from "../problems/hld/linkedin-professional-hld/content.json";
+import hldModule10 from "../problems/hld/notification-system/content.json";
+import hldModule11 from "../problems/hld/payment-gateway-hld/content.json";
+import hldModule12 from "../problems/hld/rate-limiter/content.json";
+import hldModule13 from "../problems/hld/ride-sharing-hld/content.json";
+import hldModule14 from "../problems/hld/search-autocomplete/content.json";
+import hldModule15 from "../problems/hld/slack-messaging-hld/content.json";
+import hldModule16 from "../problems/hld/spotify-music-hld/content.json";
+import hldModule17 from "../problems/hld/ticket-booking-hld/content.json";
+import hldModule18 from "../problems/hld/twitter-social-hld/content.json";
+import hldModule19 from "../problems/hld/uber-ride-sharing-hld/content.json";
+import hldModule20 from "../problems/hld/url-shortener/content.json";
+import hldModule21 from "../problems/hld/video-streaming-hld/content.json";
+import hldModule22 from "../problems/hld/web-crawler/content.json";
+import hldModule23 from "../problems/hld/whatsapp-chat-hld/content.json";
+import hldModule24 from "../problems/hld/youtube-streaming/content.json";
+import hldModule25 from "../problems/hld/zoom-conferencing-hld/content.json";
 const rawModules = [
 	sqlModule1,
 	sqlModule2,
@@ -517,6 +542,31 @@ const rawModules = [
 	lldModule23,
 	lldModule24,
 	lldModule25,
+	hldModule1,
+	hldModule2,
+	hldModule3,
+	hldModule4,
+	hldModule5,
+	hldModule6,
+	hldModule7,
+	hldModule8,
+	hldModule9,
+	hldModule10,
+	hldModule11,
+	hldModule12,
+	hldModule13,
+	hldModule14,
+	hldModule15,
+	hldModule16,
+	hldModule17,
+	hldModule18,
+	hldModule19,
+	hldModule20,
+	hldModule21,
+	hldModule22,
+	hldModule23,
+	hldModule24,
+	hldModule25,
 	dotnetModule1,
 	dotnetModule2,
 	dotnetModule3,

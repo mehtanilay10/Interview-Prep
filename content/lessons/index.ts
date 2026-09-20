@@ -1624,6 +1624,56 @@ import lldLesson47 from "../problems/lld/youtube-video/youtube-advanced.json";
 import lldLesson48 from "../problems/lld/youtube-video/youtube-basic.json";
 import lldLesson49 from "../problems/lld/zoom-conferencing/zoom-advanced.json";
 import lldLesson50 from "../problems/lld/zoom-conferencing/zoom-basic.json";
+import hldLesson1 from "../problems/hld/airbnb-booking-hld/airbnb-booking-hld-advanced.json";
+import hldLesson2 from "../problems/hld/airbnb-booking-hld/airbnb-booking-hld-basic.json";
+import hldLesson3 from "../problems/hld/amazon-ecommerce-hld/amazon-ecommerce-hld-advanced.json";
+import hldLesson4 from "../problems/hld/amazon-ecommerce-hld/amazon-ecommerce-hld-basic.json";
+import hldLesson5 from "../problems/hld/chat-system-hld/chat-system-hld-advanced.json";
+import hldLesson6 from "../problems/hld/chat-system-hld/chat-system-hld-basic.json";
+import hldLesson7 from "../problems/hld/dropbox-storage/dropbox-storage-advanced.json";
+import hldLesson8 from "../problems/hld/dropbox-storage/dropbox-storage-basic.json";
+import hldLesson9 from "../problems/hld/ecommerce-hld/ecommerce-hld-advanced.json";
+import hldLesson10 from "../problems/hld/ecommerce-hld/ecommerce-hld-basic.json";
+import hldLesson11 from "../problems/hld/food-delivery-hld/food-delivery-hld-advanced.json";
+import hldLesson12 from "../problems/hld/food-delivery-hld/food-delivery-hld-basic.json";
+import hldLesson13 from "../problems/hld/google-search/google-search-advanced.json";
+import hldLesson14 from "../problems/hld/google-search/google-search-basic.json";
+import hldLesson15 from "../problems/hld/instagram-feed/instagram-feed-advanced.json";
+import hldLesson16 from "../problems/hld/instagram-feed/instagram-feed-basic.json";
+import hldLesson17 from "../problems/hld/linkedin-professional-hld/linkedin-professional-hld-advanced.json";
+import hldLesson18 from "../problems/hld/linkedin-professional-hld/linkedin-professional-hld-basic.json";
+import hldLesson19 from "../problems/hld/notification-system/notification-system-advanced.json";
+import hldLesson20 from "../problems/hld/notification-system/notification-system-basic.json";
+import hldLesson21 from "../problems/hld/payment-gateway-hld/payment-gateway-hld-advanced.json";
+import hldLesson22 from "../problems/hld/payment-gateway-hld/payment-gateway-hld-basic.json";
+import hldLesson23 from "../problems/hld/rate-limiter/rate-limiter-advanced.json";
+import hldLesson24 from "../problems/hld/rate-limiter/rate-limiter-basic.json";
+import hldLesson25 from "../problems/hld/ride-sharing-hld/ride-sharing-hld-advanced.json";
+import hldLesson26 from "../problems/hld/ride-sharing-hld/ride-sharing-hld-basic.json";
+import hldLesson27 from "../problems/hld/search-autocomplete/search-autocomplete-advanced.json";
+import hldLesson28 from "../problems/hld/search-autocomplete/search-autocomplete-basic.json";
+import hldLesson29 from "../problems/hld/slack-messaging-hld/slack-messaging-hld-advanced.json";
+import hldLesson30 from "../problems/hld/slack-messaging-hld/slack-messaging-hld-basic.json";
+import hldLesson31 from "../problems/hld/spotify-music-hld/spotify-music-hld-advanced.json";
+import hldLesson32 from "../problems/hld/spotify-music-hld/spotify-music-hld-basic.json";
+import hldLesson33 from "../problems/hld/ticket-booking-hld/ticket-booking-hld-advanced.json";
+import hldLesson34 from "../problems/hld/ticket-booking-hld/ticket-booking-hld-basic.json";
+import hldLesson35 from "../problems/hld/twitter-social-hld/twitter-social-hld-advanced.json";
+import hldLesson36 from "../problems/hld/twitter-social-hld/twitter-social-hld-basic.json";
+import hldLesson37 from "../problems/hld/uber-ride-sharing-hld/uber-ride-sharing-hld-advanced.json";
+import hldLesson38 from "../problems/hld/uber-ride-sharing-hld/uber-ride-sharing-hld-basic.json";
+import hldLesson39 from "../problems/hld/url-shortener/url-shortener-advanced.json";
+import hldLesson40 from "../problems/hld/url-shortener/url-shortener-basic.json";
+import hldLesson41 from "../problems/hld/video-streaming-hld/video-streaming-hld-advanced.json";
+import hldLesson42 from "../problems/hld/video-streaming-hld/video-streaming-hld-basic.json";
+import hldLesson43 from "../problems/hld/web-crawler/web-crawler-advanced.json";
+import hldLesson44 from "../problems/hld/web-crawler/web-crawler-basic.json";
+import hldLesson45 from "../problems/hld/whatsapp-chat-hld/whatsapp-chat-hld-advanced.json";
+import hldLesson46 from "../problems/hld/whatsapp-chat-hld/whatsapp-chat-hld-basic.json";
+import hldLesson47 from "../problems/hld/youtube-streaming/youtube-streaming-advanced.json";
+import hldLesson48 from "../problems/hld/youtube-streaming/youtube-streaming-basic.json";
+import hldLesson49 from "../problems/hld/zoom-conferencing-hld/zoom-conferencing-hld-advanced.json";
+import hldLesson50 from "../problems/hld/zoom-conferencing-hld/zoom-conferencing-hld-basic.json";
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -3227,6 +3277,56 @@ const rawLessonsPart2: any[] = [
 	lldLesson48,
 	lldLesson49,
 	lldLesson50,
+	hldLesson1,
+	hldLesson2,
+	hldLesson3,
+	hldLesson4,
+	hldLesson5,
+	hldLesson6,
+	hldLesson7,
+	hldLesson8,
+	hldLesson9,
+	hldLesson10,
+	hldLesson11,
+	hldLesson12,
+	hldLesson13,
+	hldLesson14,
+	hldLesson15,
+	hldLesson16,
+	hldLesson17,
+	hldLesson18,
+	hldLesson19,
+	hldLesson20,
+	hldLesson21,
+	hldLesson22,
+	hldLesson23,
+	hldLesson24,
+	hldLesson25,
+	hldLesson26,
+	hldLesson27,
+	hldLesson28,
+	hldLesson29,
+	hldLesson30,
+	hldLesson31,
+	hldLesson32,
+	hldLesson33,
+	hldLesson34,
+	hldLesson35,
+	hldLesson36,
+	hldLesson37,
+	hldLesson38,
+	hldLesson39,
+	hldLesson40,
+	hldLesson41,
+	hldLesson42,
+	hldLesson43,
+	hldLesson44,
+	hldLesson45,
+	hldLesson46,
+	hldLesson47,
+	hldLesson48,
+	hldLesson49,
+	hldLesson50,
 ];
 
 const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2];

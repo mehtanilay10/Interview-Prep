@@ -30,8 +30,9 @@ import sqlProblemsCourse from "../problems/sql/content.json";
 import systemDesignProblemsCourse from "../problems/system-design/content.json";
 import azureProblemsCourse from "../problems/azure/content.json";
 import lldProblemsCourse from "../problems/lld/content.json";
+import hldProblemsCourse from "../problems/hld/content.json";
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse, azureProblemsCourse, lldProblemsCourse];
+const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse, azureProblemsCourse, lldProblemsCourse, hldProblemsCourse];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 
