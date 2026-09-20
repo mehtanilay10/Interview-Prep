@@ -1,0 +1,133 @@
+{
+  "id": "lesson-aspnet-problems-04middlewarepipelineproblems-19",
+  "slug": "exception-handling-middleware",
+  "moduleSlug": "04-middleware-pipeline-problems",
+  "courseSlug": "aspnet-core-problems",
+  "title": "Exception Handling Middleware",
+  "description": "Configure exception handling for development and production environments.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "aspnet-core",
+    "middleware",
+    "exception-handling",
+    "error-handling"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Configure exception handling for development and production environments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Scenario:** Configure or implement the described functionality in an ASP.NET Core application."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: UseExceptionHandler"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Configure UseExceptionHandler to redirect to an error endpoint in production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "UseExceptionHandler",
+        "language": "csharp",
+        "code": "var app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseDeveloperExceptionPage();\n}\nelse\n{\n    app.UseExceptionHandler(\"/error\");\n    app.UseHsts();\n}\n\napp.MapGet(\"/error\", (HttpContext context) =>\n{\n    var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();\n    var exception = exceptionHandlerPathFeature?.Error;\n    \n    // Log the exception\n    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();\n    logger.LogError(exception, \"Unhandled exception at {Path}\", context.Request.Path);\n    \n    return Results.Problem(\n        title: \"An error occurred\",\n        detail: exception?.Message,\n        statusCode: StatusCodes.Status500InternalServerError,\n        instance: context.Request.Path);\n});\n\napp.MapControllers();\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: Custom Exception Types"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Create domain-specific exceptions and handle them with custom middleware."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Exception Types",
+        "language": "csharp",
+        "code": "// Custom exceptions\npublic class NotFoundException : Exception\n{\n    public NotFoundException(string resourceName) \n        : base($\"{resourceName} not found\") { }\n}\n\npublic class ValidationException : Exception\n{\n    public ValidationException(string message) : base(message) { }\n}\n\n// Exception handler middleware\npublic class CustomExceptionMiddleware(RequestDelegate next, ILogger<CustomExceptionMiddleware> logger)\n{\n    public async Task InvokeAsync(HttpContext context)\n    {\n        try\n        {\n            await next(context);\n        }\n        catch (NotFoundException ex)\n        {\n            logger.LogWarning(ex, \"Resource not found\");\n            context.Response.StatusCode = StatusCodes.Status404NotFound;\n            await context.Response.WriteAsJsonAsync(new { error = ex.Message });\n        }\n        catch (ValidationException ex)\n        {\n            logger.LogWarning(ex, \"Validation failed\");\n            context.Response.StatusCode = StatusCodes.Status400BadRequest;\n            await context.Response.WriteAsJsonAsync(new { error = ex.Message });\n        }\n    }\n}\n\n// Register\napp.UseMiddleware<CustomExceptionMiddleware>();"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Approach Comparison",
+        "cards": [
+          {
+            "title": "UseExceptionHandler",
+            "description": "Centralized error page",
+            "pros": [
+              "Separates dev/prod behavior",
+              "Captures exception details",
+              "Logs automatically"
+            ],
+            "cons": [
+              "Only catches unhandled exceptions",
+              "Response is HTML by default"
+            ],
+            "tags": [
+              "UseExceptionHandler",
+              "IExceptionHandlerPathFeature",
+              "Hsts"
+            ]
+          },
+          {
+            "title": "Custom Exception Types",
+            "description": "Domain-specific error handling",
+            "pros": [
+              "Type-safe error responses",
+              "Clear separation of concerns",
+              "Easier debugging"
+            ],
+            "cons": [
+              "Must throw from controllers",
+              "More middleware code"
+            ],
+            "tags": [
+              "NotFoundException",
+              "custom middleware",
+              "WriteAsJsonAsync"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

@@ -1,0 +1,134 @@
+{
+  "id": "lesson-aspnet-problems-07authenticationauthorizationproblems-34",
+  "slug": "jwt-authentication",
+  "moduleSlug": "07-authentication-authorization-problems",
+  "courseSlug": "aspnet-core-problems",
+  "title": "JWT Authentication",
+  "description": "Implement JWT token authentication for stateless API authorization.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": [
+    "aspnet-core",
+    "authentication",
+    "jwt",
+    "bearer"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Implement JWT token authentication for stateless API authorization."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Scenario:** Configure or implement the described functionality in an ASP.NET Core application."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 1: JWT Setup in Program.cs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Configure JWT Bearer authentication with validation parameters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JWT Setup in Program.cs",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddAuthentication(options =>\n{\n    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;\n    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;\n})\n.AddJwtBearer(options =>\n{\n    options.TokenValidationParameters = new TokenValidationParameters\n    {\n        ValidateIssuer = true,\n        ValidateAudience = true,\n        ValidateLifetime = true,\n        ValidateIssuerSigningKey = true,\n        ValidIssuer = builder.Configuration[\"Jwt:Issuer\"],\n        ValidAudience = builder.Configuration[\"Jwt:Audience\"],\n        IssuerSigningKey = new SymmetricSecurityKey(\n            Encoding.UTF8.GetBytes(builder.Configuration[\"Jwt:Key\"]!))\n    };\n});\n\nbuilder.Services.AddAuthorization();\n\nvar app = builder.Build();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach 2: Token Generation and Validation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Generate JWT tokens on login and protect endpoints with [Authorize]."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token Generation and Validation",
+        "language": "csharp",
+        "code": "public class AuthController(IConfiguration config, IUserService userService) : ControllerBase\n{\n    [HttpPost(\"login\")]\n    public async Task<IActionResult> Login([FromBody] LoginRequest request)\n    {\n        var user = await userService.ValidateAsync(request.Email, request.Password);\n        if (user == null)\n            return Unauthorized();\n\n        var token = GenerateJwtToken(user);\n        return Ok(new { Token = token, Expires = DateTime.UtcNow.AddHours(1) });\n    }\n\n    private string GenerateJwtToken(User user)\n    {\n        var claims = new[]\n        {\n            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),\n            new Claim(ClaimTypes.Name, user.Email),\n            new Claim(ClaimTypes.Role, user.Role)\n        };\n\n        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config[\"Jwt:Key\"]!));\n        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);\n\n        var token = new JwtSecurityToken(\n            issuer: config[\"Jwt:Issuer\"],\n            audience: config[\"Jwt:Audience\"],\n            claims: claims,\n            expires: DateTime.UtcNow.AddHours(1),\n            signingCredentials: creds);\n\n        return new JwtSecurityTokenHandler().WriteToken(token);\n    }\n}\n\n// Protected endpoint\n[Authorize(Roles = \"Admin\")]\n[HttpGet(\"admin/dashboard\")]\npublic IActionResult GetAdminDashboard() => Ok(\"Admin data\");"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Approach Comparison",
+        "cards": [
+          {
+            "title": "JWT Setup in Program.cs",
+            "description": "JWT authentication configuration",
+            "pros": [
+              "Stateless",
+              "Works across services",
+              "Industry standard"
+            ],
+            "cons": [
+              "Token revocation is hard",
+              "Key management is critical",
+              "Tokens can be stolen"
+            ],
+            "tags": [
+              "JwtBearer",
+              "TokenValidationParameters",
+              "SymmetricSecurityKey"
+            ]
+          },
+          {
+            "title": "Token Generation and Validation",
+            "description": "Full JWT login flow",
+            "pros": [
+              "Complete auth flow",
+              "Role-based access",
+              "Token expiration"
+            ],
+            "cons": [
+              "Secret must be stored securely",
+              "Refresh tokens add complexity"
+            ],
+            "tags": [
+              "JwtSecurityToken",
+              "SigningCredentials",
+              "[Authorize]"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

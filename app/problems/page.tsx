@@ -8,7 +8,7 @@ import { buildMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
   title: 'Problems',
-  description: 'Practice C# and SQL Server problems with multiple approaches and detailed explanations.',
+  description: 'Practice C#, SQL, ASP.NET Core, Azure, system design, and other interview problems with multiple approaches and detailed explanations.',
   path: '/problems',
 });
 
@@ -19,8 +19,9 @@ export default function ProblemsPage() {
   const azureProblemsCourse = getCourseBySlug('azure-problems');
   const lldCourse = getCourseBySlug('lld-problems');
   const hldCourse = getCourseBySlug('hld-problems');
+  const aspNetCoreProblemsCourse = getCourseBySlug('aspnet-core-problems');
 
-  const courses = [csharpCourse, sqlCourse, systemDesignCourse, azureProblemsCourse, lldCourse, hldCourse].filter(Boolean) as Course[];
+  const courses = [csharpCourse, sqlCourse, systemDesignCourse, azureProblemsCourse, lldCourse, hldCourse, aspNetCoreProblemsCourse].filter(Boolean) as Course[];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">

@@ -307,6 +307,14 @@ import hldModule22 from "../problems/hld/web-crawler/content.json";
 import hldModule23 from "../problems/hld/whatsapp-chat-hld/content.json";
 import hldModule24 from "../problems/hld/youtube-streaming/content.json";
 import hldModule25 from "../problems/hld/zoom-conferencing-hld/content.json";
+import aspNetCoreProblemModule1 from "../problems/aspnet-core/01-mvc-fundamentals-problems/content.json";
+import aspNetCoreProblemModule2 from "../problems/aspnet-core/02-razor-views-problems/content.json";
+import aspNetCoreProblemModule3 from "../problems/aspnet-core/03-api-design-problems/content.json";
+import aspNetCoreProblemModule4 from "../problems/aspnet-core/04-middleware-pipeline-problems/content.json";
+import aspNetCoreProblemModule5 from "../problems/aspnet-core/05-dependency-injection-problems/content.json";
+import aspNetCoreProblemModule6 from "../problems/aspnet-core/06-ef-core-problems/content.json";
+import aspNetCoreProblemModule7 from "../problems/aspnet-core/07-authentication-authorization-problems/content.json";
+import aspNetCoreProblemModule8 from "../problems/aspnet-core/08-testing-debugging-problems/content.json";
 const rawModules = [
 	sqlModule1,
 	sqlModule2,
@@ -567,6 +575,14 @@ const rawModules = [
 	hldModule23,
 	hldModule24,
 	hldModule25,
+	aspNetCoreProblemModule1,
+	aspNetCoreProblemModule2,
+	aspNetCoreProblemModule3,
+	aspNetCoreProblemModule4,
+	aspNetCoreProblemModule5,
+	aspNetCoreProblemModule6,
+	aspNetCoreProblemModule7,
+	aspNetCoreProblemModule8,
 	dotnetModule1,
 	dotnetModule2,
 	dotnetModule3,

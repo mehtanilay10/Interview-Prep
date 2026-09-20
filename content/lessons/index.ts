@@ -1674,6 +1674,50 @@ import hldLesson47 from "../problems/hld/youtube-streaming/youtube-streaming-adv
 import hldLesson48 from "../problems/hld/youtube-streaming/youtube-streaming-basic.json";
 import hldLesson49 from "../problems/hld/zoom-conferencing-hld/zoom-conferencing-hld-advanced.json";
 import hldLesson50 from "../problems/hld/zoom-conferencing-hld/zoom-conferencing-hld-basic.json";
+
+import aspNetCoreProblemLesson1 from "../problems/aspnet-core/01-mvc-fundamentals-problems/routing-basics.json";
+import aspNetCoreProblemLesson2 from "../problems/aspnet-core/01-mvc-fundamentals-problems/attribute-routing.json";
+import aspNetCoreProblemLesson3 from "../problems/aspnet-core/01-mvc-fundamentals-problems/action-filters.json";
+import aspNetCoreProblemLesson4 from "../problems/aspnet-core/01-mvc-fundamentals-problems/model-binding-deep-dive.json";
+import aspNetCoreProblemLesson5 from "../problems/aspnet-core/01-mvc-fundamentals-problems/validation-attributes.json";
+import aspNetCoreProblemLesson6 from "../problems/aspnet-core/01-mvc-fundamentals-problems/controller-actions-and-results.json";
+import aspNetCoreProblemLesson7 from "../problems/aspnet-core/02-razor-views-problems/razor-syntax-basics.json";
+import aspNetCoreProblemLesson8 from "../problems/aspnet-core/02-razor-views-problems/layouts-and-partials.json";
+import aspNetCoreProblemLesson9 from "../problems/aspnet-core/02-razor-views-problems/view-components.json";
+import aspNetCoreProblemLesson10 from "../problems/aspnet-core/02-razor-views-problems/tag-helpers.json";
+import aspNetCoreProblemLesson11 from "../problems/aspnet-core/02-razor-views-problems/view-data-tempdata.json";
+import aspNetCoreProblemLesson12 from "../problems/aspnet-core/03-api-design-problems/rest-api-design-principles.json";
+import aspNetCoreProblemLesson13 from "../problems/aspnet-core/03-api-design-problems/api-versioning.json";
+import aspNetCoreProblemLesson14 from "../problems/aspnet-core/03-api-design-problems/swagger-documentation.json";
+import aspNetCoreProblemLesson15 from "../problems/aspnet-core/03-api-design-problems/response-caching.json";
+import aspNetCoreProblemLesson16 from "../problems/aspnet-core/03-api-design-problems/content-negotiation.json";
+import aspNetCoreProblemLesson17 from "../problems/aspnet-core/03-api-design-problems/api-error-handling.json";
+import aspNetCoreProblemLesson18 from "../problems/aspnet-core/04-middleware-pipeline-problems/middleware-ordering.json";
+import aspNetCoreProblemLesson19 from "../problems/aspnet-core/04-middleware-pipeline-problems/exception-handling-middleware.json";
+import aspNetCoreProblemLesson20 from "../problems/aspnet-core/04-middleware-pipeline-problems/cors-configuration.json";
+import aspNetCoreProblemLesson21 from "../problems/aspnet-core/04-middleware-pipeline-problems/request-logging.json";
+import aspNetCoreProblemLesson22 from "../problems/aspnet-core/04-middleware-pipeline-problems/custom-middleware.json";
+import aspNetCoreProblemLesson23 from "../problems/aspnet-core/04-middleware-pipeline-problems/response-compression.json";
+import aspNetCoreProblemLesson24 from "../problems/aspnet-core/05-dependency-injection-problems/service-lifetimes.json";
+import aspNetCoreProblemLesson25 from "../problems/aspnet-core/05-dependency-injection-problems/ioc-container-setup.json";
+import aspNetCoreProblemLesson26 from "../problems/aspnet-core/05-dependency-injection-problems/factory-pattern-di.json";
+import aspNetCoreProblemLesson27 from "../problems/aspnet-core/05-dependency-injection-problems/options-pattern.json";
+import aspNetCoreProblemLesson28 from "../problems/aspnet-core/05-dependency-injection-problems/scoped-vs-transient-vs-singleton.json";
+import aspNetCoreProblemLesson29 from "../problems/aspnet-core/06-ef-core-problems/dbcontext-configuration.json";
+import aspNetCoreProblemLesson30 from "../problems/aspnet-core/06-ef-core-problems/relationships-configuration.json";
+import aspNetCoreProblemLesson31 from "../problems/aspnet-core/06-ef-core-problems/eager-vs-lazy-loading.json";
+import aspNetCoreProblemLesson32 from "../problems/aspnet-core/06-ef-core-problems/query-optimization.json";
+import aspNetCoreProblemLesson33 from "../problems/aspnet-core/06-ef-core-problems/migrations-best-practices.json";
+import aspNetCoreProblemLesson34 from "../problems/aspnet-core/07-authentication-authorization-problems/jwt-authentication.json";
+import aspNetCoreProblemLesson35 from "../problems/aspnet-core/07-authentication-authorization-problems/identity-server-setup.json";
+import aspNetCoreProblemLesson36 from "../problems/aspnet-core/07-authentication-authorization-problems/role-based-access.json";
+import aspNetCoreProblemLesson37 from "../problems/aspnet-core/07-authentication-authorization-problems/policy-based-authorization.json";
+import aspNetCoreProblemLesson38 from "../problems/aspnet-core/07-authentication-authorization-problems/cookie-authentication.json";
+import aspNetCoreProblemLesson39 from "../problems/aspnet-core/08-testing-debugging-problems/unit-testing-controllers.json";
+import aspNetCoreProblemLesson40 from "../problems/aspnet-core/08-testing-debugging-problems/integration-testing.json";
+import aspNetCoreProblemLesson41 from "../problems/aspnet-core/08-testing-debugging-problems/logging-best-practices.json";
+import aspNetCoreProblemLesson42 from "../problems/aspnet-core/08-testing-debugging-problems/health-checks.json";
+import aspNetCoreProblemLesson43 from "../problems/aspnet-core/08-testing-debugging-problems/profiling-debugging.json";
 const rawLessonsPart1: any[] = [
 	sqlLesson1,
 	sqlLesson2,
@@ -3071,6 +3115,49 @@ const rawLessonsPart2: any[] = [
 	dotnetLesson805,
 	dotnetLesson806,
 	dotnetLesson807,
+	aspNetCoreProblemLesson1,
+	aspNetCoreProblemLesson2,
+	aspNetCoreProblemLesson3,
+	aspNetCoreProblemLesson4,
+	aspNetCoreProblemLesson5,
+	aspNetCoreProblemLesson6,
+	aspNetCoreProblemLesson7,
+	aspNetCoreProblemLesson8,
+	aspNetCoreProblemLesson9,
+	aspNetCoreProblemLesson10,
+	aspNetCoreProblemLesson11,
+	aspNetCoreProblemLesson12,
+	aspNetCoreProblemLesson13,
+	aspNetCoreProblemLesson14,
+	aspNetCoreProblemLesson15,
+	aspNetCoreProblemLesson16,
+	aspNetCoreProblemLesson17,
+	aspNetCoreProblemLesson18,
+	aspNetCoreProblemLesson19,
+	aspNetCoreProblemLesson20,
+	aspNetCoreProblemLesson21,
+	aspNetCoreProblemLesson22,
+	aspNetCoreProblemLesson23,
+	aspNetCoreProblemLesson24,
+	aspNetCoreProblemLesson25,
+	aspNetCoreProblemLesson26,
+	aspNetCoreProblemLesson27,
+	aspNetCoreProblemLesson28,
+	aspNetCoreProblemLesson29,
+	aspNetCoreProblemLesson30,
+	aspNetCoreProblemLesson31,
+	aspNetCoreProblemLesson32,
+	aspNetCoreProblemLesson33,
+	aspNetCoreProblemLesson34,
+	aspNetCoreProblemLesson35,
+	aspNetCoreProblemLesson36,
+	aspNetCoreProblemLesson37,
+	aspNetCoreProblemLesson38,
+	aspNetCoreProblemLesson39,
+	aspNetCoreProblemLesson40,
+	aspNetCoreProblemLesson41,
+	aspNetCoreProblemLesson42,
+	aspNetCoreProblemLesson43,
 	dotnetLesson901,
 	dotnetLesson902,
 	dotnetLesson903,
