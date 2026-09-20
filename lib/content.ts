@@ -246,8 +246,8 @@ export function searchAll(query: string): SearchResult[] {
 
 const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems']);
 
-export function isProblemCourseSlug(slug: string): boolean {
-  return PROBLEM_COURSE_SLUGS.has(slug);
+export function isProblemCourseSlug(slug: string | undefined): boolean {
+  return slug !== undefined && PROBLEM_COURSE_SLUGS.has(slug);
 }
 
 export function getSearchResultHref(result: SearchResult): string {
