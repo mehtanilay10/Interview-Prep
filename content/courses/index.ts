@@ -18,7 +18,7 @@ import devopsCourse from "./devops/content.json";
 import dotnetNugetPackagesCourse from "./dotnet-nuget-packages/content.json";
 import efCoreCourse from "./ef-core/content.json";
 import frontendPerformanceEngineeringCourse from "./frontend-performance-engineering/content.json";
-import fullStackSeniorProjectsCourse from "../projects/full-stack-senior-projects/content.json";
+import fullStackSeniorProjectsCourse from "../problems/full-stack-senior-projects/content.json";
 import fullstackSecurityCourse from "./fullstack-security/content.json";
 import gitLinuxDeveloperWorkflowCourse from "./git-linux-developer-workflow/content.json";
 import graphqlDotnetCourse from "./graphql-dotnet/content.json";
@@ -40,7 +40,7 @@ import seniorSoftwareEngineeringCourse from "./senior-software-engineering/conte
 import sqlCourse from "../problems/sql/content.json";
 import sqlServerCourse from "./sql-server/content.json";
 import systemDesignCourse from "../problems/system-design/content.json";
-import systemDesignProblemsCourse from "./system-design-problems/content.json";
+import systemDesignProblemsCourse from "../problems/system-design-problems/content.json";
 import typescriptForReactCourse from "./typescript-for-react/content.json";
 import unitTestingDotnetCourse from "./unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";

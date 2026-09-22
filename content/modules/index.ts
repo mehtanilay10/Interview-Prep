@@ -266,6 +266,7 @@ import mod20AzureSqlModule from "../courses/sql-server/20-azure-sql/content.json
 import mod21ModernDataToolsModule from "../courses/sql-server/21-modern-data-tools/content.json";
 import advancedAsyncConcurrencyThreadingModule from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/content.json";
 import advancedCRuntimeMemoryConcurrencyModule from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/content.json";
+import advancedGitWorkflowsModule from "../courses/git-linux-developer-workflow/advanced-git-workflows/content.json";
 import advancedPatternsModule from "../courses/dotnet-nuget-packages/advanced-patterns/content.json";
 import advancedPatternsModule1 from "../courses/yarn-npm-packages/advanced-patterns/content.json";
 import advancedTypeModelingRuntimeSafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
@@ -298,6 +299,7 @@ import backendDatabaseFollowUpsModule from "../interview-qa/backend-database-fol
 import backendIncidentsModule from "../problems/production-incident-lab-problems/backend-incidents/content.json";
 import bankingAppModule from "../problems/lld/banking-app/content.json";
 import browserReactPerformanceModule from "../courses/frontend-performance-engineering/browser-react-performance/content.json";
+import buildOptimizationModule from "../courses/frontend-performance-engineering/build-optimization/content.json";
 import buildToolsModule from "../courses/yarn-npm-packages/build-tools/content.json";
 import cAspnetCoreReviewsModule from "../problems/senior-code-review-lab-problems/c-aspnet-core-reviews/content.json";
 import cNetFollowUpsModule from "../interview-qa/c-net-follow-ups/content.json";
@@ -309,12 +311,14 @@ import concurrencyProductionDatabaseProblemsModule from "../courses/sql-server/c
 import csharpModule from "../problems/csharp/content.json";
 import csharpModule1 from "../cheatsheet/csharp/content.json";
 import csharpFundamentalsModule from "../courses/csharp-fundamentals/content.json";
+import dataFetchingPatternsModule from "../courses/next-js-full-stack-react/data-fetching-patterns/content.json";
+import dataStructuresDeepDiveModule from "../courses/programming-computer-web-foundations/data-structures-deep-dive/content.json";
 import databaseInfrastructureIncidentsModule from "../problems/production-incident-lab-problems/database-infrastructure-incidents/content.json";
 import databaseInternalsQueryOptimizationModule from "../courses/sql-server/database-internals-query-optimization/content.json";
 import designPatternsModule from "../courses/design-patterns/content.json";
 import devopsModule from "../courses/devops/content.json";
 import devopsSystemDesignModule from "../problems/system-design/devops-system-design/content.json";
-import distributedSystemsFundamentalsModule from "../courses/system-design-problems/distributed-systems-fundamentals/content.json";
+import distributedSystemsFundamentalsModule from "../problems/system-design-problems/distributed-systems-fundamentals/content.json";
 import dockerComposeModule from "../cheatsheet/docker-compose/content.json";
 import dotnetNugetPackagesModule from "../courses/dotnet-nuget-packages/content.json";
 import dropboxStorageModule from "../problems/hld/dropbox-storage/content.json";
@@ -330,7 +334,8 @@ import formsModule from "../courses/yarn-npm-packages/forms/content.json";
 import frontendFrameworksModule from "../courses/yarn-npm-packages/frontend-frameworks/content.json";
 import frontendIncidentsModule from "../problems/production-incident-lab-problems/frontend-incidents/content.json";
 import frontendPerformanceEngineeringModule from "../courses/frontend-performance-engineering/content.json";
-import fullStackSeniorProjectsModule from "../projects/full-stack-senior-projects/content.json";
+import fullStackApiDesignModule from "../courses/next-js-full-stack-react/full-stack-api-design/content.json";
+import fullStackSeniorProjectsModule from "../problems/full-stack-senior-projects/content.json";
 import fullstackSecurityModule from "../courses/fullstack-security/content.json";
 import gitForSeniorEngineersModule from "../courses/git-linux-developer-workflow/git-for-senior-engineers/content.json";
 import gitLinuxDeveloperWorkflowModule from "../courses/git-linux-developer-workflow/content.json";
@@ -359,6 +364,7 @@ import modernStateApplicationArchitectureModule from "../courses/react-advanced-
 import modernWebSecurityIdentityModule from "../courses/fullstack-security/modern-web-security-identity/content.json";
 import movieTicketBookingModule from "../problems/lld/movie-ticket-booking/content.json";
 import netflixStreamingModule from "../problems/lld/netflix-streaming/content.json";
+import networkingProtocolsModule from "../courses/programming-computer-web-foundations/networking-protocols/content.json";
 import nextJsFullStackReactModule from "../courses/next-js-full-stack-react/content.json";
 import notificationSystemModule from "../problems/hld/notification-system/content.json";
 import oopsConceptsModule from "../courses/oops-concepts/content.json";
@@ -372,11 +378,12 @@ import productionDockerContainerSecurityModule from "../courses/devops/productio
 import productionIncidentLabProblemsModule from "../problems/production-incident-lab-problems/content.json";
 import productionKubernetesDay2OperationsModule from "../courses/devops/production-kubernetes-day-2-operations/content.json";
 import productionOwnershipModule from "../courses/senior-software-engineering/production-ownership/content.json";
+import productionReadinessModule from "../courses/git-linux-developer-workflow/production-readiness/content.json";
 import programmingComputerFundamentalsModule from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/content.json";
 import programmingComputerWebFoundationsModule from "../courses/programming-computer-web-foundations/content.json";
-import project1EnterpriseExpensePlatformModule from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/content.json";
-import project2CollaborativeCommunicationPlatformModule from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/content.json";
-import project3ProductionIncidentSimulatorModule from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/content.json";
+import project1EnterpriseExpensePlatformModule from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/content.json";
+import project2CollaborativeCommunicationPlatformModule from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/content.json";
+import project3ProductionIncidentSimulatorModule from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/content.json";
 import rateLimiterModule from "../problems/hld/rate-limiter/content.json";
 import reactModule from "../cheatsheet/react/content.json";
 import reactAdvancedPatternsModule from "../courses/react-advanced-patterns/content.json";
@@ -397,6 +404,7 @@ import reduxModule from "../courses/redux/content.json";
 import reduxModule1 from "../cheatsheet/redux/content.json";
 import rideSharingHldModule from "../problems/hld/ride-sharing-hld/content.json";
 import routingModule from "../courses/yarn-npm-packages/routing/content.json";
+import runtimePerformanceModule from "../courses/frontend-performance-engineering/runtime-performance/content.json";
 import searchAutocompleteModule from "../problems/hld/search-autocomplete/content.json";
 import seniorCodeReviewLabProblemsModule from "../problems/senior-code-review-lab-problems/content.json";
 import seniorEngineeringJudgmentArchitectureDecisionsModule from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/content.json";
@@ -408,10 +416,13 @@ import spotifyMusicHldModule from "../problems/hld/spotify-music-hld/content.jso
 import sqlModule from "../problems/sql/content.json";
 import sqlServerModule from "../courses/sql-server/content.json";
 import sqlServerModule1 from "../cheatsheet/sql-server/content.json";
-import stateManagementModule from "../courses/yarn-npm-packages/state-management/content.json";
+import stateManagementModule from "../courses/next-js-full-stack-react/state-management/content.json";
+import stateManagementModule1 from "../courses/yarn-npm-packages/state-management/content.json";
 import stylingModule from "../courses/yarn-npm-packages/styling/content.json";
 import systemDesignModule from "../problems/system-design/content.json";
-import systemDesignProblemsModule from "../courses/system-design-problems/content.json";
+import systemDesignForSeniorsModule from "../courses/senior-software-engineering/system-design-for-seniors/content.json";
+import systemDesignProblemsModule from "../problems/system-design-problems/content.json";
+import technicalDecisionMakingModule from "../courses/senior-software-engineering/technical-decision-making/content.json";
 import technicalLeadershipModule from "../courses/senior-software-engineering/technical-leadership/content.json";
 import testingModule from "../courses/yarn-npm-packages/testing/content.json";
 import testingStrategyForSeniorFrontendEngineersModule from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/content.json";
@@ -707,6 +718,7 @@ const rawModulesPart1 = [
 	mod21ModernDataToolsModule,
 	advancedAsyncConcurrencyThreadingModule,
 	advancedCRuntimeMemoryConcurrencyModule,
+	advancedGitWorkflowsModule,
 	advancedPatternsModule,
 	advancedPatternsModule1,
 	advancedTypeModelingRuntimeSafetyModule,
@@ -739,6 +751,7 @@ const rawModulesPart1 = [
 	backendIncidentsModule,
 	bankingAppModule,
 	browserReactPerformanceModule,
+	buildOptimizationModule,
 	buildToolsModule,
 	cAspnetCoreReviewsModule,
 	cNetFollowUpsModule,
@@ -750,6 +763,8 @@ const rawModulesPart1 = [
 	csharpModule,
 	csharpModule1,
 	csharpFundamentalsModule,
+	dataFetchingPatternsModule,
+	dataStructuresDeepDiveModule,
 	databaseInfrastructureIncidentsModule,
 	databaseInternalsQueryOptimizationModule,
 	designPatternsModule,
@@ -771,6 +786,7 @@ const rawModulesPart1 = [
 	frontendFrameworksModule,
 	frontendIncidentsModule,
 	frontendPerformanceEngineeringModule,
+	fullStackApiDesignModule,
 	fullStackSeniorProjectsModule,
 	fullstackSecurityModule,
 	gitForSeniorEngineersModule,
@@ -800,6 +816,7 @@ const rawModulesPart1 = [
 	modernWebSecurityIdentityModule,
 	movieTicketBookingModule,
 	netflixStreamingModule,
+	networkingProtocolsModule,
 	nextJsFullStackReactModule,
 	notificationSystemModule,
 	oopsConceptsModule,
@@ -813,6 +830,7 @@ const rawModulesPart1 = [
 	productionIncidentLabProblemsModule,
 	productionKubernetesDay2OperationsModule,
 	productionOwnershipModule,
+	productionReadinessModule,
 	programmingComputerFundamentalsModule,
 	programmingComputerWebFoundationsModule,
 	project1EnterpriseExpensePlatformModule,
@@ -838,6 +856,7 @@ const rawModulesPart1 = [
 	reduxModule1,
 	rideSharingHldModule,
 	routingModule,
+	runtimePerformanceModule,
 	searchAutocompleteModule,
 	seniorCodeReviewLabProblemsModule,
 	seniorEngineeringJudgmentArchitectureDecisionsModule,
@@ -850,9 +869,12 @@ const rawModulesPart1 = [
 	sqlServerModule,
 	sqlServerModule1,
 	stateManagementModule,
+	stateManagementModule1,
 	stylingModule,
 	systemDesignModule,
+	systemDesignForSeniorsModule,
 	systemDesignProblemsModule,
+	technicalDecisionMakingModule,
 	technicalLeadershipModule,
 	testingModule,
 	testingStrategyForSeniorFrontendEngineersModule,

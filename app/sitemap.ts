@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { getAllCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions } from '@/lib/content';
+import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions } from '@/lib/content';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
@@ -75,14 +75,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  const problemCourses = [
-    { slug: 'csharp', label: 'C# Problems' },
-    { slug: 'sql', label: 'SQL Problems' },
-    { slug: 'system-design', label: 'System Design Problems' },
-    { slug: 'azure-problems', label: 'Azure Problems' },
-    { slug: 'lld-problems', label: 'Low Level Design Problems' },
-    { slug: 'hld-problems', label: 'High Level Design Problems' },
-  ];
+  const problemCourses = getProblemCourses();
 
   for (const course of problemCourses) {
     entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}`, 0.8, 'weekly'));

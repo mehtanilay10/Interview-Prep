@@ -25,7 +25,7 @@ export { modules, lessons, courses };
 
 export function getAllCourses(): Course[] {
   return [...courses]
-    .filter((c) => c.category !== 'problems')
+    .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet')
     .sort((a, b) => a.order - b.order);
 }
 

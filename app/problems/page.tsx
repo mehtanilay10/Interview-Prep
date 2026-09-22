@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getCourseBySlug, getModulesForCourse, getLessonsForCourse } from '@/lib/content';
+import { getProblemCourses, getModulesForCourse, getLessonsForCourse } from '@/lib/content';
 import type { Course, Lesson } from '@/types';
 import { buildMetadata } from '@/lib/seo';
 
@@ -13,15 +13,7 @@ export const metadata: Metadata = buildMetadata({
 });
 
 export default function ProblemsPage() {
-  const csharpCourse = getCourseBySlug('csharp-problems');
-  const sqlCourse = getCourseBySlug('sql-problems');
-  const systemDesignCourse = getCourseBySlug('system-design');
-  const azureProblemsCourse = getCourseBySlug('azure-problems');
-  const lldCourse = getCourseBySlug('lld-problems');
-  const hldCourse = getCourseBySlug('hld-problems');
-  const aspNetCoreProblemsCourse = getCourseBySlug('aspnet-core-problems');
-
-  const courses = [csharpCourse, sqlCourse, systemDesignCourse, azureProblemsCourse, lldCourse, hldCourse, aspNetCoreProblemsCourse].filter(Boolean) as Course[];
+  const courses = getProblemCourses();
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">

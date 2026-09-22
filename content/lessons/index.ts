@@ -300,6 +300,7 @@ import angularRouterLesson from "../courses/yarn-npm-packages/routing/angular-ro
 import animeJsLesson from "../courses/yarn-npm-packages/animation/anime-js.json";
 import apiContractTestingLesson from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/api-contract-testing.json";
 import apiControllersLesson from "../courses/aspnet-core/10-web-api-rest/api-controllers.json";
+import apiDesignLesson from "../courses/senior-software-engineering/system-design-for-seniors/api-design.json";
 import apiDesignPrinciplesLesson from "../courses/fullstack-security/05-secure-api-design/api-design-principles.json";
 import apiErrorHandlingLesson from "../problems/aspnet-core/03-api-design-problems/api-error-handling.json";
 import apiGatewayLesson from "../courses/aws/08-serverless/api-gateway.json";
@@ -311,9 +312,11 @@ import apiManagementOverviewLesson from "../courses/azure/08-networking-and-api-
 import apiManagementPoliciesLesson from "../courses/azure/08-networking-and-api-platforms/api-management-policies.json";
 import apiManagementVersioningAndRevisionsLesson from "../courses/azure/08-networking-and-api-platforms/api-management-versioning-and-revisions.json";
 import apiReturnsIntermittent503ResponsesWhileCpuRemainsLowLesson from "../problems/production-incident-lab-problems/backend-incidents/api-returns-intermittent-503-responses-while-cpu-remains-low.json";
+import apiRoutesLesson from "../courses/next-js-full-stack-react/full-stack-api-design/api-routes.json";
 import apiSecurityFundamentalsLesson from "../courses/fullstack-security/04-api-security-rate-limiting/api-security-fundamentals.json";
 import apiTestingLesson from "../courses/unit-testing-dotnet/04-integration-testing/api-testing.json";
-import apiVersioningLesson from "../problems/aspnet-core/03-api-design-problems/api-versioning.json";
+import apiVersioningLesson from "../courses/next-js-full-stack-react/full-stack-api-design/api-versioning.json";
+import apiVersioningLesson1 from "../problems/aspnet-core/03-api-design-problems/api-versioning.json";
 import apiVersioningAndCompatibilityLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/api-versioning-and-compatibility.json";
 import apolloClientLesson from "../courses/yarn-npm-packages/http-clients/apollo-client.json";
 import appConfigurationFeatureFlagsAndLabelsLesson from "../courses/azure/07-identity-security-and-configuration/app-configuration-feature-flags-and-labels.json";
@@ -343,6 +346,7 @@ import architectureReviewsLesson from "../courses/senior-software-engineering/te
 import areaRoutingLesson from "../courses/aspnet-core/03-routing-urls/area-routing.json";
 import arrangeActAssertLesson from "../courses/unit-testing-dotnet/01-testing-fundamentals/arrange-act-assert.json";
 import arraypooltAndMemorypooltLesson from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/arraypoolt-and-memorypoolt.json";
+import arraysAndLinkedListsLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/arrays-and-linked-lists.json";
 import artifactVersioningLesson from "../courses/devops/ci-cd-safe-delivery/artifact-versioning.json";
 import aspnetApiGatewayGrpcLesson from "../problems/system-design/aspnet-system-design/aspnet-api-gateway-grpc.json";
 import aspnetB01Lesson from "../interview-qa/01-beginner-questions/aspnet-b01.json";
@@ -360,12 +364,13 @@ import aspnetResilienceCircuitBreakerLesson from "../problems/system-design/aspn
 import assemblyLoadingAndMetadataLesson from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/assembly-loading-and-metadata.json";
 import assertionFrameworksLesson from "../courses/unit-testing-dotnet/06-testing-patterns/assertion-frameworks.json";
 import assertionsLesson from "../courses/unit-testing-dotnet/02-xunit-basics/assertions.json";
+import assetOptimizationLesson from "../courses/frontend-performance-engineering/build-optimization/asset-optimization.json";
 import asyncAwaitLesson from "../courses/csharp-fundamentals/05-advanced-features/async-await.json";
 import asyncAwaitPatternsLesson from "../courses/design-patterns/05-concurrency-patterns/async-await-patterns.json";
 import asyncIoVsCpuBoundWorkLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/async-io-vs-cpu-bound-work.json";
 import asyncTestingLesson from "../courses/react-testing/02-jest-basics/async-testing.json";
 import asyncawaitExplainItThenExplainHowItCanCauseThreadStarvationLesson from "../interview-qa/c-net-follow-ups/asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation.json";
-import atMostOnceVsAtLeastOnceDeliveryLesson from "../courses/system-design-problems/distributed-systems-fundamentals/at-most-once-vs-at-least-once-delivery.json";
+import atMostOnceVsAtLeastOnceDeliveryLesson from "../problems/system-design-problems/distributed-systems-fundamentals/at-most-once-vs-at-least-once-delivery.json";
 import athenaEmrLesson from "../courses/aws/13-analytics-big-data/athena-emr.json";
 import atmAdvancedLesson from "../problems/lld/atm-machine/atm-advanced.json";
 import atmBasicLesson from "../problems/lld/atm-machine/atm-basic.json";
@@ -380,6 +385,7 @@ import authOverviewLesson1 from "../courses/authentication-authorization/01-auth
 import auth0IntegrationLesson from "../courses/authentication-authorization/08-sso-identity-providers/auth0-integration.json";
 import authenticationAndAuthorizationBoundariesLesson from "../courses/next-js-full-stack-react/app-router-rendering/authentication-and-authorization-boundaries.json";
 import authenticationFlowLesson from "../courses/redux/08-redux-real-world/authentication-flow.json";
+import authenticationInApisLesson from "../courses/next-js-full-stack-react/full-stack-api-design/authentication-in-apis.json";
 import authenticationModesLesson from "../courses/sql-server/17-security-hardening/authentication-modes.json";
 import authenticationVsAuthorizationLesson from "../courses/authentication-authorization/01-auth-basics/authentication-vs-authorization.json";
 import authenticationWorksLocallyButFailsBehindAReverseProxyLesson from "../problems/production-incident-lab-problems/frontend-incidents/authentication-works-locally-but-fails-behind-a-reverse-proxy.json";
@@ -469,14 +475,15 @@ import backgroundRefetchingLesson from "../courses/react-query/05-caching-strate
 import backgroundServiceLesson from "../courses/dotnet-nuget-packages/06-messaging-events/background-service.json";
 import backgroundSyncLesson from "../courses/react-query/06-offline-support-persistence/background-sync.json";
 import backgroundserviceAndHostedWorkloadsLesson from "../courses/aspnet-core/asp-net-core-internals-production-hosting/backgroundservice-and-hosted-workloads.json";
-import backpressureLesson from "../courses/system-design-problems/distributed-systems-fundamentals/backpressure.json";
+import backpressureLesson from "../problems/system-design-problems/distributed-systems-fundamentals/backpressure.json";
+import backupAndRecoveryLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/backup-and-recovery.json";
 import backupArchivingLesson from "../courses/aws/05-storage-services/backup-archiving.json";
 import backupRestoreStrategiesLesson from "../courses/sql-server/18-high-availability-dr/backup-restore-strategies.json";
 import backwardCompatibleDeploymentsLesson from "../courses/devops/ci-cd-safe-delivery/backward-compatible-deployments.json";
 import bankingAdvancedLesson from "../problems/lld/banking-app/banking-advanced.json";
 import bankingBasicLesson from "../problems/lld/banking-app/banking-basic.json";
 import barrierPatternLesson from "../courses/design-patterns/05-concurrency-patterns/barrier-pattern.json";
-import baselineHealthyApplicationAndTelemetryLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/baseline-healthy-application-and-telemetry.json";
+import baselineHealthyApplicationAndTelemetryLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/baseline-healthy-application-and-telemetry.json";
 import basicTypesLesson from "../courses/typescript-for-react/01-typescript-basics/basic-types.json";
 import bcryptLesson from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt.json";
 import bcryptNetLesson from "../courses/dotnet-nuget-packages/08-security-cryptography/bcrypt-net.json";
@@ -540,6 +547,8 @@ import boxingUnboxingLesson from "../interview-qa/01-beginner-questions/boxing-u
 import branchingStrategiesAndTrunkBasedDevelopmentLesson from "../courses/git-linux-developer-workflow/git-for-senior-engineers/branching-strategies-and-trunk-based-development.json";
 import breakingDownLargeTechnicalInitiativesLesson from "../courses/senior-software-engineering/technical-leadership/breaking-down-large-technical-initiatives.json";
 import brokenAccessControlAndIdorbolaLesson from "../courses/fullstack-security/modern-web-security-identity/broken-access-control-and-idorbola.json";
+import buildCachingLesson from "../courses/frontend-performance-engineering/build-optimization/build-caching.json";
+import buildPipelineLesson from "../courses/frontend-performance-engineering/build-optimization/build-pipeline.json";
 import buildTestPackageDeployPipelineDesignLesson from "../courses/devops/ci-cd-safe-delivery/build-test-package-deploy-pipeline-design.json";
 import buildVsBuyDecisionsLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/build-vs-buy-decisions.json";
 import builderPatternLesson from "../courses/clean-code-csharp/02-creational-patterns/builder-pattern.json";
@@ -550,8 +559,10 @@ import buildingHookLibrariesLesson from "../courses/react-advanced-patterns/07-c
 import builtInMiddlewareLesson from "../courses/aspnet-core/07-middleware-pipeline/built-in-middleware.json";
 import builtInMiddlewareLesson1 from "../courses/aspnet-core-web-api/04-middleware/built-in-middleware.json";
 import bulkOperationsAndLargeDataChangesLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/bulk-operations-and-large-data-changes.json";
-import bulkheadsAndLoadSheddingLesson from "../courses/system-design-problems/distributed-systems-fundamentals/bulkheads-and-load-shedding.json";
+import bulkheadsAndLoadSheddingLesson from "../problems/system-design-problems/distributed-systems-fundamentals/bulkheads-and-load-shedding.json";
+import bundleAnalysisLesson from "../courses/frontend-performance-engineering/build-optimization/bundle-analysis.json";
 import bundleAnalysisAndCodeSplittingLesson from "../courses/frontend-performance-engineering/browser-react-performance/bundle-analysis-and-code-splitting.json";
+import bundlerFundamentalsLesson from "../courses/frontend-performance-engineering/build-optimization/bundler-fundamentals.json";
 import burstBalloonsLesson from "../problems/csharp/05-dynamic-programming-problems/burst-balloons.json";
 import cacheBasicsLesson from "../courses/apollo/03-caching/cache-basics.json";
 import cacheConfigurationLesson from "../courses/apollo/05-client-side-caching-advanced/cache-configuration.json";
@@ -562,11 +573,15 @@ import cacheRedirectsLesson from "../courses/apollo/05-client-side-caching-advan
 import cacheUpdatesLesson from "../courses/apollo/03-caching/cache-updates.json";
 import cachingLesson from "../courses/graphql-dotnet/06-performance/caching.json";
 import cachingAndRevalidationLesson from "../courses/next-js-full-stack-react/app-router-rendering/caching-and-revalidation.json";
+import cachingStrategiesLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/caching-strategies.json";
 import canaryReleasesLesson from "../courses/devops/ci-cd-safe-delivery/canary-releases.json";
 import cancellationtokenDesignLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/cancellationtoken-design.json";
-import capTheoremLesson from "../courses/system-design-problems/distributed-systems-fundamentals/cap-theorem.json";
-import capacityPlanningLesson from "../courses/senior-software-engineering/production-ownership/capacity-planning.json";
+import capTheoremLesson from "../problems/system-design-problems/distributed-systems-fundamentals/cap-theorem.json";
+import capacityPlanningLesson from "../courses/git-linux-developer-workflow/production-readiness/capacity-planning.json";
+import capacityPlanningLesson1 from "../courses/senior-software-engineering/production-ownership/capacity-planning.json";
+import capacityPlanningLesson2 from "../courses/senior-software-engineering/system-design-for-seniors/capacity-planning.json";
 import cartesianExplosionAndSplitQueriesLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/cartesian-explosion-and-split-queries.json";
+import cdnArchitectureLesson from "../courses/programming-computer-web-foundations/networking-protocols/cdn-architecture.json";
 import cdnReverseProxyAndLoadBalancerLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/cdn-reverse-proxy-and-load-balancer.json";
 import chainOfResponsibilityLesson from "../courses/clean-code-csharp/04-behavioral-patterns/chain-of-responsibility.json";
 import changeTrackingLesson from "../courses/ef-core/06-change-tracking/change-tracking.json";
@@ -605,6 +620,7 @@ import choosingAnAzureHostingModelLesson from "../courses/azure/02-compute-and-a
 import choosingAzureRegionAndAvailabilityZoneLesson from "../problems/azure/01-azure-foundations-problems/choosing-azure-region-and-availability-zone.json";
 import choosingBetweenVmAndAppServiceLesson from "../problems/azure/02-azure-compute-problems/choosing-between-vm-and-app-service.json";
 import choosingStateOwnershipBoundariesLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/choosing-state-ownership-boundaries.json";
+import choosingTheRightStructureLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/choosing-the-right-structure.json";
 import ciCdForAppServiceLesson from "../courses/azure/11-application-deployment-and-devops/ci-cd-for-app-service.json";
 import ciCdForContainersAndAcrLesson from "../courses/azure/11-application-deployment-and-devops/ci-cd-for-containers-and-acr.json";
 import ciCdForFunctionsLesson from "../courses/azure/11-application-deployment-and-devops/ci-cd-for-functions.json";
@@ -622,6 +638,7 @@ import cleanupFunctionsLesson from "../courses/react-fundamentals/05-lifecycle-e
 import clientCredentialsFlowLesson from "../courses/authentication-authorization/05-oauth2-flows-deep-dive/client-credentials-flow.json";
 import clientCredentialsForServiceToServiceCallsLesson from "../courses/fullstack-security/modern-web-security-identity/client-credentials-for-service-to-service-calls.json";
 import clientEvaluationAndTranslationFailuresLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/client-evaluation-and-translation-failures.json";
+import clientSideDataFetchingLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/client-side-data-fetching.json";
 import clientSideResolversLesson from "../courses/apollo/08-local-state-management/client-side-resolvers.json";
 import clientSideValidationLesson from "../courses/aspnet-core/04-model-binding-validation/client-side-validation.json";
 import climbingStairsLesson from "../problems/csharp/05-dynamic-programming-problems/climbing-stairs.json";
@@ -634,8 +651,9 @@ import clrCtsClsLesson from "../interview-qa/01-beginner-questions/clr-cts-cls.j
 import clusteredVsNonclusteredIndexesLesson from "../courses/sql-server/database-internals-query-optimization/clustered-vs-nonclustered-indexes.json";
 import codeFirstDbFirstLesson from "../interview-qa/02-intermediate-questions/code-first-db-first.json";
 import codeOrganizationLesson from "../courses/clean-code-csharp/05-clean-code-practices/code-organization.json";
-import codeSplittingLesson from "../courses/redux/07-redux-advanced-concepts/code-splitting.json";
-import codeSplittingLesson1 from "../courses/yarn-npm-packages/react-performance/code-splitting.json";
+import codeSplittingLesson from "../courses/frontend-performance-engineering/build-optimization/code-splitting.json";
+import codeSplittingLesson1 from "../courses/redux/07-redux-advanced-concepts/code-splitting.json";
+import codeSplittingLesson2 from "../courses/yarn-npm-packages/react-performance/code-splitting.json";
 import codeSplittingLazyLesson from "../courses/react-advanced-patterns/06-performance-patterns/code-splitting-lazy.json";
 import coinChangeLesson from "../problems/csharp/05-dynamic-programming-problems/coin-change.json";
 import collectionsLesson from "../courses/csharp-fundamentals/05-advanced-features/collections.json";
@@ -646,11 +664,14 @@ import commitHygieneAndReleaseBranchesLesson from "../courses/git-linux-develope
 import commonDataStructuresAndWhenToUseThemLesson from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/common-data-structures-and-when-to-use-them.json";
 import commonPitfallsLesson from "../courses/apollo/09-ssr-nextjs-performance/common-pitfalls.json";
 import communicatingTechnicalRiskLesson from "../courses/senior-software-engineering/technical-leadership/communicating-technical-risk.json";
-import compensatingActionsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/compensating-actions.json";
+import compensatingActionsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/compensating-actions.json";
 import compileTimePolymorphismLesson from "../courses/oops-concepts/04-polymorphism/compile-time-polymorphism.json";
 import compiledQueriesLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/compiled-queries.json";
+import compilerOptimizationsLesson from "../courses/frontend-performance-engineering/build-optimization/compiler-optimizations.json";
 import compilerVsInterpreterVsRuntimeLesson from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/compiler-vs-interpreter-vs-runtime.json";
 import complexFiltersLesson from "../courses/graphql-dotnet/04-filtering-pagination/complex-filters.json";
+import complexityAnalysisLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/complexity-analysis.json";
+import complianceAndAuditingLesson from "../courses/git-linux-developer-workflow/production-readiness/compliance-and-auditing.json";
 import componentTestingVsIntegrationTestingLesson from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/component-testing-vs-integration-testing.json";
 import composingComponentsLesson from "../courses/react-fundamentals/02-components-props/composing-components.json";
 import compositePatternLesson from "../courses/clean-code-csharp/03-structural-patterns/composite-pattern.json";
@@ -694,6 +715,8 @@ import containersAndContainerImagesLesson from "../courses/azure/04-containers-a
 import containsDuplicateLesson from "../problems/csharp/01-array-problems/contains-duplicate.json";
 import containsQuantifierOperatorLesson from "../courses/linq/08-quantifiers-element-operators/contains-quantifier-operator.json";
 import contentNegotiationLesson from "../problems/aspnet-core/03-api-design-problems/content-negotiation.json";
+import contextApiDeepDiveLesson from "../courses/next-js-full-stack-react/state-management/context-api-deep-dive.json";
+import continuousMonitoringLesson from "../courses/frontend-performance-engineering/runtime-performance/continuous-monitoring.json";
 import controlPropsBasicsLesson from "../courses/react-advanced-patterns/05-control-props/control-props-basics.json";
 import controlPropsExamplesLesson from "../courses/react-advanced-patterns/05-control-props/control-props-examples.json";
 import controlPropsWithFormsLesson from "../courses/react-advanced-patterns/05-control-props/control-props-with-forms.json";
@@ -721,6 +744,7 @@ import cosmosDbPartitionKeysLesson from "../courses/azure/06-databases-and-cachi
 import cosmosDbRequestUnitsAndPerformanceLesson from "../courses/azure/06-databases-and-caching/cosmos-db-request-units-and-performance.json";
 import cosmosDbSdkAndDeveloperPatternsLesson from "../courses/azure/06-databases-and-caching/cosmos-db-sdk-and-developer-patterns.json";
 import costAsAnArchitectureConstraintLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/cost-as-an-architecture-constraint.json";
+import costOptimizationLesson from "../courses/senior-software-engineering/system-design-for-seniors/cost-optimization.json";
 import countAndSayLesson from "../problems/csharp/02-string-problems/count-and-say.json";
 import countCompleteTreeNodesLesson from "../problems/csharp/04-tree-graph-problems/count-complete-tree-nodes.json";
 import countDigitsInNumberLesson from "../problems/csharp/07-recursion-problems/count-digits-in-number.json";
@@ -732,7 +756,8 @@ import coverageReportingLesson from "../courses/unit-testing-dotnet/07-code-cove
 import coverletCollectorLesson from "../courses/unit-testing-dotnet/07-code-coverage/coverlet-collector.json";
 import cpuMemoryAndDiskInvestigationLesson from "../courses/git-linux-developer-workflow/linux-production-troubleshooting/cpu-memory-and-disk-investigation.json";
 import cpuMemoryStorageAndIoLesson from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/cpu-memory-storage-and-io.json";
-import cqrsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/cqrs.json";
+import cpuProfilingLesson from "../courses/frontend-performance-engineering/runtime-performance/cpu-profiling.json";
+import cqrsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/cqrs.json";
 import cqrsBasicsLesson from "../courses/design-patterns/04-enterprise-patterns/cqrs-basics.json";
 import cqrsPatternLesson from "../courses/clean-code-csharp/06-architecture-patterns/cqrs-pattern.json";
 import createAsyncThunkLesson from "../courses/redux/02-redux-toolkit/create-async-thunk.json";
@@ -783,6 +808,7 @@ import cypressComponentLesson from "../courses/yarn-npm-packages/react-testing/c
 import cypressIntroLesson from "../courses/react-testing/05-e2e-testing/cypress-intro.json";
 import dapperLesson from "../courses/dotnet-nuget-packages/04-database-data-access/dapper.json";
 import dataDrivenTestsLesson from "../courses/unit-testing-dotnet/02-xunit-basics/data-driven-tests.json";
+import dataModelingLesson from "../courses/senior-software-engineering/system-design-for-seniors/data-modeling.json";
 import dataOperationsConnectedLesson from "../courses/ef-core/04-data-operations-connected/data-operations-connected.json";
 import dataOperationsDisconnectedLesson from "../courses/ef-core/05-data-operations-disconnected/data-operations-disconnected.json";
 import dataProtectionLesson from "../courses/dotnet-nuget-packages/08-security-cryptography/data-protection.json";
@@ -803,12 +829,15 @@ import dbcontextAndMigrationsLesson from "../courses/aspnet-core/08-entity-frame
 import dbcontextConfigurationLesson from "../courses/ef-core/02-dbcontext-configuration/dbcontext-configuration.json";
 import dbcontextConfigurationLesson1 from "../problems/aspnet-core/06-ef-core-problems/dbcontext-configuration.json";
 import dbcontextInEntityFrameworkCoreLesson from "../courses/ef-core/02-dbcontext-configuration/dbcontext-in-entity-framework-core.json";
-import deadLetterQueuesLesson from "../courses/system-design-problems/distributed-systems-fundamentals/dead-letter-queues.json";
+import deadLetterQueuesLesson from "../problems/system-design-problems/distributed-systems-fundamentals/dead-letter-queues.json";
 import deadlocksAndDeadlockGraphsLesson from "../courses/sql-server/concurrency-production-database-problems/deadlocks-and-deadlock-graphs.json";
 import deadlocksIncreaseSharplyDuringPeakTrafficLesson from "../problems/production-incident-lab-problems/database-infrastructure-incidents/deadlocks-increase-sharply-during-peak-traffic.json";
 import deadlocksStarvationAndLivelocksLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/deadlocks-starvation-and-livelocks.json";
+import debuggingPerformanceLesson from "../courses/frontend-performance-engineering/runtime-performance/debugging-performance.json";
 import debuggingTechniquesLesson from "../courses/aspnet-core/11-testing-debugging/debugging-techniques.json";
 import decideWhetherAProposedMicroserviceShouldActuallyExistLesson from "../problems/architecture-decision-lab-problems/architecture-trade-offs/decide-whether-a-proposed-microservice-should-actually-exist.json";
+import decisionDocumentationLesson from "../courses/senior-software-engineering/technical-decision-making/decision-documentation.json";
+import decisionReviewsLesson from "../courses/senior-software-engineering/technical-decision-making/decision-reviews.json";
 import declarationMergingAndModuleAugmentationLesson from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/declaration-merging-and-module-augmentation.json";
 import decodeWaysLesson from "../problems/csharp/02-string-problems/decode-ways.json";
 import decodeWaysLesson1 from "../problems/csharp/05-dynamic-programming-problems/decode-ways.json";
@@ -829,11 +858,13 @@ import dependentQueriesLesson from "../courses/react-query/02-query-hooks/depend
 import deployingContainerizedAppsOnAksLesson from "../problems/azure/02-azure-compute-problems/deploying-containerized-apps-on-aks.json";
 import deploymentArchitectureForNextjsLesson from "../courses/next-js-full-stack-react/app-router-rendering/deployment-architecture-for-nextjs.json";
 import deploymentOptionsLesson from "../courses/aspnet-core/12-deployment-production/deployment-options.json";
+import deploymentPipelinesLesson from "../courses/git-linux-developer-workflow/production-readiness/deployment-pipelines.json";
 import deploymentSecretsAndEnvironmentConfigurationLesson from "../courses/azure/11-application-deployment-and-devops/deployment-secrets-and-environment-configuration.json";
 import deploymentSetupLesson from "../courses/redux/08-redux-real-world/deployment-setup.json";
 import deploymentSlotsAndSlotSwappingLesson from "../courses/azure/11-application-deployment-and-devops/deployment-slots-and-slot-swapping.json";
 import derivedDataLesson from "../courses/redux/05-redux-patterns/derived-data.json";
 import derivedStateAndAvoidingDuplicatedStateLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/derived-state-and-avoiding-duplicated-state.json";
+import designReviewsLesson from "../courses/senior-software-engineering/system-design-for-seniors/design-reviews.json";
 import designingEventDrivenServerlessArchitectureLesson from "../problems/azure/03-azure-serverless-problems/designing-event-driven-serverless-architecture.json";
 import designingTypeSafeComponentApisLesson from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/designing-type-safe-component-apis.json";
 import devtoolsLesson from "../courses/redux/01-redux-fundamentals/devtools.json";
@@ -842,26 +873,31 @@ import diBasicsLesson1 from "../courses/aspnet-core-web-api/05-dependency-inject
 import diagnosingAPortThatIsNotReachableLesson from "../courses/git-linux-developer-workflow/linux-production-troubleshooting/diagnosing-a-port-that-is-not-reachable.json";
 import diagnosingAsyncPerformanceProblemsLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/diagnosing-async-performance-problems.json";
 import digitalRootLesson from "../problems/csharp/07-recursion-problems/digital-root.json";
+import disasterRecoveryLesson from "../courses/git-linux-developer-workflow/production-readiness/disaster-recovery.json";
 import disasterRecoveryPlanningLesson from "../courses/azure/production-architecture-reliability-cost/disaster-recovery-planning.json";
 import disasterRecoveryTestingLesson from "../courses/senior-software-engineering/production-ownership/disaster-recovery-testing.json";
 import discriminatedUnionsLesson from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/discriminated-unions.json";
+import disjointSetsLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/disjoint-sets.json";
 import distinctSetOperatorLesson from "../courses/linq/06-set-operations/distinct-set-operator.json";
 import distributedTracingAcrossServicesLesson from "../courses/aspnet-core/performance-observability/distributed-tracing-across-services.json";
 import distributedTracingAndOpenTelemetryLesson from "../courses/azure/10-observability-and-application-monitoring/distributed-tracing-and-open-telemetry.json";
-import distributedTransactionsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/distributed-transactions.json";
+import distributedTransactionsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/distributed-transactions.json";
 import dnsAndNetworkTroubleshootingFromLinuxLesson from "../courses/git-linux-developer-workflow/linux-production-troubleshooting/dns-and-network-troubleshooting-from-linux.json";
+import dnsInDepthLesson from "../courses/programming-computer-web-foundations/networking-protocols/dns-in-depth.json";
 import dnsResolutionFromBrowserToServerLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/dns-resolution-from-browser-to-server.json";
 import dockerContainerizationLesson from "../courses/aspnet-core/12-deployment-production/docker-containerization.json";
 import dockerEcrLesson from "../courses/aws/09-containers-kubernetes/docker-ecr.json";
 import dockerfilesAndContainerDevelopmentLesson from "../courses/azure/04-containers-and-container-platforms/dockerfiles-and-container-development.json";
+import documentationLesson from "../courses/next-js-full-stack-react/full-stack-api-design/documentation.json";
 import dotnetVersionsLesson from "../interview-qa/02-intermediate-questions/dotnet-versions.json";
 import driveAdvancedLesson from "../problems/lld/google-drive-storage/drive-advanced.json";
 import driveBasicLesson from "../problems/lld/google-drive-storage/drive-basic.json";
 import dropboxStorageAdvancedLesson from "../problems/hld/dropbox-storage/dropbox-storage-advanced.json";
 import dropboxStorageBasicLesson from "../problems/hld/dropbox-storage/dropbox-storage-basic.json";
 import dryPrincipleLesson from "../courses/oops-concepts/07-design-principles/dry-principle.json";
-import duplicateMessagesAndIdempotencyLesson from "../courses/system-design-problems/distributed-systems-fundamentals/duplicate-messages-and-idempotency.json";
+import duplicateMessagesAndIdempotencyLesson from "../problems/system-design-problems/distributed-systems-fundamentals/duplicate-messages-and-idempotency.json";
 import duplicatePaymentRequestsCreateDuplicateBusinessRecordsLesson from "../problems/production-incident-lab-problems/backend-incidents/duplicate-payment-requests-create-duplicate-business-records.json";
+import dynamicImportsLesson from "../courses/frontend-performance-engineering/build-optimization/dynamic-imports.json";
 import dynamodbNosqlLesson from "../courses/aws/06-databases/dynamodb-nosql.json";
 import eagerVsLazyLoadingLesson from "../problems/aspnet-core/06-ef-core-problems/eager-vs-lazy-loading.json";
 import ec2AutoScalingLesson from "../courses/aws/03-compute-services/ec2-auto-scaling.json";
@@ -891,6 +927,7 @@ import encapsulationBasicsLesson from "../courses/oops-concepts/02-encapsulation
 import encryptionTdeLesson from "../courses/sql-server/17-security-hardening/encryption-tde.json";
 import endpointRoutingInternalsLesson from "../courses/aspnet-core/asp-net-core-internals-production-hosting/endpoint-routing-internals.json";
 import enterpriseCicdPipelineDesignLesson from "../problems/system-design/devops-system-design/enterprise-cicd-pipeline-design.json";
+import enterpriseGitLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/enterprise-git.json";
 import entityAdapterLesson from "../courses/redux/05-redux-patterns/entity-adapter.json";
 import entityFrameworkCoreLesson from "../courses/dotnet-nuget-packages/04-database-data-access/entity-framework-core.json";
 import entityFrameworkCoreChangeTrackingLesson from "../courses/ef-core/06-change-tracking/entity-framework-core-change-tracking.json";
@@ -912,20 +949,23 @@ import errorBudgetsLesson from "../courses/senior-software-engineering/productio
 import errorHandlingLesson from "../courses/apollo/04-advanced-patterns/error-handling.json";
 import errorHandlingLesson1 from "../courses/clean-code-csharp/05-clean-code-practices/error-handling.json";
 import errorHandlingLesson2 from "../courses/csharp-fundamentals/06-error-handling/error-handling.json";
-import errorHandlingLesson3 from "../courses/redux/08-redux-real-world/error-handling.json";
+import errorHandlingLesson3 from "../courses/next-js-full-stack-react/full-stack-api-design/error-handling.json";
+import errorHandlingLesson4 from "../courses/redux/08-redux-real-world/error-handling.json";
 import errorHandlingBasicsLesson from "../courses/apollo/06-error-handling-optimistic/error-handling-basics.json";
 import errorHandlingBasicsLesson1 from "../courses/graphql-dotnet/07-error-handling/error-handling-basics.json";
+import errorHandlingInDataFetchingLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/error-handling-in-data-fetching.json";
 import errorHandlingStrategiesLesson from "../courses/react-query/04-advanced-features/error-handling-strategies.json";
 import errorPoliciesLesson from "../courses/apollo/06-error-handling-optimistic/error-policies.json";
 import esbuildLesson from "../courses/yarn-npm-packages/build-tools/esbuild.json";
 import estimationAndUncertaintyLesson from "../courses/senior-software-engineering/technical-leadership/estimation-and-uncertainty.json";
 import etagsAndConditionalRequestsLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/etags-and-conditional-requests.json";
+import evaluatingTechnicalOptionsLesson from "../courses/senior-software-engineering/technical-decision-making/evaluating-technical-options.json";
 import eventDrivenApplicationPatternsLesson from "../courses/azure/09-messaging-and-event-driven-architecture/event-driven-application-patterns.json";
 import eventGridTopicsEventsAndEventSubscriptionsLesson from "../courses/azure/09-messaging-and-event-driven-architecture/event-grid-topics-events-and-event-subscriptions.json";
 import eventGridWithAzureFunctionsLesson from "../courses/azure/09-messaging-and-event-driven-architecture/event-grid-with-azure-functions.json";
 import eventHubsPartitionsAndConsumerGroupsLesson from "../courses/azure/09-messaging-and-event-driven-architecture/event-hubs-partitions-and-consumer-groups.json";
 import eventHubsStreamProcessingLesson from "../courses/azure/09-messaging-and-event-driven-architecture/event-hubs-stream-processing.json";
-import eventSourcingLesson from "../courses/system-design-problems/distributed-systems-fundamentals/event-sourcing.json";
+import eventSourcingLesson from "../problems/system-design-problems/distributed-systems-fundamentals/event-sourcing.json";
 import exceptSetOperatorLesson from "../courses/linq/06-set-operations/except-set-operator.json";
 import exceptionHandlingLesson from "../courses/aspnet-core/07-middleware-pipeline/exception-handling.json";
 import exceptionHandlingMiddlewareLesson from "../problems/aspnet-core/04-middleware-pipeline-problems/exception-handling-middleware.json";
@@ -962,6 +1002,7 @@ import finalFormLesson from "../courses/yarn-npm-packages/forms/final-form.json"
 import findFirstSetBitLesson from "../problems/csharp/08-bitwise-problems/find-first-set-bit.json";
 import findMinimumInRotatedSortedArrayLesson from "../problems/csharp/01-array-problems/find-minimum-in-rotated-sorted-array.json";
 import finiteStateMachinesLesson from "../courses/react-advanced-patterns/08-state-machines-xstate/finite-state-machines.json";
+import firewallsAndSecurityLesson from "../courses/programming-computer-web-foundations/networking-protocols/firewalls-and-security.json";
 import firstEndpointLesson from "../courses/aspnet-core-web-api/01-getting-started/first-endpoint.json";
 import firstFirstordefaultLesson from "../courses/linq/08-quantifiers-element-operators/first-firstordefault.json";
 import firstProgramLesson from "../courses/csharp-fundamentals/01-getting-started/first-program.json";
@@ -982,6 +1023,7 @@ import foodBasicLesson from "../problems/lld/food-delivery/food-basic.json";
 import foodDeliveryHldAdvancedLesson from "../problems/hld/food-delivery-hld/food-delivery-hld-advanced.json";
 import foodDeliveryHldBasicLesson from "../problems/hld/food-delivery-hld/food-delivery-hld-basic.json";
 import formIntegrationLesson from "../courses/react-query/09-real-world-patterns/form-integration.json";
+import formStateManagementLesson from "../courses/next-js-full-stack-react/state-management/form-state-management.json";
 import formSubmissionLesson from "../courses/react-fundamentals/04-forms-input/form-submission.json";
 import formValidationLesson from "../courses/react-fundamentals/04-forms-input/form-validation.json";
 import formValidationLesson1 from "../courses/yarn-npm-packages/react-forms-input/form-validation.json";
@@ -1024,7 +1066,11 @@ import genericsCsharpLesson from "../interview-qa/02-intermediate-questions/gene
 import gettingStartedEfCoreLesson from "../courses/ef-core/01-getting-started-ef-core/getting-started-ef-core.json";
 import gettingStartedJestLesson from "../courses/react-testing/02-jest-basics/getting-started-jest.json";
 import gettingStartedXunitLesson from "../courses/unit-testing-dotnet/02-xunit-basics/getting-started-xunit.json";
+import gitAndCiCdLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/git-and-ci-cd.json";
+import gitBestPracticesLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/git-best-practices.json";
 import gitBisectForRegressionInvestigationLesson from "../courses/git-linux-developer-workflow/git-for-senior-engineers/git-bisect-for-regression-investigation.json";
+import gitInternalsLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/git-internals.json";
+import gitSecurityLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/git-security.json";
 import githubActionsAzureAuthenticationLesson from "../courses/azure/11-application-deployment-and-devops/github-actions-azure-authentication.json";
 import githubActionsForAzureLesson from "../courses/azure/11-application-deployment-and-devops/github-actions-for-azure.json";
 import globalErrorHandlingLesson from "../courses/aspnet-core-web-api/06-error-handling-validation/global-error-handling.json";
@@ -1037,15 +1083,18 @@ import graphqlRequestLesson from "../courses/yarn-npm-packages/http-clients/grap
 import groupAnagramsLesson from "../problems/csharp/02-string-problems/group-anagrams.json";
 import groupingOperatorGroupbyTolookupLesson from "../courses/linq/04-sorting-grouping/grouping-operator-groupby-tolookup.json";
 import groupjoinOperatorLesson from "../courses/linq/05-joining-data/groupjoin-operator.json";
+import grpcAndProtobufLesson from "../courses/programming-computer-web-foundations/networking-protocols/grpc-and-protobuf.json";
 import gsapLesson from "../courses/yarn-npm-packages/animation/gsap.json";
 import handlingEventsLesson from "../courses/react-fundamentals/03-state-events/handling-events.json";
 import handlingTechnicalDisagreementLesson from "../courses/senior-software-engineering/technical-leadership/handling-technical-disagreement.json";
 import handlingUserInputLesson from "../courses/aspnet-core/02-mvc-fundamentals/handling-user-input.json";
 import hangfireLesson from "../courses/dotnet-nuget-packages/06-messaging-events/hangfire.json";
+import hashTablesLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/hash-tables.json";
 import headlessComponentsLesson from "../courses/react-advanced-patterns/09-component-composition-strategies/headless-components.json";
 import healthChecksLesson from "../problems/aspnet-core/08-testing-debugging-problems/health-checks.json";
 import healthChecksAndReadinessVsLivenessLesson from "../courses/aspnet-core/asp-net-core-internals-production-hosting/health-checks-and-readiness-vs-liveness.json";
 import healthEndpointsAndDependencyChecksLesson from "../courses/aspnet-core/performance-observability/health-endpoints-and-dependency-checks.json";
+import heapsLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/heaps.json";
 import highAvailabilityAndZoneAwareArchitectureLesson from "../courses/azure/production-architecture-reliability-cost/high-availability-and-zone-aware-architecture.json";
 import higherOrderComponentsTypedLesson from "../courses/typescript-for-react/05-generic-components/higher-order-components-typed.json";
 import hocBasicsLesson from "../courses/react-advanced-patterns/02-higher-order-components/hoc-basics.json";
@@ -1054,6 +1103,7 @@ import hocExamplesLesson from "../courses/react-advanced-patterns/02-higher-orde
 import hookBestPracticesLesson from "../courses/react-advanced-patterns/10-advanced-hook-patterns/hook-best-practices.json";
 import hookCompositionPatternsLesson from "../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-composition-patterns.json";
 import hookErrorHandlingLesson from "../courses/react-advanced-patterns/07-custom-hooks-architecture/hook-error-handling.json";
+import hooksAndAutomationLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/hooks-and-automation.json";
 import horizontalPodAutoscalerLesson from "../courses/devops/production-kubernetes-day-2-operations/horizontal-pod-autoscaler.json";
 import hotchocolateProjectSetupLesson from "../courses/graphql-dotnet/01-getting-started/hotchocolate-project-setup.json";
 import hotelAdvancedLesson from "../problems/lld/hotel-management/hotel-advanced.json";
@@ -1075,6 +1125,7 @@ import howWouldYouImplementOptimisticUpdatesWithRollbackLesson from "../intervie
 import howWouldYouPartitionADatabaseThatHasOutgrownOneNodeLesson from "../interview-qa/architecture-follow-ups/how-would-you-partition-a-database-that-has-outgrown-one-node.json";
 import howWouldYouReduceAJavascriptBundleThatHasGrownTooLargeLesson from "../interview-qa/react-frontend-follow-ups/how-would-you-reduce-a-javascript-bundle-that-has-grown-too-large.json";
 import howWouldYourArchitectureBehaveIfOneDependencyBecameUnavailableLesson from "../interview-qa/architecture-follow-ups/how-would-your-architecture-behave-if-one-dependency-became-unavailable.json";
+import http11Http2Http3Lesson from "../courses/programming-computer-web-foundations/networking-protocols/http-1-1-http-2-http-3.json";
 import httpMethodsAndStatusCodesLesson from "../courses/aspnet-core/10-web-api-rest/http-methods-and-status-codes.json";
 import httpMethodsStatusCodesAndHeadersLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/http-methods-status-codes-and-headers.json";
 import httpRequestAndResponseLifecycleLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/http-request-and-response-lifecycle.json";
@@ -1105,8 +1156,9 @@ import immutabilityLesson from "../courses/redux/01-redux-fundamentals/immutabil
 import imperativeHandlePatternsLesson from "../courses/react-advanced-patterns/10-advanced-hook-patterns/imperative-handle-patterns.json";
 import implementStrstrLesson from "../problems/csharp/02-string-problems/implement-strstr.json";
 import implementingApiKeysLesson from "../courses/fullstack-security/04-api-security-rate-limiting/implementing-api-keys.json";
-import inboxdeduplicationPatternLesson from "../courses/system-design-problems/distributed-systems-fundamentals/inboxdeduplication-pattern.json";
+import inboxdeduplicationPatternLesson from "../problems/system-design-problems/distributed-systems-fundamentals/inboxdeduplication-pattern.json";
 import incidentCommandAndCommunicationLesson from "../courses/senior-software-engineering/production-ownership/incident-command-and-communication.json";
+import incidentResponseLesson from "../courses/git-linux-developer-workflow/production-readiness/incident-response.json";
 import incidentSeverityAndResponseLesson from "../courses/senior-software-engineering/production-ownership/incident-severity-and-response.json";
 import includedColumnsAndCoveringIndexesLesson from "../courses/sql-server/database-internals-query-optimization/included-columns-and-covering-indexes.json";
 import incrementalMigrationVsRewriteLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/incremental-migration-vs-rewrite.json";
@@ -1154,19 +1206,21 @@ import intermediateQ4Lesson from "../interview-qa/02-intermediate-questions/inte
 import intermediateQ5Lesson from "../interview-qa/02-intermediate-questions/intermediate-q5.json";
 import intersectSetOperatorLesson from "../courses/linq/06-set-operations/intersect-set-operator.json";
 import intersectionOfTwoLinkedListsLesson from "../problems/csharp/03-linked-list-problems/intersection-of-two-linked-lists.json";
-import introduceBrokenDeploymentLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-broken-deployment.json";
-import introduceCacheFailureLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-cache-failure.json";
-import introduceDatabasePerformanceRegressionLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-database-performance-regression.json";
-import introduceDownstreamTimeoutLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-downstream-timeout.json";
-import introduceDuplicateMessageProcessingLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-duplicate-message-processing.json";
-import introduceKubernetesHealthCheckFailureLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-kubernetes-health-check-failure.json";
-import introduceMemoryLeakLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/introduce-memory-leak.json";
+import interviewProblemsLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/interview-problems.json";
+import introduceBrokenDeploymentLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-broken-deployment.json";
+import introduceCacheFailureLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-cache-failure.json";
+import introduceDatabasePerformanceRegressionLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-database-performance-regression.json";
+import introduceDownstreamTimeoutLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-downstream-timeout.json";
+import introduceDuplicateMessageProcessingLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-duplicate-message-processing.json";
+import introduceKubernetesHealthCheckFailureLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-kubernetes-health-check-failure.json";
+import introduceMemoryLeakLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/introduce-memory-leak.json";
 import introductionToGraphqlLesson from "../courses/graphql-dotnet/01-getting-started/introduction-to-graphql.json";
 import invalidationLesson from "../courses/react-query/03-mutations/invalidation.json";
-import investigateUsingLogsMetricsAndTracesLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/investigate-using-logs-metrics-and-traces.json";
+import investigateUsingLogsMetricsAndTracesLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/investigate-using-logs-metrics-and-traces.json";
 import iocContainerSetupLesson from "../problems/aspnet-core/05-dependency-injection-problems/ioc-container-setup.json";
 import isomorphicStringsLesson from "../problems/csharp/02-string-problems/isomorphic-strings.json";
 import iteratorPatternLesson from "../courses/design-patterns/03-behavioral-patterns/iterator-pattern.json";
+import jankFreeAnimationsLesson from "../courses/frontend-performance-engineering/runtime-performance/jank-free-animations.json";
 import jestLesson from "../courses/yarn-npm-packages/testing/jest.json";
 import jitCompilationAndTieredCompilationLesson from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/jit-compilation-and-tiered-compilation.json";
 import joinOperatorLesson from "../courses/linq/05-joining-data/join-operator.json";
@@ -1175,6 +1229,7 @@ import jsA01Lesson from "../interview-qa/03-advanced-questions/js-a01.json";
 import jsA02Lesson from "../interview-qa/03-advanced-questions/js-a02.json";
 import jsB01Lesson from "../interview-qa/01-beginner-questions/js-b01.json";
 import jsB02Lesson from "../interview-qa/01-beginner-questions/js-b02.json";
+import jsEngineOptimizationLesson from "../courses/frontend-performance-engineering/runtime-performance/js-engine-optimization.json";
 import jsI01Lesson from "../interview-qa/02-intermediate-questions/js-i01.json";
 import jsI02Lesson from "../interview-qa/02-intermediate-questions/js-i02.json";
 import jsI03Lesson from "../interview-qa/02-intermediate-questions/js-i03.json";
@@ -1204,10 +1259,12 @@ import kubernetesPodsRestartEvenThoughApplicationLogsLookHealthyLesson from "../
 import kustoQueryLanguageForDevelopersLesson from "../courses/azure/10-observability-and-application-monitoring/kusto-query-language-for-developers.json";
 import kyLesson from "../courses/yarn-npm-packages/http-clients/ky.json";
 import largeObjectHeapAndPinnedObjectsLesson from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/large-object-heap-and-pinned-objects.json";
+import largeRepositoriesLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/large-repositories.json";
 import largestElementInArrayLesson from "../problems/csharp/01-array-problems/largest-element-in-array.json";
 import lastLastordefaultLesson from "../courses/linq/08-quantifiers-element-operators/last-lastordefault.json";
 import layoutCompositionLesson from "../courses/react-advanced-patterns/09-component-composition-strategies/layout-composition.json";
 import layoutEffectPatternsLesson from "../courses/react-advanced-patterns/10-advanced-hook-patterns/layout-effect-patterns.json";
+import layoutThrashingLesson from "../courses/frontend-performance-engineering/runtime-performance/layout-thrashing.json";
 import layoutsAndPartialsLesson from "../courses/aspnet-core/05-razor-views/layouts-and-partials.json";
 import layoutsAndPartialsLesson1 from "../problems/aspnet-core/02-razor-views-problems/layouts-and-partials.json";
 import lazyEagerLoadingLesson from "../interview-qa/02-intermediate-questions/lazy-eager-loading.json";
@@ -1233,8 +1290,11 @@ import listsAndKeysLesson from "../courses/react-fundamentals/02-components-prop
 import livenessReadinessAndStartupProbesLesson from "../courses/devops/production-kubernetes-day-2-operations/liveness-readiness-and-startup-probes.json";
 import loadBalancerOverviewLesson from "../courses/azure/08-networking-and-api-platforms/load-balancer-overview.json";
 import loadBalancerVsApplicationGatewayLesson from "../problems/azure/06-azure-networking-problems/load-balancer-vs-application-gateway.json";
+import loadBalancersLesson from "../courses/programming-computer-web-foundations/networking-protocols/load-balancers.json";
+import loadingStatesLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/loading-states.json";
 import localOnlyFieldsLesson from "../courses/apollo/08-local-state-management/local-only-fields.json";
 import localStateLesson from "../courses/apollo/04-advanced-patterns/local-state.json";
+import localStateVsServerStateLesson from "../courses/next-js-full-stack-react/state-management/local-state-vs-server-state.json";
 import localStateVsServerStateVsUrlStateLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/local-state-vs-server-state-vs-url-state.json";
 import lockAndMonitorLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/lock-and-monitor.json";
 import locksAndBlockingLesson from "../courses/sql-server/concurrency-production-database-problems/locks-and-blocking.json";
@@ -1246,7 +1306,9 @@ import loggingAndMonitoringLesson1 from "../courses/fullstack-security/04-api-se
 import loggingBasicsLesson from "../courses/aspnet-core-web-api/08-logging-configuration/logging-basics.json";
 import loggingBestPracticesLesson from "../problems/aspnet-core/08-testing-debugging-problems/logging-best-practices.json";
 import loggingInEntityFrameworkCoreLesson from "../courses/ef-core/11-database-first-diagnostics/logging-in-entity-framework-core.json";
+import loggingStrategiesLesson from "../courses/git-linux-developer-workflow/production-readiness/logging-strategies.json";
 import longRunningTransactionsLesson from "../courses/sql-server/concurrency-production-database-problems/long-running-transactions.json";
+import longTermImpactLesson from "../courses/senior-software-engineering/technical-decision-making/long-term-impact.json";
 import longestCommonPrefixLesson from "../problems/csharp/02-string-problems/longest-common-prefix.json";
 import longestCommonSubsequenceLesson from "../problems/csharp/05-dynamic-programming-problems/longest-common-subsequence.json";
 import longestConsecutiveSequenceLesson from "../problems/csharp/01-array-problems/longest-consecutive-sequence.json";
@@ -1289,15 +1351,16 @@ import mediatorPatternLesson1 from "../courses/yarn-npm-packages/advanced-patter
 import mediatrLesson from "../courses/dotnet-nuget-packages/06-messaging-events/mediatr.json";
 import memoizationBasicsLesson from "../courses/react-advanced-patterns/06-performance-patterns/memoization-basics.json";
 import memoizationStrategiesLesson from "../courses/react-query/08-performance-optimization/memoization-strategies.json";
+import memoryManagementLesson from "../courses/frontend-performance-engineering/runtime-performance/memory-management.json";
 import memoryUsageGrowsContinuouslyAndPodsRestartLesson from "../problems/production-incident-lab-problems/backend-incidents/memory-usage-grows-continuously-and-pods-restart.json";
 import memorystreamLesson from "../courses/dotnet-nuget-packages/advanced-patterns/memorystream.json";
 import mentoringJuniorEngineersLesson from "../courses/senior-software-engineering/technical-leadership/mentoring-junior-engineers.json";
 import mergeIntervalsLesson from "../problems/csharp/01-array-problems/merge-intervals.json";
 import mergeTwoSortedListsLesson from "../problems/csharp/03-linked-list-problems/merge-two-sorted-lists.json";
 import mergeVsRebaseLesson from "../courses/git-linux-developer-workflow/git-for-senior-engineers/merge-vs-rebase.json";
-import messageIdempotencyAndDuplicateHandlingLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/message-idempotency-and-duplicate-handling.json";
-import messageOrderingLesson from "../courses/system-design-problems/distributed-systems-fundamentals/message-ordering.json";
-import messagePersistenceAndOrderingLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/message-persistence-and-ordering.json";
+import messageIdempotencyAndDuplicateHandlingLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/message-idempotency-and-duplicate-handling.json";
+import messageOrderingLesson from "../problems/system-design-problems/distributed-systems-fundamentals/message-ordering.json";
+import messagePersistenceAndOrderingLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/message-persistence-and-ordering.json";
 import messagepackLesson from "../courses/dotnet-nuget-packages/05-serialization-mapping/messagepack.json";
 import messagingAndEventDrivenArchitectureLesson from "../courses/azure/09-messaging-and-event-driven-architecture/messaging-and-event-driven-architecture.json";
 import messagingReliabilityIdempotencyAndRetriesLesson from "../courses/azure/09-messaging-and-event-driven-architecture/messaging-reliability-idempotency-and-retries.json";
@@ -1324,6 +1387,8 @@ import middlewareConceptsLesson from "../courses/aspnet-core/07-middleware-pipel
 import middlewareOrderingLesson from "../problems/aspnet-core/04-middleware-pipeline-problems/middleware-ordering.json";
 import migratingToTypescriptLesson from "../courses/typescript-for-react/07-testing-best-practices/migrating-to-typescript.json";
 import migrationPatternsLesson from "../courses/react-query/09-real-world-patterns/migration-patterns.json";
+import migrationStrategiesLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/migration-strategies.json";
+import migrationStrategiesLesson1 from "../courses/senior-software-engineering/system-design-for-seniors/migration-strategies.json";
 import migrationsLesson from "../courses/ef-core/09-migrations/migrations.json";
 import migrationsBestPracticesLesson from "../problems/aspnet-core/06-ef-core-problems/migrations-best-practices.json";
 import migrationsInEntityFrameworkCoreLesson from "../courses/ef-core/09-migrations/migrations-in-entity-framework-core.json";
@@ -1346,7 +1411,9 @@ import mongodbDriverLesson from "../courses/dotnet-nuget-packages/04-database-da
 import monitoringAndAlertingLesson from "../courses/aspnet-core/12-deployment-production/monitoring-and-alerting.json";
 import monitoringContainersAndAksLesson from "../courses/azure/10-observability-and-application-monitoring/monitoring-containers-and-aks.json";
 import monitoringFunctionsAndAppServiceLesson from "../courses/azure/10-observability-and-application-monitoring/monitoring-functions-and-app-service.json";
+import monitoringSetupLesson from "../courses/git-linux-developer-workflow/production-readiness/monitoring-setup.json";
 import monolithVsModularMonolithVsMicroservicesLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/monolith-vs-modular-monolith-vs-microservices.json";
+import monorepoStrategiesLesson from "../courses/git-linux-developer-workflow/advanced-git-workflows/monorepo-strategies.json";
 import moqLesson from "../courses/dotnet-nuget-packages/07-testing-quality/moq.json";
 import moqFrameworkLesson from "../courses/unit-testing-dotnet/03-mocking-fakes/moq-framework.json";
 import moreLinqLesson from "../courses/dotnet-nuget-packages/09-utilities-helpers/more-linq.json";
@@ -1389,7 +1456,7 @@ import nextjsRoutingLesson from "../courses/yarn-npm-packages/routing/nextjs-rou
 import nlogLesson from "../courses/dotnet-nuget-packages/logging-monitoring/nlog.json";
 import normalizationLesson from "../interview-qa/01-beginner-questions/normalization.json";
 import normalizingStateLesson from "../courses/redux/05-redux-patterns/normalizing-state.json";
-import notificationArchitectureLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/notification-architecture.json";
+import notificationArchitectureLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/notification-architecture.json";
 import notificationSystemAdvancedLesson from "../problems/hld/notification-system/notification-system-advanced.json";
 import notificationSystemBasicLesson from "../problems/hld/notification-system/notification-system-basic.json";
 import npgsqlLesson from "../courses/dotnet-nuget-packages/04-database-data-access/npgsql.json";
@@ -1407,7 +1474,7 @@ import nuxtjsLesson from "../courses/yarn-npm-packages/frontend-frameworks/nuxtj
 import oauth20RolesAndFlowsLesson from "../courses/fullstack-security/modern-web-security-identity/oauth-20-roles-and-flows.json";
 import oauthJwtLesson from "../interview-qa/02-intermediate-questions/oauth-jwt.json";
 import oauthOverviewLesson from "../courses/authentication-authorization/04-oauth/oauth-overview.json";
-import observabilityAndFailureTestingLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/observability-and-failure-testing.json";
+import observabilityAndFailureTestingLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/observability-and-failure-testing.json";
 import observabilityArchitectureLesson from "../courses/aws/11-monitoring-logging-observability/observability-architecture.json";
 import observabilityLoggingMetricsAndTracingLesson from "../courses/azure/10-observability-and-application-monitoring/observability-logging-metrics-and-tracing.json";
 import observabilityPlatformDesignLesson from "../problems/system-design/devops-system-design/observability-platform-design.json";
@@ -1416,8 +1483,9 @@ import observerPatternLesson1 from "../courses/design-patterns/03-behavioral-pat
 import observerPatternLesson2 from "../courses/yarn-npm-packages/advanced-patterns/observer-pattern.json";
 import oddEvenLinkedListLesson from "../problems/csharp/03-linked-list-problems/odd-even-linked-list.json";
 import ofetchLesson from "../courses/yarn-npm-packages/http-clients/ofetch.json";
-import offlineHandlingAndReconnectBehaviorLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/offline-handling-and-reconnect-behavior.json";
-import offlineSupportLesson from "../courses/redux/08-redux-real-world/offline-support.json";
+import offlineHandlingAndReconnectBehaviorLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/offline-handling-and-reconnect-behavior.json";
+import offlineSupportLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/offline-support.json";
+import offlineSupportLesson1 from "../courses/redux/08-redux-real-world/offline-support.json";
 import oftypeFilteringOperatorLesson from "../courses/linq/03-filtering-projection/oftype-filtering-operator.json";
 import oneDatabaseQueryCauses90OfProductionDatabaseCpuLesson from "../problems/production-incident-lab-problems/backend-incidents/one-database-query-causes-90-of-production-database-cpu.json";
 import oneToManyRelationshipsConventionsLesson from "../courses/ef-core/03-conventions-relationships/one-to-many-relationships-conventions.json";
@@ -1438,25 +1506,29 @@ import opentelemetryLesson from "../courses/dotnet-nuget-packages/logging-monito
 import operatorOverloadingLesson from "../courses/oops-concepts/04-polymorphism/operator-overloading.json";
 import optimisticConcurrencyForApisLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/optimistic-concurrency-for-apis.json";
 import optimisticResponsesLesson from "../courses/apollo/06-error-handling-optimistic/optimistic-responses.json";
-import optimisticUpdatesLesson from "../courses/react-query/03-mutations/optimistic-updates.json";
+import optimisticUpdatesLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/optimistic-updates.json";
+import optimisticUpdatesLesson1 from "../courses/react-query/03-mutations/optimistic-updates.json";
 import optimisticUpdatesAndRollbackLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/optimistic-updates-and-rollback.json";
 import optionsPatternLesson from "../problems/aspnet-core/05-dependency-injection-problems/options-pattern.json";
 import optionsPatternAndConfigurationProvidersLesson from "../courses/aspnet-core/asp-net-core-internals-production-hosting/options-pattern-and-configuration-providers.json";
 import orderbyOrderbydescendingLesson from "../courses/linq/04-sorting-grouping/orderby-orderbydescending.json";
+import osiModelLesson from "../courses/programming-computer-web-foundations/networking-protocols/osi-model.json";
 import otherComputeServicesLesson from "../courses/aws/03-compute-services/other-compute-services.json";
 import otherDatabaseServicesLesson from "../courses/aws/06-databases/other-database-services.json";
-import outboxPatternLesson from "../courses/system-design-problems/distributed-systems-fundamentals/outbox-pattern.json";
+import outboxPatternLesson from "../problems/system-design-problems/distributed-systems-fundamentals/outbox-pattern.json";
 import outputEncodingLesson from "../courses/fullstack-security/05-secure-api-design/output-encoding.json";
-import pacelcAndLatencyTradeOffsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/pacelc-and-latency-trade-offs.json";
+import pacelcAndLatencyTradeOffsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/pacelc-and-latency-trade-offs.json";
 import pacificAtlanticWaterFlowLesson from "../problems/csharp/04-tree-graph-problems/pacific-atlantic-water-flow.json";
 import packageJsonScriptsLesson from "../courses/yarn-npm-packages/yarn-npm-fundamentals/package-json-scripts.json";
 import paginationLesson from "../courses/react-query/02-query-hooks/pagination.json";
 import paginationBasicsLesson from "../courses/graphql-dotnet/04-filtering-pagination/pagination-basics.json";
 import paginationCachingLesson from "../courses/apollo/03-caching/pagination-caching.json";
 import paginationFilteringAndSortingDesignLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/pagination-filtering-and-sorting-design.json";
+import paintingAndCompositingLesson from "../courses/frontend-performance-engineering/runtime-performance/painting-and-compositing.json";
 import palindromeLinkedListLesson from "../problems/csharp/03-linked-list-problems/palindrome-linked-list.json";
 import palindromePartitioningLesson from "../problems/csharp/05-dynamic-programming-problems/palindrome-partitioning.json";
 import palindromicSubstringsLesson from "../problems/csharp/02-string-problems/palindromic-substrings.json";
+import parallelDataLoadingLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/parallel-data-loading.json";
 import parameterSniffingAndPlanInstabilityLesson from "../courses/sql-server/database-internals-query-optimization/parameter-sniffing-and-plan-instability.json";
 import parkingLotAdvancedLesson from "../problems/lld/parking-lot-system/parking-lot-advanced.json";
 import parkingLotBasicLesson from "../problems/lld/parking-lot-system/parking-lot-basic.json";
@@ -1477,7 +1549,10 @@ import perfQ1Lesson from "../interview-qa/08-performance-optimization/perf-q1.js
 import perfQ2Lesson from "../interview-qa/08-performance-optimization/perf-q2.json";
 import perfQ3Lesson from "../interview-qa/08-performance-optimization/perf-q3.json";
 import perfQ4Lesson from "../interview-qa/08-performance-optimization/perf-q4.json";
+import performanceAndReRendersLesson from "../courses/next-js-full-stack-react/state-management/performance-and-re-renders.json";
+import performanceBudgetsLesson from "../courses/frontend-performance-engineering/build-optimization/performance-budgets.json";
 import performanceBulkOperationsLesson from "../courses/ef-core/12-performance-bulk-operations/performance-bulk-operations.json";
+import performanceMarkersLesson from "../courses/frontend-performance-engineering/runtime-performance/performance-markers.json";
 import performanceOptimizationLesson from "../courses/apollo/09-ssr-nextjs-performance/performance-optimization.json";
 import performanceOptimizationLesson1 from "../courses/aspnet-core/08-entity-framework-core/performance-optimization.json";
 import performanceOptimizationLesson2 from "../courses/react-fundamentals/09-performance-optimization/performance-optimization.json";
@@ -1488,18 +1563,18 @@ import permissionsAndEnvironmentVariablesLesson from "../courses/git-linux-devel
 import permissionsGrantRevokeLesson from "../courses/sql-server/17-security-hardening/permissions-grant-revoke.json";
 import persistedQueriesLesson from "../courses/graphql-dotnet/06-performance/persisted-queries.json";
 import persistenceBasicsLesson from "../courses/react-query/06-offline-support-persistence/persistence-basics.json";
-import phase1RequirementsDomainModelAndArchitectureLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-1-requirements-domain-model-and-architecture.json";
-import phase10DockerizedDeploymentAndCicdLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-10-dockerized-deployment-and-cicd.json";
-import phase11CloudDeploymentAndProductionHardeningLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-11-cloud-deployment-and-production-hardening.json";
-import phase12ScaleTheSystemAndDocumentTradeOffsLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-12-scale-the-system-and-document-trade-offs.json";
-import phase2AspnetCoreApiAndReactApplicationLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-2-aspnet-core-api-and-react-application.json";
-import phase3AuthenticationAndAuthorizationLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-3-authentication-and-authorization.json";
-import phase4SqlSchemaEfCoreAndTransactionBoundariesLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-4-sql-schema-ef-core-and-transaction-boundaries.json";
-import phase5ValidationErrorHandlingAndApiContractsLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-5-validation-error-handling-and-api-contracts.json";
-import phase6AutomatedUnitAndIntegrationTestsLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-6-automated-unit-and-integration-tests.json";
-import phase7RedisCachingAndCacheInvalidationLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-7-redis-caching-and-cache-invalidation.json";
-import phase8BackgroundJobsAndMessageProcessingLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-8-background-jobs-and-message-processing.json";
-import phase9ObservabilityWithLogsMetricsAndTracesLesson from "../projects/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-9-observability-with-logs-metrics-and-traces.json";
+import phase1RequirementsDomainModelAndArchitectureLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-1-requirements-domain-model-and-architecture.json";
+import phase10DockerizedDeploymentAndCicdLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-10-dockerized-deployment-and-cicd.json";
+import phase11CloudDeploymentAndProductionHardeningLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-11-cloud-deployment-and-production-hardening.json";
+import phase12ScaleTheSystemAndDocumentTradeOffsLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-12-scale-the-system-and-document-trade-offs.json";
+import phase2AspnetCoreApiAndReactApplicationLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-2-aspnet-core-api-and-react-application.json";
+import phase3AuthenticationAndAuthorizationLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-3-authentication-and-authorization.json";
+import phase4SqlSchemaEfCoreAndTransactionBoundariesLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-4-sql-schema-ef-core-and-transaction-boundaries.json";
+import phase5ValidationErrorHandlingAndApiContractsLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-5-validation-error-handling-and-api-contracts.json";
+import phase6AutomatedUnitAndIntegrationTestsLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-6-automated-unit-and-integration-tests.json";
+import phase7RedisCachingAndCacheInvalidationLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-7-redis-caching-and-cache-invalidation.json";
+import phase8BackgroundJobsAndMessageProcessingLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-8-background-jobs-and-message-processing.json";
+import phase9ObservabilityWithLogsMetricsAndTracesLesson from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/phase-9-observability-with-logs-metrics-and-traces.json";
 import pkceFlowLesson from "../courses/authentication-authorization/05-oauth2-flows-deep-dive/pkce-flow.json";
 import playwrightLesson from "../courses/yarn-npm-packages/testing/playwright.json";
 import playwrightBasedE2eTestingLesson from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/playwright-based-e2e-testing.json";
@@ -1518,11 +1593,12 @@ import polymorphicComponentsLesson1 from "../courses/typescript-for-react/05-gen
 import polymorphismBasicsLesson from "../courses/oops-concepts/04-polymorphism/polymorphism-basics.json";
 import popmotionLesson from "../courses/yarn-npm-packages/animation/popmotion.json";
 import postcssLesson from "../courses/yarn-npm-packages/styling/postcss.json";
+import postmortemCultureLesson from "../courses/git-linux-developer-workflow/production-readiness/postmortem-culture.json";
 import powerLesson from "../problems/csharp/07-recursion-problems/power.json";
 import powxNLesson from "../problems/csharp/06-sorting-searching-problems/powx-n.json";
 import prefetchPatternsLesson from "../courses/react-query/07-prefetching-ssr/prefetch-patterns.json";
 import prefetchingStrategiesLesson from "../courses/react-query/07-prefetching-ssr/prefetching-strategies.json";
-import presenceAndTypingIndicatorsLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/presence-and-typing-indicators.json";
+import presenceAndTypingIndicatorsLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/presence-and-typing-indicators.json";
 import principalsUsersRolesLesson from "../courses/sql-server/17-security-hardening/principals-users-roles.json";
 import privateDnsAndPrivateEndpointConnectivityLesson from "../courses/azure/08-networking-and-api-platforms/private-dns-and-private-endpoint-connectivity.json";
 import privateEndpointsAndNetworkIsolationLesson from "../courses/azure/production-architecture-reliability-cost/private-endpoints-and-network-isolation.json";
@@ -1572,8 +1648,8 @@ import queryStoreLesson from "../courses/sql-server/16-performance-tuning/query-
 import queryingLesson from "../courses/ef-core/07-querying/querying.json";
 import queryingInEntityFrameworkCoreLesson from "../courses/ef-core/07-querying/querying-in-entity-framework-core.json";
 import queryingWithLinqLesson from "../courses/aspnet-core/08-entity-framework-core/querying-with-linq.json";
-import queuesVsPubsubVsEventStreamsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/queues-vs-pubsub-vs-event-streams.json";
-import quorumConceptsLesson from "../courses/system-design-problems/distributed-systems-fundamentals/quorum-concepts.json";
+import queuesVsPubsubVsEventStreamsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/queues-vs-pubsub-vs-event-streams.json";
+import quorumConceptsLesson from "../problems/system-design-problems/distributed-systems-fundamentals/quorum-concepts.json";
 import rabbitmqClientLesson from "../courses/dotnet-nuget-packages/06-messaging-events/rabbitmq-client.json";
 import raceConditionsAndThreadSafetyLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/race-conditions-and-thread-safety.json";
 import ransomNoteLesson from "../problems/csharp/02-string-problems/ransom-note.json";
@@ -1582,6 +1658,7 @@ import rapidQ2Lesson from "../interview-qa/06-rapid-fire/rapid-q2.json";
 import rapidQ3Lesson from "../interview-qa/06-rapid-fire/rapid-q3.json";
 import rateLimiterAdvancedLesson from "../problems/hld/rate-limiter/rate-limiter-advanced.json";
 import rateLimiterBasicLesson from "../problems/hld/rate-limiter/rate-limiter-basic.json";
+import rateLimitingLesson from "../courses/next-js-full-stack-react/full-stack-api-design/rate-limiting.json";
 import rateLimitingAndLoadSheddingLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/rate-limiting-and-load-shedding.json";
 import rateLimitingInAspnetLesson from "../courses/fullstack-security/04-api-security-rate-limiting/rate-limiting-in-aspnet.json";
 import rateLimitingSecurityLesson from "../courses/authentication-authorization/09-security-best-practices/rate-limiting-security.json";
@@ -1591,7 +1668,7 @@ import rbacAndNamespacesLesson from "../courses/devops/production-kubernetes-day
 import rbacOverviewLesson from "../courses/azure/07-identity-security-and-configuration/rbac-overview.json";
 import react19FeaturesLesson from "../courses/react-fundamentals/09-performance-optimization/react-19-features.json";
 import reactA01Lesson from "../interview-qa/03-advanced-questions/react-a01.json";
-import reactApplicationAndAuthenticationLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/react-application-and-authentication.json";
+import reactApplicationAndAuthenticationLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/react-application-and-authentication.json";
 import reactB01Lesson from "../interview-qa/01-beginner-questions/react-b01.json";
 import reactB02Lesson from "../interview-qa/01-beginner-questions/react-b02.json";
 import reactContextLesson from "../courses/react-fundamentals/06-context-refs/react-context.json";
@@ -1608,6 +1685,7 @@ import reactMicroFrontendsLesson from "../problems/system-design/react-system-de
 import reactPageBecomesProgressivelySlowerAfterNavigationLesson from "../problems/production-incident-lab-problems/frontend-incidents/react-page-becomes-progressively-slower-after-navigation.json";
 import reactProfilerAndRenderInvestigationLesson from "../courses/frontend-performance-engineering/browser-react-performance/react-profiler-and-render-investigation.json";
 import reactQueryLesson from "../courses/yarn-npm-packages/react-data-fetching/react-query.json";
+import reactQueryForServerStateLesson from "../courses/next-js-full-stack-react/state-management/react-query-for-server-state.json";
 import reactQueryserverCacheArchitectureLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/react-queryserver-cache-architecture.json";
 import reactRouterLesson from "../courses/yarn-npm-packages/routing/react-router.json";
 import reactSpringLesson from "../courses/yarn-npm-packages/animation/react-spring.json";
@@ -1648,6 +1726,7 @@ import regularExpressionMatchingLesson from "../problems/csharp/05-dynamic-progr
 import relationshipsAndConfigurationsLesson from "../courses/aspnet-core/08-entity-framework-core/relationships-and-configurations.json";
 import relationshipsConfigurationLesson from "../problems/aspnet-core/06-ef-core-problems/relationships-configuration.json";
 import releaseValidationAndRollbackLesson from "../courses/azure/11-application-deployment-and-devops/release-validation-and-rollback.json";
+import reliabilityPatternsLesson from "../courses/senior-software-engineering/system-design-for-seniors/reliability-patterns.json";
 import removeDuplicatesFromSortedArrayLesson from "../problems/csharp/01-array-problems/remove-duplicates-from-sorted-array.json";
 import removeDuplicatesFromSortedListLesson from "../problems/csharp/03-linked-list-problems/remove-duplicates-from-sorted-list.json";
 import removeLinkedListElementsLesson from "../problems/csharp/03-linked-list-problems/remove-linked-list-elements.json";
@@ -1659,7 +1738,7 @@ import renderPropsBasicsLesson from "../courses/react-advanced-patterns/01-rende
 import renderPropsExamplesLesson from "../courses/react-advanced-patterns/01-render-props/render-props-examples.json";
 import renderPropsVsHooksLesson from "../courses/react-advanced-patterns/01-render-props/render-props-vs-hooks.json";
 import renderingOptimizationLesson from "../courses/yarn-npm-packages/react-performance/rendering-optimization.json";
-import replicationAndPartitioningLesson from "../courses/system-design-problems/distributed-systems-fundamentals/replication-and-partitioning.json";
+import replicationAndPartitioningLesson from "../problems/system-design-problems/distributed-systems-fundamentals/replication-and-partitioning.json";
 import repositoryPatternLesson from "../courses/clean-code-csharp/06-architecture-patterns/repository-pattern.json";
 import repositoryPatternLesson1 from "../courses/design-patterns/04-enterprise-patterns/repository-pattern.json";
 import repositoryPatternLesson2 from "../interview-qa/02-intermediate-questions/repository-pattern.json";
@@ -1667,8 +1746,10 @@ import requestCancellationAndGracefulShutdownLesson from "../courses/aspnet-core
 import requestLatencyDecompositionLesson from "../courses/aspnet-core/performance-observability/request-latency-decomposition.json";
 import requestLoggingLesson from "../problems/aspnet-core/04-middleware-pipeline-problems/request-logging.json";
 import requestPipelineAndMiddlewareExecutionLesson from "../courses/aspnet-core/asp-net-core-internals-production-hosting/request-pipeline-and-middleware-execution.json";
+import requestValidationLesson from "../courses/next-js-full-stack-react/full-stack-api-design/request-validation.json";
 import requestsAndLimitsLesson from "../courses/devops/production-kubernetes-day-2-operations/requests-and-limits.json";
-import requirementsAndRealTimeCommunicationArchitectureLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/requirements-and-real-time-communication-architecture.json";
+import requirementsAndRealTimeCommunicationArchitectureLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/requirements-and-real-time-communication-architecture.json";
+import requirementsGatheringLesson from "../courses/senior-software-engineering/system-design-for-seniors/requirements-gathering.json";
 import resolversLesson from "../courses/graphql-dotnet/03-queries-mutations/resolvers.json";
 import resolvingDifficultMergeConflictsLesson from "../courses/git-linux-developer-workflow/git-for-senior-engineers/resolving-difficult-merge-conflicts.json";
 import resourceBasedAuthorizationLesson from "../courses/authentication-authorization/06-advanced-authorization/resource-based-authorization.json";
@@ -1676,16 +1757,19 @@ import resourceGroupsVsManagementGroupsLesson from "../problems/azure/01-azure-f
 import resourceLimitsLesson from "../courses/devops/production-docker-container-security/resource-limits.json";
 import responseCachingLesson from "../problems/aspnet-core/03-api-design-problems/response-caching.json";
 import responseCompressionLesson from "../problems/aspnet-core/04-middleware-pipeline-problems/response-compression.json";
+import responseFormattingLesson from "../courses/next-js-full-stack-react/full-stack-api-design/response-formatting.json";
 import restApiDesignPrinciplesLesson from "../problems/aspnet-core/03-api-design-problems/rest-api-design-principles.json";
 import restPrinciplesLesson from "../courses/aspnet-core/10-web-api-rest/rest-principles.json";
 import restVsGraphqlDecisionFrameworkLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/rest-vs-graphql-decision-framework.json";
 import restVsGrpcDecisionFrameworkLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/rest-vs-grpc-decision-framework.json";
 import restsharpLesson from "../courses/dotnet-nuget-packages/http-clients-resilience/restsharp.json";
-import retryWithExponentialBackoffAndJitterLesson from "../courses/system-design-problems/distributed-systems-fundamentals/retry-with-exponential-backoff-and-jitter.json";
+import retryWithExponentialBackoffAndJitterLesson from "../problems/system-design-problems/distributed-systems-fundamentals/retry-with-exponential-backoff-and-jitter.json";
+import revalidationPatternsLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/revalidation-patterns.json";
 import reverseAnArrayLesson from "../problems/csharp/01-array-problems/reverse-an-array.json";
 import reverseLinkedListLesson from "../problems/csharp/03-linked-list-problems/reverse-linked-list.json";
 import reverseStringLesson from "../problems/csharp/02-string-problems/reverse-string.json";
 import reverseWordsLesson from "../problems/csharp/02-string-problems/reverse-words.json";
+import reversibilityLesson from "../courses/senior-software-engineering/technical-decision-making/reversibility.json";
 import reviewABackgroundWorkerWithNoCancellationSupportLesson from "../problems/senior-code-review-lab-problems/c-aspnet-core-reviews/review-a-background-worker-with-no-cancellation-support.json";
 import reviewAComponentThatRendersAHugeListWithoutVirtualizationLesson from "../problems/senior-code-review-lab-problems/react-typescript-reviews/review-a-component-that-renders-a-huge-list-without-virtualization.json";
 import reviewAComponentWithUnnecessaryGlobalStateLesson from "../problems/senior-code-review-lab-problems/react-typescript-reviews/review-a-component-with-unnecessary-global-state.json";
@@ -1703,6 +1787,7 @@ import reviewAnEfCoreQueryThatCausesN1DatabaseCallsLesson from "../problems/seni
 import reviewAnHttpClientImplementationThatCreatesSocketsRepeatedlyLesson from "../problems/senior-code-review-lab-problems/c-aspnet-core-reviews/review-an-http-client-implementation-that-creates-sockets-repeatedly.json";
 import rideSharingHldAdvancedLesson from "../problems/hld/ride-sharing-hld/ride-sharing-hld-advanced.json";
 import rideSharingHldBasicLesson from "../problems/hld/ride-sharing-hld/ride-sharing-hld-basic.json";
+import riskAssessmentLesson from "../courses/senior-software-engineering/technical-decision-making/risk-assessment.json";
 import roleBasedAccessLesson from "../courses/aspnet-core/09-authentication-authorization/role-based-access.json";
 import roleBasedAccessLesson1 from "../problems/aspnet-core/07-authentication-authorization-problems/role-based-access.json";
 import roleBasedAuthorizationLesson from "../courses/authentication-authorization/06-advanced-authorization/role-based-authorization.json";
@@ -1726,6 +1811,7 @@ import round8TellTheStoryOfAProductionIncidentYouOwnedLesson from "../interview-
 import round9DesignAMigrationFromMonolithToModularArchitectureLesson from "../interview-qa/mock-interview-scenarios/round-9-design-a-migration-from-monolith-to-modular-architecture.json";
 import routeConstraintsLesson from "../courses/aspnet-core/03-routing-urls/route-constraints.json";
 import routeConstraintsLesson1 from "../courses/aspnet-core-web-api/02-controllers-routing/route-constraints.json";
+import routeHandlersLesson from "../courses/next-js-full-stack-react/full-stack-api-design/route-handlers.json";
 import routeHandlersAndBackendForFrontendPatternsLesson from "../courses/next-js-full-stack-react/app-router-rendering/route-handlers-and-backend-for-frontend-patterns.json";
 import routeParamsLesson from "../courses/react-fundamentals/07-react-router/route-params.json";
 import route53DnsLesson from "../courses/aws/04-networking/route53-dns.json";
@@ -1737,11 +1823,12 @@ import rtkQueryLesson from "../courses/redux/05-redux-patterns/rtk-query.json";
 import rtlIntroLesson from "../courses/react-testing/03-react-testing-library/rtl-intro.json";
 import rtoAndRpoLesson from "../courses/senior-software-engineering/production-ownership/rto-and-rpo.json";
 import rtoAndRpoForAzureApplicationsLesson from "../courses/azure/production-architecture-reliability-cost/rto-and-rpo-for-azure-applications.json";
+import runbookAutomationLesson from "../courses/git-linux-developer-workflow/production-readiness/runbook-automation.json";
 import runningAndDebuggingLesson from "../courses/aspnet-core/01-getting-started/running-and-debugging.json";
 import runtimePolymorphismLesson from "../courses/oops-concepts/04-polymorphism/runtime-polymorphism.json";
 import runtimeValidationVsCompileTimeTypesLesson from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/runtime-validation-vs-compile-time-types.json";
 import s3AdvancedFeaturesLesson from "../courses/aws/05-storage-services/s3-advanced-features.json";
-import sagaPatternLesson from "../courses/system-design-problems/distributed-systems-fundamentals/saga-pattern.json";
+import sagaPatternLesson from "../problems/system-design-problems/distributed-systems-fundamentals/saga-pattern.json";
 import sameTreeLesson from "../problems/csharp/04-tree-graph-problems/same-tree.json";
 import saml2BasicsLesson from "../courses/authentication-authorization/08-sso-identity-providers/saml2-basics.json";
 import sampleLinqQueriesLesson from "../courses/linq/11-advanced-linq-concepts/sample-linq-queries.json";
@@ -1749,7 +1836,8 @@ import sassLesson from "../courses/yarn-npm-packages/styling/sass.json";
 import scalableAspnetApiDesignLesson from "../problems/system-design/aspnet-system-design/scalable-aspnet-api-design.json";
 import scalableReactStateArchitectureLesson from "../problems/system-design/react-system-design/scalable-react-state-architecture.json";
 import scalarsCustomTypesLesson from "../courses/graphql-dotnet/02-schema-types/scalars-custom-types.json";
-import scalingRealTimeConnectionsLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/scaling-real-time-connections.json";
+import scalingRealTimeConnectionsLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/scaling-real-time-connections.json";
+import scalingStrategiesLesson from "../courses/senior-software-engineering/system-design-for-seniors/scaling-strategies.json";
 import scenarioQ1Lesson from "../interview-qa/04-scenario-based/scenario-q1.json";
 import scenarioQ2Lesson from "../interview-qa/04-scenario-based/scenario-q2.json";
 import scenarioQ21Lesson from "../interview-qa/04-scenario-based/scenario-q21.json";
@@ -1772,6 +1860,7 @@ import secretsManagementLesson from "../courses/fullstack-security/07-environmen
 import secureStorageStrategiesLesson from "../courses/authentication-authorization/07-refresh-token-strategies/secure-storage-strategies.json";
 import securingAiServicesWithManagedIdentityLesson from "../courses/azure/13-ai-services-for-azure-developers/securing-ai-services-with-managed-identity.json";
 import securingReactAppsLesson from "../courses/fullstack-security/03-xss-csrf-protection/securing-react-apps.json";
+import securityHardeningLesson from "../courses/git-linux-developer-workflow/production-readiness/security-hardening.json";
 import securityTestingFundamentalsLesson from "../courses/fullstack-security/08-security-testing/security-testing-fundamentals.json";
 import seekVsScanLesson from "../courses/sql-server/database-internals-query-optimization/seek-vs-scan.json";
 import selectiveFetchingLesson from "../courses/react-query/08-performance-optimization/selective-fetching.json";
@@ -1782,10 +1871,12 @@ import sequenceequalOperatorLesson from "../courses/linq/11-advanced-linq-concep
 import serilogLesson from "../courses/dotnet-nuget-packages/logging-monitoring/serilog.json";
 import serverActionsAndMutationBoundariesLesson from "../courses/next-js-full-stack-react/app-router-rendering/server-actions-and-mutation-boundaries.json";
 import serverComponentsAndClientComponentsLesson from "../courses/next-js-full-stack-react/app-router-rendering/server-components-and-client-components.json";
+import serverComponentsDataFetchingLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/server-components-data-fetching.json";
 import serverComponentsVsClientComponentsLesson from "../courses/react-fundamentals/react-internals-modern-rendering/server-components-vs-client-components.json";
 import serverGcVsWorkstationGcLesson from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/server-gc-vs-workstation-gc.json";
 import serverlessApiBestPracticesLesson from "../problems/azure/03-azure-serverless-problems/serverless-api-best-practices.json";
 import serverlessArchitecturePatternsLesson from "../courses/aws/08-serverless/serverless-architecture-patterns.json";
+import serviceBoundariesLesson from "../courses/senior-software-engineering/system-design-for-seniors/service-boundaries.json";
 import serviceBusDeadLetteringAndRetriesLesson from "../courses/azure/09-messaging-and-event-driven-architecture/service-bus-dead-lettering-and-retries.json";
 import serviceBusFromAzureFunctionsLesson from "../courses/azure/09-messaging-and-event-driven-architecture/service-bus-from-azure-functions.json";
 import serviceBusQueuesLesson from "../courses/azure/09-messaging-and-event-driven-architecture/service-bus-queues.json";
@@ -1806,7 +1897,7 @@ import setupLesson from "../courses/react-query/01-query-basics/setup.json";
 import setupClientLesson from "../courses/apollo/01-apollo-basics/setup-client.json";
 import setupIdentityLesson from "../courses/authentication-authorization/03-identity/setup-identity.json";
 import shadowPropertyInEntityFrameworkCoreLesson from "../courses/ef-core/10-advanced-features/shadow-property-in-entity-framework-core.json";
-import shardingStrategiesLesson from "../courses/system-design-problems/distributed-systems-fundamentals/sharding-strategies.json";
+import shardingStrategiesLesson from "../problems/system-design-problems/distributed-systems-fundamentals/sharding-strategies.json";
 import sharpcompressLesson from "../courses/dotnet-nuget-packages/08-security-cryptography/sharpcompress.json";
 import sharpcompressLesson1 from "../courses/dotnet-nuget-packages/09-utilities-helpers/sharpcompress.json";
 import simplifyPathLesson from "../problems/csharp/02-string-problems/simplify-path.json";
@@ -1860,18 +1951,22 @@ import ssrWithApolloLesson from "../courses/apollo/09-ssr-nextjs-performance/ssr
 import ssrfAndServerSideRequestValidationLesson from "../courses/fullstack-security/modern-web-security-identity/ssrf-and-server-side-request-validation.json";
 import stackVsHeapLesson from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/stack-vs-heap.json";
 import stackexchangeRedisLesson from "../courses/dotnet-nuget-packages/04-database-data-access/stackexchange-redis.json";
+import stacksAndQueuesLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/stacks-and-queues.json";
+import stakeholderAlignmentLesson from "../courses/senior-software-engineering/technical-decision-making/stakeholder-alignment.json";
 import staleTimeGcLesson from "../courses/react-query/05-caching-strategies/stale-time-gc.json";
 import standardQueryOperatorsLesson from "../courses/linq/11-advanced-linq-concepts/standard-query-operators.json";
 import starSnowflakeSchemaLesson from "../courses/sql-server/19-data-warehousing/star-snowflake-schema.json";
+import stateArchitectureLesson from "../courses/next-js-full-stack-react/state-management/state-architecture.json";
 import stateBestPracticesLesson from "../courses/react-fundamentals/03-state-events/state-best-practices.json";
 import stateCompositionLesson from "../courses/apollo/08-local-state-management/state-composition.json";
 import stateReducerBasicsLesson from "../courses/react-advanced-patterns/04-state-reducers/state-reducer-basics.json";
 import stateReducerCompositionLesson from "../courses/react-advanced-patterns/04-state-reducers/state-reducer-composition.json";
 import stateReducerExamplesLesson from "../courses/react-advanced-patterns/04-state-reducers/state-reducer-examples.json";
 import stateSharingBetweenHooksLesson from "../courses/react-advanced-patterns/07-custom-hooks-architecture/state-sharing-between-hooks.json";
+import stateSynchronizationLesson from "../courses/next-js-full-stack-react/state-management/state-synchronization.json";
 import stateSynchronizationAcrossBrowserTabsLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/state-synchronization-across-browser-tabs.json";
 import statechartsAdvancedLesson from "../courses/react-advanced-patterns/08-state-machines-xstate/statecharts-advanced.json";
-import statelessServicesAndDistributedStateLesson from "../courses/system-design-problems/distributed-systems-fundamentals/stateless-services-and-distributed-state.json";
+import statelessServicesAndDistributedStateLesson from "../problems/system-design-problems/distributed-systems-fundamentals/stateless-services-and-distributed-state.json";
 import staticFilesAndCachingLesson from "../courses/aspnet-core/07-middleware-pipeline/static-files-and-caching.json";
 import statisticsAndCardinalityEstimationLesson from "../courses/sql-server/database-internals-query-optimization/statistics-and-cardinality-estimation.json";
 import statisticsMaintenanceLesson from "../courses/sql-server/16-performance-tuning/statistics-maintenance.json";
@@ -1888,9 +1983,10 @@ import storybookLesson from "../courses/yarn-npm-packages/testing/storybook.json
 import strategyPatternLesson from "../courses/clean-code-csharp/04-behavioral-patterns/strategy-pattern.json";
 import strategyPatternLesson1 from "../courses/design-patterns/03-behavioral-patterns/strategy-pattern.json";
 import streamingAndSuspenseLesson from "../courses/next-js-full-stack-react/app-router-rendering/streaming-and-suspense.json";
+import streamingAndSuspenseLesson1 from "../courses/next-js-full-stack-react/data-fetching-patterns/streaming-and-suspense.json";
 import streamingApisAndLargePayloadsLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/streaming-apis-and-large-payloads.json";
 import stringCompressionLesson from "../problems/csharp/02-string-problems/string-compression.json";
-import strongVsEventualConsistencyLesson from "../courses/system-design-problems/distributed-systems-fundamentals/strong-vs-eventual-consistency.json";
+import strongVsEventualConsistencyLesson from "../problems/system-design-problems/distributed-systems-fundamentals/strong-vs-eventual-consistency.json";
 import structuredLoggingLesson from "../courses/aspnet-core-web-api/08-logging-configuration/structured-logging.json";
 import structuredLoggingAndCorrelationIdsLesson from "../courses/aspnet-core/performance-observability/structured-logging-and-correlation-ids.json";
 import stubsFakesLesson from "../courses/unit-testing-dotnet/03-mocking-fakes/stubs-fakes.json";
@@ -1939,9 +2035,11 @@ import tanstackRouterLesson from "../courses/yarn-npm-packages/routing/tanstack-
 import taskSchedulingAndContinuationsLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/task-scheduling-and-continuations.json";
 import taskrunWhenIsItAppropriateInAnAspnetCoreApplicationLesson from "../interview-qa/c-net-follow-ups/taskrun-when-is-it-appropriate-in-an-aspnet-core-application.json";
 import tcpConnectionAndTlsHandshakeLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/tcp-connection-and-tls-handshake.json";
+import tcpIpStackLesson from "../courses/programming-computer-web-foundations/networking-protocols/tcp-ip-stack.json";
 import tddAspnetCoreLesson from "../courses/unit-testing-dotnet/05-tdd/tdd-aspnet-core.json";
 import tddIntroLesson from "../courses/unit-testing-dotnet/05-tdd/tdd-intro.json";
 import tddPatternsLesson from "../courses/unit-testing-dotnet/05-tdd/tdd-patterns.json";
+import technicalRoadmapsLesson from "../courses/senior-software-engineering/technical-decision-making/technical-roadmaps.json";
 import tellMeAboutADifficultTechnicalDecisionYouMadeLesson from "../interview-qa/leadership-ownership/tell-me-about-a-difficult-technical-decision-you-made.json";
 import tellMeAboutAProductionIncidentYouOwnedLesson from "../interview-qa/leadership-ownership/tell-me-about-a-production-incident-you-owned.json";
 import tellMeAboutAProjectThatFailedAndWhatYouLearnedLesson from "../interview-qa/leadership-ownership/tell-me-about-a-project-that-failed-and-what-you-learned.json";
@@ -1961,6 +2059,7 @@ import testServerLesson from "../courses/unit-testing-dotnet/04-integration-test
 import testStructureLesson from "../courses/react-testing/01-testing-fundamentals/test-structure.json";
 import testcontainersAndRealisticBackendIntegrationLesson from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/testcontainers-and-realistic-backend-integration.json";
 import testingApiCallsLesson from "../courses/react-testing/04-component-testing/testing-api-calls.json";
+import testingApisLesson from "../courses/next-js-full-stack-react/full-stack-api-design/testing-apis.json";
 import testingAsyncLesson from "../courses/redux/06-redux-testing/testing-async.json";
 import testingCacheInvalidationLesson from "../courses/react-testing/07-testing-react-query/testing-cache-invalidation.json";
 import testingComponentsLesson from "../courses/redux/06-redux-testing/testing-components.json";
@@ -1975,6 +2074,7 @@ import testingPrinciplesLesson from "../courses/react-testing/01-testing-fundame
 import testingPyramidLesson from "../courses/unit-testing-dotnet/01-testing-fundamentals/testing-pyramid.json";
 import testingReducersLesson from "../courses/redux/06-redux-testing/testing-reducers.json";
 import testingRoutingLesson from "../courses/react-testing/04-component-testing/testing-routing.json";
+import testingStateLesson from "../courses/next-js-full-stack-react/state-management/testing-state.json";
 import testingTypesLesson from "../courses/react-testing/01-testing-fundamentals/testing-types.json";
 import testingTypescriptReactLesson from "../courses/typescript-for-react/07-testing-best-practices/testing-typescript-react.json";
 import thenbyThenbydescendingLesson from "../courses/linq/04-sorting-grouping/thenby-thenbydescending.json";
@@ -1989,18 +2089,23 @@ import ticketBookingHldBasicLesson from "../problems/hld/ticket-booking-hld/tick
 import tictactoeAdvancedLesson from "../problems/lld/tic-tac-toe-game/tictactoe-advanced.json";
 import tictactoeBasicLesson from "../problems/lld/tic-tac-toe-game/tictactoe-basic.json";
 import timeComplexityAndBigOLesson from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/time-complexity-and-big-o.json";
-import timeoutsAndCircuitBreakersLesson from "../courses/system-design-problems/distributed-systems-fundamentals/timeouts-and-circuit-breakers.json";
+import timeoutsAndCircuitBreakersLesson from "../problems/system-design-problems/distributed-systems-fundamentals/timeouts-and-circuit-breakers.json";
 import timeoutsRetriesAndCancellationLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/timeouts-retries-and-cancellation.json";
 import tokenRevocationLesson from "../courses/authentication-authorization/07-refresh-token-strategies/token-revocation.json";
 import tokenRotationLesson from "../courses/authentication-authorization/07-refresh-token-strategies/token-rotation.json";
 import trackgraphInEntityFrameworkCoreLesson from "../courses/ef-core/06-change-tracking/trackgraph-in-entity-framework-core.json";
 import trackingChangesOfEntitiesLesson from "../courses/ef-core/06-change-tracking/tracking-changes-of-entities.json";
 import trackingVsAsnotrackingLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/tracking-vs-asnotracking.json";
+import tradeOffAnalysisLesson from "../courses/senior-software-engineering/technical-decision-making/trade-off-analysis.json";
 import transactionIsolationLevelsLesson from "../courses/sql-server/concurrency-production-database-problems/transaction-isolation-levels.json";
 import trapQ1Lesson from "../interview-qa/07-interview-traps/trap-q1.json";
 import trapQ2Lesson from "../interview-qa/07-interview-traps/trap-q2.json";
 import trappingRainWaterLesson from "../problems/csharp/01-array-problems/trapping-rain-water.json";
+import treeShakingLesson from "../courses/frontend-performance-engineering/build-optimization/tree-shaking.json";
 import treeShakingAndDependencyCostLesson from "../courses/frontend-performance-engineering/browser-react-performance/tree-shaking-and-dependency-cost.json";
+import treesAndGraphsLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/trees-and-graphs.json";
+import trieStructuresLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/trie-structures.json";
+import troubleshootingToolsLesson from "../courses/programming-computer-web-foundations/networking-protocols/troubleshooting-tools.json";
 import tryCatchFinallyLesson from "../courses/csharp-fundamentals/06-error-handling/try-catch-finally.json";
 import ttfbAndFrontendPerformanceBudgetsLesson from "../courses/frontend-performance-engineering/browser-react-performance/ttfb-and-frontend-performance-budgets.json";
 import turboLesson from "../courses/yarn-npm-packages/build-tools/turbo.json";
@@ -2046,6 +2151,7 @@ import unitTestingControllersLesson from "../courses/aspnet-core/11-testing-debu
 import unitTestingControllersLesson1 from "../problems/aspnet-core/08-testing-debugging-problems/unit-testing-controllers.json";
 import unknownVsAnyLesson from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/unknown-vs-any.json";
 import updateDataDisconnectedScenarioLesson from "../courses/ef-core/05-data-operations-disconnected/update-data-disconnected-scenario.json";
+import urlAsStateLesson from "../courses/next-js-full-stack-react/state-management/url-as-state.json";
 import urlGenerationLesson from "../courses/aspnet-core/03-routing-urls/url-generation.json";
 import urlShortenerAdvancedLesson from "../problems/hld/url-shortener/url-shortener-advanced.json";
 import urlShortenerBasicLesson from "../problems/hld/url-shortener/url-shortener-basic.json";
@@ -2059,6 +2165,7 @@ import useSelectorLesson from "../courses/redux/03-react-redux/use-selector.json
 import useStateEffectLesson from "../courses/yarn-npm-packages/react-hooks-patterns/use-state-effect.json";
 import usecontextHookLesson from "../courses/react-fundamentals/06-context-refs/usecontext-hook.json";
 import useeffectBasicsLesson from "../courses/react-fundamentals/05-lifecycle-effects/useeffect-basics.json";
+import userCentricMetricsLesson from "../courses/frontend-performance-engineering/runtime-performance/user-centric-metrics.json";
 import userEventsLesson from "../courses/react-testing/03-react-testing-library/user-events.json";
 import userefHookLesson from "../courses/react-fundamentals/06-context-refs/useref-hook.json";
 import usersSeeStaleDataAfterASuccessfulUpdateLesson from "../problems/production-incident-lab-problems/frontend-incidents/users-see-stale-data-after-a-successful-update.json";
@@ -2081,7 +2188,7 @@ import vendingBasicLesson from "../problems/lld/vending-machine/vending-basic.js
 import verificationLesson from "../courses/unit-testing-dotnet/03-mocking-fakes/verification.json";
 import versioningAndDocumentationLesson from "../courses/aspnet-core/10-web-api-rest/versioning-and-documentation.json";
 import versioningSemverLesson from "../courses/yarn-npm-packages/yarn-npm-fundamentals/versioning-semver.json";
-import verticalVsHorizontalScalingLesson from "../courses/system-design-problems/distributed-systems-fundamentals/vertical-vs-horizontal-scaling.json";
+import verticalVsHorizontalScalingLesson from "../problems/system-design-problems/distributed-systems-fundamentals/vertical-vs-horizontal-scaling.json";
 import videoStreamingHldAdvancedLesson from "../problems/hld/video-streaming-hld/video-streaming-hld-advanced.json";
 import videoStreamingHldBasicLesson from "../problems/hld/video-streaming-hld/video-streaming-hld-basic.json";
 import viewComponentsLesson from "../courses/aspnet-core/05-razor-views/view-components.json";
@@ -2112,8 +2219,9 @@ import webMobileAmplifyLesson from "../courses/aws/15-developer-tools-applicatio
 import webWorkersAndCpuHeavyBrowserWorkLesson from "../courses/frontend-performance-engineering/browser-react-performance/web-workers-and-cpu-heavy-browser-work.json";
 import webhooksAndReliableCallbackProcessingLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/webhooks-and-reliable-callback-processing.json";
 import webpackLesson from "../courses/yarn-npm-packages/build-tools/webpack.json";
-import websocketConnectionLifecycleLesson from "../projects/full-stack-senior-projects/project-2-collaborative-communication-platform/websocket-connection-lifecycle.json";
+import websocketConnectionLifecycleLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/websocket-connection-lifecycle.json";
 import websocketSetupLesson from "../courses/apollo/07-subscriptions-realtime/websocket-setup.json";
+import websocketsLesson from "../courses/programming-computer-web-foundations/networking-protocols/websockets.json";
 import websocketsVsServerSentEventsLesson from "../courses/programming-computer-web-foundations/web-networking-fundamentals/websockets-vs-server-sent-events.json";
 import whatCausesHydrationMismatchesLesson from "../interview-qa/react-frontend-follow-ups/what-causes-hydration-mismatches.json";
 import whatIsApolloLesson from "../courses/apollo/01-apollo-basics/what-is-apollo.json";
@@ -2143,10 +2251,11 @@ import whenShouldASynchronousApiBecomeAsynchronousLesson from "../interview-qa/b
 import whenShouldStateLiveInReactQueryRatherThanReduxLesson from "../interview-qa/react-frontend-follow-ups/when-should-state-live-in-react-query-rather-than-redux.json";
 import whenToBypassTheOrmLesson from "../courses/ef-core/ef-core-performance-orm-trade-offs/when-to-bypass-the-orm.json";
 import whenToUseContextAndWhenNotToLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/when-to-use-context-and-when-not-to.json";
+import whenToUseReduxLesson from "../courses/next-js-full-stack-react/state-management/when-to-use-redux.json";
 import whenWouldYouChooseEfCoreDapperOrRawSqlLesson from "../interview-qa/backend-database-follow-ups/when-would-you-choose-ef-core-dapper-or-raw-sql.json";
 import whereWouldYouUseCachingAndHowWouldYouInvalidateItLesson from "../interview-qa/architecture-follow-ups/where-would-you-use-caching-and-how-would-you-invalidate-it.json";
 import whyDidYouChooseMicroservicesInsteadOfAModularMonolithLesson from "../interview-qa/architecture-follow-ups/why-did-you-choose-microservices-instead-of-a-modular-monolith.json";
-import whyExactlyOnceIsDifficultLesson from "../courses/system-design-problems/distributed-systems-fundamentals/why-exactly-once-is-difficult.json";
+import whyExactlyOnceIsDifficultLesson from "../problems/system-design-problems/distributed-systems-fundamentals/why-exactly-once-is-difficult.json";
 import whyIsThisReactComponentReRenderingAndHowWouldYouProveTheCauseLesson from "../interview-qa/react-frontend-follow-ups/why-is-this-react-component-re-rendering-and-how-would-you-prove-the-cause.json";
 import whyLinqLesson from "../courses/linq/01-getting-started-linq/why-linq.json";
 import whyTestReactLesson from "../courses/react-testing/01-testing-fundamentals/why-test-react.json";
@@ -2155,14 +2264,15 @@ import windowingLargeListsLesson from "../courses/react-query/08-performance-opt
 import wordBreakLesson from "../problems/csharp/05-dynamic-programming-problems/word-break.json";
 import wordLadderLesson from "../problems/csharp/04-tree-graph-problems/word-ladder.json";
 import wordPatternLesson from "../problems/csharp/02-string-problems/word-pattern.json";
-import workflowOrchestrationVsChoreographyLesson from "../courses/system-design-problems/distributed-systems-fundamentals/workflow-orchestration-vs-choreography.json";
+import workflowOrchestrationVsChoreographyLesson from "../problems/system-design-problems/distributed-systems-fundamentals/workflow-orchestration-vs-choreography.json";
 import workingWithDbcontextInEfCoreLesson from "../courses/ef-core/01-getting-started-ef-core/working-with-dbcontext-in-ef-core.json";
 import workingWithDisconnectedEntityGraphLesson from "../courses/ef-core/05-data-operations-disconnected/working-with-disconnected-entity-graph.json";
 import workingWithProductAndQaLesson from "../courses/senior-software-engineering/technical-leadership/working-with-product-and-qa.json";
 import workingWithStoredProceduresLesson from "../courses/ef-core/10-advanced-features/working-with-stored-procedures.json";
 import workspacesMonoreposLesson from "../courses/yarn-npm-packages/yarn-npm-fundamentals/workspaces-monorepos.json";
-import writeARootCauseAnalysisAndRemediationPlanLesson from "../projects/full-stack-senior-projects/project-3-production-incident-simulator/write-a-root-cause-analysis-and-remediation-plan.json";
+import writeARootCauseAnalysisAndRemediationPlanLesson from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/write-a-root-cause-analysis-and-remediation-plan.json";
 import writingE2eTestsLesson from "../courses/react-testing/05-e2e-testing/writing-e2e-tests.json";
+import writingRfcsLesson from "../courses/senior-software-engineering/technical-decision-making/writing-rfcs.json";
 import writingTechnicalProposalsLesson from "../courses/senior-software-engineering/technical-leadership/writing-technical-proposals.json";
 import xssAndOutputEncodingLesson from "../courses/fullstack-security/modern-web-security-identity/xss-and-output-encoding.json";
 import xssPreventionTechniquesLesson from "../courses/fullstack-security/03-xss-csrf-protection/xss-prevention-techniques.json";
@@ -2484,6 +2594,7 @@ const rawLessonsPart1 = [
 	animeJsLesson,
 	apiContractTestingLesson,
 	apiControllersLesson,
+	apiDesignLesson,
 	apiDesignPrinciplesLesson,
 	apiErrorHandlingLesson,
 	apiGatewayLesson,
@@ -2495,9 +2606,11 @@ const rawLessonsPart1 = [
 	apiManagementPoliciesLesson,
 	apiManagementVersioningAndRevisionsLesson,
 	apiReturnsIntermittent503ResponsesWhileCpuRemainsLowLesson,
+	apiRoutesLesson,
 	apiSecurityFundamentalsLesson,
 	apiTestingLesson,
 	apiVersioningLesson,
+	apiVersioningLesson1,
 	apiVersioningAndCompatibilityLesson,
 	apolloClientLesson,
 	appConfigurationFeatureFlagsAndLabelsLesson,
@@ -2527,6 +2640,7 @@ const rawLessonsPart1 = [
 	areaRoutingLesson,
 	arrangeActAssertLesson,
 	arraypooltAndMemorypooltLesson,
+	arraysAndLinkedListsLesson,
 	artifactVersioningLesson,
 	aspnetApiGatewayGrpcLesson,
 	aspnetB01Lesson,
@@ -2544,6 +2658,7 @@ const rawLessonsPart1 = [
 	assemblyLoadingAndMetadataLesson,
 	assertionFrameworksLesson,
 	assertionsLesson,
+	assetOptimizationLesson,
 	asyncAwaitLesson,
 	asyncAwaitPatternsLesson,
 	asyncIoVsCpuBoundWorkLesson,
@@ -2564,6 +2679,7 @@ const rawLessonsPart1 = [
 	auth0IntegrationLesson,
 	authenticationAndAuthorizationBoundariesLesson,
 	authenticationFlowLesson,
+	authenticationInApisLesson,
 	authenticationModesLesson,
 	authenticationVsAuthorizationLesson,
 	authenticationWorksLocallyButFailsBehindAReverseProxyLesson,
@@ -2654,6 +2770,7 @@ const rawLessonsPart1 = [
 	backgroundSyncLesson,
 	backgroundserviceAndHostedWorkloadsLesson,
 	backpressureLesson,
+	backupAndRecoveryLesson,
 	backupArchivingLesson,
 	backupRestoreStrategiesLesson,
 	backwardCompatibleDeploymentsLesson,
@@ -2677,6 +2794,9 @@ const rawLessonsPart1 = [
 	beginnerQ19Lesson,
 	beginnerQ2Lesson,
 	beginnerQ20Lesson,
+];
+
+const rawLessonsPart2 = [
 	beginnerQ21Lesson,
 	beginnerQ3Lesson,
 	beginnerQ4Lesson,
@@ -2684,9 +2804,6 @@ const rawLessonsPart1 = [
 	beginnerQ6Lesson,
 	beginnerQ7Lesson,
 	beginnerQ8Lesson,
-];
-
-const rawLessonsPart2 = [
 	beginnerQ9Lesson,
 	behB01Lesson,
 	benchmarkDotnetLesson,
@@ -2727,6 +2844,8 @@ const rawLessonsPart2 = [
 	branchingStrategiesAndTrunkBasedDevelopmentLesson,
 	breakingDownLargeTechnicalInitiativesLesson,
 	brokenAccessControlAndIdorbolaLesson,
+	buildCachingLesson,
+	buildPipelineLesson,
 	buildTestPackageDeployPipelineDesignLesson,
 	buildVsBuyDecisionsLesson,
 	builderPatternLesson,
@@ -2738,7 +2857,9 @@ const rawLessonsPart2 = [
 	builtInMiddlewareLesson1,
 	bulkOperationsAndLargeDataChangesLesson,
 	bulkheadsAndLoadSheddingLesson,
+	bundleAnalysisLesson,
 	bundleAnalysisAndCodeSplittingLesson,
+	bundlerFundamentalsLesson,
 	burstBalloonsLesson,
 	cacheBasicsLesson,
 	cacheConfigurationLesson,
@@ -2749,11 +2870,15 @@ const rawLessonsPart2 = [
 	cacheUpdatesLesson,
 	cachingLesson,
 	cachingAndRevalidationLesson,
+	cachingStrategiesLesson,
 	canaryReleasesLesson,
 	cancellationtokenDesignLesson,
 	capTheoremLesson,
 	capacityPlanningLesson,
+	capacityPlanningLesson1,
+	capacityPlanningLesson2,
 	cartesianExplosionAndSplitQueriesLesson,
+	cdnArchitectureLesson,
 	cdnReverseProxyAndLoadBalancerLesson,
 	chainOfResponsibilityLesson,
 	changeTrackingLesson,
@@ -2792,6 +2917,7 @@ const rawLessonsPart2 = [
 	choosingAzureRegionAndAvailabilityZoneLesson,
 	choosingBetweenVmAndAppServiceLesson,
 	choosingStateOwnershipBoundariesLesson,
+	choosingTheRightStructureLesson,
 	ciCdForAppServiceLesson,
 	ciCdForContainersAndAcrLesson,
 	ciCdForFunctionsLesson,
@@ -2809,6 +2935,7 @@ const rawLessonsPart2 = [
 	clientCredentialsFlowLesson,
 	clientCredentialsForServiceToServiceCallsLesson,
 	clientEvaluationAndTranslationFailuresLesson,
+	clientSideDataFetchingLesson,
 	clientSideResolversLesson,
 	clientSideValidationLesson,
 	climbingStairsLesson,
@@ -2823,6 +2950,7 @@ const rawLessonsPart2 = [
 	codeOrganizationLesson,
 	codeSplittingLesson,
 	codeSplittingLesson1,
+	codeSplittingLesson2,
 	codeSplittingLazyLesson,
 	coinChangeLesson,
 	collectionsLesson,
@@ -2836,8 +2964,11 @@ const rawLessonsPart2 = [
 	compensatingActionsLesson,
 	compileTimePolymorphismLesson,
 	compiledQueriesLesson,
+	compilerOptimizationsLesson,
 	compilerVsInterpreterVsRuntimeLesson,
 	complexFiltersLesson,
+	complexityAnalysisLesson,
+	complianceAndAuditingLesson,
 	componentTestingVsIntegrationTestingLesson,
 	composingComponentsLesson,
 	compositePatternLesson,
@@ -2881,6 +3012,8 @@ const rawLessonsPart2 = [
 	containsDuplicateLesson,
 	containsQuantifierOperatorLesson,
 	contentNegotiationLesson,
+	contextApiDeepDiveLesson,
+	continuousMonitoringLesson,
 	controlPropsBasicsLesson,
 	controlPropsExamplesLesson,
 	controlPropsWithFormsLesson,
@@ -2908,6 +3041,7 @@ const rawLessonsPart2 = [
 	cosmosDbRequestUnitsAndPerformanceLesson,
 	cosmosDbSdkAndDeveloperPatternsLesson,
 	costAsAnArchitectureConstraintLesson,
+	costOptimizationLesson,
 	countAndSayLesson,
 	countCompleteTreeNodesLesson,
 	countDigitsInNumberLesson,
@@ -2919,6 +3053,7 @@ const rawLessonsPart2 = [
 	coverletCollectorLesson,
 	cpuMemoryAndDiskInvestigationLesson,
 	cpuMemoryStorageAndIoLesson,
+	cpuProfilingLesson,
 	cqrsLesson,
 	cqrsBasicsLesson,
 	cqrsPatternLesson,
@@ -2970,6 +3105,7 @@ const rawLessonsPart2 = [
 	cypressIntroLesson,
 	dapperLesson,
 	dataDrivenTestsLesson,
+	dataModelingLesson,
 	dataOperationsConnectedLesson,
 	dataOperationsDisconnectedLesson,
 	dataProtectionLesson,
@@ -2994,8 +3130,11 @@ const rawLessonsPart2 = [
 	deadlocksAndDeadlockGraphsLesson,
 	deadlocksIncreaseSharplyDuringPeakTrafficLesson,
 	deadlocksStarvationAndLivelocksLesson,
+	debuggingPerformanceLesson,
 	debuggingTechniquesLesson,
 	decideWhetherAProposedMicroserviceShouldActuallyExistLesson,
+	decisionDocumentationLesson,
+	decisionReviewsLesson,
 	declarationMergingAndModuleAugmentationLesson,
 	decodeWaysLesson,
 	decodeWaysLesson1,
@@ -3016,11 +3155,13 @@ const rawLessonsPart2 = [
 	deployingContainerizedAppsOnAksLesson,
 	deploymentArchitectureForNextjsLesson,
 	deploymentOptionsLesson,
+	deploymentPipelinesLesson,
 	deploymentSecretsAndEnvironmentConfigurationLesson,
 	deploymentSetupLesson,
 	deploymentSlotsAndSlotSwappingLesson,
 	derivedDataLesson,
 	derivedStateAndAvoidingDuplicatedStateLesson,
+	designReviewsLesson,
 	designingEventDrivenServerlessArchitectureLesson,
 	designingTypeSafeComponentApisLesson,
 	devtoolsLesson,
@@ -3029,18 +3170,22 @@ const rawLessonsPart2 = [
 	diagnosingAPortThatIsNotReachableLesson,
 	diagnosingAsyncPerformanceProblemsLesson,
 	digitalRootLesson,
+	disasterRecoveryLesson,
 	disasterRecoveryPlanningLesson,
 	disasterRecoveryTestingLesson,
 	discriminatedUnionsLesson,
+	disjointSetsLesson,
 	distinctSetOperatorLesson,
 	distributedTracingAcrossServicesLesson,
 	distributedTracingAndOpenTelemetryLesson,
 	distributedTransactionsLesson,
 	dnsAndNetworkTroubleshootingFromLinuxLesson,
+	dnsInDepthLesson,
 	dnsResolutionFromBrowserToServerLesson,
 	dockerContainerizationLesson,
 	dockerEcrLesson,
 	dockerfilesAndContainerDevelopmentLesson,
+	documentationLesson,
 	dotnetVersionsLesson,
 	driveAdvancedLesson,
 	driveBasicLesson,
@@ -3049,6 +3194,7 @@ const rawLessonsPart2 = [
 	dryPrincipleLesson,
 	duplicateMessagesAndIdempotencyLesson,
 	duplicatePaymentRequestsCreateDuplicateBusinessRecordsLesson,
+	dynamicImportsLesson,
 	dynamodbNosqlLesson,
 	eagerVsLazyLoadingLesson,
 	ec2AutoScalingLesson,
@@ -3078,6 +3224,7 @@ const rawLessonsPart2 = [
 	encryptionTdeLesson,
 	endpointRoutingInternalsLesson,
 	enterpriseCicdPipelineDesignLesson,
+	enterpriseGitLesson,
 	entityAdapterLesson,
 	entityFrameworkCoreLesson,
 	entityFrameworkCoreChangeTrackingLesson,
@@ -3100,13 +3247,16 @@ const rawLessonsPart2 = [
 	errorHandlingLesson1,
 	errorHandlingLesson2,
 	errorHandlingLesson3,
+	errorHandlingLesson4,
 	errorHandlingBasicsLesson,
 	errorHandlingBasicsLesson1,
+	errorHandlingInDataFetchingLesson,
 	errorHandlingStrategiesLesson,
 	errorPoliciesLesson,
 	esbuildLesson,
 	estimationAndUncertaintyLesson,
 	etagsAndConditionalRequestsLesson,
+	evaluatingTechnicalOptionsLesson,
 	eventDrivenApplicationPatternsLesson,
 	eventGridTopicsEventsAndEventSubscriptionsLesson,
 	eventGridWithAzureFunctionsLesson,
@@ -3147,8 +3297,12 @@ const rawLessonsPart2 = [
 	filteringOperatorWhereLesson,
 	finalFormLesson,
 	findFirstSetBitLesson,
+];
+
+const rawLessonsPart3 = [
 	findMinimumInRotatedSortedArrayLesson,
 	finiteStateMachinesLesson,
+	firewallsAndSecurityLesson,
 	firstEndpointLesson,
 	firstFirstordefaultLesson,
 	firstProgramLesson,
@@ -3169,6 +3323,7 @@ const rawLessonsPart2 = [
 	foodDeliveryHldAdvancedLesson,
 	foodDeliveryHldBasicLesson,
 	formIntegrationLesson,
+	formStateManagementLesson,
 	formSubmissionLesson,
 	formValidationLesson,
 	formValidationLesson1,
@@ -3187,9 +3342,6 @@ const rawLessonsPart2 = [
 	functionsDependencyInjectionAndConfigurationLesson,
 	functionsDurableWorkflowsLesson,
 	functionsEventDrivenDevelopmentLesson,
-];
-
-const rawLessonsPart3 = [
 	functionsHttpApisLesson,
 	functionsLocalDevelopmentAndDebuggingLesson,
 	functionsMethodsLesson,
@@ -3214,7 +3366,11 @@ const rawLessonsPart3 = [
 	gettingStartedEfCoreLesson,
 	gettingStartedJestLesson,
 	gettingStartedXunitLesson,
+	gitAndCiCdLesson,
+	gitBestPracticesLesson,
 	gitBisectForRegressionInvestigationLesson,
+	gitInternalsLesson,
+	gitSecurityLesson,
 	githubActionsAzureAuthenticationLesson,
 	githubActionsForAzureLesson,
 	globalErrorHandlingLesson,
@@ -3227,15 +3383,18 @@ const rawLessonsPart3 = [
 	groupAnagramsLesson,
 	groupingOperatorGroupbyTolookupLesson,
 	groupjoinOperatorLesson,
+	grpcAndProtobufLesson,
 	gsapLesson,
 	handlingEventsLesson,
 	handlingTechnicalDisagreementLesson,
 	handlingUserInputLesson,
 	hangfireLesson,
+	hashTablesLesson,
 	headlessComponentsLesson,
 	healthChecksLesson,
 	healthChecksAndReadinessVsLivenessLesson,
 	healthEndpointsAndDependencyChecksLesson,
+	heapsLesson,
 	highAvailabilityAndZoneAwareArchitectureLesson,
 	higherOrderComponentsTypedLesson,
 	hocBasicsLesson,
@@ -3244,6 +3403,7 @@ const rawLessonsPart3 = [
 	hookBestPracticesLesson,
 	hookCompositionPatternsLesson,
 	hookErrorHandlingLesson,
+	hooksAndAutomationLesson,
 	horizontalPodAutoscalerLesson,
 	hotchocolateProjectSetupLesson,
 	hotelAdvancedLesson,
@@ -3265,6 +3425,7 @@ const rawLessonsPart3 = [
 	howWouldYouPartitionADatabaseThatHasOutgrownOneNodeLesson,
 	howWouldYouReduceAJavascriptBundleThatHasGrownTooLargeLesson,
 	howWouldYourArchitectureBehaveIfOneDependencyBecameUnavailableLesson,
+	http11Http2Http3Lesson,
 	httpMethodsAndStatusCodesLesson,
 	httpMethodsStatusCodesAndHeadersLesson,
 	httpRequestAndResponseLifecycleLesson,
@@ -3297,6 +3458,7 @@ const rawLessonsPart3 = [
 	implementingApiKeysLesson,
 	inboxdeduplicationPatternLesson,
 	incidentCommandAndCommunicationLesson,
+	incidentResponseLesson,
 	incidentSeverityAndResponseLesson,
 	includedColumnsAndCoveringIndexesLesson,
 	incrementalMigrationVsRewriteLesson,
@@ -3344,6 +3506,7 @@ const rawLessonsPart3 = [
 	intermediateQ5Lesson,
 	intersectSetOperatorLesson,
 	intersectionOfTwoLinkedListsLesson,
+	interviewProblemsLesson,
 	introduceBrokenDeploymentLesson,
 	introduceCacheFailureLesson,
 	introduceDatabasePerformanceRegressionLesson,
@@ -3357,6 +3520,7 @@ const rawLessonsPart3 = [
 	iocContainerSetupLesson,
 	isomorphicStringsLesson,
 	iteratorPatternLesson,
+	jankFreeAnimationsLesson,
 	jestLesson,
 	jitCompilationAndTieredCompilationLesson,
 	joinOperatorLesson,
@@ -3365,6 +3529,7 @@ const rawLessonsPart3 = [
 	jsA02Lesson,
 	jsB01Lesson,
 	jsB02Lesson,
+	jsEngineOptimizationLesson,
 	jsI01Lesson,
 	jsI02Lesson,
 	jsI03Lesson,
@@ -3394,10 +3559,12 @@ const rawLessonsPart3 = [
 	kustoQueryLanguageForDevelopersLesson,
 	kyLesson,
 	largeObjectHeapAndPinnedObjectsLesson,
+	largeRepositoriesLesson,
 	largestElementInArrayLesson,
 	lastLastordefaultLesson,
 	layoutCompositionLesson,
 	layoutEffectPatternsLesson,
+	layoutThrashingLesson,
 	layoutsAndPartialsLesson,
 	layoutsAndPartialsLesson1,
 	lazyEagerLoadingLesson,
@@ -3423,8 +3590,11 @@ const rawLessonsPart3 = [
 	livenessReadinessAndStartupProbesLesson,
 	loadBalancerOverviewLesson,
 	loadBalancerVsApplicationGatewayLesson,
+	loadBalancersLesson,
+	loadingStatesLesson,
 	localOnlyFieldsLesson,
 	localStateLesson,
+	localStateVsServerStateLesson,
 	localStateVsServerStateVsUrlStateLesson,
 	lockAndMonitorLesson,
 	locksAndBlockingLesson,
@@ -3436,7 +3606,9 @@ const rawLessonsPart3 = [
 	loggingBasicsLesson,
 	loggingBestPracticesLesson,
 	loggingInEntityFrameworkCoreLesson,
+	loggingStrategiesLesson,
 	longRunningTransactionsLesson,
+	longTermImpactLesson,
 	longestCommonPrefixLesson,
 	longestCommonSubsequenceLesson,
 	longestConsecutiveSequenceLesson,
@@ -3479,6 +3651,7 @@ const rawLessonsPart3 = [
 	mediatrLesson,
 	memoizationBasicsLesson,
 	memoizationStrategiesLesson,
+	memoryManagementLesson,
 	memoryUsageGrowsContinuouslyAndPodsRestartLesson,
 	memorystreamLesson,
 	mentoringJuniorEngineersLesson,
@@ -3514,6 +3687,8 @@ const rawLessonsPart3 = [
 	middlewareOrderingLesson,
 	migratingToTypescriptLesson,
 	migrationPatternsLesson,
+	migrationStrategiesLesson,
+	migrationStrategiesLesson1,
 	migrationsLesson,
 	migrationsBestPracticesLesson,
 	migrationsInEntityFrameworkCoreLesson,
@@ -3536,7 +3711,9 @@ const rawLessonsPart3 = [
 	monitoringAndAlertingLesson,
 	monitoringContainersAndAksLesson,
 	monitoringFunctionsAndAppServiceLesson,
+	monitoringSetupLesson,
 	monolithVsModularMonolithVsMicroservicesLesson,
+	monorepoStrategiesLesson,
 	moqLesson,
 	moqFrameworkLesson,
 	moreLinqLesson,
@@ -3608,6 +3785,7 @@ const rawLessonsPart3 = [
 	ofetchLesson,
 	offlineHandlingAndReconnectBehaviorLesson,
 	offlineSupportLesson,
+	offlineSupportLesson1,
 	oftypeFilteringOperatorLesson,
 	oneDatabaseQueryCauses90OfProductionDatabaseCpuLesson,
 	oneToManyRelationshipsConventionsLesson,
@@ -3622,6 +3800,9 @@ const rawLessonsPart3 = [
 	openapiGeneratorLesson,
 	openidConnectLesson,
 	openidConnectLesson1,
+];
+
+const rawLessonsPart4 = [
 	openiddictLesson,
 	opensearchQuicksightLesson,
 	opentelemetryLesson,
@@ -3629,10 +3810,12 @@ const rawLessonsPart3 = [
 	optimisticConcurrencyForApisLesson,
 	optimisticResponsesLesson,
 	optimisticUpdatesLesson,
+	optimisticUpdatesLesson1,
 	optimisticUpdatesAndRollbackLesson,
 	optionsPatternLesson,
 	optionsPatternAndConfigurationProvidersLesson,
 	orderbyOrderbydescendingLesson,
+	osiModelLesson,
 	otherComputeServicesLesson,
 	otherDatabaseServicesLesson,
 	outboxPatternLesson,
@@ -3644,9 +3827,11 @@ const rawLessonsPart3 = [
 	paginationBasicsLesson,
 	paginationCachingLesson,
 	paginationFilteringAndSortingDesignLesson,
+	paintingAndCompositingLesson,
 	palindromeLinkedListLesson,
 	palindromePartitioningLesson,
 	palindromicSubstringsLesson,
+	parallelDataLoadingLesson,
 	parameterSniffingAndPlanInstabilityLesson,
 	parkingLotAdvancedLesson,
 	parkingLotBasicLesson,
@@ -3667,7 +3852,10 @@ const rawLessonsPart3 = [
 	perfQ2Lesson,
 	perfQ3Lesson,
 	perfQ4Lesson,
+	performanceAndReRendersLesson,
+	performanceBudgetsLesson,
 	performanceBulkOperationsLesson,
+	performanceMarkersLesson,
 	performanceOptimizationLesson,
 	performanceOptimizationLesson1,
 	performanceOptimizationLesson2,
@@ -3690,9 +3878,6 @@ const rawLessonsPart3 = [
 	phase7RedisCachingAndCacheInvalidationLesson,
 	phase8BackgroundJobsAndMessageProcessingLesson,
 	phase9ObservabilityWithLogsMetricsAndTracesLesson,
-];
-
-const rawLessonsPart4 = [
 	pkceFlowLesson,
 	playwrightLesson,
 	playwrightBasedE2eTestingLesson,
@@ -3711,6 +3896,7 @@ const rawLessonsPart4 = [
 	polymorphismBasicsLesson,
 	popmotionLesson,
 	postcssLesson,
+	postmortemCultureLesson,
 	powerLesson,
 	powxNLesson,
 	prefetchPatternsLesson,
@@ -3775,6 +3961,7 @@ const rawLessonsPart4 = [
 	rapidQ3Lesson,
 	rateLimiterAdvancedLesson,
 	rateLimiterBasicLesson,
+	rateLimitingLesson,
 	rateLimitingAndLoadSheddingLesson,
 	rateLimitingInAspnetLesson,
 	rateLimitingSecurityLesson,
@@ -3801,6 +3988,7 @@ const rawLessonsPart4 = [
 	reactPageBecomesProgressivelySlowerAfterNavigationLesson,
 	reactProfilerAndRenderInvestigationLesson,
 	reactQueryLesson,
+	reactQueryForServerStateLesson,
 	reactQueryserverCacheArchitectureLesson,
 	reactRouterLesson,
 	reactSpringLesson,
@@ -3841,6 +4029,7 @@ const rawLessonsPart4 = [
 	relationshipsAndConfigurationsLesson,
 	relationshipsConfigurationLesson,
 	releaseValidationAndRollbackLesson,
+	reliabilityPatternsLesson,
 	removeDuplicatesFromSortedArrayLesson,
 	removeDuplicatesFromSortedListLesson,
 	removeLinkedListElementsLesson,
@@ -3860,8 +4049,10 @@ const rawLessonsPart4 = [
 	requestLatencyDecompositionLesson,
 	requestLoggingLesson,
 	requestPipelineAndMiddlewareExecutionLesson,
+	requestValidationLesson,
 	requestsAndLimitsLesson,
 	requirementsAndRealTimeCommunicationArchitectureLesson,
+	requirementsGatheringLesson,
 	resolversLesson,
 	resolvingDifficultMergeConflictsLesson,
 	resourceBasedAuthorizationLesson,
@@ -3869,16 +4060,19 @@ const rawLessonsPart4 = [
 	resourceLimitsLesson,
 	responseCachingLesson,
 	responseCompressionLesson,
+	responseFormattingLesson,
 	restApiDesignPrinciplesLesson,
 	restPrinciplesLesson,
 	restVsGraphqlDecisionFrameworkLesson,
 	restVsGrpcDecisionFrameworkLesson,
 	restsharpLesson,
 	retryWithExponentialBackoffAndJitterLesson,
+	revalidationPatternsLesson,
 	reverseAnArrayLesson,
 	reverseLinkedListLesson,
 	reverseStringLesson,
 	reverseWordsLesson,
+	reversibilityLesson,
 	reviewABackgroundWorkerWithNoCancellationSupportLesson,
 	reviewAComponentThatRendersAHugeListWithoutVirtualizationLesson,
 	reviewAComponentWithUnnecessaryGlobalStateLesson,
@@ -3896,6 +4090,7 @@ const rawLessonsPart4 = [
 	reviewAnHttpClientImplementationThatCreatesSocketsRepeatedlyLesson,
 	rideSharingHldAdvancedLesson,
 	rideSharingHldBasicLesson,
+	riskAssessmentLesson,
 	roleBasedAccessLesson,
 	roleBasedAccessLesson1,
 	roleBasedAuthorizationLesson,
@@ -3919,6 +4114,7 @@ const rawLessonsPart4 = [
 	round9DesignAMigrationFromMonolithToModularArchitectureLesson,
 	routeConstraintsLesson,
 	routeConstraintsLesson1,
+	routeHandlersLesson,
 	routeHandlersAndBackendForFrontendPatternsLesson,
 	routeParamsLesson,
 	route53DnsLesson,
@@ -3930,6 +4126,7 @@ const rawLessonsPart4 = [
 	rtlIntroLesson,
 	rtoAndRpoLesson,
 	rtoAndRpoForAzureApplicationsLesson,
+	runbookAutomationLesson,
 	runningAndDebuggingLesson,
 	runtimePolymorphismLesson,
 	runtimeValidationVsCompileTimeTypesLesson,
@@ -3943,6 +4140,7 @@ const rawLessonsPart4 = [
 	scalableReactStateArchitectureLesson,
 	scalarsCustomTypesLesson,
 	scalingRealTimeConnectionsLesson,
+	scalingStrategiesLesson,
 	scenarioQ1Lesson,
 	scenarioQ2Lesson,
 	scenarioQ21Lesson,
@@ -3965,6 +4163,7 @@ const rawLessonsPart4 = [
 	secureStorageStrategiesLesson,
 	securingAiServicesWithManagedIdentityLesson,
 	securingReactAppsLesson,
+	securityHardeningLesson,
 	securityTestingFundamentalsLesson,
 	seekVsScanLesson,
 	selectiveFetchingLesson,
@@ -3975,10 +4174,12 @@ const rawLessonsPart4 = [
 	serilogLesson,
 	serverActionsAndMutationBoundariesLesson,
 	serverComponentsAndClientComponentsLesson,
+	serverComponentsDataFetchingLesson,
 	serverComponentsVsClientComponentsLesson,
 	serverGcVsWorkstationGcLesson,
 	serverlessApiBestPracticesLesson,
 	serverlessArchitecturePatternsLesson,
+	serviceBoundariesLesson,
 	serviceBusDeadLetteringAndRetriesLesson,
 	serviceBusFromAzureFunctionsLesson,
 	serviceBusQueuesLesson,
@@ -4053,15 +4254,19 @@ const rawLessonsPart4 = [
 	ssrfAndServerSideRequestValidationLesson,
 	stackVsHeapLesson,
 	stackexchangeRedisLesson,
+	stacksAndQueuesLesson,
+	stakeholderAlignmentLesson,
 	staleTimeGcLesson,
 	standardQueryOperatorsLesson,
 	starSnowflakeSchemaLesson,
+	stateArchitectureLesson,
 	stateBestPracticesLesson,
 	stateCompositionLesson,
 	stateReducerBasicsLesson,
 	stateReducerCompositionLesson,
 	stateReducerExamplesLesson,
 	stateSharingBetweenHooksLesson,
+	stateSynchronizationLesson,
 	stateSynchronizationAcrossBrowserTabsLesson,
 	statechartsAdvancedLesson,
 	statelessServicesAndDistributedStateLesson,
@@ -4081,6 +4286,7 @@ const rawLessonsPart4 = [
 	strategyPatternLesson,
 	strategyPatternLesson1,
 	streamingAndSuspenseLesson,
+	streamingAndSuspenseLesson1,
 	streamingApisAndLargePayloadsLesson,
 	stringCompressionLesson,
 	strongVsEventualConsistencyLesson,
@@ -4097,6 +4303,9 @@ const rawLessonsPart4 = [
 	subscriptionsResourceGroupsResourcesLesson,
 	supplyChainSecurityInCicdLesson,
 	surroundedRegionsLesson,
+];
+
+const rawLessonsPart5 = [
 	suspenseLesson,
 	suspenseAndAsynchronousUiLesson,
 	svelteLesson,
@@ -4132,9 +4341,11 @@ const rawLessonsPart4 = [
 	taskSchedulingAndContinuationsLesson,
 	taskrunWhenIsItAppropriateInAnAspnetCoreApplicationLesson,
 	tcpConnectionAndTlsHandshakeLesson,
+	tcpIpStackLesson,
 	tddAspnetCoreLesson,
 	tddIntroLesson,
 	tddPatternsLesson,
+	technicalRoadmapsLesson,
 	tellMeAboutADifficultTechnicalDecisionYouMadeLesson,
 	tellMeAboutAProductionIncidentYouOwnedLesson,
 	tellMeAboutAProjectThatFailedAndWhatYouLearnedLesson,
@@ -4154,6 +4365,7 @@ const rawLessonsPart4 = [
 	testStructureLesson,
 	testcontainersAndRealisticBackendIntegrationLesson,
 	testingApiCallsLesson,
+	testingApisLesson,
 	testingAsyncLesson,
 	testingCacheInvalidationLesson,
 	testingComponentsLesson,
@@ -4168,6 +4380,7 @@ const rawLessonsPart4 = [
 	testingPyramidLesson,
 	testingReducersLesson,
 	testingRoutingLesson,
+	testingStateLesson,
 	testingTypesLesson,
 	testingTypescriptReactLesson,
 	thenbyThenbydescendingLesson,
@@ -4189,14 +4402,16 @@ const rawLessonsPart4 = [
 	trackgraphInEntityFrameworkCoreLesson,
 	trackingChangesOfEntitiesLesson,
 	trackingVsAsnotrackingLesson,
+	tradeOffAnalysisLesson,
 	transactionIsolationLevelsLesson,
 	trapQ1Lesson,
 	trapQ2Lesson,
 	trappingRainWaterLesson,
-];
-
-const rawLessonsPart5 = [
+	treeShakingLesson,
 	treeShakingAndDependencyCostLesson,
+	treesAndGraphsLesson,
+	trieStructuresLesson,
+	troubleshootingToolsLesson,
 	tryCatchFinallyLesson,
 	ttfbAndFrontendPerformanceBudgetsLesson,
 	turboLesson,
@@ -4242,6 +4457,7 @@ const rawLessonsPart5 = [
 	unitTestingControllersLesson1,
 	unknownVsAnyLesson,
 	updateDataDisconnectedScenarioLesson,
+	urlAsStateLesson,
 	urlGenerationLesson,
 	urlShortenerAdvancedLesson,
 	urlShortenerBasicLesson,
@@ -4255,6 +4471,7 @@ const rawLessonsPart5 = [
 	useStateEffectLesson,
 	usecontextHookLesson,
 	useeffectBasicsLesson,
+	userCentricMetricsLesson,
 	userEventsLesson,
 	userefHookLesson,
 	usersSeeStaleDataAfterASuccessfulUpdateLesson,
@@ -4310,6 +4527,7 @@ const rawLessonsPart5 = [
 	webpackLesson,
 	websocketConnectionLifecycleLesson,
 	websocketSetupLesson,
+	websocketsLesson,
 	websocketsVsServerSentEventsLesson,
 	whatCausesHydrationMismatchesLesson,
 	whatIsApolloLesson,
@@ -4339,6 +4557,7 @@ const rawLessonsPart5 = [
 	whenShouldStateLiveInReactQueryRatherThanReduxLesson,
 	whenToBypassTheOrmLesson,
 	whenToUseContextAndWhenNotToLesson,
+	whenToUseReduxLesson,
 	whenWouldYouChooseEfCoreDapperOrRawSqlLesson,
 	whereWouldYouUseCachingAndHowWouldYouInvalidateItLesson,
 	whyDidYouChooseMicroservicesInsteadOfAModularMonolithLesson,
@@ -4359,6 +4578,7 @@ const rawLessonsPart5 = [
 	workspacesMonoreposLesson,
 	writeARootCauseAnalysisAndRemediationPlanLesson,
 	writingE2eTestsLesson,
+	writingRfcsLesson,
 	writingTechnicalProposalsLesson,
 	xssAndOutputEncodingLesson,
 	xssPreventionTechniquesLesson,
