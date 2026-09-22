@@ -132,7 +132,7 @@ function scanModules(): ModuleInfo[] {
         if (stat.isDirectory()) {
           const contentJsonPath = path.join(fullPath, 'content.json');
           if (fs.existsSync(contentJsonPath)) {
-            const relativePath = path.relative(CONTENT_DIR, fullPath);
+            const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
             const importPath = `../${relativePath}/content.json`;
             const slug = entry;
             let variableName = toVariableName(slug, '');
@@ -185,8 +185,8 @@ function scanLessons(): LessonInfo[] {
         if (stat.isDirectory()) {
           walk(fullPath);
         } else if (entry.endsWith('.json') && entry !== 'content.json') {
-          const relativePath = path.relative(CONTENT_DIR, fullPath);
-          const importPath = `../${relativePath}`;
+const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
+            const importPath = `../${relativePath}`;
           const slug = entry.replace('.json', '');
           let variableName = toVariableName(slug, '');
           variableName = `${variableName}Lesson`;
