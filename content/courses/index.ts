@@ -1,52 +1,99 @@
 import type { Course } from "@/types";
 
-import sqlServerCourse from "./sql-server/content.json";
-import aspNetCoreCourse from "./aspnet-core/content.json";
-import linqCourse from "./linq/content.json";
-import efCoreCourse from "./ef-core/content.json";
-import reactFundamentalsCourse from "./react-fundamentals/content.json";
-import reactAdvancedPatternsCourse from "./react-advanced-patterns/content.json";
-import typescriptForReactCourse from "./typescript-for-react/content.json";
-import reduxCourse from "./redux/content.json";
-import reactQueryCourse from "./react-query/content.json";
 import apolloCourse from "./apollo/content.json";
-import csharpFundamentalsCourse from "./csharp-fundamentals/content.json";
-import aspNetCoreWebApiCourse from "./aspnet-core-web-api/content.json";
-import authCourse from "./authentication-authorization/content.json";
-import cleanCodeCSharpCourse from "./clean-code-csharp/content.json";
-import unitTestingDotNetCourse from "./unit-testing-dotnet/content.json";
-import reactTestingCourse from "./react-testing/content.json";
-import oopsCourse from "./oops-concepts/content.json";
-import graphQlCourse from "./graphql-dotnet/content.json";
-import designPatternsCourse from "./design-patterns/content.json";
-import fullstackSecurityCourse from "./fullstack-security/content.json";
-import devOpsCourse from "./devops/content.json";
-import azureCourse from "./azure/content.json";
+import architectureDecisionLabProblemsCourse from "../problems/architecture-decision-lab-problems/content.json";
+import aspnetCoreCourse from "./aspnet-core/content.json";
+import aspnetCoreCourse1 from "../problems/aspnet-core/content.json";
+import aspnetCoreWebApiCourse from "./aspnet-core-web-api/content.json";
+import authenticationAuthorizationCourse from "./authentication-authorization/content.json";
 import awsCourse from "./aws/content.json";
+import azureCourse from "./azure/content.json";
+import azureCourse1 from "../problems/azure/content.json";
+import cheatsheetCourse from "../cheatsheet/content.json";
+import cleanCodeCsharpCourse from "./clean-code-csharp/content.json";
+import csharpCourse from "../problems/csharp/content.json";
+import csharpFundamentalsCourse from "./csharp-fundamentals/content.json";
+import designPatternsCourse from "./design-patterns/content.json";
+import devopsCourse from "./devops/content.json";
 import dotnetNugetPackagesCourse from "./dotnet-nuget-packages/content.json";
+import efCoreCourse from "./ef-core/content.json";
+import frontendPerformanceEngineeringCourse from "./frontend-performance-engineering/content.json";
+import fullStackSeniorProjectsCourse from "../projects/full-stack-senior-projects/content.json";
+import fullstackSecurityCourse from "./fullstack-security/content.json";
+import gitLinuxDeveloperWorkflowCourse from "./git-linux-developer-workflow/content.json";
+import graphqlDotnetCourse from "./graphql-dotnet/content.json";
+import hldCourse from "../problems/hld/content.json";
+import interviewQaCourse from "../interview-qa/content.json";
+import linqCourse from "./linq/content.json";
+import lldCourse from "../problems/lld/content.json";
+import nextJsFullStackReactCourse from "./next-js-full-stack-react/content.json";
+import oopsConceptsCourse from "./oops-concepts/content.json";
+import productionIncidentLabProblemsCourse from "../problems/production-incident-lab-problems/content.json";
+import programmingComputerWebFoundationsCourse from "./programming-computer-web-foundations/content.json";
+import reactAdvancedPatternsCourse from "./react-advanced-patterns/content.json";
+import reactFundamentalsCourse from "./react-fundamentals/content.json";
+import reactQueryCourse from "./react-query/content.json";
+import reactTestingCourse from "./react-testing/content.json";
+import reduxCourse from "./redux/content.json";
+import seniorCodeReviewLabProblemsCourse from "../problems/senior-code-review-lab-problems/content.json";
+import seniorSoftwareEngineeringCourse from "./senior-software-engineering/content.json";
+import sqlCourse from "../problems/sql/content.json";
+import sqlServerCourse from "./sql-server/content.json";
+import systemDesignCourse from "../problems/system-design/content.json";
+import systemDesignProblemsCourse from "./system-design-problems/content.json";
+import typescriptForReactCourse from "./typescript-for-react/content.json";
+import unitTestingDotnetCourse from "./unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";
-import csharpProblemsCourse from "../problems/csharp/content.json";
-import sqlProblemsCourse from "../problems/sql/content.json";
-import systemDesignProblemsCourse from "../problems/system-design/content.json";
-import azureProblemsCourse from "../problems/azure/content.json";
-import lldProblemsCourse from "../problems/lld/content.json";
-import hldProblemsCourse from "../problems/hld/content.json";
-import aspNetCoreProblemsCourse from "../problems/aspnet-core/content.json";
-import frontendperformanceengineeringCourse from "./frontend-performance-engineering/content.json";
-import nextjsfullstackreactCourse from "./next-js-full-stack-react/content.json";
-import programmingcomputerwebfoundationsCourse from "./programming-computer-web-foundations/content.json";
-import systemdesignproblemsCourse from "./system-design-problems/content.json";
-import seniorsoftwareengineeringCourse from "./senior-software-engineering/content.json";
-import gitlinuxdeveloperworkflowCourse from "./git-linux-developer-workflow/content.json";
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse, azureProblemsCourse, lldProblemsCourse, hldProblemsCourse, aspNetCoreProblemsCourse,
-    frontendperformanceengineeringCourse,
-    nextjsfullstackreactCourse,
-    programmingcomputerwebfoundationsCourse,
-    systemdesignproblemsCourse,
-    seniorsoftwareengineeringCourse,
-    gitlinuxdeveloperworkflowCourse,
+const rawCoursesPart1 = [
+	apolloCourse,
+	architectureDecisionLabProblemsCourse,
+	aspnetCoreCourse,
+	aspnetCoreCourse1,
+	aspnetCoreWebApiCourse,
+	authenticationAuthorizationCourse,
+	awsCourse,
+	azureCourse,
+	azureCourse1,
+	cheatsheetCourse,
+	cleanCodeCsharpCourse,
+	csharpCourse,
+	csharpFundamentalsCourse,
+	designPatternsCourse,
+	devopsCourse,
+	dotnetNugetPackagesCourse,
+	efCoreCourse,
+	frontendPerformanceEngineeringCourse,
+	fullStackSeniorProjectsCourse,
+	fullstackSecurityCourse,
+	gitLinuxDeveloperWorkflowCourse,
+	graphqlDotnetCourse,
+	hldCourse,
+	interviewQaCourse,
+	linqCourse,
+	lldCourse,
+	nextJsFullStackReactCourse,
+	oopsConceptsCourse,
+	productionIncidentLabProblemsCourse,
+	programmingComputerWebFoundationsCourse,
+	reactAdvancedPatternsCourse,
+	reactFundamentalsCourse,
+	reactQueryCourse,
+	reactTestingCourse,
+	reduxCourse,
+	seniorCodeReviewLabProblemsCourse,
+	seniorSoftwareEngineeringCourse,
+	sqlCourse,
+	sqlServerCourse,
+	systemDesignCourse,
+	systemDesignProblemsCourse,
+	typescriptForReactCourse,
+	unitTestingDotnetCourse,
+	yarnNpmPackagesCourse,
 ];
+
+
+const rawCourses: any[] = [...rawCoursesPart1];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 
