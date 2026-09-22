@@ -32,8 +32,21 @@ import azureProblemsCourse from "../problems/azure/content.json";
 import lldProblemsCourse from "../problems/lld/content.json";
 import hldProblemsCourse from "../problems/hld/content.json";
 import aspNetCoreProblemsCourse from "../problems/aspnet-core/content.json";
+import frontendperformanceengineeringCourse from "./frontend-performance-engineering/content.json";
+import nextjsfullstackreactCourse from "./next-js-full-stack-react/content.json";
+import programmingcomputerwebfoundationsCourse from "./programming-computer-web-foundations/content.json";
+import systemdesignproblemsCourse from "./system-design-problems/content.json";
+import seniorsoftwareengineeringCourse from "./senior-software-engineering/content.json";
+import gitlinuxdeveloperworkflowCourse from "./git-linux-developer-workflow/content.json";
 
-const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse, azureProblemsCourse, lldProblemsCourse, hldProblemsCourse, aspNetCoreProblemsCourse];
+const rawCourses = [sqlServerCourse, aspNetCoreCourse, linqCourse, efCoreCourse, reactFundamentalsCourse, reactAdvancedPatternsCourse, typescriptForReactCourse, reduxCourse, reactQueryCourse, apolloCourse, csharpFundamentalsCourse, aspNetCoreWebApiCourse, authCourse, cleanCodeCSharpCourse, unitTestingDotNetCourse, reactTestingCourse, oopsCourse, graphQlCourse, designPatternsCourse, fullstackSecurityCourse, devOpsCourse, azureCourse, awsCourse, dotnetNugetPackagesCourse, yarnNpmPackagesCourse, csharpProblemsCourse, sqlProblemsCourse, systemDesignProblemsCourse, azureProblemsCourse, lldProblemsCourse, hldProblemsCourse, aspNetCoreProblemsCourse,
+    frontendperformanceengineeringCourse,
+    nextjsfullstackreactCourse,
+    programmingcomputerwebfoundationsCourse,
+    systemdesignproblemsCourse,
+    seniorsoftwareengineeringCourse,
+    gitlinuxdeveloperworkflowCourse,
+];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 

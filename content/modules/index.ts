@@ -653,7 +653,221 @@ const rawModules = [
 	yarnModule14,
 	yarnModule15,
 	yarnModule16,
-	yarnModule17,
+	yarnModule17,,
+    frontendperformanceengineeringbrowserreactperformanceModule,
+    nextjsfullstackreactapprouterrenderingModule,
+    authenticationauthorizationadvancedauthorizationModule,
+    authenticationauthorizationssoidentityprovidersModule,
+    authenticationauthorizationoauthModule,
+    authenticationauthorizationoauth2flowsdeepdiveModule,
+    authenticationauthorizationauthbasicsModule,
+    authenticationauthorizationjwtModule,
+    authenticationauthorizationrefreshtokenstrategiesModule,
+    authenticationauthorizationidentityModule,
+    authenticationauthorizationsecuritybestpracticesModule,
+    devopsproductionkubernetesday2operationsModule,
+    devopsdockerfundamentalsModule,
+    devopskubernetesfundamentalsModule,
+    devopscicdsafedeliveryModule,
+    devopscicdfundamentalsModule,
+    devopskubernetesadvancedModule,
+    devopsproductiondockercontainersecurityModule,
+    devopsdockeradvancedModule,
+    devopscicdmoderntoolsModule,
+    sqlserverdatabaseinternalsqueryoptimizationModule,
+    sqlserverviewsModule,
+    sqlserverazuresqlModule,
+    sqlservermoderndatatoolsModule,
+    sqlserverqueryingdataModule,
+    sqlservertransactionserrorhandlingbackupModule,
+    sqlservergroupingaggregationsubqueriesModule,
+    sqlserverdatabaseschematableobjectsModule,
+    sqlserversecurityhardeningModule,
+    sqlserverjoinsModule,
+    sqlserverperformancetuningModule,
+    sqlservertriggersModule,
+    sqlserverhighavailabilitydrModule,
+    sqlserverdatamodificationdmlModule,
+    sqlserverindexesModule,
+    sqlserveradvancedtopicsModule,
+    sqlserverstoredproceduresfunctionsModule,
+    sqlserverdatatypesModule,
+    sqlserverconstraintsModule,
+    sqlserverdatawarehousingModule,
+    sqlserversetoperationsModule,
+    sqlserverconcurrencyproductiondatabaseproblemsModule,
+    sqlservergettingstartedModule,
+    efcoreperformancebulkoperationsModule,
+    efcorechangetrackingModule,
+    efcoreadvancedfeaturesModule,
+    efcoregettingstartedefcoreModule,
+    efcoredatabasefirstdiagnosticsModule,
+    efcoremigrationsModule,
+    efcoredbcontextconfigurationModule,
+    efcoredataoperationsdisconnectedModule,
+    efcoreefcoreperformanceormtradeoffsModule,
+    efcorequeryingModule,
+    efcoreconventionsrelationshipsModule,
+    efcoredataoperationsconnectedModule,
+    efcoreinheritancestrategiesModule,
+    aspnetcorewebapierrorhandlingvalidationModule,
+    aspnetcorewebapiauthenticationbasicsModule,
+    aspnetcorewebapiproductionapidesignreliabilityModule,
+    aspnetcorewebapidependencyinjectionModule,
+    aspnetcorewebapimiddlewareModule,
+    aspnetcorewebapimodelbindingModule,
+    aspnetcorewebapicontrollersroutingModule,
+    aspnetcorewebapiloggingconfigurationModule,
+    aspnetcorewebapigettingstartedModule,
+    linqconversiongenerationoperatorsModule,
+    linqadvancedlinqconceptsModule,
+    linqpartitioningoperatorsModule,
+    linqfilteringprojectionModule,
+    linqaggregationoperatorsModule,
+    linqsetoperationsModule,
+    linqjoiningdataModule,
+    linqlinqfundamentalssyntaxModule,
+    linqgettingstartedlinqModule,
+    linqsortinggroupingModule,
+    linqquantifierselementoperatorsModule,
+    cleancodecsharpcleancodepracticesModule,
+    cleancodecsharpcreationalpatternsModule,
+    cleancodecsharpstructuralpatternsModule,
+    cleancodecsharpsolidprinciplesModule,
+    cleancodecsharpbehavioralpatternsModule,
+    cleancodecsharparchitecturepatternsModule,
+    cleancodecsharpseniorengineeringjudgmentarchitecturedecisionsModule,
+    reacttestingtestingreactqueryModule,
+    reacttestinge2etestingModule,
+    reacttestingjestbasicsModule,
+    reacttestingcomponenttestingModule,
+    reacttestingreacttestinglibraryModule,
+    reacttestingtestingfundamentalsModule,
+    reacttestingadvancedtestingpatternsModule,
+    reacttestingtestingstrategyforseniorfrontendengineersModule,
+    csharpfundamentalsmoderncsharpModule,
+    csharpfundamentalsoopModule,
+    csharpfundamentalsadvancedasyncconcurrencythreadingModule,
+    csharpfundamentalscontrolflowModule,
+    csharpfundamentalsvariablestypesModule,
+    csharpfundamentalsadvancedfeaturesModule,
+    csharpfundamentalsadvancedcruntimememoryconcurrencyModule,
+    csharpfundamentalserrorhandlingModule,
+    csharpfundamentalsgettingstartedModule,
+    oopsconceptsencapsulationdatahidingModule,
+    oopsconceptsinheritanceModule,
+    oopsconceptsabstractionModule,
+    oopsconceptsoopfundamentalsModule,
+    oopsconceptsinterfacesabstractclassesModule,
+    oopsconceptsdesignprinciplesModule,
+    oopsconceptspolymorphismModule,
+    animationModule,
+    routingModule,
+    reactformsinputModule,
+    utilitiesModule,
+    advancedpatternsModule,
+    statemanagementModule,
+    reactdatafetchingModule,
+    reacthookspatternsModule,
+    reacttestingModule,
+    yarnnpmfundamentalsModule,
+    httpclientsModule,
+    formsModule,
+    stylingModule,
+    reactperformanceModule,
+    buildtoolsModule,
+    frontendframeworksModule,
+    testingModule,
+    programmingcomputerwebfoundationswebnetworkingfundamentalsModule,
+    programmingcomputerwebfoundationsprogrammingcomputerfundamentalsModule,
+    systemdesignproblemsdistributedsystemsfundamentalsModule,
+    reactadvancedpatternsstatemachinesxstateModule,
+    reactadvancedpatternsstatereducersModule,
+    reactadvancedpatternscomponentcompositionstrategiesModule,
+    reactadvancedpatternsadvancedhookpatternsModule,
+    reactadvancedpatternshigherordercomponentsModule,
+    reactadvancedpatternsrenderpropsModule,
+    reactadvancedpatternscompoundcomponentsModule,
+    reactadvancedpatternsperformancepatternsModule,
+    reactadvancedpatternscustomhooksarchitectureModule,
+    reactadvancedpatternsmodernstateapplicationarchitectureModule,
+    reactadvancedpatternscontrolpropsModule,
+    seniorsoftwareengineeringtechnicalleadershipModule,
+    seniorsoftwareengineeringproductionownershipModule,
+    apolloadvancedpatternsModule,
+    apollocachingModule,
+    apollolocalstatemanagementModule,
+    apolloqueriesmutationsModule,
+    apolloclientsidecachingadvancedModule,
+    apolloerrorhandlingoptimisticModule,
+    apollosubscriptionsrealtimeModule,
+    apollossrnextjsperformanceModule,
+    apolloapollobasicsModule,
+    typescriptforreactadvancedtypemodelingruntimesafetyModule,
+    typescriptforreacttypescriptbasicsModule,
+    typescriptforreactgenericcomponentsModule,
+    typescriptforreacttestingbestpracticesModule,
+    typescriptforreacttypinghooksModule,
+    typescriptforreactadvancedtypesModule,
+    typescriptforreacttypesinreactModule,
+    typescriptforreactreactpatternsModule,
+    gitlinuxdeveloperworkflowgitforseniorengineersModule,
+    gitlinuxdeveloperworkflowlinuxproductiontroubleshootingModule,
+    aspnetcoreaspnetcoreinternalsproductionhostingModule,
+    aspnetcoreperformanceobservabilityModule,
+    unittestingdotnettestingpatternsModule,
+    unittestingdotnetcodecoverageModule,
+    unittestingdotnetmockingfakesModule,
+    unittestingdotnettddModule,
+    unittestingdotnetintegrationtestingModule,
+    unittestingdotnettestingfundamentalsModule,
+    unittestingdotnetxunitbasicsModule,
+    reactfundamentalscomponentspropsModule,
+    reactfundamentalslifecycleeffectsModule,
+    reactfundamentalsstylingModule,
+    reactfundamentalsperformanceoptimizationModule,
+    reactfundamentalscontextrefsModule,
+    reactfundamentalsreactinternalsmodernrenderingModule,
+    reactfundamentalsstateeventsModule,
+    reactfundamentalsreactrouterModule,
+    reactfundamentalsformsinputModule,
+    reactfundamentalsgettingstartedModule,
+    dotnetnugetpackagestestingqualityModule,
+    dotnetnugetpackagesmessagingeventsModule,
+    dotnetnugetpackagesutilitieshelpersModule,
+    dotnetnugetpackagescoreextensionsModule,
+    dotnetnugetpackagessecuritycryptographyModule,
+    dotnetnugetpackagesnugetfundamentalsModule,
+    dotnetnugetpackagesserializationmappingModule,
+    dotnetnugetpackagesaspnetwebModule,
+    dotnetnugetpackagesdatabasedataaccessModule,
+    reactqueryqueryhooksModule,
+    reactquerycachingstrategiesModule,
+    reactqueryadvancedfeaturesModule,
+    reactquerymutationsModule,
+    reactqueryrealworldpatternsModule,
+    reactqueryofflinesupportpersistenceModule,
+    reactqueryprefetchingssrModule,
+    reactqueryperformanceoptimizationModule,
+    reactqueryquerybasicsModule,
+    reduxreduxadvancedconceptsModule,
+    reduxreduxpatternsModule,
+    reduxreduxrealworldModule,
+    reduxreduxtoolkitModule,
+    reduxreduxtestingModule,
+    reduxreduxmiddlewareModule,
+    reduxreactreduxModule,
+    reduxreduxfundamentalsModule,
+    designpatterns03behavioralpatternsModule,
+    designpatterns02structuralpatternsModule,
+    designpatterns04enterprisepatternsModule,
+    designpatterns01creationalpatternsModule,
+    seniorcodereviewlabproblemscaspnetcorereviewsModule,
+    seniorcodereviewlabproblemsreacttypescriptreviewsModule,
+    productionincidentlabproblemsfrontendincidentsModule,
+    productionincidentlabproblemsdatabaseinfrastructureincidentsModule,
+    productionincidentlabproblemsbackendincidentsModule,
+    architecturedecisionlabproblemsarchitecturetradeoffsModule,
 ];
 
 export const modules: Module[] = rawModules as unknown as Module[];
@@ -720,4 +934,218 @@ import azureProblemsModule5 from "../problems/azure/05-azure-databases-problems/
 import azureProblemsModule6 from "../problems/azure/06-azure-networking-problems/content.json";
 import azureProblemsModule7 from "../problems/azure/07-azure-security-problems/content.json";
 import azureProblemsModule8 from "../problems/azure/08-azure-ai-services-problems/content.json";
+import frontendperformanceengineeringbrowserreactperformanceModule from "../courses/frontend-performance-engineering/browser-react-performance/content.json";
+import nextjsfullstackreactapprouterrenderingModule from "../courses/next-js-full-stack-react/app-router-rendering/content.json";
+import authenticationauthorizationadvancedauthorizationModule from "../courses/authentication-authorization/advanced-authorization/content.json";
+import authenticationauthorizationssoidentityprovidersModule from "../courses/authentication-authorization/sso-identity-providers/content.json";
+import authenticationauthorizationoauthModule from "../courses/authentication-authorization/oauth/content.json";
+import authenticationauthorizationoauth2flowsdeepdiveModule from "../courses/authentication-authorization/oauth2-flows-deep-dive/content.json";
+import authenticationauthorizationauthbasicsModule from "../courses/authentication-authorization/auth-basics/content.json";
+import authenticationauthorizationjwtModule from "../courses/authentication-authorization/jwt/content.json";
+import authenticationauthorizationrefreshtokenstrategiesModule from "../courses/authentication-authorization/refresh-token-strategies/content.json";
+import authenticationauthorizationidentityModule from "../courses/authentication-authorization/identity/content.json";
+import authenticationauthorizationsecuritybestpracticesModule from "../courses/authentication-authorization/security-best-practices/content.json";
+import devopsproductionkubernetesday2operationsModule from "../courses/devops/production-kubernetes-day-2-operations/content.json";
+import devopsdockerfundamentalsModule from "../courses/devops/docker-fundamentals/content.json";
+import devopskubernetesfundamentalsModule from "../courses/devops/kubernetes-fundamentals/content.json";
+import devopscicdsafedeliveryModule from "../courses/devops/ci-cd-safe-delivery/content.json";
+import devopscicdfundamentalsModule from "../courses/devops/ci-cd-fundamentals/content.json";
+import devopskubernetesadvancedModule from "../courses/devops/kubernetes-advanced/content.json";
+import devopsproductiondockercontainersecurityModule from "../courses/devops/production-docker-container-security/content.json";
+import devopsdockeradvancedModule from "../courses/devops/docker-advanced/content.json";
+import devopscicdmoderntoolsModule from "../courses/devops/ci-cd-modern-tools/content.json";
+import sqlserverdatabaseinternalsqueryoptimizationModule from "../courses/sql-server/database-internals-query-optimization/content.json";
+import sqlserverviewsModule from "../courses/sql-server/views/content.json";
+import sqlserverazuresqlModule from "../courses/sql-server/azure-sql/content.json";
+import sqlservermoderndatatoolsModule from "../courses/sql-server/modern-data-tools/content.json";
+import sqlserverqueryingdataModule from "../courses/sql-server/querying-data/content.json";
+import sqlservertransactionserrorhandlingbackupModule from "../courses/sql-server/transactions-error-handling-backup/content.json";
+import sqlservergroupingaggregationsubqueriesModule from "../courses/sql-server/grouping-aggregation-subqueries/content.json";
+import sqlserverdatabaseschematableobjectsModule from "../courses/sql-server/database-schema-table-objects/content.json";
+import sqlserversecurityhardeningModule from "../courses/sql-server/security-hardening/content.json";
+import sqlserverjoinsModule from "../courses/sql-server/joins/content.json";
+import sqlserverperformancetuningModule from "../courses/sql-server/performance-tuning/content.json";
+import sqlservertriggersModule from "../courses/sql-server/triggers/content.json";
+import sqlserverhighavailabilitydrModule from "../courses/sql-server/high-availability-dr/content.json";
+import sqlserverdatamodificationdmlModule from "../courses/sql-server/data-modification-dml/content.json";
+import sqlserverindexesModule from "../courses/sql-server/indexes/content.json";
+import sqlserveradvancedtopicsModule from "../courses/sql-server/advanced-topics/content.json";
+import sqlserverstoredproceduresfunctionsModule from "../courses/sql-server/stored-procedures-functions/content.json";
+import sqlserverdatatypesModule from "../courses/sql-server/data-types/content.json";
+import sqlserverconstraintsModule from "../courses/sql-server/constraints/content.json";
+import sqlserverdatawarehousingModule from "../courses/sql-server/data-warehousing/content.json";
+import sqlserversetoperationsModule from "../courses/sql-server/set-operations/content.json";
+import sqlserverconcurrencyproductiondatabaseproblemsModule from "../courses/sql-server/concurrency-production-database-problems/content.json";
+import sqlservergettingstartedModule from "../courses/sql-server/getting-started/content.json";
+import efcoreperformancebulkoperationsModule from "../courses/ef-core/performance-bulk-operations/content.json";
+import efcorechangetrackingModule from "../courses/ef-core/change-tracking/content.json";
+import efcoreadvancedfeaturesModule from "../courses/ef-core/advanced-features/content.json";
+import efcoregettingstartedefcoreModule from "../courses/ef-core/getting-started-ef-core/content.json";
+import efcoredatabasefirstdiagnosticsModule from "../courses/ef-core/database-first-diagnostics/content.json";
+import efcoremigrationsModule from "../courses/ef-core/migrations/content.json";
+import efcoredbcontextconfigurationModule from "../courses/ef-core/dbcontext-configuration/content.json";
+import efcoredataoperationsdisconnectedModule from "../courses/ef-core/data-operations-disconnected/content.json";
+import efcoreefcoreperformanceormtradeoffsModule from "../courses/ef-core/ef-core-performance-orm-trade-offs/content.json";
+import efcorequeryingModule from "../courses/ef-core/querying/content.json";
+import efcoreconventionsrelationshipsModule from "../courses/ef-core/conventions-relationships/content.json";
+import efcoredataoperationsconnectedModule from "../courses/ef-core/data-operations-connected/content.json";
+import efcoreinheritancestrategiesModule from "../courses/ef-core/inheritance-strategies/content.json";
+import aspnetcorewebapierrorhandlingvalidationModule from "../courses/aspnet-core-web-api/error-handling-validation/content.json";
+import aspnetcorewebapiauthenticationbasicsModule from "../courses/aspnet-core-web-api/authentication-basics/content.json";
+import aspnetcorewebapiproductionapidesignreliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
+import aspnetcorewebapidependencyinjectionModule from "../courses/aspnet-core-web-api/dependency-injection/content.json";
+import aspnetcorewebapimiddlewareModule from "../courses/aspnet-core-web-api/middleware/content.json";
+import aspnetcorewebapimodelbindingModule from "../courses/aspnet-core-web-api/model-binding/content.json";
+import aspnetcorewebapicontrollersroutingModule from "../courses/aspnet-core-web-api/controllers-routing/content.json";
+import aspnetcorewebapiloggingconfigurationModule from "../courses/aspnet-core-web-api/logging-configuration/content.json";
+import aspnetcorewebapigettingstartedModule from "../courses/aspnet-core-web-api/getting-started/content.json";
+import linqconversiongenerationoperatorsModule from "../courses/linq/conversion-generation-operators/content.json";
+import linqadvancedlinqconceptsModule from "../courses/linq/advanced-linq-concepts/content.json";
+import linqpartitioningoperatorsModule from "../courses/linq/partitioning-operators/content.json";
+import linqfilteringprojectionModule from "../courses/linq/filtering-projection/content.json";
+import linqaggregationoperatorsModule from "../courses/linq/aggregation-operators/content.json";
+import linqsetoperationsModule from "../courses/linq/set-operations/content.json";
+import linqjoiningdataModule from "../courses/linq/joining-data/content.json";
+import linqlinqfundamentalssyntaxModule from "../courses/linq/linq-fundamentals-syntax/content.json";
+import linqgettingstartedlinqModule from "../courses/linq/getting-started-linq/content.json";
+import linqsortinggroupingModule from "../courses/linq/sorting-grouping/content.json";
+import linqquantifierselementoperatorsModule from "../courses/linq/quantifiers-element-operators/content.json";
+import cleancodecsharpcleancodepracticesModule from "../courses/clean-code-csharp/clean-code-practices/content.json";
+import cleancodecsharpcreationalpatternsModule from "../courses/clean-code-csharp/creational-patterns/content.json";
+import cleancodecsharpstructuralpatternsModule from "../courses/clean-code-csharp/structural-patterns/content.json";
+import cleancodecsharpsolidprinciplesModule from "../courses/clean-code-csharp/solid-principles/content.json";
+import cleancodecsharpbehavioralpatternsModule from "../courses/clean-code-csharp/behavioral-patterns/content.json";
+import cleancodecsharparchitecturepatternsModule from "../courses/clean-code-csharp/architecture-patterns/content.json";
+import cleancodecsharpseniorengineeringjudgmentarchitecturedecisionsModule from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/content.json";
+import reacttestingtestingreactqueryModule from "../courses/react-testing/testing-react-query/content.json";
+import reacttestinge2etestingModule from "../courses/react-testing/e2e-testing/content.json";
+import reacttestingjestbasicsModule from "../courses/react-testing/jest-basics/content.json";
+import reacttestingcomponenttestingModule from "../courses/react-testing/component-testing/content.json";
+import reacttestingreacttestinglibraryModule from "../courses/react-testing/react-testing-library/content.json";
+import reacttestingtestingfundamentalsModule from "../courses/react-testing/testing-fundamentals/content.json";
+import reacttestingadvancedtestingpatternsModule from "../courses/react-testing/advanced-testing-patterns/content.json";
+import reacttestingtestingstrategyforseniorfrontendengineersModule from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/content.json";
+import csharpfundamentalsmoderncsharpModule from "../courses/csharp-fundamentals/modern-csharp/content.json";
+import csharpfundamentalsoopModule from "../courses/csharp-fundamentals/oop/content.json";
+import csharpfundamentalsadvancedasyncconcurrencythreadingModule from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/content.json";
+import csharpfundamentalscontrolflowModule from "../courses/csharp-fundamentals/control-flow/content.json";
+import csharpfundamentalsvariablestypesModule from "../courses/csharp-fundamentals/variables-types/content.json";
+import csharpfundamentalsadvancedfeaturesModule from "../courses/csharp-fundamentals/advanced-features/content.json";
+import csharpfundamentalsadvancedcruntimememoryconcurrencyModule from "../courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/content.json";
+import csharpfundamentalserrorhandlingModule from "../courses/csharp-fundamentals/error-handling/content.json";
+import csharpfundamentalsgettingstartedModule from "../courses/csharp-fundamentals/getting-started/content.json";
+import oopsconceptsencapsulationdatahidingModule from "../courses/oops-concepts/encapsulation-data-hiding/content.json";
+import oopsconceptsinheritanceModule from "../courses/oops-concepts/inheritance/content.json";
+import oopsconceptsabstractionModule from "../courses/oops-concepts/abstraction/content.json";
+import oopsconceptsoopfundamentalsModule from "../courses/oops-concepts/oop-fundamentals/content.json";
+import oopsconceptsinterfacesabstractclassesModule from "../courses/oops-concepts/interfaces-abstract-classes/content.json";
+import oopsconceptsdesignprinciplesModule from "../courses/oops-concepts/design-principles/content.json";
+import oopsconceptspolymorphismModule from "../courses/oops-concepts/polymorphism/content.json";
+import animationModule from "../courses//animation/content.json";
+import routingModule from "../courses//routing/content.json";
+import reactformsinputModule from "../courses//react-forms-input/content.json";
+import utilitiesModule from "../courses//utilities/content.json";
+import advancedpatternsModule from "../courses//advanced-patterns/content.json";
+import statemanagementModule from "../courses//state-management/content.json";
+import reactdatafetchingModule from "../courses//react-data-fetching/content.json";
+import reacthookspatternsModule from "../courses//react-hooks-patterns/content.json";
+import reacttestingModule from "../courses//react-testing/content.json";
+import yarnnpmfundamentalsModule from "../courses//yarn-npm-fundamentals/content.json";
+import httpclientsModule from "../courses//http-clients/content.json";
+import formsModule from "../courses//forms/content.json";
+import stylingModule from "../courses//styling/content.json";
+import reactperformanceModule from "../courses//react-performance/content.json";
+import buildtoolsModule from "../courses//build-tools/content.json";
+import frontendframeworksModule from "../courses//frontend-frameworks/content.json";
+import testingModule from "../courses//testing/content.json";
+import programmingcomputerwebfoundationswebnetworkingfundamentalsModule from "../courses/programming-computer-web-foundations/web-networking-fundamentals/content.json";
+import programmingcomputerwebfoundationsprogrammingcomputerfundamentalsModule from "../courses/programming-computer-web-foundations/programming-computer-fundamentals/content.json";
+import systemdesignproblemsdistributedsystemsfundamentalsModule from "../courses/system-design-problems/distributed-systems-fundamentals/content.json";
+import reactadvancedpatternsstatemachinesxstateModule from "../courses/react-advanced-patterns/state-machines-xstate/content.json";
+import reactadvancedpatternsstatereducersModule from "../courses/react-advanced-patterns/state-reducers/content.json";
+import reactadvancedpatternscomponentcompositionstrategiesModule from "../courses/react-advanced-patterns/component-composition-strategies/content.json";
+import reactadvancedpatternsadvancedhookpatternsModule from "../courses/react-advanced-patterns/advanced-hook-patterns/content.json";
+import reactadvancedpatternshigherordercomponentsModule from "../courses/react-advanced-patterns/higher-order-components/content.json";
+import reactadvancedpatternsrenderpropsModule from "../courses/react-advanced-patterns/render-props/content.json";
+import reactadvancedpatternscompoundcomponentsModule from "../courses/react-advanced-patterns/compound-components/content.json";
+import reactadvancedpatternsperformancepatternsModule from "../courses/react-advanced-patterns/performance-patterns/content.json";
+import reactadvancedpatternscustomhooksarchitectureModule from "../courses/react-advanced-patterns/custom-hooks-architecture/content.json";
+import reactadvancedpatternsmodernstateapplicationarchitectureModule from "../courses/react-advanced-patterns/modern-state-application-architecture/content.json";
+import reactadvancedpatternscontrolpropsModule from "../courses/react-advanced-patterns/control-props/content.json";
+import seniorsoftwareengineeringtechnicalleadershipModule from "../courses/senior-software-engineering/technical-leadership/content.json";
+import seniorsoftwareengineeringproductionownershipModule from "../courses/senior-software-engineering/production-ownership/content.json";
+import apolloadvancedpatternsModule from "../courses/apollo/advanced-patterns/content.json";
+import apollocachingModule from "../courses/apollo/caching/content.json";
+import apollolocalstatemanagementModule from "../courses/apollo/local-state-management/content.json";
+import apolloqueriesmutationsModule from "../courses/apollo/queries-mutations/content.json";
+import apolloclientsidecachingadvancedModule from "../courses/apollo/client-side-caching-advanced/content.json";
+import apolloerrorhandlingoptimisticModule from "../courses/apollo/error-handling-optimistic/content.json";
+import apollosubscriptionsrealtimeModule from "../courses/apollo/subscriptions-realtime/content.json";
+import apollossrnextjsperformanceModule from "../courses/apollo/ssr-nextjs-performance/content.json";
+import apolloapollobasicsModule from "../courses/apollo/apollo-basics/content.json";
+import typescriptforreactadvancedtypemodelingruntimesafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
+import typescriptforreacttypescriptbasicsModule from "../courses/typescript-for-react/typescript-basics/content.json";
+import typescriptforreactgenericcomponentsModule from "../courses/typescript-for-react/generic-components/content.json";
+import typescriptforreacttestingbestpracticesModule from "../courses/typescript-for-react/testing-best-practices/content.json";
+import typescriptforreacttypinghooksModule from "../courses/typescript-for-react/typing-hooks/content.json";
+import typescriptforreactadvancedtypesModule from "../courses/typescript-for-react/advanced-types/content.json";
+import typescriptforreacttypesinreactModule from "../courses/typescript-for-react/types-in-react/content.json";
+import typescriptforreactreactpatternsModule from "../courses/typescript-for-react/react-patterns/content.json";
+import gitlinuxdeveloperworkflowgitforseniorengineersModule from "../courses/git-linux-developer-workflow/git-for-senior-engineers/content.json";
+import gitlinuxdeveloperworkflowlinuxproductiontroubleshootingModule from "../courses/git-linux-developer-workflow/linux-production-troubleshooting/content.json";
+import aspnetcoreaspnetcoreinternalsproductionhostingModule from "../courses/aspnet-core/asp-net-core-internals-production-hosting/content.json";
+import aspnetcoreperformanceobservabilityModule from "../courses/aspnet-core/performance-observability/content.json";
+import unittestingdotnettestingpatternsModule from "../courses/unit-testing-dotnet/testing-patterns/content.json";
+import unittestingdotnetcodecoverageModule from "../courses/unit-testing-dotnet/code-coverage/content.json";
+import unittestingdotnetmockingfakesModule from "../courses/unit-testing-dotnet/mocking-fakes/content.json";
+import unittestingdotnettddModule from "../courses/unit-testing-dotnet/tdd/content.json";
+import unittestingdotnetintegrationtestingModule from "../courses/unit-testing-dotnet/integration-testing/content.json";
+import unittestingdotnettestingfundamentalsModule from "../courses/unit-testing-dotnet/testing-fundamentals/content.json";
+import unittestingdotnetxunitbasicsModule from "../courses/unit-testing-dotnet/xunit-basics/content.json";
+import reactfundamentalscomponentspropsModule from "../courses/react-fundamentals/components-props/content.json";
+import reactfundamentalslifecycleeffectsModule from "../courses/react-fundamentals/lifecycle-effects/content.json";
+import reactfundamentalsstylingModule from "../courses/react-fundamentals/styling/content.json";
+import reactfundamentalsperformanceoptimizationModule from "../courses/react-fundamentals/performance-optimization/content.json";
+import reactfundamentalscontextrefsModule from "../courses/react-fundamentals/context-refs/content.json";
+import reactfundamentalsreactinternalsmodernrenderingModule from "../courses/react-fundamentals/react-internals-modern-rendering/content.json";
+import reactfundamentalsstateeventsModule from "../courses/react-fundamentals/state-events/content.json";
+import reactfundamentalsreactrouterModule from "../courses/react-fundamentals/react-router/content.json";
+import reactfundamentalsformsinputModule from "../courses/react-fundamentals/forms-input/content.json";
+import reactfundamentalsgettingstartedModule from "../courses/react-fundamentals/getting-started/content.json";
+import dotnetnugetpackagestestingqualityModule from "../courses/dotnet-nuget-packages/testing-quality/content.json";
+import dotnetnugetpackagesmessagingeventsModule from "../courses/dotnet-nuget-packages/messaging-events/content.json";
+import dotnetnugetpackagesutilitieshelpersModule from "../courses/dotnet-nuget-packages/utilities-helpers/content.json";
+import dotnetnugetpackagescoreextensionsModule from "../courses/dotnet-nuget-packages/core-extensions/content.json";
+import dotnetnugetpackagessecuritycryptographyModule from "../courses/dotnet-nuget-packages/security-cryptography/content.json";
+import dotnetnugetpackagesnugetfundamentalsModule from "../courses/dotnet-nuget-packages/nuget-fundamentals/content.json";
+import dotnetnugetpackagesserializationmappingModule from "../courses/dotnet-nuget-packages/serialization-mapping/content.json";
+import dotnetnugetpackagesaspnetwebModule from "../courses/dotnet-nuget-packages/aspnet-web/content.json";
+import dotnetnugetpackagesdatabasedataaccessModule from "../courses/dotnet-nuget-packages/database-data-access/content.json";
+import reactqueryqueryhooksModule from "../courses/react-query/query-hooks/content.json";
+import reactquerycachingstrategiesModule from "../courses/react-query/caching-strategies/content.json";
+import reactqueryadvancedfeaturesModule from "../courses/react-query/advanced-features/content.json";
+import reactquerymutationsModule from "../courses/react-query/mutations/content.json";
+import reactqueryrealworldpatternsModule from "../courses/react-query/real-world-patterns/content.json";
+import reactqueryofflinesupportpersistenceModule from "../courses/react-query/offline-support-persistence/content.json";
+import reactqueryprefetchingssrModule from "../courses/react-query/prefetching-ssr/content.json";
+import reactqueryperformanceoptimizationModule from "../courses/react-query/performance-optimization/content.json";
+import reactqueryquerybasicsModule from "../courses/react-query/query-basics/content.json";
+import reduxreduxadvancedconceptsModule from "../courses/redux/redux-advanced-concepts/content.json";
+import reduxreduxpatternsModule from "../courses/redux/redux-patterns/content.json";
+import reduxreduxrealworldModule from "../courses/redux/redux-real-world/content.json";
+import reduxreduxtoolkitModule from "../courses/redux/redux-toolkit/content.json";
+import reduxreduxtestingModule from "../courses/redux/redux-testing/content.json";
+import reduxreduxmiddlewareModule from "../courses/redux/redux-middleware/content.json";
+import reduxreactreduxModule from "../courses/redux/react-redux/content.json";
+import reduxreduxfundamentalsModule from "../courses/redux/redux-fundamentals/content.json";
+import designpatterns03behavioralpatternsModule from "../courses/design-patterns/03-behavioral-patterns/content.json";
+import designpatterns02structuralpatternsModule from "../courses/design-patterns/02-structural-patterns/content.json";
+import designpatterns04enterprisepatternsModule from "../courses/design-patterns/04-enterprise-patterns/content.json";
+import designpatterns01creationalpatternsModule from "../courses/design-patterns/01-creational-patterns/content.json";
+import seniorcodereviewlabproblemscaspnetcorereviewsModule from "../problems/senior-code-review-lab-problems/c-aspnet-core-reviews/content.json";
+import seniorcodereviewlabproblemsreacttypescriptreviewsModule from "../problems/senior-code-review-lab-problems/react-typescript-reviews/content.json";
+import productionincidentlabproblemsfrontendincidentsModule from "../problems/production-incident-lab-problems/frontend-incidents/content.json";
+import productionincidentlabproblemsdatabaseinfrastructureincidentsModule from "../problems/production-incident-lab-problems/database-infrastructure-incidents/content.json";
+import productionincidentlabproblemsbackendincidentsModule from "../problems/production-incident-lab-problems/backend-incidents/content.json";
+import architecturedecisionlabproblemsarchitecturetradeoffsModule from "../problems/architecture-decision-lab-problems/architecture-trade-offs/content.json";
 
