@@ -231,24 +231,22 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 ### Adding a new lesson
 
 1. Create the lesson JSON file in the appropriate module folder
-2. Import it in `content/lessons/index.ts`
-3. Add the lesson slug to the module's `lessonSlugs` array in the module's `content.json`
+2. Add the lesson slug to the module's `lessonSlugs` array in the module's `content.json`
+3. Run `npm run generate:content` to regenerate index files (or just run `npm run dev` / `npm run build`, which trigger it automatically via `predev`/`prebuild`)
 
 ### Adding a new module
 
 1. Create `content/[area]/[courseSlug]/[moduleSlug]/content.json`
 2. Create lesson JSON files in the module folder
-3. Import the module in `content/modules/index.ts`
-4. Add the module slug to the course's `moduleSlugs` array
+3. Add the module slug to the course's `moduleSlugs` array
+4. Run `npm run generate:content` to regenerate index files
 
 ### Adding a new course
 
 1. Create `content/[area]/[courseSlug]/content.json`
 2. Add module folders with `content.json` and lesson JSON files
-3. Import course in `content/courses/index.ts` (if it's a regular course)
-4. Add module imports to `content/modules/index.ts`
-5. Add lesson imports to `content/lessons/index.ts`
-6. Update `app/sitemap.ts` if needed
+3. Update `app/sitemap.ts` if needed
+4. Run `npm run generate:content` to regenerate index files (or just run `npm run dev` / `npm run build`, which trigger it automatically via `predev`/`prebuild`)
 
 ### Content blocks
 
