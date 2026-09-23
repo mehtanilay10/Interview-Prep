@@ -388,6 +388,7 @@ import rateLimiterModule from "../problems/hld/rate-limiter/content.json";
 import reactModule from "../cheatsheet/react/content.json";
 import reactAdvancedPatternsModule from "../courses/react-advanced-patterns/content.json";
 import reactDataFetchingModule from "../courses/yarn-npm-packages/react-data-fetching/content.json";
+import reactEcosystemModule from "../courses/yarn-npm-packages/react-ecosystem/content.json";
 import reactFormsInputModule from "../courses/yarn-npm-packages/react-forms-input/content.json";
 import reactFrontendFollowUpsModule from "../interview-qa/react-frontend-follow-ups/content.json";
 import reactFundamentalsModule from "../courses/react-fundamentals/content.json";
@@ -840,6 +841,7 @@ const rawModulesPart1 = [
 	reactModule,
 	reactAdvancedPatternsModule,
 	reactDataFetchingModule,
+	reactEcosystemModule,
 	reactFormsInputModule,
 	reactFrontendFollowUpsModule,
 	reactFundamentalsModule,

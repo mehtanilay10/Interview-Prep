@@ -4600,7 +4600,7 @@ const rawLessonsPart5 = [
 	zustandLesson,
 ];
 
-const rawLessons: any[] = [...rawLessonsPart1, rawLessonsPart2, rawLessonsPart3, rawLessonsPart4, rawLessonsPart5];
+const rawLessons: any[] = [...rawLessonsPart1, ...rawLessonsPart2, ...rawLessonsPart3, ...rawLessonsPart4, ...rawLessonsPart5];
 
 export const lessons: Lesson[] = rawLessons as unknown as Lesson[];
 

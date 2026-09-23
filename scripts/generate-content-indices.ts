@@ -244,7 +244,7 @@ function generateCoursesIndex(courses: CourseInfo[]): string {
 
     const partRefs = chunks.map((_, idx) => `rawCoursesPart${idx + 1}`).join(', ');
     partsDecl = partDecls;
-    combineDecl = `const rawCourses: any[] = [...${partRefs}];`;
+    combineDecl = `const rawCourses: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
   }
 
   return `import type { Course } from "@/types";
@@ -286,7 +286,7 @@ function generateModulesIndex(modules: ModuleInfo[]): string {
 
     const partRefs = chunks.map((_, idx) => `rawModulesPart${idx + 1}`).join(', ');
     partsDecl = partDecls;
-    combineDecl = `const rawModules: any[] = [...${partRefs}];`;
+    combineDecl = `const rawModules: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
   }
 
   return `import type { Module } from "@/types";
@@ -332,7 +332,7 @@ function generateLessonsIndex(lessons: LessonInfo[]): string {
 
     const partRefs = chunks.map((_, idx) => `rawLessonsPart${idx + 1}`).join(', ');
     partsDecl = partDecls;
-    combineDecl = `const rawLessons: any[] = [...${partRefs}];`;
+    combineDecl = `const rawLessons: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
   }
 
   return `import type { Lesson } from '@/types';
