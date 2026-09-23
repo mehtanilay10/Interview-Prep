@@ -13,12 +13,13 @@ export const metadata: Metadata = buildMetadata({
 });
 
 const CATEGORY_LABELS: Record<string, string> = {
-  cloud: 'Cloud',
-  database: 'Database',
+  basics: 'Basics',
+  backend: 'Backends',
   frontend: 'Frontend',
-  backend: 'Backend',
-  architecture: 'Architecture',
-  interview: 'Interview Prep',
+  database: 'Database',
+  cloud: 'Cloud',
+  devops: 'DevOps',
+  security: 'Security',
 };
 
 export default function CoursesPage() {
@@ -31,7 +32,7 @@ export default function CoursesPage() {
   }
 
   const sortedCategories = Object.keys(grouped).sort((a, b) => {
-    const order = ['backend', 'frontend', 'database', 'architecture', 'cloud', 'other'];
+    const order = ['basics', 'backend', 'frontend', 'database', 'cloud', 'devops', 'security'];
     return order.indexOf(a) - order.indexOf(b);
   });
 
