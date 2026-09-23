@@ -44,7 +44,7 @@ export default async function CourseDetailPage({ params }: Params) {
             key={mod.id}
             module={mod}
             courseSlug={courseSlug}
-            lessonCount={mod.lessonSlugs.length}
+              lessonCount={mod.lessonSlugs?.length ?? 0}
           />
         ))}
       </div>

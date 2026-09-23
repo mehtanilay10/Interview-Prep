@@ -552,7 +552,28 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
 }
 
 function normalizeBlock(block: ContentBlock): ContentBlock {
-  if ('data' in block && block.data) return block;
+  if ('data' in block && block.data) {
+    if (block.type === 'comparison-cards' && (block.data as any).items && !(block.data as any).cards) {
+      return {
+        ...block,
+        data: {
+          title: block.data.title,
+          cards: (block.data as any).items as { title: string; description: string; pros?: string[]; cons?: string[]; tags?: string[] }[],
+        },
+      } as ContentBlock;
+    }
+    if (block.type === 'summary-box' && (block.data as any).items && !(block.data as any).points) {
+      return {
+        ...block,
+        data: {
+          title: block.data.title,
+          points: ((block.data as any).items as { text: string }[]).map((i) => i.text),
+          takeaway: block.data.takeaway,
+        },
+      } as ContentBlock;
+    }
+    return block;
+  }
 
   const legacy = block as Record<string, unknown>;
   const common = { id: legacy.id as string | undefined };

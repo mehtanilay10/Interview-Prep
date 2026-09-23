@@ -30,7 +30,7 @@ export function ProblemFilters({
         moduleLessons.some(
           (l) =>
             l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            l.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
+            (l.tags ?? []).some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
         );
       return matchesDifficulty && matchesSearch;
     });
@@ -76,7 +76,7 @@ export function ProblemFilters({
               module={mod}
               courseSlug={courseSlug}
               basePrefix="problems"
-              lessonCount={mod.lessonSlugs.length}
+               lessonCount={mod.lessonSlugs?.length ?? 0}
             />
           ))}
         </div>

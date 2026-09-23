@@ -14,7 +14,7 @@ interface LessonActionsProps {
     difficulty: string;
     estimatedMinutes: number;
     isOptional?: boolean;
-    tags: string[];
+    tags?: string[];
   };
   courseSlug: string;
   moduleSlug: string;

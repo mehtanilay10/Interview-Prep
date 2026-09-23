@@ -87,9 +87,9 @@ export function ModuleCard({
 
       <div className="mt-auto">
         {/* Tags */}
-        {module.tags.length > 0 && (
+        {(module.tags?.length ?? 0) > 0 && (
           <div className="mb-3 flex flex-wrap gap-1">
-            {module.tags.slice(0, 3).map((tag) => (
+            {(module.tags ?? []).slice(0, 3).map((tag) => (
               <span
                 key={tag}
                 className="rounded-full bg-canvas-subtle px-2 py-0.5 text-xs text-fg-subtle border border-border"
@@ -105,7 +105,7 @@ export function ModuleCard({
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-              {lessonCount ?? module.lessonSlugs.length} lessons
+              {lessonCount ?? module.lessonSlugs?.length ?? 0} lessons
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />

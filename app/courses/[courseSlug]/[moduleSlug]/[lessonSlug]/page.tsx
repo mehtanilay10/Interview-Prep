@@ -128,9 +128,9 @@ export default async function CourseLessonDetailPage({ params }: Params) {
             </h1>
             <p className="text-base text-fg-muted">{lesson.description}</p>
 
-            {lesson.tags.length > 0 && (
+            {(lesson.tags?.length ?? 0) > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {lesson.tags.map((tag) => (
+                {(lesson.tags ?? []).map((tag) => (
                   <span
                     key={tag}
                     className="rounded-full border border-border bg-canvas-subtle px-2 py-0.5 text-xs text-fg-subtle"

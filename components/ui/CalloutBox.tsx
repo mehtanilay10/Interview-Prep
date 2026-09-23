@@ -24,6 +24,12 @@ const variantConfig: Record<
     iconClass: 'text-attention-fg',
     label: 'Warning',
   },
+  danger: {
+    icon: AlertTriangle,
+    classes: 'bg-danger-subtle border-danger-muted text-fg-default',
+    iconClass: 'text-danger-fg',
+    label: 'Danger',
+  },
   note: {
     icon: FileText,
     classes: 'bg-canvas-subtle border-border text-fg-default',

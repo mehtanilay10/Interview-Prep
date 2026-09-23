@@ -6,7 +6,7 @@
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 
-export type CalloutVariant = 'info' | 'tip' | 'warning' | 'note' | 'important';
+export type CalloutVariant = 'info' | 'tip' | 'warning' | 'note' | 'important' | 'danger';
 
 // ── Content block system ─────────────────────────────────────────────────────
 
@@ -182,8 +182,8 @@ export interface Module {
   difficulty: Difficulty;
   estimatedHours: number;
   icon: string;
-  tags: string[];
-  lessonSlugs: string[]; // ordered list of lesson slugs
+  tags?: string[];
+  lessonSlugs?: string[]; // ordered list of lesson slugs
   isOptional?: boolean;
   skipLabel?: string;
   prerequisites?: string[]; // module slugs
@@ -214,7 +214,7 @@ export interface Lesson {
   order: number;
   difficulty: Difficulty;
   estimatedMinutes: number;
-  tags: string[];
+  tags?: string[];
   technology?: string;
   prerequisites?: string[]; // lesson slugs
   isOptional?: boolean;

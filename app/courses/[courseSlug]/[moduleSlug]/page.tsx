@@ -89,9 +89,9 @@ export default async function CourseModuleDetailPage({ params }: Params) {
           </span>
         </div>
 
-        {mod.tags.length > 0 && (
+        {(mod.tags?.length ?? 0) > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {mod.tags.map((tag) => (
+            {(mod.tags ?? []).map((tag) => (
               <span
                 key={tag}
                 className="rounded-full border border-border bg-canvas-subtle px-2.5 py-0.5 text-xs text-fg-muted"
