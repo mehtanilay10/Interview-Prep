@@ -21,6 +21,7 @@ import mod01GettingStartedLinqModule from "../courses/linq/01-getting-started-li
 import mod01MvcFundamentalsProblemsModule from "../problems/aspnet-core/01-mvc-fundamentals-problems/content.json";
 import mod01NugetFundamentalsModule from "../courses/dotnet-nuget-packages/01-nuget-fundamentals/content.json";
 import mod01OopFundamentalsModule from "../courses/oops-concepts/01-oop-fundamentals/content.json";
+import mod01PrismaBasicsModule from "../courses/prisma/01-prisma-basics/content.json";
 import mod01QueryBasicsModule from "../courses/react-query/01-query-basics/content.json";
 import mod01ReduxFundamentalsModule from "../courses/redux/01-redux-fundamentals/content.json";
 import mod01RenderPropsModule from "../courses/react-advanced-patterns/01-render-props/content.json";
@@ -46,6 +47,7 @@ import mod02JwtModule from "../courses/authentication-authorization/02-jwt/conte
 import mod02JwtAuthenticationModule from "../courses/fullstack-security/02-jwt-authentication/content.json";
 import mod02LinqFundamentalsSyntaxModule from "../courses/linq/02-linq-fundamentals-syntax/content.json";
 import mod02MvcFundamentalsModule from "../courses/aspnet-core/02-mvc-fundamentals/content.json";
+import mod02PrismaSchemaDesignModule from "../courses/prisma/02-prisma-schema-design/content.json";
 import mod02QueriesMutationsModule from "../courses/apollo/02-queries-mutations/content.json";
 import mod02QueryHooksModule from "../courses/react-query/02-query-hooks/content.json";
 import mod02QueryingDataModule from "../courses/sql-server/02-querying-data/content.json";
@@ -77,6 +79,7 @@ import mod03LinkedListProblemsModule from "../problems/csharp/03-linked-list-pro
 import mod03MockingFakesModule from "../courses/unit-testing-dotnet/03-mocking-fakes/content.json";
 import mod03ModelBindingModule from "../courses/aspnet-core-web-api/03-model-binding/content.json";
 import mod03MutationsModule from "../courses/react-query/03-mutations/content.json";
+import mod03PrismaQueriesMutationsModule from "../courses/prisma/03-prisma-queries-mutations/content.json";
 import mod03QueriesMutationsModule from "../courses/graphql-dotnet/03-queries-mutations/content.json";
 import mod03ReactReduxModule from "../courses/redux/03-react-redux/content.json";
 import mod03ReactTestingLibraryModule from "../courses/react-testing/03-react-testing-library/content.json";
@@ -109,6 +112,7 @@ import mod04NetworkingModule from "../courses/aws/04-networking/content.json";
 import mod04OauthModule from "../courses/authentication-authorization/04-oauth/content.json";
 import mod04OopModule from "../courses/csharp-fundamentals/04-oop/content.json";
 import mod04PolymorphismModule from "../courses/oops-concepts/04-polymorphism/content.json";
+import mod04PrismaRelationsModule from "../courses/prisma/04-prisma-relations/content.json";
 import mod04ReduxMiddlewareModule from "../courses/redux/04-redux-middleware/content.json";
 import mod04ScenarioBasedModule from "../interview-qa/04-scenario-based/content.json";
 import mod04SetOperationsModule from "../courses/sql-server/04-set-operations/content.json";
@@ -135,6 +139,7 @@ import mod05GroupingAggregationSubqueriesModule from "../courses/sql-server/05-g
 import mod05JoiningDataModule from "../courses/linq/05-joining-data/content.json";
 import mod05LifecycleEffectsModule from "../courses/react-fundamentals/05-lifecycle-effects/content.json";
 import mod05Oauth2FlowsDeepDiveModule from "../courses/authentication-authorization/05-oauth2-flows-deep-dive/content.json";
+import mod05PrismaMigrationsModule from "../courses/prisma/05-prisma-migrations/content.json";
 import mod05RazorViewsModule from "../courses/aspnet-core/05-razor-views/content.json";
 import mod05ReduxPatternsModule from "../courses/redux/05-redux-patterns/content.json";
 import mod05SecureApiDesignModule from "../courses/fullstack-security/05-secure-api-design/content.json";
@@ -165,6 +170,7 @@ import mod06MessagingEventsModule from "../courses/dotnet-nuget-packages/06-mess
 import mod06OfflineSupportPersistenceModule from "../courses/react-query/06-offline-support-persistence/content.json";
 import mod06PerformanceModule from "../courses/graphql-dotnet/06-performance/content.json";
 import mod06PerformancePatternsModule from "../courses/react-advanced-patterns/06-performance-patterns/content.json";
+import mod06PrismaAdvancedFeaturesModule from "../courses/prisma/06-prisma-advanced-features/content.json";
 import mod06RapidFireModule from "../interview-qa/06-rapid-fire/content.json";
 import mod06ReactPatternsModule from "../courses/typescript-for-react/06-react-patterns/content.json";
 import mod06ReduxTestingModule from "../courses/redux/06-redux-testing/content.json";
@@ -187,6 +193,7 @@ import mod07LoadBalancingApplicationIntegrationModule from "../courses/aws/07-lo
 import mod07MiddlewarePipelineModule from "../courses/aspnet-core/07-middleware-pipeline/content.json";
 import mod07ModernCsharpModule from "../courses/csharp-fundamentals/07-modern-csharp/content.json";
 import mod07PrefetchingSsrModule from "../courses/react-query/07-prefetching-ssr/content.json";
+import mod07PrismaNextjsIntegrationModule from "../courses/prisma/07-prisma-nextjs-integration/content.json";
 import mod07QueryingModule from "../courses/ef-core/07-querying/content.json";
 import mod07ReactRouterModule from "../courses/react-fundamentals/07-react-router/content.json";
 import mod07RecursionProblemsModule from "../problems/csharp/07-recursion-problems/content.json";
@@ -269,6 +276,7 @@ import advancedCRuntimeMemoryConcurrencyModule from "../courses/csharp-fundament
 import advancedGitWorkflowsModule from "../courses/git-linux-developer-workflow/advanced-git-workflows/content.json";
 import advancedPatternsModule from "../courses/dotnet-nuget-packages/advanced-patterns/content.json";
 import advancedPatternsModule1 from "../courses/yarn-npm-packages/advanced-patterns/content.json";
+import advancedTopicsModule from "../courses/postgresql/advanced-topics/content.json";
 import advancedTypeModelingRuntimeSafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
 import airbnbBookingModule from "../problems/lld/airbnb-booking/content.json";
 import airbnbBookingHldModule from "../problems/hld/airbnb-booking-hld/content.json";
@@ -308,13 +316,17 @@ import ciCdSafeDeliveryModule from "../courses/devops/ci-cd-safe-delivery/conten
 import cleanCodeCsharpModule from "../courses/clean-code-csharp/content.json";
 import cloudIntegrationModule from "../courses/dotnet-nuget-packages/cloud-integration/content.json";
 import concurrencyProductionDatabaseProblemsModule from "../courses/sql-server/concurrency-production-database-problems/content.json";
+import constraintsModule from "../courses/postgresql/constraints/content.json";
 import csharpModule from "../problems/csharp/content.json";
 import csharpModule1 from "../cheatsheet/csharp/content.json";
 import csharpFundamentalsModule from "../courses/csharp-fundamentals/content.json";
 import dataFetchingPatternsModule from "../courses/next-js-full-stack-react/data-fetching-patterns/content.json";
+import dataModificationDmlModule from "../courses/postgresql/data-modification-dml/content.json";
 import dataStructuresDeepDiveModule from "../courses/programming-computer-web-foundations/data-structures-deep-dive/content.json";
+import dataTypesModule from "../courses/postgresql/data-types/content.json";
 import databaseInfrastructureIncidentsModule from "../problems/production-incident-lab-problems/database-infrastructure-incidents/content.json";
 import databaseInternalsQueryOptimizationModule from "../courses/sql-server/database-internals-query-optimization/content.json";
+import databaseSchemaTableObjectsModule from "../courses/postgresql/database-schema-table-objects/content.json";
 import designPatternsModule from "../courses/design-patterns/content.json";
 import devopsModule from "../courses/devops/content.json";
 import devopsSystemDesignModule from "../problems/system-design/devops-system-design/content.json";
@@ -337,19 +349,24 @@ import frontendPerformanceEngineeringModule from "../courses/frontend-performanc
 import fullStackApiDesignModule from "../courses/next-js-full-stack-react/full-stack-api-design/content.json";
 import fullStackSeniorProjectsModule from "../problems/full-stack-senior-projects/content.json";
 import fullstackSecurityModule from "../courses/fullstack-security/content.json";
+import gettingStartedModule from "../courses/postgresql/getting-started/content.json";
 import gitForSeniorEngineersModule from "../courses/git-linux-developer-workflow/git-for-senior-engineers/content.json";
 import gitLinuxDeveloperWorkflowModule from "../courses/git-linux-developer-workflow/content.json";
 import googleDriveStorageModule from "../problems/lld/google-drive-storage/content.json";
 import googleSearchModule from "../problems/hld/google-search/content.json";
 import graphqlModule from "../cheatsheet/graphql/content.json";
 import graphqlDotnetModule from "../courses/graphql-dotnet/content.json";
+import groupingAggregationSubqueriesModule from "../courses/postgresql/grouping-aggregation-subqueries/content.json";
+import highAvailabilityDrModule from "../courses/postgresql/high-availability-dr/content.json";
 import hldModule from "../problems/hld/content.json";
 import hotelManagementModule from "../problems/lld/hotel-management/content.json";
 import httpClientsModule from "../courses/yarn-npm-packages/http-clients/content.json";
 import httpClientsResilienceModule from "../courses/dotnet-nuget-packages/http-clients-resilience/content.json";
+import indexesModule from "../courses/postgresql/indexes/content.json";
 import instagramFeedModule from "../problems/hld/instagram-feed/content.json";
 import instagramPhotoSharingModule from "../problems/lld/instagram-photo-sharing/content.json";
 import javascriptModule from "../cheatsheet/javascript/content.json";
+import joinsModule from "../courses/postgresql/joins/content.json";
 import leadershipOwnershipModule from "../interview-qa/leadership-ownership/content.json";
 import libraryManagementModule from "../problems/lld/library-management/content.json";
 import linkedinProfessionalModule from "../problems/lld/linkedin-professional/content.json";
@@ -360,6 +377,7 @@ import linuxProductionTroubleshootingModule from "../courses/git-linux-developer
 import lldModule from "../problems/lld/content.json";
 import loggingMonitoringModule from "../courses/dotnet-nuget-packages/logging-monitoring/content.json";
 import mockInterviewScenariosModule from "../interview-qa/mock-interview-scenarios/content.json";
+import modernDataToolsModule from "../courses/postgresql/modern-data-tools/content.json";
 import modernStateApplicationArchitectureModule from "../courses/react-advanced-patterns/modern-state-application-architecture/content.json";
 import modernWebSecurityIdentityModule from "../courses/fullstack-security/modern-web-security-identity/content.json";
 import movieTicketBookingModule from "../problems/lld/movie-ticket-booking/content.json";
@@ -372,6 +390,9 @@ import parkingLotSystemModule from "../problems/lld/parking-lot-system/content.j
 import paymentGatewayModule from "../problems/lld/payment-gateway/content.json";
 import paymentGatewayHldModule from "../problems/hld/payment-gateway-hld/content.json";
 import performanceObservabilityModule from "../courses/aspnet-core/performance-observability/content.json";
+import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
+import postgresqlModule from "../courses/postgresql/content.json";
+import prismaModule from "../courses/prisma/content.json";
 import productionApiDesignReliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
 import productionArchitectureReliabilityCostModule from "../courses/azure/production-architecture-reliability-cost/content.json";
 import productionDockerContainerSecurityModule from "../courses/devops/production-docker-container-security/content.json";
@@ -384,6 +405,7 @@ import programmingComputerWebFoundationsModule from "../courses/programming-comp
 import project1EnterpriseExpensePlatformModule from "../problems/full-stack-senior-projects/project-1-enterprise-expense-platform/content.json";
 import project2CollaborativeCommunicationPlatformModule from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/content.json";
 import project3ProductionIncidentSimulatorModule from "../problems/full-stack-senior-projects/project-3-production-incident-simulator/content.json";
+import queryingDataModule from "../courses/postgresql/querying-data/content.json";
 import rateLimiterModule from "../problems/hld/rate-limiter/content.json";
 import reactModule from "../cheatsheet/react/content.json";
 import reactAdvancedPatternsModule from "../courses/react-advanced-patterns/content.json";
@@ -407,9 +429,11 @@ import rideSharingHldModule from "../problems/hld/ride-sharing-hld/content.json"
 import routingModule from "../courses/yarn-npm-packages/routing/content.json";
 import runtimePerformanceModule from "../courses/frontend-performance-engineering/runtime-performance/content.json";
 import searchAutocompleteModule from "../problems/hld/search-autocomplete/content.json";
+import securityHardeningModule from "../courses/postgresql/security-hardening/content.json";
 import seniorCodeReviewLabProblemsModule from "../problems/senior-code-review-lab-problems/content.json";
 import seniorEngineeringJudgmentArchitectureDecisionsModule from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/content.json";
 import seniorSoftwareEngineeringModule from "../courses/senior-software-engineering/content.json";
+import setOperationsModule from "../courses/postgresql/set-operations/content.json";
 import slackMessagingModule from "../problems/lld/slack-messaging/content.json";
 import slackMessagingHldModule from "../problems/hld/slack-messaging-hld/content.json";
 import spotifyMusicModule from "../problems/lld/spotify-music/content.json";
@@ -419,6 +443,7 @@ import sqlServerModule from "../courses/sql-server/content.json";
 import sqlServerModule1 from "../cheatsheet/sql-server/content.json";
 import stateManagementModule from "../courses/next-js-full-stack-react/state-management/content.json";
 import stateManagementModule1 from "../courses/yarn-npm-packages/state-management/content.json";
+import storedProceduresFunctionsModule from "../courses/postgresql/stored-procedures-functions/content.json";
 import stylingModule from "../courses/yarn-npm-packages/styling/content.json";
 import systemDesignModule from "../problems/system-design/content.json";
 import systemDesignForSeniorsModule from "../courses/senior-software-engineering/system-design-for-seniors/content.json";
@@ -429,6 +454,8 @@ import testingModule from "../courses/yarn-npm-packages/testing/content.json";
 import testingStrategyForSeniorFrontendEngineersModule from "../courses/react-testing/testing-strategy-for-senior-frontend-engineers/content.json";
 import ticTacToeGameModule from "../problems/lld/tic-tac-toe-game/content.json";
 import ticketBookingHldModule from "../problems/hld/ticket-booking-hld/content.json";
+import transactionsErrorHandlingBackupModule from "../courses/postgresql/transactions-error-handling-backup/content.json";
+import triggersModule from "../courses/postgresql/triggers/content.json";
 import twitterSocialModule from "../problems/lld/twitter-social/content.json";
 import twitterSocialHldModule from "../problems/hld/twitter-social-hld/content.json";
 import typescriptModule from "../cheatsheet/typescript/content.json";
@@ -441,6 +468,7 @@ import utilitiesModule from "../courses/yarn-npm-packages/utilities/content.json
 import validationAuthorizationModule from "../courses/dotnet-nuget-packages/validation-authorization/content.json";
 import vendingMachineModule from "../problems/lld/vending-machine/content.json";
 import videoStreamingHldModule from "../problems/hld/video-streaming-hld/content.json";
+import viewsModule from "../courses/postgresql/views/content.json";
 import webCrawlerModule from "../problems/hld/web-crawler/content.json";
 import webNetworkingFundamentalsModule from "../courses/programming-computer-web-foundations/web-networking-fundamentals/content.json";
 import whatsappChatModule from "../problems/lld/whatsapp-chat/content.json";
@@ -474,6 +502,7 @@ const rawModulesPart1 = [
 	mod01MvcFundamentalsProblemsModule,
 	mod01NugetFundamentalsModule,
 	mod01OopFundamentalsModule,
+	mod01PrismaBasicsModule,
 	mod01QueryBasicsModule,
 	mod01ReduxFundamentalsModule,
 	mod01RenderPropsModule,
@@ -499,6 +528,7 @@ const rawModulesPart1 = [
 	mod02JwtAuthenticationModule,
 	mod02LinqFundamentalsSyntaxModule,
 	mod02MvcFundamentalsModule,
+	mod02PrismaSchemaDesignModule,
 	mod02QueriesMutationsModule,
 	mod02QueryHooksModule,
 	mod02QueryingDataModule,
@@ -530,6 +560,7 @@ const rawModulesPart1 = [
 	mod03MockingFakesModule,
 	mod03ModelBindingModule,
 	mod03MutationsModule,
+	mod03PrismaQueriesMutationsModule,
 	mod03QueriesMutationsModule,
 	mod03ReactReduxModule,
 	mod03ReactTestingLibraryModule,
@@ -562,6 +593,7 @@ const rawModulesPart1 = [
 	mod04OauthModule,
 	mod04OopModule,
 	mod04PolymorphismModule,
+	mod04PrismaRelationsModule,
 	mod04ReduxMiddlewareModule,
 	mod04ScenarioBasedModule,
 	mod04SetOperationsModule,
@@ -588,6 +620,7 @@ const rawModulesPart1 = [
 	mod05JoiningDataModule,
 	mod05LifecycleEffectsModule,
 	mod05Oauth2FlowsDeepDiveModule,
+	mod05PrismaMigrationsModule,
 	mod05RazorViewsModule,
 	mod05ReduxPatternsModule,
 	mod05SecureApiDesignModule,
@@ -618,6 +651,7 @@ const rawModulesPart1 = [
 	mod06OfflineSupportPersistenceModule,
 	mod06PerformanceModule,
 	mod06PerformancePatternsModule,
+	mod06PrismaAdvancedFeaturesModule,
 	mod06RapidFireModule,
 	mod06ReactPatternsModule,
 	mod06ReduxTestingModule,
@@ -640,6 +674,7 @@ const rawModulesPart1 = [
 	mod07MiddlewarePipelineModule,
 	mod07ModernCsharpModule,
 	mod07PrefetchingSsrModule,
+	mod07PrismaNextjsIntegrationModule,
 	mod07QueryingModule,
 	mod07ReactRouterModule,
 	mod07RecursionProblemsModule,
@@ -722,6 +757,7 @@ const rawModulesPart1 = [
 	advancedGitWorkflowsModule,
 	advancedPatternsModule,
 	advancedPatternsModule1,
+	advancedTopicsModule,
 	advancedTypeModelingRuntimeSafetyModule,
 	airbnbBookingModule,
 	airbnbBookingHldModule,
@@ -761,13 +797,17 @@ const rawModulesPart1 = [
 	cleanCodeCsharpModule,
 	cloudIntegrationModule,
 	concurrencyProductionDatabaseProblemsModule,
+	constraintsModule,
 	csharpModule,
 	csharpModule1,
 	csharpFundamentalsModule,
 	dataFetchingPatternsModule,
+	dataModificationDmlModule,
 	dataStructuresDeepDiveModule,
+	dataTypesModule,
 	databaseInfrastructureIncidentsModule,
 	databaseInternalsQueryOptimizationModule,
+	databaseSchemaTableObjectsModule,
 	designPatternsModule,
 	devopsModule,
 	devopsSystemDesignModule,
@@ -790,19 +830,24 @@ const rawModulesPart1 = [
 	fullStackApiDesignModule,
 	fullStackSeniorProjectsModule,
 	fullstackSecurityModule,
+	gettingStartedModule,
 	gitForSeniorEngineersModule,
 	gitLinuxDeveloperWorkflowModule,
 	googleDriveStorageModule,
 	googleSearchModule,
 	graphqlModule,
 	graphqlDotnetModule,
+	groupingAggregationSubqueriesModule,
+	highAvailabilityDrModule,
 	hldModule,
 	hotelManagementModule,
 	httpClientsModule,
 	httpClientsResilienceModule,
+	indexesModule,
 	instagramFeedModule,
 	instagramPhotoSharingModule,
 	javascriptModule,
+	joinsModule,
 	leadershipOwnershipModule,
 	libraryManagementModule,
 	linkedinProfessionalModule,
@@ -813,6 +858,7 @@ const rawModulesPart1 = [
 	lldModule,
 	loggingMonitoringModule,
 	mockInterviewScenariosModule,
+	modernDataToolsModule,
 	modernStateApplicationArchitectureModule,
 	modernWebSecurityIdentityModule,
 	movieTicketBookingModule,
@@ -825,6 +871,9 @@ const rawModulesPart1 = [
 	paymentGatewayModule,
 	paymentGatewayHldModule,
 	performanceObservabilityModule,
+	performanceTuningModule,
+	postgresqlModule,
+	prismaModule,
 	productionApiDesignReliabilityModule,
 	productionArchitectureReliabilityCostModule,
 	productionDockerContainerSecurityModule,
@@ -837,6 +886,7 @@ const rawModulesPart1 = [
 	project1EnterpriseExpensePlatformModule,
 	project2CollaborativeCommunicationPlatformModule,
 	project3ProductionIncidentSimulatorModule,
+	queryingDataModule,
 	rateLimiterModule,
 	reactModule,
 	reactAdvancedPatternsModule,
@@ -860,9 +910,11 @@ const rawModulesPart1 = [
 	routingModule,
 	runtimePerformanceModule,
 	searchAutocompleteModule,
+	securityHardeningModule,
 	seniorCodeReviewLabProblemsModule,
 	seniorEngineeringJudgmentArchitectureDecisionsModule,
 	seniorSoftwareEngineeringModule,
+	setOperationsModule,
 	slackMessagingModule,
 	slackMessagingHldModule,
 	spotifyMusicModule,
@@ -872,6 +924,7 @@ const rawModulesPart1 = [
 	sqlServerModule1,
 	stateManagementModule,
 	stateManagementModule1,
+	storedProceduresFunctionsModule,
 	stylingModule,
 	systemDesignModule,
 	systemDesignForSeniorsModule,
@@ -882,6 +935,8 @@ const rawModulesPart1 = [
 	testingStrategyForSeniorFrontendEngineersModule,
 	ticTacToeGameModule,
 	ticketBookingHldModule,
+	transactionsErrorHandlingBackupModule,
+	triggersModule,
 	twitterSocialModule,
 	twitterSocialHldModule,
 	typescriptModule,
@@ -894,6 +949,7 @@ const rawModulesPart1 = [
 	validationAuthorizationModule,
 	vendingMachineModule,
 	videoStreamingHldModule,
+	viewsModule,
 	webCrawlerModule,
 	webNetworkingFundamentalsModule,
 	whatsappChatModule,

@@ -1,0 +1,148 @@
+{
+  "id": "lesson-prisma-042",
+  "slug": "fullstack-postgresql-prisma-nextjs",
+  "moduleSlug": "prisma-nextjs-integration",
+  "courseSlug": "prisma",
+  "title": "Full-Stack PostgreSQL + Prisma + Next.js",
+  "description": "Build a complete full-stack flow using PostgreSQL, Prisma, Next.js Server Actions, Route Handlers, and authentication.",
+  "order": 10,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": [
+    "prisma",
+    "postgresql",
+    "nextjs",
+    "full-stack",
+    "server-actions",
+    "route-handlers"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson ties together everything you have learned. You will build a complete full-stack feature: a task management app using PostgreSQL, Prisma, Next.js Server Actions, Route Handlers, and session-based authentication."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Project Setup"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start by defining your Prisma schema with User, Task, and Project models. Use relations to connect users to tasks and projects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Prisma Schema",
+        "content": "Define the schema for a task management app.",
+        "code": "generator client {\n  provider = \"prisma-client-js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel User {\n  id        String    @id @default(cuid())\n  email     String    @unique\n  name      String?\n  tasks     Task[]\n  projects  Project[]\n}\n\nmodel Project {\n  id          Int     @id @default(autoincrement())\n  name        String\n  description String?\n  ownerId     String\n  owner       User    @relation(fields: [ownerId], references: [id])\n  tasks       Task[]\n  createdAt   DateTime @default(now())\n}\n\nmodel Task {\n  id          Int      @id @default(autoincrement())\n  title       String\n  completed   Boolean  @default(false)\n  assigneeId  String?\n  projectId   Int\n  assignee    User?    @relation(fields: [assigneeId], references: [id])\n  project     Project  @relation(fields: [projectId], references: [id])\n  createdAt   DateTime @default(now())\n}",
+        "language": "prisma"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server Actions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Create Server Actions for creating tasks, toggling completion, and deleting tasks. Each action uses Prisma to mutate the database."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server Actions",
+        "content": "Server Actions for task management.",
+        "code": "'use server';\n\nimport prisma from '@/lib/prisma';\nimport { auth } from '@/auth';\nimport { revalidateTag } from 'next/cache';\n\nexport async function createTask(formData: FormData) {\n  const session = await auth();\n  if (!session?.user) throw new Error('Unauthorized');\n\n  const title = formData.get('title') as string;\n  const projectId = parseInt(formData.get('projectId') as string);\n\n  const task = await prisma.task.create({\n    data: { title, projectId, assigneeId: session.user.id }\n  });\n\n  revalidateTag('tasks');\n  return task;\n}\n\nexport async function toggleTask(id: number) {\n  const task = await prisma.task.findUnique({ where: { id } });\n  if (!task) throw new Error('Task not found');\n\n  return prisma.task.update({\n    where: { id },\n    data: { completed: !task.completed }\n  });\n}\n\nexport async function deleteTask(id: number) {\n  await prisma.task.delete({ where: { id } });\n  revalidateTag('tasks');\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Route Handlers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Expose a REST API endpoint for tasks using Route Handlers. This allows external clients or server components to fetch and manipulate tasks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Route Handler",
+        "content": "API route for tasks.",
+        "code": "import prisma from '@/lib/prisma';\n\nexport async function GET(request: Request) {\n  const { searchParams } = new URL(request.url);\n  const projectId = parseInt(searchParams.get('projectId') || '0');\n\n  const tasks = await prisma.task.findMany({\n    where: { projectId },\n    include: { assignee: true },\n    orderBy: { createdAt: 'desc' }\n  });\n\n  return Response.json(tasks);\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Client Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use Server Actions in client components to create and manage tasks. Use the Route Handler to fetch the task list."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Client Component",
+        "content": "A client component that displays and manages tasks.",
+        "code": "'use client';\n\nimport { createTask, toggleTask, deleteTask } from '@/app/actions';\nimport useSWR from 'swr';\n\nconst fetcher = (url: string) => fetch(url).then(r => r.json());\n\nexport function TaskList({ projectId }: { projectId: number }) {\n  const { data: tasks, mutate } = useSWR(\n    `/api/tasks?projectId=${projectId}`,\n    fetcher\n  );\n\n  async function handleCreate(formData: FormData) {\n    await createTask(formData);\n    mutate();\n  }\n\n  return (\n    <div>\n      <form action={handleCreate}>\n        <input name=\"title\" required />\n        <input type=\"hidden\" name=\"projectId\" value={projectId} />\n        <button type=\"submit\">Add Task</button>\n      </form>\n      <ul>\n        {tasks?.map((task) => (\n          <li key={task.id}>\n            <input\n              type=\"checkbox\"\n              checked={task.completed}\n              onChange={() => toggleTask(task.id)}\n            />\n            <span>{task.title}</span>\n            <button onClick={() => deleteTask(task.id)}>Delete</button>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authentication Flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use Auth.js to authenticate users. The session is available in Server Actions and Route Handlers, allowing you to associate tasks with the correct user."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Prisma schema defines User, Project, and Task models with relations",
+          "Server Actions handle mutations (create, toggle, delete)",
+          "Route Handlers expose a REST API for fetching tasks",
+          "Client components use Server Actions and SWR for data fetching",
+          "Auth.js session ties tasks to authenticated users"
+        ],
+        "takeaway": "This full-stack flow demonstrates how PostgreSQL, Prisma, and Next.js work together to build a production-ready application."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "prisma-with-server-actions",
+    "prisma-route-handlers",
+    "prisma-with-authentication"
+  ],
+  "courseSlug": "prisma"
+}

@@ -28,6 +28,8 @@ import linqCourse from "./linq/content.json";
 import lldCourse from "../problems/lld/content.json";
 import nextJsFullStackReactCourse from "./next-js-full-stack-react/content.json";
 import oopsConceptsCourse from "./oops-concepts/content.json";
+import postgresqlCourse from "./postgresql/content.json";
+import prismaCourse from "./prisma/content.json";
 import productionIncidentLabProblemsCourse from "../problems/production-incident-lab-problems/content.json";
 import programmingComputerWebFoundationsCourse from "./programming-computer-web-foundations/content.json";
 import reactAdvancedPatternsCourse from "./react-advanced-patterns/content.json";
@@ -74,6 +76,8 @@ const rawCoursesPart1 = [
 	lldCourse,
 	nextJsFullStackReactCourse,
 	oopsConceptsCourse,
+	postgresqlCourse,
+	prismaCourse,
 	productionIncidentLabProblemsCourse,
 	programmingComputerWebFoundationsCourse,
 	reactAdvancedPatternsCourse,
