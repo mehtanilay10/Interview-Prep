@@ -70,6 +70,12 @@ yarn typecheck
 yarn lint
 ```
 
+### Content validation
+
+```bash
+yarn test:content
+```
+
 ---
 
 ## Project Structure
@@ -117,16 +123,9 @@ interview-prep/
 │   │   └── [technology]/
 │   │       └── page.tsx          # Individual cheat sheet
 │   ├── search/page.tsx           # Search page
-│   ├── roadmap/page.tsx          # Visual roadmap + module table
-│   ├── glossary/page.tsx         # Searchable glossary
-│   ├── tools/page.tsx            # Tool comparisons
-│   ├── plan/page.tsx             # 90-day learning plan
-│   ├── projects/page.tsx         # Mini projects
-│   ├── prompts/page.tsx          # Prompt library
-│   ├── safety/page.tsx           # Safety & responsible use
-│   ├── faq/page.tsx              # FAQ accordion
-│   ├── advanced/page.tsx         # Advanced concepts hub
-│   └── about/page.tsx            # Course overview
+│   └── internal/
+│       └── article-compare/
+│           └── page.tsx          # Internal side-by-side article comparison tool (noindex)
 │
 ├── components/
 │   ├── layout/
@@ -168,7 +167,6 @@ interview-prep/
 ├── content/                      # All course content (JSON/TypeScript files)
 │   ├── courses/                  # Structured courses
 │   ├── problems/                 # Coding problems (C#, SQL)
-│   ├── sql-problems/             # SQL problem sets
 │   ├── interview-qa/             # Interview Q&A by technology
 │   ├── cheatsheet/               # Cheat sheets by technology
 │   ├── modules/index.ts          # Module definitions
@@ -221,10 +219,9 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 ### Content areas
 
 | Area | Path | Purpose |
-|---|---|---|
+|---|---|
 | Courses | `content/courses/` | Structured learning modules |
 | Problems | `content/problems/` | Coding problems with multiple solutions |
-| SQL Problems | `content/sql-problems/` | SQL problem sets |
 | Interview Q&A | `content/interview-qa/` | Technology-grouped interview questions |
 | Cheat sheets | `content/cheatsheet/` | Quick-reference code examples |
 
@@ -269,7 +266,7 @@ Lessons are composed of typed `ContentBlock[]`. Available block types:
 | `mermaid` | Mermaid diagram definitions |
 | `comparison-cards` | Side-by-side comparison cards |
 | `summary-box` | Summary with bullet points |
-| `faq-block` | Inline FAQ items |
+| `faq-block` | Inline FAQ items; use `items` with `question`/`answer` objects |
 | `divider` | Horizontal rule |
 
 ---

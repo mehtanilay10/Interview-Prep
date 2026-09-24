@@ -13,7 +13,6 @@ Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching
 - Coding problems with multiple solutions (`content/problems/`)
 - Interview Q&A organized by technology (`content/interview-qa/`)
 - Cheat sheets for quick reference (`content/cheatsheet/`)
-- SQL problem sets (`content/sql-problems/`)
 - User authentication via **NextAuth v5** with **Google OAuth**
 - Per-user progress and bookmarks stored in **Neon PostgreSQL**
 
@@ -76,10 +75,6 @@ content/
       [moduleSlug]/
         content.json        # Module metadata + lessonSlugs[]
         [lessonSlug].json   # Problem lesson
-  sql-problems/             # SQL problem sets (courseSlug: "sql-problems")
-    [moduleSlug]/
-      content.json
-      [lessonSlug].json
   interview-qa/             # Interview questions (not a course)
     content.json            # "Course" metadata (isInterview: true)
     [moduleSlug]/
@@ -121,15 +116,12 @@ by topic (arrays, strings, recursion, bitwise, etc.). Problem lessons carry `dif
 and `estimatedMinutes` and typically include multiple solution approaches using
 `example` blocks. They are served at `/problems/[courseSlug]/[moduleSlug]/[lessonSlug]`.
 
-**SQL problem sets** live under `content/sql-problems/` with `courseSlug: "sql-problems"`.
-
 **Cheat sheets** live under `content/cheatsheet/` and reuse the course/module/lesson model
 with `courseSlug: "cheatsheet"`. Each technology is one module whose lesson file is named
 `cheatsheet.json` (the lesson `slug` is `"cheatsheet"`). Cheat-sheet modules and their
 single lesson are registered in `content/modules/index.ts` and `content/lessons/index.ts`
 (`csModule1..csModule10` / `csLesson1..csLesson10`). They are served at `/cheatsheet` and
-`/cheatsheet/[technology]`. Run `node scripts/fix-cheatsheet-examples.js` to repair duplicate
-code/content in example blocks and ensure language tags are present.
+`/cheatsheet/[technology]`.
 
 **Interview questions** live under `content/interview-qa/` (moved out of `content/courses/`
 so they are treated as a separate section, not a course). Their lesson JSON carries a
@@ -164,6 +156,8 @@ See `types/index.ts` for the full list. Current types:
 - `mermaid`, `comparison-cards`, `summary-box`, `faq-block`
 - `divider`, `image`
 
+`faq-block` data should use `items: { question: string; answer: string }[]`. Legacy content may use `faqs`; the renderer and article-compare validator normalize this automatically.
+
 ---
 
 ## Routes
@@ -187,14 +181,19 @@ See `types/index.ts` for the full list. Current types:
 - `/search` — Search page
 - `/internal/article-compare` — Internal side-by-side article comparison tool (noindex)
 
----
-
 ## Navigation and indexing
 
 Whenever you add a new top-level page:
 1. Add it to `NAV_LINKS` in `components/layout/Navbar.tsx`
 2. Add it to `FOOTER_LINKS` in `components/layout/Footer.tsx`
 3. Add it to `app/sitemap.ts` in the static routes array
+
+## Module ordering
+
+Module order within a course is determined by the `order` field in each module's `content.json`.
+- Always set explicit numeric `order` values when creating or reorganizing modules.
+- `getModulesByCourse()` and `getLessonsForCourse()` sort by `module.order`, so missing or `null` values produce unstable ordering.
+- The PostgreSQL course was recently reordered using explicit `order` values 1-19.
 
 ## Authentication and user data
 
@@ -245,8 +244,7 @@ Whenever you add a new top-level page:
 
 ### Cheatsheet example blocks
 Cheatsheet `example` blocks are code-only: store the snippet in the `code` field, always include
-a correct `language` tag, and avoid duplicate content. Run `node scripts/fix-cheatsheet-examples.js`
-to repair duplicate code/content in example blocks and ensure language tags are present.
+a correct `language` tag, and avoid duplicate content.
 
 ---
 
@@ -282,9 +280,9 @@ Utility scripts in `scripts/` help keep content consistent:
 - `yarn db:studio` — opens Prisma Studio
 - `yarn db:migrate` — creates/applies Prisma migrations during development
 - `yarn vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
-- `node scripts/fix-cheatsheet-examples.js` — repairs duplicate code/content in cheatsheet `example` blocks and ensures language tags are present
-- `node scripts/audit-cheatsheets.js` — audits cheatsheets for example-block correctness
-- `node scripts/fix-content.js`, `fix-indices.js`, `fix-content-recalc.js`, `fix-module-slugs.js`, `fix-lesson-module-slugs.js`, `fix-course-slugs.js`, `fix-callout-variants.js` — repair content slugs, indices, and callout variants
+- `yarn generate:content` — regenerates `content/courses/index.ts`, `content/modules/index.ts`, and `content/lessons/index.ts`
+- `yarn test:content` — runs content validation tests
+- `node scripts/vercel-build.js` — Vercel build entrypoint
 
 ---
 
