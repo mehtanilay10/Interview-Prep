@@ -4,14 +4,16 @@
   "moduleSlug": "whatsapp-chat-hld",
   "courseSlug": "hld-problems",
   "title": "WhatsApp Chat System: Complete Architecture",
-  "description": "Design a WhatsApp-like instant messaging system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a WhatsApp-scale instant messaging system with WebSockets, E2EE, offline queuing, and media delivery.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "whatsappchathld"
+    "messaging",
+    "websockets",
+    "real-time"
   ],
   "blocks": [
     {
@@ -24,7 +26,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a WhatsApp-scale instant messaging system supporting billions of users exchanging text, photos, videos, and voice messages. The system must guarantee message delivery, show online presence and typing indicators, support group chats up to 256 participants, and operate reliably across poor network conditions with offline message queueing."
+        "text": "Design a WhatsApp-scale instant messaging system supporting 2 billion users exchanging 100 billion messages per day. The system must guarantee message delivery with receipts (sent ✓, delivered ✓✓, read ✓✓ blue), show real-time presence and typing indicators, support group chats up to 1024 participants, deliver media files (photos, videos, voice notes), enable end-to-end encryption, and operate reliably across poor network conditions with offline queuing."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "WebSocket",
+            "definition": "Persistent full-duplex TCP connection enabling server-push without polling overhead."
+          },
+          {
+            "term": "XMPP / MQTT",
+            "definition": "Lightweight messaging protocols; MQTT is preferred for mobile due to minimal overhead on unreliable networks."
+          },
+          {
+            "term": "Fan-out",
+            "definition": "Process of delivering one message to multiple recipients (e.g., broadcasting to a group chat of 1024)."
+          },
+          {
+            "term": "Signal Protocol",
+            "definition": "End-to-end encryption protocol using Double Ratchet Algorithm for perfect forward secrecy."
+          },
+          {
+            "term": "Presence Service",
+            "definition": "Component tracking online/offline/typing status, broadcasting changes to relevant users."
+          }
+        ]
       }
     },
     {
@@ -39,16 +68,15 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Send and receive 1:1 text messages with delivery receipts (sent, delivered, read)",
-          "Share media messages (photos, videos, voice notes) with compression and thumbnails",
-          "Real-time presence indicators: online, offline, last seen, typing... status",
-          "Group chat support with participant management and admin controls",
-          "End-to-end encryption (E2EE) for message content using Signal Protocol",
-          "Push notifications via FCM/APNS when app is backgrounded",
-          "Offline message queue: store messages locally and sync when reconnected",
-          "Message search across chat history with full-text indexing",
-          "Status updates (stories) that disappear after 24 hours",
-          "Blocked user lists and message deletion for everyone"
+          "Send 1:1 and group text messages with delivery receipts (sent, delivered, read)",
+          "Share media (photos, videos up to 2GB, voice notes, documents) with thumbnails",
+          "Real-time presence: online, offline with last-seen timestamp, typing indicator",
+          "Group chats up to 1024 participants with admin controls and invite links",
+          "End-to-end encryption using Signal Protocol (server sees only ciphertext)",
+          "Push notifications (FCM / APNs) when app is backgrounded",
+          "Offline message queue: store pending messages and sync on reconnect",
+          "Status updates (stories) expiring after 24 hours",
+          "Voice and video calls (WebRTC, separate from message path)"
         ]
       }
     },
@@ -57,14 +85,13 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-100ms P95 message delivery between online users",
-          "99.99% availability with graceful degradation under network partition",
-          "Store-and-forward architecture for offline users with 30-day retention",
-          "End-to-end encryption without server access to plaintext messages",
-          "Presence heartbeat every 30 seconds with stale detection after 2 minutes",
-          "Horizontal scaling to 2+ billion monthly active users",
-          "Message ordering guarantees within a chat thread",
-          "Media upload/download with resume support for large files"
+          "100 billion messages/day (~1.16 million messages/second)",
+          "Message delivery latency: <100ms P95 for online users",
+          "99.99% message delivery guarantee (at-least-once with deduplication)",
+          "2 billion registered users; 500 million daily active users",
+          "Media storage: petabytes scale, deduplicated by content hash",
+          "Horizontal scaling; no single point of failure",
+          "Multi-region active-active with geo-partitioned user data"
         ]
       }
     },
@@ -72,210 +99,137 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Build a monolithic SignalR hub in ASP.NET Core with SQL Server persistence. Use SQL Server for users, messages, and presence tables. SignalR manages real-time connections and push notifications. This validates the message delivery flow, presence logic, and media upload pipeline."
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-whatsappchatsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for WhatsApp Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MessageService[Message Service]\n        MS_PresenceService[Presence Service]\n        MS_NotificationService[Notification Service]\n        MS_DeliveryService[Delivery Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MessageService\n        MS_MessageService --> MS_DB\n        MS_MessageService --> MS_Queue\n        MS_MessageService --> MS_Cache\n        MS_LB --> MS_PresenceService\n        MS_PresenceService --> MS_DB\n        MS_PresenceService --> MS_Queue\n        MS_PresenceService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_DeliveryService\n        MS_DeliveryService --> MS_DB\n        MS_DeliveryService --> MS_Queue\n        MS_DeliveryService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Monolith Tech Stack",
-        "language": "text",
-        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - SignalR Hub for real-time messaging\n  - Minimal API for REST endpoints\n  - Entity Framework Core with SQL Server\n  - Azure SQL Database for messages, users, presence\n  - Azure Blob Storage for media (photos, voice notes)\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service with WebSockets enabled\n  - Azure Redis Cache for presence and online user lists\n  - Azure Service Bus for offline notification queue\n  - Single database with tables: Users, Contacts, Messages, Media, Presence, Groups"
+        "id": "hld-whatsapp-arch",
+        "caption": "WhatsApp system architecture: WebSocket connection servers, message router, fan-out service, offline queue, media pipeline, and presence service",
+        "definition": "flowchart TD\n    subgraph Clients[\"📱 Client Applications\"]\n        iOS[\"🍎 iOS App\\nSignal Protocol\\nLocal SQLite DB\"]\n        Android[\"🤖 Android App\\nSignal Protocol\\nLocal Room DB\"]\n        Web[\"🌐 WhatsApp Web\\nWebSocket Bridge\"]\n    end\n\n    subgraph Gateway[\"🔀 Connection Gateway\"]\n        WSRouter[\"WebSocket Router\\nSticky Load Balancing\\n(IP Hash)\"]\n        ConnServer1[\"Connection Server 1\\n~1M concurrent\\nconnections/node\"]\n        ConnServer2[\"Connection Server 2\\n~1M concurrent\\nconnections/node\"]\n        ConnServerN[\"Connection Server N\\n(auto-scaled)\"]\n        SessionStore[\"📋 Session Registry\\nRedis\\nuserId → serverNode\"]\n    end\n\n    subgraph MessagePath[\"✉️ Message Processing\"]\n        MessageRouter[\"Message Router\\nRoute to recipient's\\nconnection server\"]\n        FanoutService[\"📡 Fan-out Service\\nGroup message\\ndelivery (1024 members)\"]\n        DedupService[\"🔁 Dedup Service\\nIdempotency key\\nchecking\"]\n        MessageQueue[\"📨 Message Queue\\nKafka\\nmessage-delivery topic\"]\n    end\n\n    subgraph Storage[\"🗄️ Storage\"]\n        MessageDB[(\"💬 Message Store\\nCassandra Cluster\\nPartitioned by\\nconversation_id\"]\n        OfflineQueue[(\"📬 Offline Queue\\nRabbitMQ /\\nSQS FIFO\\nper-user queues\")]\n        UserDB[(\"👤 User DB\\nPostgreSQL\\nprofiles, contacts,\\ngroup metadata\")]\n        GroupDB[(\"👥 Group DB\\nCassandra\\nmember lists,\\ngroup settings\")]\n    end\n\n    subgraph MediaPipeline[\"📸 Media Pipeline\"]\n        MediaUpload[\"Upload Service\\nChunked upload\\nresumable\"]\n        Transcoder[\"Transcoder\\nThumbnail gen\\nVideo compression\"]\n        MediaStore[\"🗃️ Object Store\\nS3 / Azure Blob\\nContent-addressed\\n(SHA-256 dedup)\"]\n        MediaCDN[\"🌍 Media CDN\\nEdge delivery\"]\n    end\n\n    subgraph PresenceService[\"🟢 Presence Service\"]\n        PresenceAPI[\"Presence API\\nHeartbeat every 30s\"]\n        PresenceStore[\"Redis Pub/Sub\\nonline status\\n+ typing events\"]\n        NotifService[\"🔔 Notification Service\\nFCM / APNs\\npush delivery\"]\n    end\n\n    subgraph Encryption[\"🔐 E2E Encryption\"]\n        KeyServer[\"Key Distribution\\nServer\\nPublic keys only\\n(no private keys)\"]\n        SignalProto[\"Signal Protocol\\nDouble Ratchet\\nPFS per message\"]\n    end\n\n    iOS & Android & Web -->|WebSocket / TLS| WSRouter\n    WSRouter --> ConnServer1 & ConnServer2 & ConnServerN\n    ConnServer1 & ConnServer2 & ConnServerN --> SessionStore\n    ConnServer1 -->|Send message| MessageRouter\n    MessageRouter --> DedupService\n    DedupService --> MessageQueue\n    MessageQueue --> FanoutService\n    FanoutService -->|Recipient online?| SessionStore\n    FanoutService -->|Online: push via WS| ConnServer2\n    FanoutService -->|Offline: queue| OfflineQueue\n    FanoutService -->|Persist| MessageDB\n    OfflineQueue -->|Reconnect sync| ConnServerN\n    FanoutService -->|App backgrounded| NotifService\n    NotifService -->|FCM / APNs| iOS & Android\n    MediaUpload --> Transcoder --> MediaStore --> MediaCDN\n    iOS & Android -->|Media download| MediaCDN\n    ConnServer1 & ConnServer2 -->|Key lookup| KeyServer\n    PresenceAPI --> PresenceStore\n    PresenceStore -->|Broadcast to subscribers| ConnServer1 & ConnServer2"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "At billions of messages per day, split by domain. The Message Service handles chat history and E2EE key management, Presence Service tracks online status with heartbeats, Notification Service manages push and in-app alerts, Delivery Service tracks read receipts, and User Service manages contacts and blocking."
+        "text": "Message Delivery Flow"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-whatsappchatsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for WhatsApp Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MessageService[Message Service]\n        MS_PresenceService[Presence Service]\n        MS_NotificationService[Notification Service]\n        MS_DeliveryService[Delivery Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MessageService\n        MS_MessageService --> MS_DB\n        MS_MessageService --> MS_Queue\n        MS_MessageService --> MS_Cache\n        MS_LB --> MS_PresenceService\n        MS_PresenceService --> MS_DB\n        MS_PresenceService --> MS_Queue\n        MS_PresenceService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_DeliveryService\n        MS_DeliveryService --> MS_DB\n        MS_DeliveryService --> MS_Queue\n        MS_DeliveryService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-whatsapp-sequence",
+        "caption": "Message delivery sequence: sender → connection server → message router → fan-out → recipient (online) or offline queue → push notification",
+        "definition": "sequenceDiagram\n    autonumber\n    participant Alice as 📱 Alice (Sender)\n    participant CS_A as 🖥️ Conn Server A\n    participant Router as 📨 Message Router\n    participant Fanout as 📡 Fan-out\n    participant Kafka as 📬 Kafka\n    participant Session as 📋 Session Registry\n    participant CS_B as 🖥️ Conn Server B\n    participant Bob as 📱 Bob (Recipient)\n    participant Queue as 📬 Offline Queue\n    participant FCM as 🔔 FCM/APNs\n\n    Alice->>CS_A: Send Message (E2E encrypted payload)\n    CS_A->>Router: Route message (idempotency_key)\n    Router->>Kafka: Publish message event\n    Kafka->>Fanout: Consume event\n    Fanout->>Session: Lookup Bob's connection server\n    alt Bob is Online\n        Session-->>Fanout: CS_B (Bob connected)\n        Fanout->>CS_B: Push message to Bob's WS\n        CS_B->>Bob: Deliver message (✓✓ delivered)\n        Bob->>CS_B: Send read receipt\n        CS_B->>CS_A: Forward read receipt\n        CS_A->>Alice: ✓✓ blue (read)\n    else Bob is Offline\n        Session-->>Fanout: Not connected\n        Fanout->>Queue: Enqueue for Bob\n        Fanout->>FCM: Trigger push notification\n        FCM->>Bob: Push notification\n        Bob->>CS_B: Reconnect, request pending messages\n        CS_B->>Queue: Drain Bob's queue\n        Queue-->>CS_B: Deliver queued messages\n        CS_B->>Bob: Deliver messages (✓✓ delivered)\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Message Service: Stores and retrieves chat history per conversation with encryption metadata, handles E2EE key pre-key bundles, and emits message events to queue for delivery.",
-          "Presence Service: Tracks online/offline status via heartbeat WebSocket connections, computes last-seen timestamps, broadcasts typing indicators to active chat participants using pub/sub.",
-          "Notification Service: Sends push notifications via FCM/APNS for background messages, manages in-app notification badges, and handles silent data messages for background sync.",
-          "Delivery Service: Tracks sent/delivered/read states per message, computes unread counts, and emits read receipt events to sender devices via SignalR.",
-          "User Service: Manages contacts, profile photos, blocked users, group memberships, and phone number verification via OTP."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "React App Structure",
-        "language": "text",
-        "code": "src/\n  features/\n    Chat/\n      components/\n        MessageBubble.tsx       # Text, image, voice bubbles\n        ChatInput.tsx           # Text input + media picker\n        TypingIndicator.tsx     # Animated typing dots\n        ReadReceipt.tsx         # Single/double check marks\n        PresenceBadge.tsx       # Online/offline/last-seen\n        ChatList.tsx            # Recent conversations\n        MessageSearch.tsx        # Full-text search UI\n      hooks/\n        useSignalR.ts           # WebSocket connection mgmt\n        usePresence.ts          # Online status polling\n        useMediaUpload.ts       # Photo/video compression\n        useE2EE.ts              # Signal Protocol wrapper\n      store/\n        chatSlice.ts            # Active chat, drafts, scroll\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - SignalR client with auto-reconnect and offline queue\n  - IndexedDB for local message persistence when offline\n  - Media compression before upload (Sharp in worker)\n  - Optimistic UI for sent messages with rollback on failure\n  - Service Worker for push notification handling"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Message Service with SignalR and E2EE\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<ChatDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"WhatsAppChatDb\"\n    )\n);\nbuilder.Services.AddSignalR();\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingAzureServiceBus((context, cfg) => {\n        cfg.Host(builder.Configuration[\"Azure:ServiceBus:ConnectionString\"]);\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapHub<ChatHub>(\"/chat\");\napp.MapPost(\"/api/messages\", async.SendMessage);\napp.MapGet(\"/api/messages/{chatId}\", async.GetMessages);\napp.MapPost(\"/api/presence\", async.UpdatePresence);\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Real-Time Messaging",
-            "description": "WebSocket hub for message delivery and presence",
-            "tags": [
-              "Azure SignalR Service",
-              "AWS AppSync (GraphQL Subscriptions)"
-            ],
-            "pros": [
-              "Auto-scales connections",
-              "Backplane for multi-instance"
-            ],
-            "cons": [
-              "Vendor lock-in on protocol",
-              "Debugging connection issues hard"
-            ]
-          },
-          {
-            "title": "Push Notifications",
-            "description": "FCM/APNS integration for background alerts",
-            "tags": [
-              "Azure Notification Hubs",
-              "Amazon SNS"
-            ],
-            "pros": [
-              "Template-based per platform",
-              "Tag-based targeting"
-            ],
-            "cons": [
-              "Limited customization per platform",
-              "Costs scale with notifications"
-            ]
-          },
-          {
-            "title": "Media Storage",
-            "description": "Store encrypted photos, videos, and voice notes",
-            "tags": [
-              "Azure Blob Storage + CDN",
-              "Amazon S3 + CloudFront"
-            ],
-            "pros": [
-              "Unlimited scale",
-              "Integrated CDN"
-            ],
-            "cons": [
-              "Egress costs at scale",
-              "Cache invalidation complexity"
-            ]
-          },
-          {
-            "title": "Offline Queue",
-            "description": "Store undelivered messages for offline users",
-            "tags": [
-              "Azure Service Bus Topics",
-              "Amazon SQS + DynamoDB"
-            ],
-            "pros": [
-              "At-least-once guarantees",
-              "Dead-letter queues"
-            ],
-            "cons": [
-              "Message size limits",
-              "Ordering requires extra setup"
-            ]
-          }
-        ]
+        "level": 2,
+        "text": "Group Chat Fan-out at Scale"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "variant": "warning",
+        "title": "Group Fan-out Challenge",
+        "text": "A group with 1024 members receiving 1 message requires delivering to up to 1024 different connection servers. At 1M messages/day in a large group, this is 1 billion individual deliveries. WhatsApp solves this with a two-tier fan-out: immediate push to online members, batch delivery to offline members via a single queue drain on reconnect."
       }
     },
     {
-      "type": "heading",
+      "type": "table",
       "data": {
-        "level": 2,
-        "text": "Key Takeaways"
+        "headers": [
+          "Approach",
+          "Latency",
+          "Complexity",
+          "Best For"
+        ],
+        "rows": [
+          [
+            "Push fan-out (1:N writes)",
+            "Low (instant)",
+            "High at scale",
+            "Small groups (<100 members)"
+          ],
+          [
+            "Pull on reconnect",
+            "Medium (reconnect lag)",
+            "Low",
+            "Offline users in large groups"
+          ],
+          [
+            "Hybrid (push online, pull offline)",
+            "Low for online",
+            "Medium",
+            "WhatsApp/Slack approach"
+          ],
+          [
+            "Message timeline per user",
+            "Low",
+            "High storage",
+            "Twitter/Instagram-style feeds"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How does end-to-end encryption work without server seeing messages?",
+            "answer": "Signal Protocol uses Curve25519 for key exchange and AES-256-GCM for encryption. Each session has independent keys via the Double Ratchet Algorithm. The server stores only public keys and encrypted ciphertext — it cannot decrypt messages even with a court order."
+          },
+          {
+            "question": "How do you guarantee exactly-once delivery while at scale?",
+            "answer": "WhatsApp uses at-least-once delivery with client-side deduplication. Each message carries a UUID idempotency key. The client checks its local DB before displaying, silently dropping duplicates. This is simpler and more reliable than exactly-once at the broker level."
+          },
+          {
+            "question": "How is presence (online/offline) handled at 2B users?",
+            "answer": "Clients send heartbeats every 30 seconds over the persistent WebSocket. Connection servers update a Redis TTL key. When the TTL expires (60s), the user is marked offline. Presence broadcasts are limited to mutual contacts using a subscription model to avoid fan-out storms."
+          },
+          {
+            "question": "How to handle media deduplication across billions of files?",
+            "answer": "SHA-256 hash the media client-side before upload. If the hash already exists in the object store, skip the upload entirely (content-addressed storage). This drastically reduces storage — viral media (memes, videos) shared by millions is stored only once."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Chat systems are write-heavy and real-time - optimize for delivery, not queries",
-          "Separate presence (volatile, Redis) from message history (durable, Cosmos/DynamoDB)",
-          "E2EE means the server cannot read messages - design for key management carefully",
-          "Offline queueing is mandatory: store-and-forward with conflict-free resolution",
-          "Use WebSocket/SignalR for online users and push notifications for background"
+          "Persistent WebSocket connections per user eliminate polling overhead at scale",
+          "Session registry (Redis) maps userId → connection server enabling cross-server delivery",
+          "Separate offline queue ensures at-least-once delivery even through network outages",
+          "E2E encryption means the server stores only ciphertext; key exchange uses public key cryptography only",
+          "Media deduplication via content hashing saves petabytes of storage for viral content"
         ],
-        "takeaway": "WhatsApp is a real-time distributed system with strict consistency needs for messages and eventual consistency for presence. Separate the hot presence path from durable message history, and always design for intermittent connectivity."
+        "takeaway": "WhatsApp's architecture is fundamentally about maintaining billion concurrent connections efficiently, routing messages to the right connection server in milliseconds, and guaranteeing delivery through robust offline queuing and push notifications."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "chat-system-hld",
+    "slack-messaging-hld",
+    "notification-system"
+  ],
+  "furtherReading": [
+    {
+      "title": "WhatsApp Architecture at Scale",
+      "url": "https://highscalability.com/blog/2014/2/26/the-whatsapp-architecture-facebook-bought-for-19-billion.html",
+      "type": "article"
+    },
+    {
+      "title": "Signal Protocol Documentation",
+      "url": "https://signal.org/docs/",
+      "type": "article"
+    }
+  ]
 }

@@ -572,6 +572,15 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
         },
       } as ContentBlock;
     }
+    if (block.type === 'faq-block' && (block.data as any).faqs && !(block.data as any).items) {
+      return {
+        ...block,
+        data: {
+          title: block.data.title,
+          items: (block.data as any).faqs as { question: string; answer: string }[],
+        },
+      } as ContentBlock;
+    }
     return block;
   }
 

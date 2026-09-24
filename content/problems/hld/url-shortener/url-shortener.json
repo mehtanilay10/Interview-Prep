@@ -4,14 +4,16 @@
   "moduleSlug": "url-shortener",
   "courseSlug": "hld-problems",
   "title": "URL Shortener: Complete Architecture",
-  "description": "Design a scalable URL shortener like bit.ly with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a scalable URL shortener like bit.ly with caching, analytics, and global distribution.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "urlshortener"
+    "url-shortener",
+    "caching",
+    "base62"
   ],
   "blocks": [
     {
@@ -24,7 +26,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a URL shortening service similar to bit.ly or tinyurl.com. Users paste long URLs and receive short, shareable links. The system must handle billions of redirects per month while maintaining sub-50ms response times. Consider custom aliases, analytics, expiration policies, and high availability across geographic regions."
+        "text": "Design a URL shortening service similar to bit.ly or TinyURL. Users paste long URLs and receive short, shareable links (e.g., https://bit.ly/3xK9mP). The system must handle 500 million redirects per day, ensure sub-50ms P99 redirect latency at the edge, support custom aliases, analytics tracking per click, link expiration, and be available in multiple geographic regions with 99.99% uptime."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Base62 Encoding",
+            "definition": "Encoding scheme using [A-Z, a-z, 0-9] to generate compact short codes (6 chars = 56 billion possibilities)."
+          },
+          {
+            "term": "Cache-Aside Pattern",
+            "definition": "Application checks cache first; on miss, loads from DB and populates cache for future reads."
+          },
+          {
+            "term": "CDN Edge Cache",
+            "definition": "Redirect responses cached at geographically distributed edge nodes to serve users with minimal latency."
+          },
+          {
+            "term": "Consistent Hashing",
+            "definition": "Distribution strategy that minimises key remapping when nodes are added or removed."
+          },
+          {
+            "term": "Write-Behind Cache",
+            "definition": "Analytics writes buffered in Redis, flushed asynchronously to the database to avoid write amplification."
+          }
+        ]
       }
     },
     {
@@ -39,14 +68,14 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Shorten long URLs to 6-8 character Base62 encoded short links",
-          "Support custom aliases (e.g., /my-brand) with availability validation",
-          "Redirect short URLs to original long URLs with HTTP 301/302 status",
-          "Track analytics: click count, referrer, geographic location, device type, timestamp",
-          "Set expiration dates (TTL) or make links permanent",
-          "Generate QR codes for short URLs",
-          "Bulk create short links via CSV upload for enterprise users",
-          "Preview destination page before redirect with safety warnings"
+          "Shorten any valid URL to a 6-character Base62 code (e.g., https://sho.rt/aB3xKz)",
+          "Support custom vanity aliases (e.g., /product-launch) with uniqueness validation",
+          "Redirect short URL → original URL with HTTP 301 (permanent) or 302 (trackable)",
+          "Track analytics: click count, referrer, user-agent, country, timestamp per click",
+          "Set optional expiration (TTL) on links; expired links return 410 Gone",
+          "Bulk URL creation via CSV upload for enterprise tier",
+          "QR code generation for each short link",
+          "Rate limiting: 100 creates/hour for free tier, unlimited for paid"
         ]
       }
     },
@@ -55,14 +84,14 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-50ms P99 redirect latency from edge cache",
-          "99.99% availability for redirect endpoints",
-          "10 million+ URLs shortened per day with horizontal scaling",
-          "Geo-distributed redirects served from nearest edge location",
-          "Immutable append-only analytics logs with 7-year retention",
-          "Rate limiting per user/IP to prevent abuse",
-          "At-least-once delivery for analytics events",
-          "Disaster recovery with cross-region database replication"
+          "500 million redirects/day (~5,800 req/s avg, ~50,000 req/s peak)",
+          "Sub-50ms P99 redirect latency from CDN edge cache",
+          "99.99% availability for redirect endpoints (≤52 min downtime/year)",
+          "Write path: 10 million new URLs/day (~115 creates/s)",
+          "Analytics: at-least-once delivery, eventual consistency acceptable (lag ≤30s)",
+          "Storage: ~500 bytes/URL × 10M/day × 365 days × 5 years ≈ 9 TB",
+          "Horizontal scaling with no single point of failure",
+          "Cross-region active-active replication for global low latency"
         ]
       }
     },
@@ -70,176 +99,160 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core API where shortening, redirect, analytics, and user management share a single database. This validates the Base62 encoding algorithm, collision detection, and basic redirect flow before introducing distributed complexity."
+        "text": "The system separates the high-throughput read path (redirects) from the low-throughput write path (URL creation) and the async analytics pipeline. CDN edge caching absorbs the majority of redirect traffic before it ever reaches origin servers."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-urlshortenercompletearchitecture-combined",
-        "caption": "Combined architecture diagram for URL Shortener: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_URLEncodingService[URL Encoding Service]\n        MS_CacheService[Cache Service]\n        MS_DatabaseService[Database Service]\n        MS_AnalyticsService[Analytics Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_URLEncodingService\n        MS_URLEncodingService --> MS_DB\n        MS_URLEncodingService --> MS_Queue\n        MS_URLEncodingService --> MS_Cache\n        MS_LB --> MS_CacheService\n        MS_CacheService --> MS_DB\n        MS_CacheService --> MS_Queue\n        MS_CacheService --> MS_Cache\n        MS_LB --> MS_DatabaseService\n        MS_DatabaseService --> MS_DB\n        MS_DatabaseService --> MS_Queue\n        MS_DatabaseService --> MS_Cache\n        MS_LB --> MS_AnalyticsService\n        MS_AnalyticsService --> MS_DB\n        MS_AnalyticsService --> MS_Queue\n        MS_AnalyticsService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Monolith Tech Stack",
-        "language": "text",
-        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - Minimal API with clean architecture\n  - Entity Framework Core for data access\n  - Azure SQL Database for relational data (users, urls table)\n  - Base62 encoding with collision retry logic\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service for hosting\n  - Azure Blob Storage for QR code assets\n  - Azure Monitor for logging\n  - Single database with tables: Users, ShortUrls, Analytics, CustomAliases"
+        "id": "hld-url-shortener-arch",
+        "caption": "Complete URL Shortener architecture: client → CDN edge → load balancer → microservices → caches → DB → async analytics pipeline",
+        "definition": "flowchart TD\n    subgraph Clients[\"👤 Client Layer\"]\n        Browser[\"🌐 Browser\"]\n        MobileApp[\"📱 Mobile App\"]\n        APIClient[\"🔧 API Client / SDK\"]\n    end\n\n    subgraph CDN[\"🌍 CDN — CloudFront / Azure CDN\"]\n        EdgeNode1[\"📍 Edge Node\\nUS-East\"]\n        EdgeNode2[\"📍 Edge Node\\nEU-West\"]\n        EdgeNode3[\"📍 Edge Node\\nAP-South\"]\n    end\n\n    subgraph Gateway[\"⚖️ API Gateway + Load Balancer\"]\n        ALB[\"ALB / NGINX\\nSSL Termination\\nRate Limiting\"]\n        RateLimiter[\"🚦 Rate Limiter\\n(Token Bucket)\\nRedis-backed\"]\n    end\n\n    subgraph WriteCluster[\"✏️ Write Path — URL Encoding Service\"]\n        WriteAPI[\"Write API\\nASP.NET Core\\n(2 replicas)\"]\n        IDGen[\"🔢 ID Generator\\nSnowflake / Zookeeper\\nDistributed Counter\"]\n        Base62[\"Base62 Encoder\\n62^6 = 56B codes\"]\n        AliasCheck[\"Alias Validator\\nBloom Filter +\\nDB uniqueness check\"]\n    end\n\n    subgraph ReadCluster[\"⚡ Read Path — Redirect Service\"]\n        RedirectAPI[\"Redirect API\\nASP.NET Core\\n(10 replicas, auto-scale)\"]\n        L1Cache[\"L1 Cache\\nIn-Process\\n10k hot URLs\"]\n        L2Cache[\"L2 Cache\\nRedis Cluster\\nTTL: 24h\"]\n    end\n\n    subgraph Storage[\"🗄️ Storage Layer\"]\n        PrimaryDB[(\"🐘 Primary DB\\nPostgreSQL / DynamoDB\\nURL mappings\")]\n        ReplicaDB[(\"📖 Read Replicas\\n× 3 instances\\nGlobal spread\")]\n        BlobStorage[\"📦 Blob Storage\\nS3 / Azure Blob\\nQR code images\"]\n    end\n\n    subgraph AnalyticsPipeline[\"📊 Analytics Pipeline\"]\n        ClickQueue[\"📨 Message Queue\\nKafka / SQS\\nclick-events topic\"]\n        AnalyticsWorker[\"Analytics Worker\\nFlink / Lambda\\nConsumer Group\"]\n        AnalyticsDB[(\"📈 Analytics DB\\nTimescaleDB /\\nRedshift\\n7-year retention\")]\n        Dashboard[\"📊 Dashboard API\\nAggregated metrics\"]\n    end\n\n    subgraph Monitoring[\"🔍 Observability\"]\n        Prometheus[\"Prometheus\\n+ Grafana\"]\n        Jaeger[\"Jaeger\\nDistributed Tracing\"]\n        Alerts[\"PagerDuty\\nAlerting\"]\n    end\n\n    Browser & MobileApp & APIClient --> CDN\n    EdgeNode1 & EdgeNode2 & EdgeNode3 -->|Cache Miss| ALB\n    ALB --> RateLimiter\n    RateLimiter -->|POST /shorten| WriteAPI\n    RateLimiter -->|GET /:code| RedirectAPI\n\n    WriteAPI --> IDGen --> Base62\n    WriteAPI --> AliasCheck\n    WriteAPI -->|Write URL mapping| PrimaryDB\n    WriteAPI -->|Cache warm| L2Cache\n    WriteAPI -->|Generate QR| BlobStorage\n\n    RedirectAPI --> L1Cache\n    L1Cache -->|Miss| L2Cache\n    L2Cache -->|Miss| ReplicaDB\n    RedirectAPI -->|Publish click event| ClickQueue\n\n    PrimaryDB --> ReplicaDB\n    ClickQueue --> AnalyticsWorker --> AnalyticsDB --> Dashboard\n\n    WriteAPI & RedirectAPI --> Prometheus & Jaeger\n    Prometheus --> Alerts"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "At scale, split into focused microservices. The Encoding Service handles creation, the Redirect Service handles lookups with cache-first strategy, the Analytics Service processes click events asynchronously, and the User Service manages accounts and rate limits."
+        "text": "Data Flow: URL Redirect Sequence"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-urlshortenercompletearchitecture-combined",
-        "caption": "Combined architecture diagram for URL Shortener: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_URLEncodingService[URL Encoding Service]\n        MS_CacheService[Cache Service]\n        MS_DatabaseService[Database Service]\n        MS_AnalyticsService[Analytics Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_URLEncodingService\n        MS_URLEncodingService --> MS_DB\n        MS_URLEncodingService --> MS_Queue\n        MS_URLEncodingService --> MS_Cache\n        MS_LB --> MS_CacheService\n        MS_CacheService --> MS_DB\n        MS_CacheService --> MS_Queue\n        MS_CacheService --> MS_Cache\n        MS_LB --> MS_DatabaseService\n        MS_DatabaseService --> MS_DB\n        MS_DatabaseService --> MS_Queue\n        MS_DatabaseService --> MS_Cache\n        MS_LB --> MS_AnalyticsService\n        MS_AnalyticsService --> MS_DB\n        MS_AnalyticsService --> MS_Queue\n        MS_AnalyticsService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-url-shortener-sequence",
+        "caption": "Sequence diagram showing the fast redirect path: CDN cache hit vs cache miss with async analytics publish",
+        "definition": "sequenceDiagram\n    autonumber\n    participant User as 👤 User\n    participant CDN as 🌍 CDN Edge\n    participant LB as ⚖️ Load Balancer\n    participant API as ⚡ Redirect API\n    participant L1 as 🔥 L1 Cache\n    participant Redis as ⚡ Redis L2\n    participant DB as 🗄️ Database\n    participant Kafka as 📨 Kafka\n    participant Analytics as 📊 Analytics\n\n    User->>CDN: GET /aB3xKz\n    alt CDN Cache Hit (70% of traffic)\n        CDN-->>User: 301 Redirect → original URL (< 5ms)\n    else CDN Cache Miss\n        CDN->>LB: Forward request\n        LB->>API: GET /aB3xKz\n        API->>L1: Lookup aB3xKz\n        alt L1 Hit (10k hot URLs)\n            L1-->>API: Return URL (< 1ms)\n        else L1 Miss → Redis\n            API->>Redis: GET url:aB3xKz\n            alt Redis Hit\n                Redis-->>API: Return URL (< 5ms)\n                API->>L1: Warm L1 cache\n            else Redis Miss → DB\n                API->>DB: SELECT * WHERE code='aB3xKz'\n                DB-->>API: URL record\n                API->>Redis: SET url:aB3xKz TTL=24h\n                API->>L1: Warm L1 cache\n            end\n        end\n        API-->>CDN: 301 Redirect + Cache-Control: max-age=86400\n        CDN-->>User: 301 Redirect → original URL\n        API--)Kafka: Publish ClickEvent (async, fire-and-forget)\n    end\n    Kafka--)Analytics: Consume batch → aggregate → store"
       }
     },
     {
       "type": "heading",
       "data": {
-        "level": 3,
-        "text": "Core Microservices"
+        "level": 2,
+        "text": "Data Model"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "table",
       "data": {
-        "items": [
-          "URL Encoding Service: Generates unique short codes via Base62, validates custom alias availability, prevents collisions using distributed ID generators, and persists URL mappings.",
-          "Redirect Service: Reads short codes with cache-first strategy (Redis then database), returns 301/302 redirects, logs click events to queue, and handles expired/inactive links.",
-          "Analytics Service: Consumes click events from queue, aggregates metrics (clicks, browsers, countries, devices), exposes real-time dashboards, and exports to data warehouse.",
-          "User Service: Manages accounts, API keys, rate limits per tier, bulk upload history, and billing integration for enterprise plans.",
-          "QR Code Service: Generates SVG/PNG QR codes on demand, caches generated codes, and supports custom branding colors and logos."
+        "headers": [
+          "Table",
+          "Column",
+          "Type",
+          "Notes"
+        ],
+        "rows": [
+          [
+            "short_urls",
+            "code",
+            "CHAR(8) PK",
+            "Base62 short code or custom alias"
+          ],
+          [
+            "short_urls",
+            "long_url",
+            "TEXT NOT NULL",
+            "Original destination URL"
+          ],
+          [
+            "short_urls",
+            "user_id",
+            "UUID FK",
+            "Owner; NULL for anonymous"
+          ],
+          [
+            "short_urls",
+            "created_at",
+            "TIMESTAMPTZ",
+            "Creation timestamp"
+          ],
+          [
+            "short_urls",
+            "expires_at",
+            "TIMESTAMPTZ",
+            "NULL = permanent link"
+          ],
+          [
+            "short_urls",
+            "is_active",
+            "BOOLEAN",
+            "Soft-delete flag"
+          ],
+          [
+            "click_events",
+            "id",
+            "BIGINT PK",
+            "Auto-increment or Snowflake ID"
+          ],
+          [
+            "click_events",
+            "code",
+            "CHAR(8) FK",
+            "References short_urls.code"
+          ],
+          [
+            "click_events",
+            "clicked_at",
+            "TIMESTAMPTZ",
+            "Partitioned by month"
+          ],
+          [
+            "click_events",
+            "country",
+            "CHAR(2)",
+            "GeoIP resolved at edge"
+          ],
+          [
+            "click_events",
+            "user_agent",
+            "TEXT",
+            "Browser/device info"
+          ],
+          [
+            "click_events",
+            "referrer",
+            "TEXT",
+            "HTTP Referer header"
+          ]
         ]
       }
     },
     {
       "type": "heading",
       "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
+        "level": 2,
+        "text": "Key Design Decisions & Trade-offs"
       }
     },
     {
-      "type": "example",
+      "type": "faq-block",
       "data": {
-        "title": "React App Structure",
-        "language": "text",
-        "code": "src/\n  features/\n    UrlShortener/\n      api/\n        encoding.client.ts      # Create short URLs\n        redirect.client.ts      # Resolve and redirect\n        analytics.client.ts     # Fetch stats\n      components/\n        ShortenerForm.tsx       # Input + custom alias\n        UrlResultCard.tsx       # Short URL + QR display\n        AnalyticsChart.tsx      # Clicks over time\n        BulkUpload.tsx          # CSV drag & drop\n        UrlTable.tsx            # Sortable list of URLs\n      hooks/\n        useCopyToClipboard.ts\n        useQrCode.ts\n      pages/\n        Dashboard.tsx\n        Analytics.tsx\n        Settings.tsx\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - React Query for optimistic URL creation\n  - Service Worker for offline redirect fallback\n  - Intersection Observer for lazy analytics charts\n  - CSV parsing with Papa Parse for bulk upload\n  - Web Share API for native mobile sharing"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// URL Encoding Service\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<UrlDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"UrlShortenerDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingAzureServiceBus((context, cfg) => {\n        cfg.Host(builder.Configuration[\"Azure:ServiceBus:ConnectionString\"]);\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapPost(\"/api/shorten\", async.CreateShortUrl);\napp.MapGet(\"/{code}\", async.ResolveShortUrl);\napp.MapGet(\"/api/analytics/{code}\", async.GetAnalytics);\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
+        "faqs": [
           {
-            "title": "CDN for Redirects",
-            "description": "Serve redirects from edge locations closest to user",
-            "tags": [
-              "Azure CDN Standard from Microsoft",
-              "Amazon CloudFront"
-            ],
-            "pros": [
-              "Sub-50ms redirect latency",
-              "DDoS protection at edge"
-            ],
-            "cons": [
-              "Cache invalidation delays",
-              "Configuration complexity"
-            ]
+            "question": "Why Base62 over MD5/SHA hashing?",
+            "answer": "Hashing creates collision risk requiring retries and longer codes. Base62 with a distributed counter guarantees uniqueness with predictable 6-character output. Snowflake IDs provide globally unique 64-bit integers that encode cleanly to Base62."
           },
           {
-            "title": "Edge Computing",
-            "description": "Run redirect logic directly at edge to reduce origin hits",
-            "tags": [
-              "Azure Functions + Front Door",
-              "Lambda@Edge + CloudFront"
-            ],
-            "pros": [
-              "Eliminates origin round-trip",
-              "Scales infinitely"
-            ],
-            "cons": [
-              "Cold start for first request",
-              "Debugging distributed edge code"
-            ]
+            "question": "301 (Permanent) vs 302 (Temporary) redirect?",
+            "answer": "301 lets browsers cache the redirect permanently, reducing server load — but click analytics are lost since the browser never hits your server again. 302 forces the browser to always hit your server, enabling accurate click tracking at the cost of higher origin traffic. Choose based on analytics requirements."
           },
           {
-            "title": "NoSQL Database",
-            "description": "Store URL mappings with high throughput",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Single-digit ms reads",
-              "Global replication"
-            ],
-            "cons": [
-              "Cost at high throughput",
-              "Eventually consistent reads"
-            ]
+            "question": "How to handle hot links (viral URLs)?",
+            "answer": "A small % of URLs receive 80%+ of traffic. Use a two-tier cache: in-process L1 cache (LRU, 10k entries) for truly hot links, and Redis L2 for the long tail. CDN edge caching absorbs the remaining burst before it reaches origin."
           },
           {
-            "title": "Messaging",
-            "description": "Queue analytics events without blocking redirects",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon Kinesis / SQS"
-            ],
-            "pros": [
-              "High throughput ingestion",
-              "Replay capability"
-            ],
-            "cons": [
-              "Ordering guarantees cost more",
-              "Consumer scaling complexity"
-            ]
+            "question": "How to prevent abuse and malicious URLs?",
+            "answer": "Integrate Google Safe Browsing API to scan destination URLs at creation time. Use Bloom filters to quickly detect known-bad domains. Apply rate limiting per user/IP with token bucket algorithm backed by Redis."
+          },
+          {
+            "question": "How to scale the write path for 10M URLs/day?",
+            "answer": "The write path is 100x lighter than reads. Two ASP.NET Core instances behind a load balancer handle 115 creates/second easily. Shard the distributed ID generator (Zookeeper-assigned ranges) to eliminate ID generation as a bottleneck."
           }
         ]
       }
@@ -247,33 +260,55 @@
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "variant": "tip",
+        "title": "Interview Tip: Start with scale numbers",
+        "text": "In interviews, always start by deriving scale: 500M redirects/day ÷ 86,400s = ~5,800 req/s average. With a 10:1 peak-to-average ratio, plan for 58,000 req/s peak. This drives every architectural decision that follows."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Capacity Estimation"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Back-of-Envelope Calculation",
+        "language": "text",
+        "code": "TRAFFIC\n  Redirects/day:       500,000,000\n  Avg req/s:           500M / 86,400 ≈ 5,800 req/s\n  Peak req/s (10×):    58,000 req/s\n  New URLs/day:        10,000,000 (~115 creates/s)\n\nSTORAGE (5 years)\n  Per URL record:      ~500 bytes (code + url + metadata)\n  Total URLs (5yr):    10M/day × 365 × 5 = 18.25 billion URLs\n  URL storage:         18.25B × 500B ≈ 9 TB\n  Click events/day:    500M × 200B ≈ 100 GB/day → 182 TB/5yr\n\nCACHE SIZING\n  Assume 80% of traffic hits 20% of URLs (Pareto)\n  Hot URL set:         ~10M URLs × 500B = 5 GB → fits in Redis\n  CDN hit rate:        Target ≥70% (reduces origin load to ~1,740 req/s)\n\nBANDWIDTH\n  Redirect response:   ~300 bytes (301 + Location header)\n  Peak outbound:       58,000 × 300B = ~17 MB/s (trivial)"
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "URL shorteners are read-heavy (100:1 read-to-write ratio) - cache aggressively",
-          "Use Base62 encoding with collision detection and distributed ID generation",
-          "Separate redirect path (sync, cached) from analytics (async, queued)",
-          "Custom aliases require pre-validation to prevent abuse",
-          "Edge CDN or Lambda@Edge is critical for sub-50ms global redirects"
+          "Read-to-write ratio is ~50:1; optimise the redirect path relentlessly with multi-tier caching",
+          "Base62 encoding of distributed Snowflake IDs gives unique, compact, collision-free codes",
+          "Separate the fast redirect path (sync) from analytics (async Kafka pipeline)",
+          "301 reduces server load; 302 enables per-click tracking — choose based on requirements",
+          "CDN edge caching is the single biggest lever for latency and origin capacity"
         ],
-        "takeaway": "A URL shortener is a cache-heavy distributed system. Optimize the redirect hot path with edge caching, offload analytics to async queues, and use Base62 with collision-safe ID generation for scale."
+        "takeaway": "A URL shortener is deceptively simple at small scale but requires careful cache hierarchy, async analytics separation, and distributed ID generation to handle billions of daily redirects reliably."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "rate-limiter",
+    "web-crawler"
+  ],
+  "furtherReading": [
+    {
+      "title": "System Design Interview: URL Shortener",
+      "url": "https://bytebytego.com/courses/system-design-interview/design-a-url-shortener",
+      "type": "article"
+    },
+    {
+      "title": "Snowflake ID Generation at Twitter",
+      "url": "https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake",
+      "type": "article"
+    }
+  ]
 }

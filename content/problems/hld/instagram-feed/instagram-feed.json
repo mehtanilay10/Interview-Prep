@@ -4,14 +4,17 @@
   "moduleSlug": "instagram-feed",
   "courseSlug": "hld-problems",
   "title": "Instagram Feed: Complete Architecture",
-  "description": "Design an Instagram-like photo and video sharing platform with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design Instagram-scale photo sharing and personalized feed with fan-out-on-write, CDN, and ML ranking.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "instagramfeed"
+    "social-media",
+    "feed",
+    "cdn",
+    "fan-out"
   ],
   "blocks": [
     {
@@ -24,7 +27,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a photo and video sharing platform like Instagram. Users upload media with captions, apply filters, like and comment on posts, follow other users, and browse a personalized feed. The system must support Stories that expire after 24 hours, an Explore page for discovery, and real-time notifications for engagement."
+        "text": "Design a photo-sharing social platform like Instagram. Users upload photos and short videos, follow other users, and receive a personalized home feed showing posts from people they follow ranked by relevance. The system must handle 95 million photos uploaded daily, 500 million daily active users viewing their feed, and deliver images with sub-200ms load times globally. Core challenges include feed generation at scale, efficient media delivery, and real-time engagement (likes, comments)."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Fan-out on Write",
+            "definition": "When a user posts, proactively write the post to all followers' feed caches immediately. Fast read, expensive write."
+          },
+          {
+            "term": "Fan-out on Read (Pull)",
+            "definition": "When a user opens the feed, compute it on the fly by querying who they follow. Cheap write, slow read."
+          },
+          {
+            "term": "Hybrid Fan-out",
+            "definition": "Push to feeds of regular users on write; pull for celebrity (10M+ followers) posts on read to avoid write storms."
+          },
+          {
+            "term": "Thundering Herd",
+            "definition": "When a celebrity posts to 10M followers, 10M simultaneous writes overwhelm the fan-out system."
+          },
+          {
+            "term": "Image Pipeline",
+            "definition": "Upload → validation → format conversion → multi-resolution thumbnail generation → CDN distribution."
+          }
+        ]
       }
     },
     {
@@ -39,16 +69,14 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Upload photos and videos with captions, location tags, and multiple media per post",
-          "Apply real-time filters and basic edits before publishing",
-          "Like, unlike, comment, save/bookmark, and share posts",
-          "Follow and unfollow users with private account approval flows",
-          "Generate personalized home feed using follow graph and engagement signals",
-          "Stories: photo/video clips visible for 24 hours with view tracking",
-          "Explore page: algorithmically ranked content from non-followed accounts",
-          "Direct messaging with media sharing and ephemeral story replies",
-          "Push notifications for likes, comments, follows, and mentions",
-          "Content moderation queue for auto-flagged and human-reviewed media"
+          "Upload photos and short videos (Reels up to 90 seconds) with caption and hashtags",
+          "Follow/unfollow users; private accounts require follow request approval",
+          "Personalized home feed: posts from followed users, ranked by ML model",
+          "Like, comment, save, and share posts; see like and comment counts",
+          "Stories: 15-second photo/video clips visible for 24 hours",
+          "Explore/Discover page: trending posts and recommendations for non-followed accounts",
+          "Real-time notifications for likes, comments, follows, mentions",
+          "Direct messaging (built on chat system, secondary scope)"
         ]
       }
     },
@@ -57,14 +85,13 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-200ms feed generation at P99 with edge caching for hot content",
-          "99.9% availability for read traffic, 99.5% for uploads",
-          "Support 1 billion+ media objects with infinite horizontal scale",
-          "Eventual consistency for likes and follower counts (tolerate stale counts)",
-          "Strong consistency for user authentication and posting ownership",
-          "Global CDN distribution for media assets with origin shield",
-          "Real-time notification delivery within 5 seconds of engagement",
-          "Content moderation latency under 2 seconds for auto-scanned media"
+          "500 million DAU; 2 billion total users",
+          "95 million photos uploaded per day (~1,100 uploads/s)",
+          "Feed load: 500M users × 5 feed opens/day = 2.5B feed requests/day (~29,000 req/s)",
+          "Image CDN: serve media with <200ms TTFB from edge",
+          "99.9% availability for feed read path",
+          "Feed eventual consistency acceptable (lag ≤2s for new posts)",
+          "Storage: 95M photos × ~3MB average = ~285 TB/day of raw uploads"
         ]
       }
     },
@@ -72,211 +99,98 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Build a monolithic ASP.NET Core API with SQL Server. Use Entity Framework Core for posts, users, comments, and follows. Store media in Azure Blob Storage with CDN fronting. Implement basic feed generation via SQL joins on the follow graph. This validates the content model, upload flow, and simple ranking."
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-instagramphotosharingcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Instagram Photo Sharing: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_FeedService[Feed Service]\n        MS_PostService[Post Service]\n        MS_UserService[User Service]\n        MS_NotificationService[Notification Service]\n        MS_MediaService[Media Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_FeedService\n        MS_FeedService --> MS_DB\n        MS_FeedService --> MS_Queue\n        MS_FeedService --> MS_Cache\n        MS_LB --> MS_PostService\n        MS_PostService --> MS_DB\n        MS_PostService --> MS_Queue\n        MS_PostService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Monolith Tech Stack",
-        "language": "text",
-        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - Minimal API with clean architecture\n  - Entity Framework Core with SQL Server\n  - Azure SQL Database for users, posts, comments, follows\n  - Azure Blob Storage + CDN for media delivery\n  - Azure Cognitive Services (Vision) for content moderation\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service for hosting\n  - Azure Redis Cache for feed pre-computation\n  - Azure Service Bus for async notifications\n  - Single database with tables: Users, Posts, Media, Comments, Likes, Follows, Stories"
+        "id": "hld-instagram-arch",
+        "caption": "Instagram system architecture: upload pipeline, hybrid fan-out feed generation, CDN media delivery, and ML ranking service",
+        "definition": "flowchart TD\n    subgraph Clients[\"📱 Client Layer\"]\n        MobileApp[\"📱 iOS / Android App\"]\n        WebApp[\"🌐 Instagram Web\"]\n    end\n\n    subgraph Gateway[\"🔀 API Gateway\"]\n        APIGW[\"API Gateway\\nAuth + Rate Limit\\nRouting\"]\n    end\n\n    subgraph UploadPipeline[\"📤 Upload Pipeline\"]\n        UploadSvc[\"Upload Service\\nChunked upload\\nresumable (TUS)\"]\n        MediaProcessor[\"Media Processor\\nFormat validation\\nVirus scan\"]\n        Transcoder[\"🎬 Transcoder\\nMulti-resolution\\n(240p/480p/1080p)\\nWebP conversion\"]\n        MediaStore[\"🗃️ Object Store\\nS3 / Azure Blob\\nOriginal + variants\"]\n        MediaCDN[\"🌍 CDN\\nCloudFront / Akamai\\nEdge delivery\\n200+ PoPs\"]\n    end\n\n    subgraph PostService[\"📝 Post Service\"]\n        PostAPI[\"Post API\\nCreate, update,\\ndelete posts\"]\n        PostDB[(\"📄 Post DB\\nCassandra\\npost_id, author,\\ncaption, media_url\")]\n    end\n\n    subgraph FeedService[\"📰 Feed Service\"]\n        FanoutWorker[\"Fan-out Worker\\nKafka consumer\\nwrite to feed caches\"]\n        FeedCache[\"⚡ Feed Cache\\nRedis\\nper-user sorted set\\n(score=timestamp)\"]\n        FeedAPI[\"Feed API\\nRead feed\\nfrom cache +\\nMerge celebrity posts\"]\n        CelebSvc[\"⭐ Celebrity Service\\nFan-out on Read\\nfor users with\\n10M+ followers\"]\n    end\n\n    subgraph SocialGraph[\"👥 Social Graph\"]\n        FollowSvc[\"Follow Service\\nFollow / Unfollow\"]\n        GraphDB[(\"🕸️ Graph DB\\nNeo4j / Cassandra\\nfollower/following\\nadjacency lists\")]\n    end\n\n    subgraph EngagementService[\"❤️ Engagement Service\"]\n        LikeAPI[\"Like / Comment API\"]\n        CountStore[\"Counter Store\\nRedis HyperLogLog\\nlike counts\\n(approximate)\"]\n        EngagementDB[(\"📊 Engagement DB\\nCassandra\\nlikes, comments,\\nsaves\")]\n    end\n\n    subgraph RankingService[\"🧠 ML Ranking Service\"]\n        RankingModel[\"Ranking Model\\n(TensorFlow Serving)\\nPersonalised score\"]\n        FeatureStore[\"Feature Store\\nUser signals:\\nwatch time, likes,\\nshares, saves\"]\n    end\n\n    subgraph EventStream[\"📨 Event Stream\"]\n        Kafka[\"Kafka\\npost-created\\nlike-events\\nfollow-events\"]\n    end\n\n    subgraph NotificationService[\"🔔 Notifications\"]\n        NotifSvc[\"Notification Service\\nFCM / APNs\\nreal-time alerts\"]\n    end\n\n    MobileApp & WebApp --> APIGW\n    APIGW -->|Upload| UploadSvc\n    APIGW -->|Create post| PostAPI\n    APIGW -->|Get feed| FeedAPI\n    APIGW -->|Like/Comment| LikeAPI\n\n    UploadSvc --> MediaProcessor --> Transcoder --> MediaStore --> MediaCDN\n    MobileApp & WebApp -->|Images| MediaCDN\n\n    PostAPI --> PostDB\n    PostAPI -->|Publish post-created| Kafka\n    Kafka --> FanoutWorker\n    FanoutWorker --> GraphDB\n    FanoutWorker -->|Regular user posts| FeedCache\n    FanoutWorker -->|Celebrity posts: skip push| CelebSvc\n\n    FeedAPI --> FeedCache\n    FeedAPI -->|Merge celebrity posts| CelebSvc\n    FeedAPI -->|Re-rank top N| RankingModel\n    RankingModel --> FeatureStore\n\n    LikeAPI --> CountStore & EngagementDB\n    LikeAPI -->|Publish like-event| Kafka\n    Kafka --> NotifSvc\n    NotifSvc -->|Push| MobileApp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Fan-out Strategy Decision"
       }
     },
     {
-      "type": "paragraph",
+      "type": "table",
       "data": {
-        "text": "Split into microservices by domain: Feed Service pre-computes timelines using fan-out-on-write, Post Service manages content creation, Media Service handles uploads and transformations, Recommendation Service powers Explore, and Notification Service handles engagement alerts."
-      }
-    },
-    {
-      "type": "mermaid",
-      "data": {
-        "id": "mermaid-instagramphotosharingcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Instagram Photo Sharing: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_FeedService[Feed Service]\n        MS_PostService[Post Service]\n        MS_UserService[User Service]\n        MS_NotificationService[Notification Service]\n        MS_MediaService[Media Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_FeedService\n        MS_FeedService --> MS_DB\n        MS_FeedService --> MS_Queue\n        MS_FeedService --> MS_Cache\n        MS_LB --> MS_PostService\n        MS_PostService --> MS_DB\n        MS_PostService --> MS_Queue\n        MS_PostService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Feed Service: Implements fan-out-on-write by pushing new posts to follower timelines at publish time, caches pre-computed feeds in Redis sorted sets, and falls back to on-read merge for users with millions of followers.",
-          "Post Service: Handles post creation, edits, deletions, and caption processing, manages post visibility rules (private accounts, blocked users), and emits PostCreated events for feed fan-out.",
-          "Media Service: Accepts multipart uploads, generates variants (thumbnail, preview, full-res), applies CDN cache headers, and triggers content moderation scans via Azure Cognitive Services or AWS Rekognition.",
-          "User Service: Manages profiles, follow/unfollow actions, follower/following counts, private account approvals, and blocked user relationships.",
-          "Notification Service: Processes engagement events (like, comment, follow, mention), aggregates per-user notification feeds, and dispatches push/in-app alerts via SignalR and FCM/APNS.",
-          "Recommendation Service: Powers the Explore page using collaborative filtering and content-based ranking, ingests engagement signals, and serves ranked post candidates via gRPC for low latency."
+        "headers": [
+          "Strategy",
+          "When Post Created",
+          "When Feed Loaded",
+          "Best For"
+        ],
+        "rows": [
+          [
+            "Push (fan-out on write)",
+            "Write to all N followers' caches",
+            "Read from cache (instant)",
+            "Regular users (<10K followers)"
+          ],
+          [
+            "Pull (fan-out on read)",
+            "Write to author's post list only",
+            "Query all followees and merge",
+            "Celebrity accounts (>10M followers)"
+          ],
+          [
+            "Hybrid",
+            "Push to regular followers' cache",
+            "Pull celebrities at load time + merge",
+            "Instagram / Twitter approach"
+          ]
         ]
       }
     },
     {
-      "type": "heading",
+      "type": "faq-block",
       "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "React App Structure",
-        "language": "text",
-        "code": "src/\n  features/\n    Instagram/\n      components/\n        Feed.tsx                # Infinite scroll post list\n        PostCard.tsx            # Image, caption, actions\n        StoriesCarousel.tsx      # Horizontal story circles\n        StoryViewer.tsx          # Full-screen 24h stories\n        UploadFlow.tsx           # Camera/gallery + filters\n        ExploreGrid.tsx          # Masonry photo grid\n        ReelsPlayer.tsx          # Vertical video player\n      hooks/\n        useInfiniteFeed.ts       # Cursor-based pagination\n        useStoryUpload.ts        # Media picker + progress\n        useFilterPreview.ts      # CSS/canvas filter pipeline\n        useIntersectionObserver.ts # Lazy media loading\n      store/\n        feedSlice.ts             # Cached feed pages\n        uploadSlice.ts           # Upload queue, retries\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - Virtualized list for feed performance (react-window)\n  - Intersection Observer for lazy media and ad impressions\n  - Offline draft saving for posts in progress\n  - Web Workers for client-side image/video compression\n  - Optimistic like with rollback on API failure"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Feed Service - fan-out-on-write pattern\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<FeedDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"InstagramFeedDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingAzureServiceBus((context, cfg) => {\n        cfg.Host(builder.Configuration[\"Azure:ServiceBus:ConnectionString\"]);\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/api/feed/{userId}\", async.GetFeed);\napp.MapPost(\"/api/feed/refresh\", async.RefreshFeed);\napp.MapGet(\"/api/feed/explore\", async.GetExplore);\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
+        "faqs": [
           {
-            "title": "Content Moderation",
-            "description": "Auto-scan uploaded media for unsafe content",
-            "tags": [
-              "Azure AI Vision (Content Safety)",
-              "Amazon Rekognition"
-            ],
-            "pros": [
-              "Detects violence, adult content",
-              "Custom allow/block lists"
-            ],
-            "cons": [
-              "False positives require human review",
-              "Latency added to upload pipeline"
-            ]
+            "question": "Why hybrid fan-out vs pure push or pure pull?",
+            "answer": "Pure push for a celebrity with 100M followers means 100M Redis writes per post — creating a thundering herd. Pure pull means merging 1000+ followees' timelines on every feed load — too slow. Hybrid pushes for regular users and lazily merges celebrity posts at read time, balancing both."
           },
           {
-            "title": "Media CDN",
-            "description": "Distribute images and videos globally with edge caching",
-            "tags": [
-              "Azure CDN Standard from Microsoft",
-              "Amazon CloudFront"
-            ],
-            "pros": [
-              "Origin shield reduces backend load",
-              "Image/video optimization at edge"
-            ],
-            "cons": [
-              "Cache invalidation cost",
-              "Signed URL complexity"
-            ]
+            "question": "How does the ML ranking work on the feed?",
+            "answer": "After fetching the user's pre-built feed cache (last 200 candidates), the ranking model scores each post using signals: relationship strength with author, post recency, predicted engagement (like probability, comment probability, save probability, watch time). Top 20-30 are returned. The model is trained daily on aggregate engagement data."
           },
           {
-            "title": "Recommendation Pipeline",
-            "description": "Train and serve personalized explore rankings",
-            "tags": [
-              "Azure Machine Learning + Redis",
-              "Amazon Personalize + ElastiCache"
-            ],
-            "pros": [
-              "Pre-built ranking algorithms",
-              "Real-time inference support"
-            ],
-            "cons": [
-              "Cold start for new users",
-              "Feature engineering overhead"
-            ]
-          },
-          {
-            "title": "Event Streaming",
-            "description": "Ingest engagement events for analytics and ranking",
-            "tags": [
-              "Azure Event Hubs",
-              "Amazon Kinesis Data Streams"
-            ],
-            "pros": [
-              "High throughput ingestion",
-              "Integration with analytics tools"
-            ],
-            "cons": [
-              "Retention limits for replay",
-              "Shard scaling planning required"
-            ]
+            "question": "How are like counts maintained accurately at 500M DAU scale?",
+            "answer": "Exact counters in SQL become write hotspots. Instagram uses Redis counters with periodic flush to the database. For display, HyperLogLog provides approximate counts (error <1%) at constant memory. For creator analytics, exact counts are computed from the events database asynchronously."
           }
         ]
       }
     },
     {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Takeaways"
-      }
-    },
-    {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Social feeds are read-heavy - pre-compute timelines with fan-out-on-write for users with < 1M followers",
-          "Media is the bulk of storage - use CDN with origin shield and auto-generated variants",
-          "Eventual consistency is acceptable for likes and counts; strong consistency for ownership and auth",
-          "Recommendation systems require separate feature stores and ML pipelines",
-          "Content moderation must be async to avoid blocking user uploads"
+          "Hybrid fan-out: push posts to normal followers' feed caches; pull celebrity posts at read time",
+          "Feed cache per user in Redis (sorted set by timestamp) enables O(log N) inserts and O(1) range reads",
+          "CDN with 200+ PoPs is non-negotiable for <200ms image TTFB globally",
+          "ML ranking re-scores the top 200 candidates from the feed cache, not the entire post graph",
+          "Image pipeline: original → multi-resolution WebP variants → CDN, deduplicated by hash"
         ],
-        "takeaway": "Instagram is a media-heavy social graph system. Optimize the read path with edge caching and pre-computed feeds, separate media processing from business logic, and accept eventual consistency for engagement metrics to maximize availability."
+        "takeaway": "Instagram-scale feed generation requires separating the write path (fan-out to Redis caches) from the read path (cache reads + ML re-ranking), with CDN handling the enormous media delivery load."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "twitter-social-hld",
+    "youtube-streaming"
+  ],
+  "furtherReading": [
+    {
+      "title": "Instagram Engineering Blog",
+      "url": "https://instagram-engineering.com/",
+      "type": "article"
+    }
+  ]
 }

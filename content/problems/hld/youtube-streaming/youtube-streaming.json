@@ -4,14 +4,17 @@
   "moduleSlug": "youtube-streaming",
   "courseSlug": "hld-problems",
   "title": "YouTube Video Platform: Complete Architecture",
-  "description": "Design a YouTube-like video streaming platform with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a YouTube-scale video streaming platform with chunked upload, adaptive bitrate streaming, CDN, and recommendation engine.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "youtubestreaming"
+    "video-streaming",
+    "cdn",
+    "transcoding",
+    "adaptive-bitrate"
   ],
   "blocks": [
     {
@@ -24,7 +27,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a video streaming platform like YouTube. Users upload videos that are transcoded into multiple bitrates for adaptive streaming, browse recommendations, like and comment, subscribe to channels, and watch live streams. The system must handle 500 hours of video uploaded every minute and serve billions of streams daily with sub-3s time-to-first-frame."
+        "text": "Design a video streaming platform like YouTube. Users upload videos that are transcoded into multiple bitrates for adaptive streaming, browse personalized recommendations, like and comment, subscribe to channels, and watch live streams. The system must handle 500 hours of video uploaded every minute, serve 1 billion hours of video watched daily by 2 billion monthly active users, deliver <3s time-to-first-frame globally, and support adaptive quality switching based on available bandwidth."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "HLS / DASH",
+            "definition": "HTTP Live Streaming / Dynamic Adaptive Streaming over HTTP — chop video into small segments (2-10s) fetched independently, enabling ABR."
+          },
+          {
+            "term": "Adaptive Bitrate (ABR)",
+            "definition": "Player dynamically selects video quality (144p to 4K) based on current download bandwidth and buffer size."
+          },
+          {
+            "term": "Transcoding",
+            "definition": "Converting uploaded raw video into multiple codecs (H.264, VP9, AV1) and resolutions for all devices and bandwidths."
+          },
+          {
+            "term": "CDN Edge Caching",
+            "definition": "Video segments cached at 200+ global PoPs; popular segments served without hitting origin storage."
+          },
+          {
+            "term": "Resumable Upload (TUS)",
+            "definition": "Upload protocol that checkpoints progress, allowing large files to resume after network failure from the last chunk."
+          }
+        ]
       }
     },
     {
@@ -39,18 +69,14 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Upload videos via chunked/resumable upload for files up to 128GB",
-          "Transcode uploaded videos into multiple bitrates (144p to 4K) and codecs (H.264, VP9, AV1)",
-          "Adaptive bitrate streaming (HLS/DASH) with automatic quality switching based on bandwidth",
-          "Video player with playback controls, captions/subtitles, quality selector, and playback speed",
-          "Like, dislike, comment, and share videos with threaded replies",
-          "Subscribe to channels with notification preferences (all, personalized, none)",
-          "Personalized home feed and recommendations based on watch history and engagement",
-          "Live streaming with sub-second latency and real-time chat overlay",
-          "Playlist management: create, reorder, public/private, collaborative playlists",
-          "Content ID system to detect copyrighted material and claim/ad monetize",
-          "Video chapters, end screens, and cards for creator engagement",
-          "Age-restricted content gating and regional availability controls"
+          "Upload videos (up to 256GB) via resumable chunked upload with progress tracking",
+          "Transcode to H.264/VP9/AV1 at 144p, 360p, 480p, 720p, 1080p, 1440p, 4K",
+          "Adaptive bitrate streaming via HLS/DASH manifests",
+          "Personalized home feed and recommendations using ML collaborative filtering",
+          "Like, dislike, comment (threaded), share; subscribe to channels with notifications",
+          "Live streaming with DVR (rewind up to 4 hours), live chat overlay",
+          "Chapters, subtitles/captions (auto-generated via speech recognition), timestamps",
+          "Creator analytics: views, watch time, revenue, audience demographics"
         ]
       }
     },
@@ -59,15 +85,12 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-3s time-to-first-frame for video playback globally",
-          "99.99% streaming availability with multi-CDN failover",
-          "Support 500+ hours of video uploaded per minute with parallel transcoding",
-          "Transcoding latency under 30 minutes for 4K content",
-          "Global CDN with 200+ edge locations for cache-hit ratio above 95%",
-          "Adaptive streaming resilience: switch quality within 2 seconds of bandwidth drop",
-          "Live stream latency under 5 seconds for主播-to-viewer path",
-          "DRM support for premium content (Widevine, FairPlay, PlayReady)",
-          "Immutable audit logs for Content ID claims and copyright disputes"
+          "500 hours of video uploaded per minute (~8.3 hours/second)",
+          "1 billion hours watched daily; peak 2M concurrent streams",
+          "Time to first frame (TTFF): <3s globally; rebuffering rate <1%",
+          "99.95% availability for streaming endpoints",
+          "Storage: 500 hrs/min × 1GB/hr × 1440 min/day ≈ 720 TB raw uploads/day; 6-10× after multi-resolution encoding ≈ 5 PB/day stored",
+          "CDN bandwidth: 1B hours × average 2Mbps bitrate = 250 PB/day served"
         ]
       }
     },
@@ -75,211 +98,122 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Build a monolithic ASP.NET Core API with SQL Server. Use FFmpeg for local transcoding during upload, store originals in Azure Blob Storage, and serve via Azure CDN. Implement SQL-based recommendations using watch history joins. This validates the upload-to-playback pipeline and basic metadata management."
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-youtubevideoplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for YouTube Video Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Monolith Tech Stack",
-        "language": "text",
-        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - Minimal API with clean architecture\n  - Entity Framework Core with SQL Server\n  - Azure SQL Database for metadata, users, comments, subscriptions\n  - FFmpeg for synchronous video transcoding during upload\n  - Azure Blob Storage for originals and transcoded renditions\n  - Azure CDN for global video delivery\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service for API hosting\n  - Azure Redis Cache for hot video metadata and session tokens\n  - Azure Service Bus for transcoding job queue\n  - Single database with tables: Videos, Users, Comments, Subscriptions, WatchHistory, Playlists"
+        "id": "hld-youtube-arch",
+        "caption": "YouTube architecture: upload pipeline → transcoding cluster → CDN, separate from the metadata and recommendation read path serving the feed",
+        "definition": "flowchart TD\n    subgraph Clients[\"📺 Client Layer\"]\n        WebBrowser[\"🌐 Web Browser\\nHTML5 Player\"]\n        MobileApp[\"📱 Mobile App\\nExoPlayer / AVPlayer\"]\n        SmartTV[\"📺 Smart TV\\nNative App\"]\n        CastDevice[\"📡 Chromecast\\n/ AirPlay\"]\n    end\n\n    subgraph UploadPath[\"📤 Upload Pipeline\"]\n        UploadSvc[\"Upload Service\\nTUS Resumable\\nChunked upload\\n(S3 Multipart)\"]\n        RawStore[\"🗃️ Raw Storage\\nS3 / GCS\\nOriginal files\\n(temporary)\"]\n        UploadQueue[\"📨 Upload Queue\\nKafka\\nvideo-uploaded topic\"]\n    end\n\n    subgraph TranscodingCluster[\"🎬 Transcoding Cluster\"]\n        TranscodeCoord[\"Transcoding\\nCoordinator\\n(Workflow Engine)\"]\n        TranscodeWorker1[\"Worker 1\\nH.264 encoder\\nFFmpeg\"]\n        TranscodeWorker2[\"Worker 2\\nVP9 encoder\\nFFmpeg\"]\n        TranscodeWorkerN[\"Worker N\\nAV1 encoder\\n(GPU accelerated)\"]\n        ThumbnailGen[\"Thumbnail\\nGenerator\\nN thumbnails\\nper video\"]\n        CaptionGen[\"Caption AI\\nWhisper ASR\\nAuto-subtitles\"]\n    end\n\n    subgraph ProcessedStorage[\"🗄️ Processed Storage\"]\n        SegmentStore[\"🗃️ Video Segments\\nS3 / GCS\\n2-10s HLS chunks\\nper resolution\"]\n        ManifestStore[\"📋 Manifest Store\\nm3u8 / mpd files\\nABR playlists\"]\n        ThumbnailStore[\"🖼️ Thumbnail Store\\nS3 / Blob\\nMultiple sizes\"]\n    end\n\n    subgraph CDN[\"🌍 CDN Layer\"]\n        CDNOrchestrator[\"CDN Orchestrator\\nEdge config\\npurge control\"]\n        EdgeNode_US[\"📍 Edge US\\n(80+ PoPs)\"]\n        EdgeNode_EU[\"📍 Edge EU\\n(60+ PoPs)\"]\n        EdgeNode_AP[\"📍 Edge APAC\\n(60+ PoPs)\"]\n    end\n\n    subgraph MetadataServices[\"📝 Metadata Services\"]\n        VideoAPI[\"Video API\\nMetadata CRUD\"]\n        VideoDB[(\"📄 Video DB\\nPostgreSQL\\nvideo_id, title,\\ndescription,\\nstatus, creator\")]\n        SearchIndex[\"🔍 Search Index\\nElasticsearch\\ntitle, tags,\\ntranscript\"]\n    end\n\n    subgraph EngagementServices[\"❤️ Engagement\"]\n        LikeSvc[\"Like / Dislike\\nService\"]\n        CommentSvc[\"Comment Service\\nThreaded replies\"]\n        SubscribeSvc[\"Subscribe Service\\nChannel follows\"]\n        EngagDB[(\"📊 Engagement DB\\nCassandra\\ncounts + events\")]\n    end\n\n    subgraph FeedRecommendation[\"🧠 Recommendation Engine\"]\n        FeedAPI[\"Home Feed API\"]\n        RankModel[\"ML Ranking Model\\nTwo-tower DNN\\n(TF Serving)\"]\n        CandidateGen[\"Candidate Generator\\nCollaborative filter\\nMatrix factorisation\"]\n        WatchHistory[(\"📈 Watch History\\nBigtable / DynamoDB\\nuser events\")]\n    end\n\n    subgraph LiveStreaming[\"🔴 Live Streaming\"]\n        RTMPIngest[\"RTMP Ingest\\nOBS / Encoder\"]\n        LiveTranscoder[\"Live Transcoder\\nLow-latency HLS\\n(LHLS / LL-DASH)\"]\n        LiveCDN[\"Live CDN\\nSegment push\\nto edge\"]\n    end\n\n    subgraph Monitoring[\"🔍 Observability\"]\n        Metrics[\"Prometheus\\n+ Grafana\"]\n        Alerting[\"PagerDuty\"]\n    end\n\n    WebBrowser & MobileApp & SmartTV & CastDevice --> CDN\n    CDN -->|Cache miss| SegmentStore & ManifestStore\n    WebBrowser & MobileApp -->|Metadata, comments, likes| VideoAPI\n    WebBrowser & MobileApp -->|Search| SearchIndex\n\n    WebBrowser & MobileApp -->|Upload| UploadSvc\n    UploadSvc --> RawStore\n    UploadSvc -->|Notify| UploadQueue\n    UploadQueue --> TranscodeCoord\n    TranscodeCoord --> TranscodeWorker1 & TranscodeWorker2 & TranscodeWorkerN\n    TranscodeCoord --> ThumbnailGen & CaptionGen\n    TranscodeWorker1 & TranscodeWorker2 & TranscodeWorkerN --> SegmentStore & ManifestStore\n    ThumbnailGen --> ThumbnailStore\n    CaptionGen --> VideoDB\n\n    SegmentStore --> CDNOrchestrator\n    CDNOrchestrator --> EdgeNode_US & EdgeNode_EU & EdgeNode_AP\n\n    VideoAPI --> VideoDB & SearchIndex\n    LikeSvc & CommentSvc & SubscribeSvc --> EngagDB\n\n    FeedAPI --> CandidateGen --> RankModel\n    RankModel --> WatchHistory\n    FeedAPI --> WatchHistory\n\n    RTMPIngest --> LiveTranscoder --> LiveCDN\n    LiveCDN --> EdgeNode_US & EdgeNode_EU"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Split into microservices by workload: Upload Service handles resumable chunked uploads, Transcoding Service processes videos into multiple renditions using a worker pool, Streaming Service serves HLS/DASH manifests and segments, Metadata Service manages search and recommendations, and Live Service handles RTMP/WHIP ingest and packaging."
+        "text": "Video Upload and Transcoding Flow"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-youtubevideoplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for YouTube Video Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-youtube-upload-sequence",
+        "caption": "Sequence: video upload → Kafka notification → transcoding pipeline → CDN distribution → video goes live",
+        "definition": "sequenceDiagram\n    autonumber\n    participant Creator as 🎥 Creator\n    participant UploadSvc as 📤 Upload Service\n    participant S3Raw as 🗃️ Raw S3\n    participant Kafka as 📨 Kafka\n    participant Coordinator as 🎬 Transcoding Coordinator\n    participant Workers as ⚙️ Transcoding Workers (N parallel)\n    participant SegmentS3 as 🗃️ Segment S3\n    participant CDN as 🌍 CDN\n    participant VideoDB as 📄 Video DB\n\n    Creator->>UploadSvc: Initiate TUS resumable upload\n    UploadSvc-->>Creator: Upload URL + upload_id\n    loop Chunk upload (chunk_size=5MB)\n        Creator->>UploadSvc: Upload chunk N\n        UploadSvc->>S3Raw: Multipart upload part N\n    end\n    UploadSvc->>S3Raw: Complete multipart upload\n    UploadSvc->>Kafka: Publish video-uploaded event\n    UploadSvc->>VideoDB: Set status=PROCESSING\n\n    Kafka->>Coordinator: Consume event\n    Coordinator->>Workers: Spawn parallel transcoding jobs\n    Note over Workers: H.264 @ 360p, 720p, 1080p<br/>VP9 @ 720p, 1080p, 4K<br/>AV1 @ 1080p, 4K<br/>Each job = 1 worker\n\n    Workers->>SegmentS3: Write HLS segments (.ts files)\n    Workers->>SegmentS3: Write .m3u8 manifest files\n    Workers->>VideoDB: Report progress (%)\n\n    Coordinator->>CDN: Invalidate + pre-warm segments\n    CDN->>SegmentS3: Pull new segments to edge nodes\n\n    Coordinator->>VideoDB: Set status=LIVE\n    VideoDB-->>Creator: Email/notification: video published"
       }
     },
     {
-      "type": "heading",
+      "type": "table",
       "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Upload Service: Accepts chunked uploads with resumable protocol, computes checksums, stores raw files in blob storage, and emits VideoUploaded events for transcoding pipeline.",
-          "Transcoding Service: Consumes upload events, runs parallel FFmpeg jobs via Kubernetes or Azure Batch, generates HLS/DASH renditions at multiple bitrates, extracts thumbnails and captions, and publishes VideoReady events.",
-          "Streaming Service: Serves HLS/DASH manifests and video segments, manages signed URLs for protected content, supports multi-CDN failover, and handles live stream packaging (HLS/LL-HLS/DASH).",
-          "Metadata Service: Manages video titles, descriptions, tags, categories, and search indexing using Elasticsearch or Azure Cognitive Search, exposes gRPC for recommendation candidate retrieval.",
-          "Recommendation Service: Computes personalized video suggestions using collaborative filtering and deep learning models, ingests watch history and engagement events, and serves ranked candidates via low-latency API.",
-          "Live Service: Handles RTMP/WHIP ingest from broadcasters, transcodes live streams in real-time, manages live chat via WebSocket, and archives live recordings to blob storage."
+        "headers": [
+          "Codec",
+          "Quality",
+          "Bitrate",
+          "Browser Support",
+          "Notes"
+        ],
+        "rows": [
+          [
+            "H.264 (AVC)",
+            "360p–1080p",
+            "0.5–8 Mbps",
+            "100% universal",
+            "Baseline for all devices; highest compatibility"
+          ],
+          [
+            "VP9",
+            "720p–4K",
+            "0.3–6 Mbps",
+            "85% (Chrome, Firefox)",
+            "~40% better compression than H.264; YouTube default"
+          ],
+          [
+            "AV1",
+            "1080p–4K",
+            "0.2–4 Mbps",
+            "70% (Chrome 70+)",
+            "Best compression; highest CPU cost to encode; future default"
+          ],
+          [
+            "HEVC (H.265)",
+            "1080p–4K",
+            "0.3–5 Mbps",
+            "Safari, iOS",
+            "Apple ecosystem; licensing fees apply"
+          ]
         ]
       }
     },
     {
-      "type": "heading",
+      "type": "faq-block",
       "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "React App Structure",
-        "language": "text",
-        "code": "src/\n  features/\n    Video/\n      components/\n        VideoPlayer.tsx          # HLS.js with quality selector\n        WatchPage.tsx            # Video + comments + suggestions\n        UploadFlow.tsx            # Chunked upload with progress\n        LiveStream.tsx            # Low-latency player + chat\n        Transcript.tsx            # Closed captions overlay\n        RecommendationRail.tsx    # Horizontal scroll suggestions\n      hooks/\n        useHlsPlayer.ts           # HLS.js + DASH.js integration\n        useChunkedUpload.ts       # Resumable upload with retry\n        useWatchHistory.ts        # Sync progress to backend\n        useLiveChat.ts            # WebSocket chat consumer\n      store/\n        playerSlice.ts            # Playback state, quality, speed\n        uploadSlice.ts            # Upload queue, progress\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - HLS.js or Shaka Player for adaptive streaming\n  - Service Worker for offline video caching\n  - Web Worker for client-side video thumbnail generation\n  - Intersection Observer for auto-pause offscreen videos\n  - MediaSource Extensions for custom buffer management"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Streaming Service - serves HLS/DASH manifests\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<StreamDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"YoutubeStreamingDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingAzureServiceBus((context, cfg) => {\n        cfg.Host(builder.Configuration[\"Azure:ServiceBus:ConnectionString\"]);\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/api/stream/{videoId}/manifest\", async.GetManifest);\napp.MapGet(\"/api/stream/{videoId}/segment/{quality}/{segment}\", async.GetSegment);\napp.MapGet(\"/api/live/{channelId}/playlist\", async.GetLivePlaylist);\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
+        "faqs": [
           {
-            "title": "Video Transcoding",
-            "description": "Convert uploaded videos to multiple bitrates and formats",
-            "tags": [
-              "Azure Media Services / Azure Batch",
-              "AWS Elemental MediaConvert"
-            ],
-            "pros": [
-              "Managed encoding presets",
-              "Parallel job scaling"
-            ],
-            "cons": [
-              "Cost per minute of output",
-              "Job queue depth limits"
-            ]
+            "question": "How does adaptive bitrate (ABR) streaming work?",
+            "answer": "The player downloads a master .m3u8 manifest listing available quality levels. It monitors download speed and buffer fill rate, selecting the highest quality stream whose download speed fits within the available bandwidth. On bandwidth drop, it seamlessly switches to a lower quality segment at the next segment boundary (every 2-10 seconds)."
           },
           {
-            "title": "Live Ingest",
-            "description": "Receive RTMP/RTSP streams from broadcasters",
-            "tags": [
-              "Azure Media Services Live",
-              "AWS Elemental MediaLive"
-            ],
-            "pros": [
-              "Auto-scaling input channels",
-              "Built-in redundancy"
-            ],
-            "cons": [
-              "Minimum billing duration",
-              "Complex channel configuration"
-            ]
+            "question": "How does YouTube's recommendation system work at a high level?",
+            "answer": "Two-stage process: (1) Candidate generation — retrieve ~100-500 candidate videos using collaborative filtering (matrix factorisation on watch history). (2) Ranking — a deep neural network re-ranks candidates using hundreds of features: watch-time probability, click-through probability, freshness, user satisfaction signals. Final list is the home feed."
           },
           {
-            "title": "Search Indexing",
-            "description": "Full-text search across video titles, descriptions, and transcripts",
-            "tags": [
-              "Azure Cognitive Search",
-              "Amazon OpenSearch Service"
-            ],
-            "pros": [
-              "Faceted search out of box",
-              "Synonym and phonetic support"
-            ],
-            "cons": [
-              "Index sync latency",
-              "Custom ranking requires code"
-            ]
-          },
-          {
-            "title": "Video CDN",
-            "description": "Deliver video segments from edge locations globally",
-            "tags": [
-              "Azure CDN Standard from Microsoft",
-              "Amazon CloudFront"
-            ],
-            "pros": [
-              "Origin shield for cache hit ratio",
-              "Signed URLs for content protection"
-            ],
-            "cons": [
-              "Egress costs at scale",
-              "Cache purge propagation delays"
-            ]
+            "question": "How do you handle 500 hours/minute of video upload without transcoding becoming a bottleneck?",
+            "answer": "Transcoding is horizontally scalable — each video is an independent job. Use a distributed workflow engine (Temporal, AWS Step Functions) to orchestrate parallel encoding jobs across a fleet of GPU/CPU workers. Prioritise popular creators and apply backpressure by queuing during traffic spikes. Batch encode lower-priority resolutions asynchronously after higher resolutions are ready."
           }
         ]
       }
     },
     {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Takeaways"
-      }
-    },
-    {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Video platforms are storage and bandwidth intensive - use multi-CDN with origin shield",
-          "Transcoding is CPU-heavy and async - decouple upload from processing via queues",
-          "Adaptive streaming requires pre-generated renditions at multiple bitrates",
-          "Recommendations require separate feature stores and ML pipelines from the serving path",
-          "Live streaming needs real-time ingest, packaging, and sub-5s end-to-end latency"
+          "Transcoding pipeline must be async and horizontally scalable — one video produces 15+ output files",
+          "Serve via HLS/DASH with CDN — never stream from origin storage directly",
+          "ABR enables seamless quality switching as bandwidth changes, keeping rebuffering <1%",
+          "Separate upload path, transcoding cluster, and read/streaming path for independent scaling",
+          "Recommendation: two-stage (candidate generation → deep ranking) to balance speed and quality"
         ],
-        "takeaway": "YouTube is a media-heavy distributed system with heavy async processing. Separate upload, transcoding, and streaming into independent services, pre-compute recommendations offline, and use multi-CDN with origin shielding for global playback performance."
+        "takeaway": "YouTube's complexity lies not in the streaming itself but in the upload → transcode → CDN distribution pipeline and the recommendation engine that determines what 2 billion users watch next."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "video-streaming-hld",
+    "instagram-feed"
+  ],
+  "furtherReading": [
+    {
+      "title": "YouTube Architecture",
+      "url": "https://highscalability.com/youtube-architecture/",
+      "type": "article"
+    },
+    {
+      "title": "Deep Neural Networks for YouTube Recommendations (2016)",
+      "url": "https://research.google.com/pubs/pub45530.html",
+      "type": "article"
+    }
+  ]
 }

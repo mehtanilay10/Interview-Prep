@@ -1,0 +1,217 @@
+{
+  "id": "lesson-auth-017",
+  "slug": "oauth-security-best-practices",
+  "moduleSlug": "oauth",
+  "title": "OAuth Security Best Practices",
+  "description": "Learn security best practices for implementing OAuth 2.0 and OpenID Connect.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": [
+    "oauth",
+    "security",
+    "best-practices",
+    "openid-connect"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Implementing OAuth 2.0 and OpenID Connect requires careful attention to security. Following best practices ensures your application remains secure and user data is protected."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use HTTPS Only"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "All OAuth flows must use HTTPS. Tokens, authorization codes, and user credentials are transmitted and can be intercepted over HTTP."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Critical Security Requirement",
+        "text": "Never implement OAuth over HTTP. Use HTTPS for all endpoints, redirect URIs, and token exchanges."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validate Redirect URIs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Strictly validate redirect URIs to prevent open redirect attacks. Only allow pre-registered, exact-match URLs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redirect URI Validation",
+        "content": "Configure allowed redirect URIs.",
+        "language": "csharp",
+        "code": "builder.Services.AddAuthentication()\n    .AddGoogle(options =>\n    {\n        options.ClientId = \"your-client-id\";\n        options.ClientSecret = \"your-client-secret\";\n        options.CallbackPath = \"/signin-google\";\n        \n        // Strict redirect URI validation\n        options.SaveTokens = true;\n        options.Events = new OAuthEvents\n        {\n            OnRedirectToAuthorizationEndpoint = context =>\n            {\n                // Validate redirect URI\n                var redirectUri = context.RedirectUri;\n                if (!IsValidRedirectUri(redirectUri))\n                {\n                    throw new SecurityException(\"Invalid redirect URI\");\n                }\n                return Task.CompletedTask;\n            }\n        };\n    });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use PKCE for Public Clients"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For mobile and SPA applications, use PKCE (Proof Key for Code Exchange) to prevent authorization code interception attacks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PKCE Implementation",
+        "content": "Implement PKCE for enhanced security.",
+        "language": "csharp",
+        "code": "// Generate code verifier and challenge\nvar codeVerifier = GenerateRandomString(43);\nvar codeChallenge = Base64UrlEncode(SHA256(codeVerifier));\n\n// Include in authorization request\nvar authUrl = $\"https://accounts.google.com/o/oauth2/v2/auth?\" +\n    $\"client_id={clientId}&\" +\n    $\"redirect_uri={redirectUri}&\" +\n    $\"response_type=code&\" +\n    $\"code_challenge={codeChallenge}&\" +\n    $\"code_challenge_method=S256\";\n\n// Exchange code with verifier\nvar tokenResponse = await httpClient.PostAsync(tokenEndpoint, \n    new FormUrlEncodedContent(new Dictionary<string, string>\n    {\n        [\"code\"] = authorizationCode,\n        [\"code_verifier\"] = codeVerifier,\n        [\"client_id\"] = clientId,\n        [\"grant_type\"] = \"authorization_code\"\n    }));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Storage and Security"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Store access tokens securely. For web applications, use HTTP-only, secure cookies. For mobile apps, use the platform's secure storage."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Secure Cookie Configuration",
+        "content": "Configure secure authentication cookies.",
+        "language": "csharp",
+        "code": "builder.Services.ConfigureApplicationCookie(options =>\n{\n    options.Cookie.HttpOnly = true;\n    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;\n    options.Cookie.SameSite = SameSiteMode.Strict;\n    options.ExpireTimeSpan = TimeSpan.FromHours(1);\n    options.SlidingExpiration = true;\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "State Parameter"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always use the state parameter to prevent CSRF attacks. Generate a random value, include it in the auth request, and validate it on callback."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "State Parameter Implementation",
+        "content": "Implement CSRF protection with state parameter.",
+        "language": "csharp",
+        "code": "// Generate and store state\nvar state = GenerateRandomString(32);\nHttpContext.Session.SetString(\"OAuthState\", state);\n\n// Include in authorization request\nvar authUrl = $\"https://accounts.google.com/o/oauth2/v2/auth?\" +\n    $\"client_id={clientId}&\" +\n    $\"redirect_uri={redirectUri}&\" +\n    $\"response_type=code&\" +\n    $\"state={state}\";\n\n// Validate on callback\nvar returnedState = context.Request.Query[\"state\"];\nvar storedState = HttpContext.Session.GetString(\"OAuthState\");\nif (returnedState != storedState)\n{\n    throw new SecurityException(\"CSRF detected\");\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Validation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always validate ID tokens and access tokens. Check the signature, issuer, audience, and expiration."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token Validation",
+        "content": "Validate ID token structure and claims.",
+        "language": "csharp",
+        "code": "public bool ValidateIdToken(string idToken)\n{\n    var handler = new JwtSecurityTokenHandler();\n    var token = handler.ReadJwtToken(idToken);\n    \n    // Validate issuer\n    if (token.Issuer != \"https://accounts.google.com\")\n        return false;\n    \n    // Validate audience\n    if (!token.Audiences.Contains(clientId))\n        return false;\n    \n    // Validate expiration\n    if (token.ValidTo < DateTime.UtcNow)\n        return false;\n    \n    // Validate signature (requires JWT validation)\n    // Implementation depends on your validation library\n    \n    return true;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scope Minimization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Request only the scopes you need. More scopes mean more access and higher risk if tokens are compromised."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Principle of Least Privilege",
+        "text": "Request the minimum scopes necessary for your application to function. Don't request email access if you only need profile information."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "PKCE",
+            "definition": "Proof Key for Code Exchange - a security extension for OAuth that prevents authorization code interception."
+          },
+          {
+            "term": "State Parameter",
+            "definition": "A random value used in OAuth flows to prevent cross-site request forgery (CSRF) attacks."
+          },
+          {
+            "term": "Scope Minimization",
+            "definition": "Security practice of requesting only the minimum permissions needed for an application to function."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Always use HTTPS for OAuth operations",
+          "Validate redirect URIs strictly",
+          "Use PKCE for public clients",
+          "Store tokens securely (HTTP-only cookies)",
+          "Implement state parameter for CSRF protection",
+          "Validate tokens (signature, issuer, audience, expiration)",
+          "Request minimum necessary scopes"
+        ],
+        "takeaway": "Following OAuth security best practices protects your application and user data from common vulnerabilities."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "oauth-overview",
+    "external-providers",
+    "openid-connect"
+  ],
+  "courseSlug": "authentication-authorization"
+}

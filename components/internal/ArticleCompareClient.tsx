@@ -156,10 +156,11 @@ function isContentBlock(value: unknown): value is ContentBlock {
         (value.data.takeaway === undefined || typeof value.data.takeaway === 'string')
       );
     case 'faq-block':
+      const faqItems = value.data.items ?? value.data.faqs;
       return (
         (value.data.title === undefined || typeof value.data.title === 'string') &&
-        Array.isArray(value.data.items) &&
-        value.data.items.every(
+        Array.isArray(faqItems) &&
+        faqItems.every(
           (item) =>
             isRecord(item) &&
             typeof item.question === 'string' &&

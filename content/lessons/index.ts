@@ -971,6 +971,7 @@ import errorHandlingBasicsLesson from "../courses/apollo/06-error-handling-optim
 import errorHandlingBasicsLesson1 from "../courses/graphql-dotnet/07-error-handling/error-handling-basics.json";
 import errorHandlingInDataFetchingLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/error-handling-in-data-fetching.json";
 import errorHandlingStrategiesLesson from "../courses/react-query/04-advanced-features/error-handling-strategies.json";
+import errorLoggingMonitoringLesson from "../courses/graphql-dotnet/07-error-handling/error-logging-monitoring.json";
 import errorPoliciesLesson from "../courses/apollo/06-error-handling-optimistic/error-policies.json";
 import esbuildLesson from "../courses/yarn-npm-packages/build-tools/esbuild.json";
 import estimationAndUncertaintyLesson from "../courses/senior-software-engineering/technical-leadership/estimation-and-uncertainty.json";
@@ -1522,6 +1523,7 @@ import nuxtjsLesson from "../courses/yarn-npm-packages/frontend-frameworks/nuxtj
 import oauth20RolesAndFlowsLesson from "../courses/fullstack-security/modern-web-security-identity/oauth-20-roles-and-flows.json";
 import oauthJwtLesson from "../interview-qa/02-intermediate-questions/oauth-jwt.json";
 import oauthOverviewLesson from "../courses/authentication-authorization/04-oauth/oauth-overview.json";
+import oauthSecurityBestPracticesLesson from "../courses/authentication-authorization/04-oauth/oauth-security-best-practices.json";
 import objectManagementLesson from "../courses/postgresql/database-schema-table-objects/object-management.json";
 import observabilityAndFailureTestingLesson from "../problems/full-stack-senior-projects/project-2-collaborative-communication-platform/observability-and-failure-testing.json";
 import observabilityArchitectureLesson from "../courses/aws/11-monitoring-logging-observability/observability-architecture.json";
@@ -1589,6 +1591,7 @@ import partialDataErrorHandlingLesson from "../courses/apollo/06-error-handling-
 import partialExpressionLesson from "../courses/postgresql/indexes/partial-expression.json";
 import partialViewsLesson from "../courses/aspnet-core/05-razor-views/partial-views.json";
 import partitioningLesson from "../courses/postgresql/advanced-topics/partitioning.json";
+import passwordManagementLesson from "../courses/authentication-authorization/03-identity/password-management.json";
 import passwordValidatorLesson from "../courses/dotnet-nuget-packages/08-security-cryptography/password-validator.json";
 import passwordlessAuthenticationLesson from "../courses/authentication-authorization/09-security-best-practices/passwordless-authentication.json";
 import pathSumLesson from "../problems/csharp/04-tree-graph-problems/path-sum.json";
@@ -3361,6 +3364,7 @@ const rawLessonsPart2 = [
 	errorHandlingBasicsLesson1,
 	errorHandlingInDataFetchingLesson,
 	errorHandlingStrategiesLesson,
+	errorLoggingMonitoringLesson,
 	errorPoliciesLesson,
 	esbuildLesson,
 	estimationAndUncertaintyLesson,
@@ -3389,10 +3393,10 @@ const rawLessonsPart2 = [
 	expressionTreesLesson,
 	extensionMethodsLesson,
 	extensionsLesson,
-	externalProvidersLesson,
 ];
 
 const rawLessonsPart3 = [
+	externalProvidersLesson,
 	extraReducersLesson,
 	facadePatternLesson,
 	facadePatternLesson1,
@@ -3892,10 +3896,10 @@ const rawLessonsPart3 = [
 	nextjsAppRouterArchitectureLesson,
 	nextjsIntegrationLesson,
 	nextjsRoutingLesson,
-	nlogLesson,
 ];
 
 const rawLessonsPart4 = [
+	nlogLesson,
 	normalizationLesson,
 	normalizingStateLesson,
 	notNullLesson,
@@ -3918,6 +3922,7 @@ const rawLessonsPart4 = [
 	oauth20RolesAndFlowsLesson,
 	oauthJwtLesson,
 	oauthOverviewLesson,
+	oauthSecurityBestPracticesLesson,
 	objectManagementLesson,
 	observabilityAndFailureTestingLesson,
 	observabilityArchitectureLesson,
@@ -3985,6 +3990,7 @@ const rawLessonsPart4 = [
 	partialExpressionLesson,
 	partialViewsLesson,
 	partitioningLesson,
+	passwordManagementLesson,
 	passwordValidatorLesson,
 	passwordlessAuthenticationLesson,
 	pathSumLesson,
@@ -4393,12 +4399,12 @@ const rawLessonsPart4 = [
 	skipSkipwhileLesson,
 	slackMessagingLesson,
 	slackMessagingHldLesson,
-	sliSloAndSlaLesson,
-	sliSloAndSlaInAzureWorkloadsLesson,
-	slidingExpirationLesson,
 ];
 
 const rawLessonsPart5 = [
+	sliSloAndSlaLesson,
+	sliSloAndSlaInAzureWorkloadsLesson,
+	slidingExpirationLesson,
 	slotPatternLesson,
 	slowApiInvestigationWorkflowLesson,
 	snapshotIsolationAndRowVersioningLesson,
