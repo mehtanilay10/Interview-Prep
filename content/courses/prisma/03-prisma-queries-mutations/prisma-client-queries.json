@@ -1,85 +1,140 @@
 {
   "id": "lesson-prisma-011",
   "slug": "prisma-client-queries",
-  "moduleSlug": "prisma-queries-mutations",
+  "moduleSlug": "03-prisma-queries-mutations",
   "courseSlug": "prisma",
-  "title": "Prisma Client Queries",
-  "description": "Learn to read data with findMany, findUnique, findFirst, and understand when to use each query method.",
+  "title": "Prisma Client Queries Overview",
+  "description": "Learn how Prisma Client executes queries, understands method semantics, and optimizes queries via its Rust engine.",
   "order": 1,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "prisma",
-    "prisma-client",
     "queries",
-    "crud"
+    "crud",
+    "findUnique",
+    "findFirst",
+    "findMany"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client provides three primary methods for reading data: `findMany`, `findUnique`, and `findFirst`. Each method has a specific use case depending on whether you are querying by a unique field or applying filters."
+        "text": "Prisma Client provides an intuitive, promise-based API for interacting with your database. Every model defined in your `schema.prisma` exposes a dedicated model delegate (e.g. `prisma.user`, `prisma.order`) containing specialized methods for reading, inserting, updating, and deleting records."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "findMany"
+        "text": "Core Read Methods Overview"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Method",
+          "Target Result",
+          "Where Constraint",
+          "Generated SQL Equivalent"
+        ],
+        "rows": [
+          [
+            "`findUnique`",
+            "Single record or `null`",
+            "Must filter by `@id` or `@unique` field",
+            "`SELECT ... WHERE unique_col = $1 LIMIT 1`"
+          ],
+          [
+            "`findUniqueOrThrow`",
+            "Single record (throws NotFound error if absent)",
+            "Must filter by `@id` or `@unique` field",
+            "`SELECT ... WHERE unique_col = $1 LIMIT 1`"
+          ],
+          [
+            "`findFirst`",
+            "First matching record or `null`",
+            "Any arbitrary condition (`where: { status: 'ACTIVE' }`)",
+            "`SELECT ... WHERE ... LIMIT 1`"
+          ],
+          [
+            "`findFirstOrThrow`",
+            "First record or throws error",
+            "Any arbitrary condition",
+            "`SELECT ... WHERE ... LIMIT 1`"
+          ],
+          [
+            "`findMany`",
+            "Array of records `T[]`",
+            "Any arbitrary condition, pagination, ordering",
+            "`SELECT ... WHERE ... ORDER BY ... LIMIT ...`"
+          ],
+          [
+            "`count`",
+            "Number of records (`number`)",
+            "Any arbitrary filtering criteria",
+            "`SELECT COUNT(*) FROM ... WHERE ...`"
+          ],
+          [
+            "`aggregate`",
+            "Min, Max, Avg, Sum, Count calculations",
+            "Any aggregation fields",
+            "`SELECT AVG(price), SUM(total) FROM ...`"
+          ],
+          [
+            "`groupBy`",
+            "Aggregated groups of data",
+            "Group by specific scalar columns",
+            "`SELECT status, COUNT(*) FROM ... GROUP BY status`"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "findUnique vs findFirst: Architectural Difference"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "`findMany` returns an array of records. It is the most common query method and supports filtering, sorting, and pagination."
+        "text": "A common question in database interviews is why Prisma differentiates `findUnique` from `findFirst`. `findUnique` enforces at compile-time that you query by an indexed unique field (e.g. `id`, `email`, or a composite `@@unique`). This guarantees that PostgreSQL performs an index lookup with `O(log N)` complexity. In contrast, `findFirst` allows non-unique filters which might result in sequential table scans if not indexed properly."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "findMany Example",
-        "content": "Fetch all published posts.",
-        "code": "const posts = await prisma.post.findMany({\n  where: { published: true },\n  orderBy: { createdAt: 'desc' }\n});",
-        "language": "typescript"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "findUnique and findFirst"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "**findUnique** — Requires a unique field in the `where` clause. Throws if no record is found.",
-          "**findFirst** — Returns the first record matching the `where` clause, or `null` if none found."
-        ]
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "findUnique Example",
-        "content": "Fetch a user by unique email.",
-        "code": "const user = await prisma.user.findUnique({\n  where: { email: 'alice@example.com' }\n});",
-        "language": "typescript"
+        "title": "findUnique vs findFirst Code Sample",
+        "content": "Observe the TypeScript constraint enforcement on where arguments.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\n// 1. findUnique: TypeScript ONLY allows unique fields in 'where'\nconst userByEmail = await prisma.user.findUnique({\n  where: { email: 'sarah@example.com' },\n});\n\n// 2. findFirst: Allows any arbitrary filters with ordering\nconst latestActiveUser = await prisma.user.findFirst({\n  where: { \n    role: 'ADMIN',\n    isActive: true \n  },\n  orderBy: { createdAt: 'desc' },\n});"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "warning",
-        "title": "Note",
-        "text": "`findUnique` requires a field marked with `@unique` in your schema. If you need to query by a non-unique field, use `findFirst`."
+        "variant": "tip",
+        "title": "Use `findUniqueOrThrow` for Route Handlers",
+        "text": "When building Next.js dynamic routes (e.g. `/api/users/[id]`), `findUniqueOrThrow()` automatically throws a `PrismaClientKnownRequestError` with code `P2025` if the entity is missing, allowing centralized error handling to return an HTTP 404 response."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use `findUnique` whenever querying by primary key or unique fields.",
+          "Use `findFirst` when filtering by non-unique fields or ordering by date.",
+          "`findMany` returns an empty array `[]` when no rows match, while `findUnique` and `findFirst` return `null`."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "create-update-delete-ops",
-    "filtering-and-sorting"
-  ],
-  "courseSlug": "prisma"
+    "select-and-include",
+    "create-update-delete-ops"
+  ]
 }

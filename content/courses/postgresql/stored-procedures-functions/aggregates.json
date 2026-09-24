@@ -1,53 +1,33 @@
 {
-  "id": "lesson-pg-064",
+  "id": "lesson-pg-076",
   "slug": "aggregates",
   "moduleSlug": "stored-procedures-functions",
   "courseSlug": "postgresql",
-  "title": "Aggregates & Extensions",
-  "description": "Create custom aggregates and use extensions.",
+  "title": "User-Defined Aggregate Functions",
+  "description": "Create custom aggregate functions using state transition functions and finalizers with CREATE AGGREGATE.",
   "order": 6,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 35,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
   "tags": [
     "aggregates",
-    "extensions"
+    "create-aggregate",
+    "state-transition",
+    "udf"
   ],
   "blocks": [
     {
-      "type": "heading",
+      "type": "paragraph",
       "data": {
-        "level": 2,
-        "text": "Aggregates"
+        "text": "PostgreSQL allows developers to construct custom aggregate functions by defining a **State Transition Function** (accumulates values row-by-row) and an optional **Final Function** (transforms the accumulated state into the final result)."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Aggregate",
-        "content": "Create aggregate for mode",
+        "title": "Creating a Geometric Mean Aggregate",
+        "content": "Building an aggregate using exp() and avg(ln()).",
         "language": "sql",
-        "code": "CREATE OR REPLACE FUNCTION mode_state(INTERNAL, ANYARRAY)\nRETURNS ANYARRAY\nLANGUAGE SQL\nAS $$ SELECT mode() WITHIN GROUP (ORDER BY $2); $$;\n\nCREATE AGGREGATE mode (ANYARRAY) (\n  SFUNC = mode_state,\n  STYPE = ANYARRAY,\n  FINALFUNC = mode_state\n);"
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use extensions such as tablefunc and earthdistance for advanced aggregates."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Create Aggregate",
-        "description": "Create custom aggregate for string_agg with order.",
-        "steps": [
-          "Create aggregate",
-          "Use ordered_set",
-          "Use for data"
-        ],
-        "expectedOutcome": "Aggregate created."
+        "code": "-- 1. Transition function: adds natural log of value to running sum and count\nCREATE OR REPLACE FUNCTION geo_mean_state(state NUMERIC[], val NUMERIC)\nRETURNS NUMERIC[] AS $$\nBEGIN\n    IF val > 0 THEN\n        RETURN ARRAY[state[1] + LN(val), state[2] + 1];\n    END IF;\n    RETURN state;\nEND;\n$$ LANGUAGE plpgsql IMMUTABLE;\n\n-- 2. Final function: computes EXP(sum_ln / count)\nCREATE OR REPLACE FUNCTION geo_mean_final(state NUMERIC[])\nRETURNS NUMERIC AS $$\nBEGIN\n    IF state[2] > 0 THEN\n        RETURN EXP(state[1] / state[2]);\n    END IF;\n    RETURN NULL;\nEND;\n$$ LANGUAGE plpgsql IMMUTABLE;\n\n-- 3. Define the Aggregate\nCREATE AGGREGATE geometric_mean (NUMERIC) (\n    SFUNC = geo_mean_state,\n    STYPE = NUMERIC[],\n    FINALFUNC = geo_mean_final,\n    INITCOND = '{0, 0}'\n);"
       }
     },
     {
@@ -55,13 +35,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Create custom aggregates with CREATE AGGREGATE.",
-          "Use ordered-set aggregates.",
-          "Use extensions for reusable logic."
+          "`CREATE AGGREGATE` combines state transition and finalizer functions.",
+          "State is preserved in an accumulator (`STYPE`) across all evaluated rows.",
+          "Custom aggregates integrate natively with `GROUP BY` and window `OVER` clauses."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "aggregate-functions",
+    "plpgsql-functions"
+  ]
 }

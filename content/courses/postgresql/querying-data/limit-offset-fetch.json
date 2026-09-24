@@ -3,61 +3,61 @@
   "slug": "limit-offset-fetch",
   "moduleSlug": "querying-data",
   "courseSlug": "postgresql",
-  "title": "LIMIT, OFFSET, and FETCH",
-  "description": "Page results with LIMIT, OFFSET, and SQL-standard FETCH.",
+  "title": "LIMIT, OFFSET, and Keyset Pagination",
+  "description": "Compare classic LIMIT/OFFSET with SQL-standard FETCH FIRST and implement high-performance keyset pagination.",
   "order": 7,
-  "difficulty": "beginner",
-  "estimatedMinutes": 35,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
   "tags": [
     "limit",
     "offset",
-    "pagination"
+    "fetch",
+    "pagination",
+    "keyset"
   ],
   "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Limiting result set size is essential for API pagination and user interfaces. PostgreSQL supports both the traditional `LIMIT / OFFSET` syntax and the SQL:2008 standard `FETCH FIRST ... ROWS ONLY` syntax."
+      }
+    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "LIMIT, OFFSET, and FETCH"
+        "text": "Syntax Comparison: LIMIT vs FETCH FIRST"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "LIMIT and OFFSET",
-        "content": "Page through results",
+        "title": "PostgreSQL LIMIT vs SQL Standard FETCH",
+        "content": "Both produce identical execution plans in PostgreSQL.",
         "language": "sql",
-        "code": "SELECT id, name\nFROM products\nORDER BY created_at DESC\nLIMIT $1 OFFSET $2;"
+        "code": "-- PostgreSQL native syntax\nSELECT id, title FROM articles\nORDER BY published_at DESC\nLIMIT 10 OFFSET 20;\n\n-- SQL:2008 Standard syntax\nSELECT id, title FROM articles\nORDER BY published_at DESC\nOFFSET 20 ROWS\nFETCH NEXT 10 ROWS ONLY;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The High Cost of Deep Offsets & The Keyset Solution"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When executing `OFFSET 500000 LIMIT 10`, PostgreSQL must physically scan 500,000 rows through an index or table before returning the 10 target rows. Keyset pagination (cursor-based pagination) eliminates this by seeking directly to the next row via an index seek predicate."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "FETCH",
-        "content": "SQL-standard pagination",
+        "title": "Keyset (Cursor-Based) Pagination Query",
+        "content": "Runs in constant O(1) time regardless of whether you are on page 1 or page 50,000.",
         "language": "sql",
-        "code": "SELECT id, name\nFROM products\nORDER BY created_at DESC\nFETCH NEXT 25 ROWS ONLY;"
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "warning",
-        "title": "Cursors",
-        "text": "For large result sets, consider DECLARE CURSOR to avoid repeated scans."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Paginate Products",
-        "description": "Implement page-based pagination for a product catalog.",
-        "steps": [
-          "Use LIMIT and OFFSET",
-          "Use FETCH NEXT",
-          "Use keyset pagination for deep pages"
-        ],
-        "expectedOutcome": "Correct pagination queries."
+        "code": "-- Page 1: Initial query\nSELECT id, title, created_at FROM articles\nORDER BY created_at DESC, id DESC\nLIMIT 10;\n\n-- Page 2: Fetch rows using cursor (last_created_at, last_id)\nSELECT id, title, created_at FROM articles\nWHERE (created_at, id) < ('2024-01-01 10:00:00'::timestamptz, 'art-123')\nORDER BY created_at DESC, id DESC\nLIMIT 10;"
       }
     },
     {
@@ -65,13 +65,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use LIMIT and OFFSET for simple pagination.",
-          "Use FETCH NEXT for SQL-standard syntax.",
-          "Avoid deep OFFSET on large tables."
+          "`LIMIT` and `FETCH FIRST` restrict the number of rows returned.",
+          "`OFFSET` skips rows but suffers severe performance degradation on large tables.",
+          "Use keyset pagination (`WHERE (col, id) < (cursor_col, cursor_id)`) for scalable feeds."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "order-by",
+    "select-statement"
+  ]
 }

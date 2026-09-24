@@ -1,84 +1,85 @@
 {
-  "id": "lesson-prisma-039",
+  "id": "lesson-prisma-040",
   "slug": "prisma-security-best-practices",
-  "moduleSlug": "prisma-nextjs-integration",
+  "moduleSlug": "07-prisma-nextjs-integration",
   "courseSlug": "prisma",
   "title": "Prisma Security Best Practices",
-  "description": "Apply security best practices including parameterized queries, input validation, and avoiding raw queries.",
-  "order": 7,
-  "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "description": "Guard against SQL injection, enforce authorization at the database layer, sanitize inputs, and prevent data leakage.",
+  "order": 8,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
   "tags": [
     "prisma",
     "security",
+    "authorization",
     "sql-injection",
-    "validation"
+    "tenant-isolation"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client automatically parameterizes queries, protecting you from SQL injection. However, there are still security considerations when building applications with Prisma."
+        "text": "Prisma Client protects against classic SQL injection by default because all query builder arguments are converted into parameterized queries. However, web security extends far beyond SQL injection: multi-tenant data leakage, mass assignment vulnerabilities, and unverified ID lookups remain common threats."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Prisma's Built-in Protections"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "All queries are parameterized by default",
-          "Input validation should happen before passing data to Prisma",
-          "Use `$queryRaw` and `$executeRaw` only when necessary and with validated inputs"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Input Validation"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Validating Input",
-        "content": "Validate user input before passing to Prisma.",
-        "code": "import { z } from 'zod';\n\nconst CreateUserSchema = z.object({\n  email: z.string().email(),\n  name: z.string().min(1).max(100)\n});\n\nexport async function createUser(input: unknown) {\n  const data = CreateUserSchema.parse(input);\n\n  return prisma.user.create({ data });\n}",
-        "language": "typescript"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Avoiding Raw Queries"
+        "text": "Critical Rule: Tenant Isolation & Scoped Queries"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Prefer Prisma's query methods over raw queries. When you must use raw queries, always validate and sanitize inputs, and use parameterized queries."
+        "text": "In B2B SaaS or multi-user applications, an attacker can modify a URL parameter (e.g. `/api/documents/doc-123`) to view or mutate another tenant's private data (Insecure Direct Object Reference / IDOR). Always scope queries with the authenticated user or tenant ID!"
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "danger",
-        "title": "Security",
-        "text": "Never concatenate user input into raw SQL strings. Use template literal syntax with `$queryRaw` which safely parameterizes values."
+        "title": "Vulnerable vs Secure Scoped Query",
+        "content": "Preventing IDOR by enforcing user ownership in the where clause.",
+        "language": "typescript",
+        "code": "// ❌ INSECURE: Vulnerable to IDOR (any authenticated user can delete any invoice)\n// await prisma.invoice.delete({\n//   where: { id: invoiceId }\n// });\n\n// ✅ SECURE: Scoped to the authenticated user's organization\nexport async function deleteUserInvoice(invoiceId: string, orgId: string) {\n  return await prisma.invoice.delete({\n    where: {\n      id: invoiceId,\n      organizationId: orgId, // Must match tenant constraint!\n    }\n  });\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Safe Raw SQL with `Prisma.sql` Tagged Template"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When using `prisma.$queryRaw`, NEVER concatenate raw strings! Always use the tagged template `Prisma.sql` which automatically parameterizes variables."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe Parameterized Raw Query",
+        "content": "Prisma automatically escapes parameters passed inside the template literal.",
+        "language": "typescript",
+        "code": "import { Prisma } from '@prisma/client';\nimport { prisma } from '@/lib/prisma';\n\nasync function searchUsersByName(nameInput: string) {\n  // ✅ SAFE: Tagged template creates parameterized query ($1)\n  return await prisma.$queryRaw<User[]>`\n    SELECT id, name, email \n    FROM \"users\" \n    WHERE name ILIKE ${'%' + nameInput + '%'}\n  `;\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Prisma Client query builder is 100% immune to SQL injection through parameterization.",
+          "Always enforce tenant isolation in `where` clauses to prevent IDOR attacks.",
+          "Always use `Prisma.sql` tagged template literals when executing `$queryRaw`."
+        ]
       }
     }
   ],
   "relatedLessons": [
     "prisma-with-authentication",
-    "prisma-cicd-deployment"
-  ],
-  "courseSlug": "prisma"
+    "prisma-performance-optimization"
+  ]
 }

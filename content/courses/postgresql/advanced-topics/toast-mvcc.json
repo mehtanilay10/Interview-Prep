@@ -1,60 +1,68 @@
 {
-  "id": "lesson-pg-080",
+  "id": "lesson-pg-097",
   "slug": "toast-mvcc",
   "moduleSlug": "advanced-topics",
   "courseSlug": "postgresql",
-  "title": "TOAST & MVCC",
-  "description": "Understand TOAST for large values and MVCC snapshots.",
-  "order": 6,
+  "title": "TOAST Storage & MVCC Internals",
+  "description": "Deep dive into PostgreSQL page architecture (8KB pages), TOAST out-of-line compression, xmin/xmax tuple headers, and visibility maps.",
+  "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 35,
   "tags": [
     "toast",
-    "mvcc",
-    "ctid"
+    "mvcc-internals",
+    "8kb-pages",
+    "tuple-headers",
+    "xmin-xmax"
   ],
   "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "PostgreSQL stores table data in fixed-size **8KB disk pages**. Because a physical row tuple cannot span across multiple pages, how does PostgreSQL store large values like a 10MB text article or a 50MB PDF? The answer is **TOAST (The Oversized-Attribute Storage Technique)**."
+      }
+    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "TOAST & MVCC"
+        "text": "How TOAST Works Under the Hood"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "TOAST stores large values externally. MVCC provides multi-version concurrency control."
+        "text": "When a row exceeds ~2KB (one-fourth of an 8KB page), the TOAST engine first attempts to compress large columns using `pglz` or `lz4`. If still too large, it moves the column data out of the main heap table into a separate secondary TOAST table, leaving only an 18-byte pointer in the main row tuple."
       }
     },
     {
-      "type": "example",
+      "type": "heading",
       "data": {
-        "title": "CTID",
-        "content": "Use CTID for physical row IDs",
-        "language": "sql",
-        "code": "SELECT ctid, xmin, cmin, xmax, cmax, t.om\nFROM users AS t\nWHERE id = $1;"
+        "level": 2,
+        "text": "MVCC Tuple Headers: `xmin` and `xmax`"
       }
     },
     {
-      "type": "callout",
+      "type": "table",
       "data": {
-        "variant": "info",
-        "title": "TOAST",
-        "text": "PostgreSQL TOASTs values over 2 KB."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Inspect MVCC",
-        "description": "Inspect CTID and transaction IDs.",
-        "steps": [
-          "Select ctid",
-          "Inspect xmin",
-          "Check ctid"
+        "headers": [
+          "Header Field",
+          "Role in MVCC Snapshot Visibility"
         ],
-        "expectedOutcome": "Query returns MVCC metadata."
+        "rows": [
+          [
+            "`xmin`",
+            "The transaction ID that inserted this tuple. A transaction can only see this row if `xmin` has committed."
+          ],
+          [
+            "`xmax`",
+            "The transaction ID that deleted or updated this tuple. Once committed, transactions starting afterward consider this row invisible."
+          ],
+          [
+            "`ctid`",
+            "The physical location of the tuple on disk `(page_number, tuple_index)`."
+          ]
+        ]
       }
     },
     {
@@ -62,13 +70,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "TOAST stores large values externally.",
-          "MVCC provides snapshots.",
-          "CTID identifies physical rows."
+          "TOAST transparently compresses and splits large columns into secondary storage.",
+          "Reading a table without requesting TOAST columns avoids reading TOAST tables entirely.",
+          "`xmin` and `xmax` embedded in every tuple header power PostgreSQL's lock-free MVCC snapshots."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "partitioning",
+    "vacuum-analyze"
+  ]
 }

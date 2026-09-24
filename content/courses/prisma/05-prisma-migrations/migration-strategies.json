@@ -1,77 +1,84 @@
 {
-  "id": "lesson-prisma-026",
+  "id": "lesson-prisma-025",
   "slug": "migration-strategies",
-  "moduleSlug": "prisma-migrations",
+  "moduleSlug": "05-prisma-migrations",
   "courseSlug": "prisma",
-  "title": "Migration Strategies for Teams",
-  "description": "Manage Prisma migrations in team environments and handle merge conflicts and branching.",
-  "order": 6,
+  "title": "Zero-Downtime Migration Strategies",
+  "description": "Learn blue-green schema migration patterns, the Expand and Contract pattern, and avoiding table locks on high-traffic tables.",
+  "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 35,
   "tags": [
     "prisma",
-    "migrations",
-    "git",
-    "team-workflow"
+    "zero-downtime",
+    "expand-contract",
+    "production",
+    "locks"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "When multiple developers work on the same codebase, migration conflicts are common. Prisma Migrate provides strategies to handle these situations gracefully."
+        "text": "In high-availability web applications, deploying database changes cannot involve taking the database offline. A common mistake is renaming a column in a single migration while deploying code simultaneously; during the rolling deployment, old servers crash when querying the old column name, while new servers crash if the migration hasn't finished yet. The **Expand and Contract Pattern** solves this problem completely."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Common Scenarios"
+        "text": "The Expand and Contract Pattern"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "mermaid",
       "data": {
+        "id": "mermaid-expand-contract",
+        "caption": "Expand and Contract 3-Phase Migration",
+        "definition": "flowchart TD\n    A[Phase 1: Expand] -->|Add new column as nullable| B[Deploy DB Migration]\n    B --> C[Deploy App Code: writes to both old & new columns]\n    C --> D[Backfill existing rows in background]\n    D --> E[Deploy App Code: reads strictly from new column]\n    E --> F[Phase 2: Contract] -->|Drop old column| G[Final DB Migration]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Phase Breakdown with Example"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Renaming `fullName` to `firstName` and `lastName` Safely",
         "items": [
-          "**Divergent migrations** — Two developers create migrations with the same timestamp",
-          " **Baseline reset** — Reset the migration history when the schema drifts too far",
-          "**Squash migrations** — Combine old migrations into a single baseline for production"
+          "**Step 1 (Expand)**: Add `firstName` and `lastName` as optional columns. Run `prisma migrate deploy`. Both old and new application code continue running without error.",
+          "**Step 2 (Dual Write)**: Deploy application update that writes to both `fullName` and the new columns, while continuing to read from `fullName`.",
+          "**Step 3 (Backfill)**: Run a background script to parse and populate `firstName` and `lastName` for historical records.",
+          "**Step 4 (Switch Read)**: Deploy application update that reads strictly from `firstName` and `lastName`.",
+          "**Step 5 (Contract)**: Remove `fullName` from `schema.prisma` and create a migration to drop the column. Run `prisma migrate deploy`."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Handling Conflicts"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "When you encounter a migration conflict, you can use `prisma migrate resolve` to mark a migration as applied or rolled back. This helps keep the migration history consistent across environments."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Resolve a Migration",
-        "content": "Mark a migration as applied without running it.",
-        "code": "npx prisma migrate resolve --applied 20231201_add_posts",
-        "language": "bash"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "important",
-        "title": "Best Practice",
-        "text": "Pull the latest migrations before creating new ones. If a conflict occurs, communicate with your team and resolve it together before proceeding."
+        "variant": "warning",
+        "title": "PostgreSQL Lock Contention",
+        "text": "Adding a `NOT NULL` constraint without a default value requires an exclusive table lock (`ACCESS EXCLUSIVE`) in PostgreSQL, which can lock the entire table and cause query timeouts on high-traffic applications. Always add columns as nullable first, populate them, and then add constraints."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Never perform breaking schema changes (e.g. column renames/drops) in a single synchronous release.",
+          "Use Expand and Contract: Expand the schema, dual-write, backfill, switch reads, and finally contract.",
+          "Be mindful of PostgreSQL table-level locks when modifying large tables."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "prisma-migrate-deploy",
-    "prisma-cicd-deployment"
-  ],
-  "courseSlug": "prisma"
+    "migrations-overview",
+    "prisma-migrate-deploy"
+  ]
 }

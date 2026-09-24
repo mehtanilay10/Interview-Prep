@@ -1,74 +1,79 @@
 {
-  "id": "lesson-prisma-038",
+  "id": "lesson-prisma-039",
   "slug": "prisma-performance-optimization",
-  "moduleSlug": "prisma-nextjs-integration",
+  "moduleSlug": "07-prisma-nextjs-integration",
   "courseSlug": "prisma",
-  "title": "Prisma Performance Optimization",
-  "description": "Optimize Prisma queries with indexes, select/include, and EXPLAIN for production performance.",
-  "order": 6,
+  "title": "Performance Optimization in Next.js",
+  "description": "Eliminate query waterfalls, implement parallel data fetching, optimize connection pools, and leverage React cache().",
+  "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
     "performance",
-    "indexes",
-    "explain",
-    "optimization"
+    "optimization",
+    "waterfalls",
+    "react-cache"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Performance optimization in Prisma involves selecting the right queries, adding database indexes, and analyzing query plans. Small changes can have a large impact on response times."
+        "text": "When building data-intensive applications in Next.js, poorly structured database queries create significant latency. By adopting parallel fetching (`Promise.all`), eliminating sequential waterfalls, and deduplicating queries using React `cache()`, you can drastically reduce page load times."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Adding Indexes"
+        "text": "Pattern 1: Parallel Data Fetching with Promise.all"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Index Definition",
-        "content": "Add an index to the email field.",
-        "code": "model User {\n  id        Int      @id @default(autoincrement())\n  email     String   @unique\n  name      String\n\n  @@index([name])\n}",
-        "language": "prisma"
+        "title": "Sequential Waterfall vs Parallel Execution",
+        "content": "Executing independent database queries concurrently.",
+        "language": "typescript",
+        "code": "// ❌ SLOW: Sequential waterfall (Query 2 waits for Query 1)\n// const user = await prisma.user.findUnique({ where: { id } });\n// const notifications = await prisma.notification.findMany({ where: { userId: id } });\n// const stats = await prisma.stat.findFirst();\n\n// ✅ FAST: Parallel execution in a single roundtrip batch\nconst [user, notifications, stats] = await Promise.all([\n  prisma.user.findUnique({ where: { id } }),\n  prisma.notification.findMany({ where: { userId: id }, take: 10 }),\n  prisma.stat.findFirst(),\n]);"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Optimization Strategies"
+        "text": "Pattern 2: Request Deduplication with React `cache()`"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Use `select` to fetch only the fields you need",
-          "Use `include` instead of multiple queries for relations",
-          "Add indexes on frequently filtered or sorted columns",
-          "Use cursor pagination for large datasets",
-          "Avoid N+1 queries by using `include` or relation filters"
+        "text": "In React Server Components, multiple components in the component tree (e.g. `Navbar`, `Sidebar`, and `ProfilePage`) often need the same current user profile. Wrapping your Prisma query with React's `cache()` deduplicates the query within a single render pass, executing the SQL query exactly once."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "lib/data/user.ts with React cache()",
+        "content": "Deduplicated query accessible across multiple Server Components.",
+        "language": "typescript",
+        "code": "import { cache } from 'react';\nimport { prisma } from '@/lib/prisma';\n\nexport const getCurrentUser = cache(async (userId: string) => {\n  console.log(`[DB Query] Fetching user ${userId} once per render`);\n  return await prisma.user.findUnique({\n    where: { id: userId },\n    select: { id: true, name: true, email: true, image: true }\n  });\n});"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use `Promise.all` to fetch independent datasets in parallel.",
+          "Use React `cache()` to deduplicate identical Prisma queries across the component tree.",
+          "Always use `select` to minimize database bandwidth and memory consumption."
         ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Always run `EXPLAIN ANALYZE` on slow queries. Prisma's query logging makes it easy to copy and analyze queries in a PostgreSQL client."
       }
     }
   ],
   "relatedLessons": [
-    "query-logging-and-performance",
-    "select-and-include"
-  ],
-  "courseSlug": "prisma"
+    "prisma-in-nextjs-app-router",
+    "query-logging-and-performance"
+  ]
 }

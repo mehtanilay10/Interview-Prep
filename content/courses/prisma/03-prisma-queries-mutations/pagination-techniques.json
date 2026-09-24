@@ -1,82 +1,103 @@
 {
   "id": "lesson-prisma-014",
   "slug": "pagination-techniques",
-  "moduleSlug": "prisma-queries-mutations",
+  "moduleSlug": "03-prisma-queries-mutations",
   "courseSlug": "prisma",
   "title": "Pagination Techniques",
-  "description": "Implement offset-based and cursor-based pagination with Prisma Client.",
+  "description": "Compare Offset-based vs Keyset (Cursor-based) pagination in Prisma and implement scalable infinite scrolling.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
     "pagination",
+    "cursor",
     "offset",
-    "cursor"
+    "performance"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Pagination is essential for APIs that return large datasets. Prisma supports two main pagination strategies: offset-based and cursor-based."
+        "text": "When serving large datasets to client applications, loading all rows at once overwhelms memory and network bandwidth. Prisma provides first-class support for both **Offset-based pagination** and **Cursor-based pagination**."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Offset Pagination"
+        "text": "Offset vs Cursor Pagination Comparison"
       }
     },
     {
-      "type": "paragraph",
+      "type": "table",
       "data": {
-        "text": "Offset pagination uses `skip` and `take` to page through results. It is simple but can be slow on large tables because the database must scan and discard skipped rows."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Offset Pagination",
-        "content": "Fetch page 2 with 10 items per page.",
-        "code": "const page = 2;\nconst pageSize = 10;\n\nconst posts = await prisma.post.findMany({\n  skip: (page - 1) * pageSize,\n  take: pageSize,\n  orderBy: { createdAt: 'desc' }\n});",
-        "language": "typescript"
+        "headers": [
+          "Strategy",
+          "Prisma Arguments",
+          "Performance",
+          "Best Used For"
+        ],
+        "rows": [
+          [
+            "Offset Pagination",
+            "`skip: 20, take: 10`",
+            "Degrades linearly `O(N)` on large offsets",
+            "Admin dashboards with explicit page numbers (Page 1, 2, 3)"
+          ],
+          [
+            "Cursor (Keyset) Pagination",
+            "`cursor: { id: lastId }, skip: 1, take: 10`",
+            "Constant `O(1)` index seek performance",
+            "Infinite scroll feeds (Twitter, Instagram, mobile apps)"
+          ]
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Cursor Pagination"
+        "text": "Why Offset Pagination Degrades at Scale"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Cursor pagination uses a unique cursor (usually an ID or timestamp) to fetch the next page. It is more stable when data changes between requests."
+        "text": "When you execute `SELECT * FROM orders OFFSET 100000 LIMIT 10`, PostgreSQL must scan and count 100,000 index entries or table rows before discarding them and returning the 10 rows. As the offset increases, query latency spikes significantly."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Cursor Pagination",
-        "content": "Fetch the next page after a given cursor.",
-        "code": "const posts = await prisma.post.findMany({\n  take: 10,\n  skip: 1,\n  cursor: { id: lastSeenId },\n  orderBy: { id: 'asc' }\n});",
-        "language": "typescript"
+        "title": "Production Keyset / Cursor Pagination Implementation",
+        "content": "High-performance infinite scrolling with cursor and skip.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\ninterface FetchPostsParams {\n  limit?: number;\n  cursor?: string; // ID of the last item from previous fetch\n}\n\nexport async function getPaginatedPosts({ limit = 10, cursor }: FetchPostsParams) {\n  const posts = await prisma.post.findMany({\n    take: limit + 1, // Fetch 1 extra item to determine if hasNextPage is true\n    skip: cursor ? 1 : 0, // Skip the cursor itself\n    cursor: cursor ? { id: cursor } : undefined,\n    orderBy: { id: 'desc' }, // Must order by unique cursor field\n  });\n\n  let nextCursor: string | undefined = undefined;\n  if (posts.length > limit) {\n    const nextItem = posts.pop(); // Remove the extra probe item\n    nextCursor = nextItem?.id;\n  }\n\n  return {\n    items: posts,\n    nextCursor,\n    hasNextPage: Boolean(nextCursor)\n  };\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use cursor pagination for infinite scroll feeds and real-time data. Use offset pagination for traditional page numbers where stability is not critical."
+        "variant": "important",
+        "title": "Cursor Rule",
+        "text": "The field specified in `cursor` MUST be a unique column (e.g. `@id` or `@unique`). If you order by `createdAt`, you should sort by a composite unique key like `[createdAt, id]`."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use offset pagination (`skip`/`take`) only for small datasets or explicit page-number controls.",
+          "Use cursor pagination for infinite scrolling and high-throughput feeds.",
+          "Always sort by the cursor field (or a composite key including the cursor) to ensure deterministic results."
+        ]
       }
     }
   ],
   "relatedLessons": [
     "filtering-and-sorting",
     "select-and-include"
-  ],
-  "courseSlug": "prisma"
+  ]
 }

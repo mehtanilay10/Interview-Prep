@@ -3,52 +3,81 @@
   "slug": "delete",
   "moduleSlug": "data-modification-dml",
   "courseSlug": "postgresql",
-  "title": "DELETE",
-  "description": "Delete rows with RETURNING and soft delete patterns.",
+  "title": "DELETE Statement vs TRUNCATE",
+  "description": "Remove rows safely, compare DELETE and TRUNCATE performance and locking, and understand WAL generation.",
   "order": 4,
   "difficulty": "beginner",
-  "estimatedMinutes": 35,
+  "estimatedMinutes": 20,
   "tags": [
     "delete",
-    "dml",
-    "returning"
+    "truncate",
+    "table-locks",
+    "wal",
+    "vacuum"
   ],
   "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Deleting rows can be accomplished with either `DELETE` or `TRUNCATE`. While both remove records, their underlying database engine implementations and performance profiles are radically different."
+      }
+    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "DELETE"
+        "text": "DELETE vs TRUNCATE Comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Attribute",
+          "`DELETE`",
+          "`TRUNCATE`"
+        ],
+        "rows": [
+          [
+            "Filtering (`WHERE`)",
+            "Supported (filters specific rows)",
+            "Not supported (wipes entire table)"
+          ],
+          [
+            "Mechanism",
+            "Marks each tuple as dead (requires VACUUM later)",
+            "Deallocates disk pages immediately; creates new empty file"
+          ],
+          [
+            "WAL Overhead",
+            "High (logs deletion of every single row)",
+            "Minimal (logs only storage deallocation)"
+          ],
+          [
+            "Lock Level",
+            "`ROW EXCLUSIVE` (concurrent reads allowed)",
+            "`ACCESS EXCLUSIVE` (locks entire table from all reads/writes)"
+          ],
+          [
+            "Triggers",
+            "Fires row-level `ON DELETE` triggers",
+            "Fires only statement-level `ON TRUNCATE` triggers"
+          ],
+          [
+            "Transaction Safe",
+            "Yes (can be rolled back)",
+            "Yes (can be rolled back in PostgreSQL!)"
+          ]
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Delete",
-        "content": "Delete and return rows",
+        "title": "DELETE with USING Clause and RETURNING",
+        "content": "Deleting records matching criteria in another table.",
         "language": "sql",
-        "code": "DELETE FROM users\nWHERE deleted_at IS NULL\n  AND last_login_at < CURRENT_DATE - INTERVAL '3 years'\nRETURNING id, email;"
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "Soft Delete",
-        "text": "Prefer soft delete with deleted_at unless physical removal is required."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Cleanup Users",
-        "description": "Delete inactive users with RETURNING.",
-        "steps": [
-          "Filter last login",
-          "Use RETURNING",
-          "Order by id"
-        ],
-        "expectedOutcome": "Query returns deleted rows."
+        "code": "DELETE FROM session_tokens st\nUSING expired_accounts ea\nWHERE st.user_id = ea.user_id\nRETURNING st.id, st.user_id;"
       }
     },
     {
@@ -56,13 +85,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use DELETE for rows.",
-          "Use RETURNING for confirmation.",
-          "Prefer soft delete in apps."
+          "Use `DELETE` when removing specific filtered rows.",
+          "Use `TRUNCATE` when emptying an entire table; it is hundreds of times faster.",
+          "In PostgreSQL, `TRUNCATE` is fully transaction-safe and can be rolled back."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "update",
+    "merge"
+  ]
 }

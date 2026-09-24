@@ -1,76 +1,96 @@
 {
   "id": "lesson-prisma-028",
   "slug": "middleware-and-extensions",
-  "moduleSlug": "prisma-advanced-features",
+  "moduleSlug": "06-prisma-advanced-features",
   "courseSlug": "prisma",
-  "title": "Middleware and Extensions",
-  "description": "Use Prisma Client middleware and extensions to add cross-cutting concerns like logging and caching.",
+  "title": "Client Extensions and Middleware",
+  "description": "Extend Prisma Client with custom methods, query hooks, computed fields, and automated soft delete filtering using Prisma Client Extensions.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
-    "middleware",
     "extensions",
-    "logging"
+    "middleware",
+    "soft-delete",
+    "computed-fields"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client middleware lets you intercept and modify queries before they are executed. Extensions are the newer, more powerful mechanism for adding cross-cutting concerns."
+        "text": "Prisma Client Extensions (`$extends`) is the modern, type-safe API that supersedes legacy middleware (`$use`). Extensions allow you to hook into queries, add custom model methods, compute virtual fields on the fly, and transform client behavior while preserving 100% TypeScript type inference."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Middleware"
+        "text": "The Four Types of Client Extensions"
       }
     },
     {
-      "type": "paragraph",
+      "type": "table",
       "data": {
-        "text": "Middleware wraps Prisma Client methods. It runs for every query and can modify parameters, log queries, or implement caching."
+        "headers": [
+          "Extension Component",
+          "Purpose",
+          "Example Application"
+        ],
+        "rows": [
+          [
+            "`model`",
+            "Adds custom methods to specific models",
+            "`prisma.user.signUp(...)`"
+          ],
+          [
+            "`client`",
+            "Adds global methods to the entire Prisma Client",
+            "`prisma.$metrics.json()`"
+          ],
+          [
+            "`query`",
+            "Intercepts and modifies query arguments or results",
+            "Automated soft-delete filtering (`where: { deletedAt: null }`)"
+          ],
+          [
+            "`result`",
+            "Adds virtual/computed fields to returned records",
+            "Computed `fullName = `${firstName} ${lastName}``"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comprehensive Extension Example: Soft Deletes & Computed Fields"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Logging Middleware",
-        "content": "Add a middleware that logs every query.",
-        "code": "const prisma = new PrismaClient().$extends({\n  query: {\n    $allModels: {\n      $allOperations: {\n        async $allOperations({ model, operation, args, query }) {\n          const start = Date.now();\n          const result = await query(args);\n          console.log(`${model}.${operation} took ${Date.now() - start}ms`);\n          return result;\n        }\n      }\n    }\n  }\n});",
-        "language": "typescript"
+        "title": "lib/prisma-extended.ts",
+        "content": "Implementing automatic soft-delete and virtual full name property.",
+        "language": "typescript",
+        "code": "import { PrismaClient } from '@prisma/client';\n\nconst basePrisma = new PrismaClient();\n\nexport const extendedPrisma = basePrisma.$extends({\n  // 1. Computed Fields: Virtual properties added to model results\n  result: {\n    user: {\n      fullName: {\n        needs: { firstName: true, lastName: true },\n        compute(user) {\n          return `${user.firstName} ${user.lastName}`.trim();\n        },\n      },\n    },\n  },\n  // 2. Query Hooks: Transparently exclude soft-deleted records\n  query: {\n    user: {\n      async findMany({ args, query }) {\n        args.where = { ...args.where, deletedAt: null };\n        return query(args);\n      },\n      async findFirst({ args, query }) {\n        args.where = { ...args.where, deletedAt: null };\n        return query(args);\n      },\n    },\n  },\n});"
       }
     },
     {
-      "type": "heading",
+      "type": "summary-box",
       "data": {
-        "level": 2,
-        "text": "Extensions vs Middleware"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "**Middleware** — Legacy; wraps all operations globally",
-          "**Extensions** — Recommended; more granular, type-safe, and composable"
+        "title": "Key Takeaways",
+        "points": [
+          "Use Prisma Client Extensions (`$extends`) instead of deprecated `$use` middleware.",
+          "`result` extensions add computed fields that appear directly in TypeScript autocomplete.",
+          "`query` hooks allow implementing global soft-deletes and auditing transparently."
         ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use extensions for new code. They provide better TypeScript support and allow you to compose multiple extensions cleanly."
       }
     }
   ],
   "relatedLessons": [
-    "query-logging-and-performance",
-    "error-handling"
-  ],
-  "courseSlug": "prisma"
+    "transactions-and-interactive-transactions",
+    "query-logging-and-performance"
+  ]
 }

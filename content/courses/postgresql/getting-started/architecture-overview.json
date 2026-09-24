@@ -3,78 +3,95 @@
   "slug": "architecture-overview",
   "moduleSlug": "getting-started",
   "courseSlug": "postgresql",
-  "title": "PostgreSQL Architecture",
-  "description": "Explore PostgreSQL process model, shared memory, and WAL.",
+  "title": "PostgreSQL Architecture & Process Model",
+  "description": "Understand the multi-process architecture, Postmaster, shared memory segments, WAL buffers, and background worker daemons.",
   "order": 2,
-  "difficulty": "beginner",
-  "estimatedMinutes": 35,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
   "tags": [
     "architecture",
+    "postmaster",
     "processes",
+    "shared-memory",
     "wal"
   ],
   "blocks": [
     {
+      "type": "paragraph",
+      "data": {
+        "text": "Unlike modern threaded database engines like MySQL (InnoDB) or Microsoft SQL Server, PostgreSQL utilizes a **process-based client-server architecture**. Every client connection that connects to PostgreSQL is handled by a dedicated operating system process called a **backend process** (or `postgres` backend worker)."
+      }
+    },
+    {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "PostgreSQL Architecture"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "PostgreSQL uses a process model with a postmaster and multiple backend processes. Shared buffers and WAL provide durability and concurrency."
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "title": "Core Processes",
-        "items": [
-          "postmaster - main process",
-          "backend - one per connection",
-          "background writer - writes dirty buffers",
-          "WAL writer - writes WAL buffers",
-          "autovacuum - cleans dead tuples",
-          "logical replication launcher"
-        ]
+        "text": "PostgreSQL Memory & Process Layout"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-pg-arch",
-        "caption": "PostgreSQL process model",
-        "definition": "flowchart TD\n    A[postmaster] --> B[backend]\n    A --> C[WAL writer]\n    A --> D[autovacuum]\n    A --> E[background writer]"
+        "id": "mermaid-pg-process-arch",
+        "caption": "PostgreSQL Process and Memory Architecture",
+        "definition": "flowchart TD\n    Client[Client Applications] -->|TCP Connection| Postmaster[postmaster / supervisor]\n    Postmaster -->|fork()| Backend[Backend Worker Processes]\n    subgraph SharedMemory [Shared Memory Area]\n      SharedBuffers[shared_buffers / Data Page Cache]\n      WALBuffers[wal_buffers / Transaction Logs]\n      CLOG[Commit Log / CLOG]\n    end\n    Backend <--> SharedMemory\n    BackgroundWriter[Background Writer / bgwriter] <--> SharedMemory\n    WALWriter[WAL Writer daemon] <--> WALBuffers\n    AutoVacuum[Autovacuum Launcher & Workers] <--> SharedMemory\n    WALWriter --> DiskWAL[(WAL Segment Files on Disk)]\n    BackgroundWriter --> DiskData[(Heap Data Files on Disk)]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core Background Processes"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Process Name",
+          "Primary Role",
+          "Configuration Tuning Parameter"
+        ],
+        "rows": [
+          [
+            "`postmaster`",
+            "Main supervisor process; listens on port 5432 and forks backend processes for new connections.",
+            "`port`, `listen_addresses`"
+          ],
+          [
+            "`backend`",
+            "Dedicated process per client connection that executes SQL queries, plans queries, and returns results.",
+            "`max_connections`, `work_mem`"
+          ],
+          [
+            "`bgwriter` (Background Writer)",
+            "Flushes modified (dirty) pages from `shared_buffers` to disk progressively to avoid sudden I/O spikes.",
+            "`bgwriter_delay`, `bgwriter_lru_maxpages`"
+          ],
+          [
+            "`checkpointer`",
+            "Creates periodic checkpoints, flushing all dirty buffers to disk and guaranteeing WAL recovery points.",
+            "`checkpoint_timeout`, `max_wal_size`"
+          ],
+          [
+            "`walwriter`",
+            "Flushes WAL buffers to disk sequentially to ensure transaction durability.",
+            "`wal_writer_delay`"
+          ],
+          [
+            "`autovacuum`",
+            "Automates dead tuple reclamation and updates planner statistics.",
+            "`autovacuum_max_workers`, `autovacuum_vacuum_cost_limit`"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "PostgreSQL 16 introduces parallel vacuum and incremental sort."
-      }
-    },
-    {
-      "type": "faq-block",
-      "data": {
-        "title": "Architecture FAQ",
-        "items": [
-          {
-            "question": "Does PostgreSQL use threads?",
-            "answer": "Backend processes are operating system processes, not threads."
-          },
-          {
-            "question": "What is the WAL?",
-            "answer": "Write-Ahead Logging ensures changes are logged before data files are modified."
-          },
-          {
-            "question": "What are CTID and xmin?",
-            "answer": "CTID identifies a row physically. xmin tracks the inserting transaction ID."
-          }
-        ]
+        "variant": "warning",
+        "title": "Process Overhead & Connection Starvation",
+        "text": "Because each client connection allocates an OS process consuming 5MB to 10MB of memory, having 2,000 direct connections can consume 20GB of RAM purely on process overhead! This is why external connection poolers like PgBouncer or Odyssey are mandatory in high-traffic applications."
       }
     },
     {
@@ -82,13 +99,16 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "PostgreSQL uses a process-based model.",
-          "WAL provides durability and replication.",
-          "Background processes handle maintenance and recovery."
+          "PostgreSQL uses a multi-process architecture instead of a multi-threaded architecture.",
+          "`shared_buffers` serves as the shared data cache across all backend processes.",
+          "`wal_buffers` and the WAL writer ensure durability before writing to heap pages.",
+          "Connection pooling is required for high concurrency to avoid process exhaustion."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "what-is-postgresql",
+    "installation-setup"
+  ]
 }

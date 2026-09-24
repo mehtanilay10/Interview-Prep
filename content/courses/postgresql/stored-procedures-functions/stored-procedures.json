@@ -1,59 +1,67 @@
 {
-  "id": "lesson-pg-062",
+  "id": "lesson-pg-074",
   "slug": "stored-procedures",
   "moduleSlug": "stored-procedures-functions",
   "courseSlug": "postgresql",
-  "title": "Stored Procedures",
-  "description": "Use stored procedures for transactions and batch operations.",
+  "title": "Stored Procedures (CREATE PROCEDURE) & Transaction Control",
+  "description": "Compare Functions vs Stored Procedures (PG 11+) and control transactions inside procedures with COMMIT and ROLLBACK.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 35,
+  "estimatedMinutes": 25,
   "tags": [
     "stored-procedures",
-    "transactions"
+    "procedures-vs-functions",
+    "transactions",
+    "commit"
   ],
   "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before PostgreSQL 11, developers could only write Functions (`CREATE FUNCTION`). Functions execute within the caller's transaction and cannot commit or roll back. PostgreSQL 11 introduced true **Stored Procedures (`CREATE PROCEDURE`)**, which are invoked via `CALL` and can commit transactions internally."
+      }
+    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Stored Procedures"
+        "text": "Functions vs Stored Procedures"
       }
     },
     {
-      "type": "paragraph",
+      "type": "table",
       "data": {
-        "text": "Stored procedures can manage transactions explicitly and do not return values."
+        "headers": [
+          "Feature",
+          "Function (`CREATE FUNCTION`)",
+          "Stored Procedure (`CREATE PROCEDURE`)"
+        ],
+        "rows": [
+          [
+            "Invocation",
+            "`SELECT my_func()` or in `WHERE/FROM`",
+            "`CALL my_proc()`"
+          ],
+          [
+            "Return Value",
+            "Must return a value (or `void`)",
+            "Does not return values (uses `INOUT` parameters)"
+          ],
+          [
+            "Transaction Control",
+            "Cannot commit or roll back internally",
+            "Can execute `COMMIT` and `ROLLBACK` mid-execution!"
+          ]
+        ]
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Procedure",
-        "content": "Create procedure",
+        "title": "Batch Deletion Procedure with Incremental Commits",
+        "content": "Prevents lock accumulation on large tables by committing every 10,000 rows.",
         "language": "sql",
-        "code": "CREATE OR REPLACE PROCEDURE archive_old_orders(p_months INT)\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  r RECORD;\nBEGIN\n  FOR r IN\n    SELECT id\n    FROM orders\n    WHERE created_at < CURRENT_DATE - (p_months || ' months')::INTERVAL\n    AND status = 'completed'\n  LOOP\n    INSERT INTO archived_orders SELECT * FROM orders WHERE id = r.id;\n    DELETE FROM orders WHERE id = r.id;\n  END LOOP;\n  COMMIT;\nEND;\n$$;"
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use procedures for batch jobs and explicit transaction control."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Archive Procedure",
-        "description": "Create procedure to archive old orders.",
-        "steps": [
-          "Create procedure",
-          "Use loop",
-          "Commit"
-        ],
-        "expectedOutcome": "Procedure archives rows."
+        "code": "CREATE OR REPLACE PROCEDURE purge_old_audit_logs(p_retention_days INT)\nLANGUAGE plpgsql AS $$\nDECLARE\n    v_deleted_count INT;\nBEGIN\n    LOOP\n        DELETE FROM audit_logs\n        WHERE id IN (\n            SELECT id FROM audit_logs\n            WHERE created_at < NOW() - (p_retention_days || ' days')::INTERVAL\n            LIMIT 10000\n        );\n        GET DIAGNOSTICS v_deleted_count = ROW_COUNT;\n        \n        -- Commit batch to release locks and allow WAL cleanup\n        COMMIT;\n        \n        EXIT WHEN v_deleted_count = 0;\n    END LOOP;\nEND;\n$$;"
       }
     },
     {
@@ -61,13 +69,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Procedures do not return values.",
-          "Use for explicit transaction control.",
-          "Use CALL to execute procedures."
+          "Use `CREATE PROCEDURE` when you need transaction control (`COMMIT`/`ROLLBACK`).",
+          "Stored procedures are executed using `CALL procedure_name()`.",
+          "Essential for long-running batch operations that need periodic checkpoint commits."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "plpgsql-functions",
+    "transaction-fundamentals"
+  ]
 }

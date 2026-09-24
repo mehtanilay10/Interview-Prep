@@ -1,31 +1,32 @@
 {
-  "id": "lesson-prisma-007",
+  "id": "lesson-prisma-008",
   "slug": "field-types-mapping",
-  "moduleSlug": "prisma-schema-design",
+  "moduleSlug": "02-prisma-schema-design",
   "courseSlug": "prisma",
-  "title": "Field Types Mapping to PostgreSQL",
-  "description": "Learn how Prisma field types map to PostgreSQL types and when to use native database types.",
-  "order": 2,
+  "title": "Field Types and Database Mapping",
+  "description": "Understand Prisma scalar types, optionality, lists, and native database type mappings with `@db` annotations.",
+  "order": 3,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "prisma",
+    "data-types",
+    "scalar-types",
     "postgresql",
-    "field-types",
     "native-types"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma provides a set of scalar types that map to native PostgreSQL types. Understanding these mappings helps you choose the right type for each field and avoid data loss or truncation."
+        "text": "Prisma provides standard scalar types (`String`, `Boolean`, `Int`, `BigInt`, `Float`, `Decimal`, `DateTime`, `Json`, `Bytes`) that translate seamlessly to TypeScript types. However, relational engines like PostgreSQL support dozens of specialized column types (e.g. `VARCHAR(100)`, `TEXT`, `TIMESTAMPTZ`, `UUID`, `JSONB`). Prisma uses native type attributes (`@db.*`) to give you fine-grained control over the physical schema."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Common Type Mappings"
+        "text": "Type Mapping Matrix: Prisma -> TypeScript -> PostgreSQL"
       }
     },
     {
@@ -33,54 +34,64 @@
       "data": {
         "headers": [
           "Prisma Type",
-          "PostgreSQL Type",
-          "Notes"
+          "TypeScript Type",
+          "Default PostgreSQL Type",
+          "Native `@db` Attributes"
         ],
         "rows": [
           [
-            "String",
-            "text / varchar",
-            "Use `@db.VarChar(n)` for varchar"
+            "`String`",
+            "`string`",
+            "`text`",
+            "`@db.VarChar(255)`, `@db.Char(10)`, `@db.Uuid`"
           ],
           [
-            "Int",
-            "integer",
-            "32-bit signed integer"
+            "`Boolean`",
+            "`boolean`",
+            "`boolean`",
+            "`@db.Boolean`"
           ],
           [
-            "BigInt",
-            "bigint",
-            "64-bit signed integer"
+            "`Int`",
+            "`number`",
+            "`integer` (4 bytes)",
+            "`@db.SmallInt` (2 bytes)"
           ],
           [
-            "Float",
-            "double precision",
-            "64-bit floating point"
+            "`BigInt`",
+            "`bigint`",
+            "`bigint` (8 bytes)",
+            "`@db.BigInt`"
           ],
           [
-            "Decimal",
-            "decimal",
-            "Exact precision; use `@db.Decimal(p, s)`"
+            "`Float`",
+            "`number`",
+            "`double precision`",
+            "`@db.Real`"
           ],
           [
-            "Boolean",
-            "boolean",
-            "true / false"
+            "`Decimal`",
+            "`Prisma.Decimal` (Decimal.js)",
+            "`decimal(65, 30)`",
+            "`@db.Decimal(12, 2)` (Precise currency)"
           ],
           [
-            "DateTime",
-            "timestamp",
-            "Use `@db.Timestamp` for precise control"
+            "`DateTime`",
+            "`Date`",
+            "`timestamp(3)`",
+            "`@db.Timestamptz`, `@db.Date`, `@db.Time`"
           ],
           [
-            "Json",
-            "jsonb",
-            "Binary JSON; supports indexing"
+            "`Json`",
+            "`Prisma.JsonValue`",
+            "`jsonb`",
+            "`@db.JsonB`, `@db.Json`"
           ],
           [
-            "Bytes",
-            "bytea",
-            "Binary data"
+            "`Bytes`",
+            "`Buffer`",
+            "`bytea`",
+            "`@db.ByteA`"
           ]
         ]
       }
@@ -89,28 +100,47 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Using Native Database Types"
+        "text": "Optional Fields vs List Fields"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "When you need PostgreSQL-specific types not covered by Prisma scalars, use the `@db` attribute to map directly to a native type."
+        "text": "A field is made optional (nullable) by appending a question mark `?`. In PostgreSQL, this maps to a column without the `NOT NULL` constraint. Appending `[]` indicates a list/array of items."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Native Type Mapping",
-        "content": "Map Prisma types to native PostgreSQL types.",
-        "code": "model Product {\n  id          Int      @id @default(autoincrement())\n  sku         String   @db.VarChar(50)\n  price       Decimal  @db.Decimal(10, 2)\n  metadata    Json\n  createdAt   DateTime @default(now()) @db.Timestamp\n}",
-        "language": "prisma"
+        "title": "Native Type Customization in Practice",
+        "content": "Using UUIDs, constrained text, precise currency, and PostgreSQL arrays in schema.prisma.",
+        "language": "prisma",
+        "code": "model Product {\n  id          String   @id @default(uuid()) @db.Uuid\n  sku         String   @unique @db.VarChar(50)\n  title       String   @db.VarChar(200)\n  description String?  @db.Text\n  price       Decimal  @db.Decimal(10, 2) // Max 99,999,999.99\n  tags        String[] // PostgreSQL text[] native array\n  metadata    Json?    @db.JsonB\n  releasedAt  DateTime @db.Timestamptz(6)\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Precision Warning: Float vs Decimal",
+        "text": "Never use `Float` for money or financial balances! `Float` is a binary floating-point representation that suffers from rounding inaccuracies (e.g. 0.1 + 0.2 !== 0.3). Always use `Decimal` with `@db.Decimal(precision, scale)` for monetary values."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Prisma scalar types map to idiomatic TypeScript types automatically.",
+          "Use `@db.*` attributes to enforce strict database storage types like `VARCHAR` and `UUID`.",
+          "Always use `Decimal` for currency and financial calculations.",
+          "PostgreSQL native arrays (`String[]`) are supported directly by Prisma."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "schema-prisma-structure",
-    "model-attributes-and-constraints"
-  ],
-  "courseSlug": "prisma"
+    "enums-and-native-types",
+    "schema-best-practices"
+  ]
 }

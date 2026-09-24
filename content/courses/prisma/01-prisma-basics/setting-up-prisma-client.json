@@ -1,73 +1,108 @@
 {
   "id": "lesson-prisma-004",
   "slug": "setting-up-prisma-client",
-  "moduleSlug": "prisma-basics",
+  "moduleSlug": "01-prisma-basics",
   "courseSlug": "prisma",
   "title": "Setting Up Prisma Client",
-  "description": "Create a singleton Prisma Client instance and configure it for Next.js server-side usage.",
+  "description": "Implement the production-grade Prisma Client singleton pattern in Next.js to prevent connection pool exhaustion during hot reload.",
   "order": 4,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 25,
   "tags": [
     "prisma",
     "prisma-client",
+    "singleton",
     "nextjs",
-    "singleton"
+    "connection-pooling"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client is auto-generated from your schema. In Next.js, it is important to create a singleton instance to avoid exhausting database connections during development and in serverless environments."
+        "text": "In a standard Node.js server, creating `const prisma = new PrismaClient()` once at the top of your server file works fine. However, in Next.js during local development, **Fast Refresh (Hot Module Replacement)** re-evaluates modules on every code edit. If you instantiate `new PrismaClient()` directly in a route file, each reload creates a brand new client instance with its own internal connection pool, quickly exhausting your database connection limit!"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why a Singleton?"
+        "text": "The Next.js Singleton Pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Next.js Server Components and API routes can be invoked many times. Without a singleton, each invocation would create a new Prisma Client instance, potentially exhausting your database connection pool."
+        "text": "The canonical solution recommended by the Prisma and Next.js teams is to store the PrismaClient instance on the Node.js global object (`globalThis`) in development mode, while using a standard singleton in production."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Singleton Prisma Client",
-        "content": "Create a singleton Prisma Client instance in lib/prisma.ts.",
-        "code": "import { PrismaClient } from '@prisma/client';\n\nconst prismaClient = globalThis.prisma || new PrismaClient();\n\nif (process.env.NODE_ENV !== 'production') {\n  globalThis.prisma = prismaClient;\n}\n\nexport default prismaClient;",
-        "language": "typescript"
+        "title": "lib/prisma.ts (Standard Implementation)",
+        "content": "Place this singleton in lib/prisma.ts or src/lib/prisma.ts and import it across all route handlers, server actions, and server components.",
+        "language": "typescript",
+        "code": "import { PrismaClient } from '@prisma/client';\n\nconst prismaClientSingleton = () => {\n  return new PrismaClient({\n    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],\n  });\n};\n\ndeclare const globalThis: {\n  prismaGlobal: ReturnType<typeof prismaClientSingleton> | undefined;\n} & typeof global;\n\nexport const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();\n\nif (process.env.NODE_ENV !== 'production') {\n  globalThis.prismaGlobal = prisma;\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Using Prisma Client"
+        "text": "Why `globalThis` Works"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Import the singleton into server-side files and use it like any other database client. All queries are fully typed based on your schema."
+        "text": "In Node.js, `globalThis` persists across module re-evaluations during development. When you save a file in Next.js, module-scoped variables are wiped, but `globalThis.prismaGlobal` remains in memory. The nullish coalescing operator (`??`) reuses the existing instance rather than creating a new connection pool."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-prisma-singleton-flow",
+        "caption": "Singleton Lifecycle across Hot Module Reloads",
+        "definition": "flowchart TD\n    A[Code Edit in Next.js] --> B[Next.js triggers HMR]\n    B --> C{Does globalThis.prismaGlobal exist?}\n    C -->|Yes| D[Reuse existing PrismaClient]\n    C -->|No| E[new PrismaClient() & assign to globalThis]\n    D --> F[Database Connection Pool Preserved (No Leaks)]\n    E --> F"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "warning",
-        "title": "Warning",
-        "text": "Never create a new PrismaClient() inside a client component or a route handler that runs frequently without a singleton pattern. This can exhaust your connection pool."
+        "variant": "important",
+        "title": "Production Behavior",
+        "text": "In production (`NODE_ENV === 'production'`), Next.js creates optimized, immutable bundles without HMR. The conditional check ensures `globalThis.prismaGlobal` is only assigned during development, preventing unintended global pollution in serverless lambda environments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using Prisma Client in Server Components and Route Handlers"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "app/users/page.tsx (React Server Component)",
+        "content": "Direct database access inside Next.js Server Components without API endpoints or client-side fetch waterfalls.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\nexport default async function UsersPage() {\n  const users = await prisma.user.findMany({\n    select: {\n      id: true,\n      name: true,\n      email: true,\n      createdAt: true,\n    },\n    orderBy: { createdAt: 'desc' },\n    take: 10,\n  });\n\n  return (\n    <div className=\"p-6\">\n      <h1 className=\"text-2xl font-bold mb-4\">Users Directory</h1>\n      <ul className=\"space-y-2\">\n        {users.map((user) => (\n          <li key={user.id} className=\"p-3 border rounded-lg\">\n            <p className=\"font-semibold\">{user.name ?? 'Anonymous'}</p>\n            <p className=\"text-sm text-gray-500\">{user.email}</p>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Never create `new PrismaClient()` in local function scopes or individual component files.",
+          "Use the `globalThis` singleton pattern in `lib/prisma.ts` to survive Next.js Fast Refresh.",
+          "Enable query logging in development to observe generated SQL statements and detect slow queries early."
+        ]
       }
     }
   ],
   "relatedLessons": [
     "installing-prisma-in-nextjs",
-    "prisma-studio-introduction"
-  ],
-  "courseSlug": "prisma"
+    "prisma-in-nextjs-app-router"
+  ]
 }

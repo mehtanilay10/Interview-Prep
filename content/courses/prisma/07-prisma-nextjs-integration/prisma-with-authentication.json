@@ -1,71 +1,73 @@
 {
   "id": "lesson-prisma-037",
   "slug": "prisma-with-authentication",
-  "moduleSlug": "prisma-nextjs-integration",
+  "moduleSlug": "07-prisma-nextjs-integration",
   "courseSlug": "prisma",
-  "title": "Prisma with Authentication",
-  "description": "Integrate Prisma with Clerk, Auth.js, and session-based authentication in Next.js.",
+  "title": "Prisma with NextAuth.js / Auth.js",
+  "description": "Integrate Prisma with NextAuth v5 via @auth/prisma-adapter to manage users, sessions, verification tokens, and OAuth accounts.",
   "order": 5,
-  "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
-    "authentication",
-    "clerk",
+    "nextauth",
     "authjs",
-    "nextjs"
+    "authentication",
+    "oauth"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Authentication providers like Clerk and Auth.js manage user sessions and identities. Prisma stores user-specific data and can link to authentication provider IDs."
+        "text": "**Auth.js (NextAuth.js v5)** is the premier authentication library for Next.js. It delegates persistence of users, OAuth accounts, and sessions to database adapters. The `@auth/prisma-adapter` package connects Auth.js directly to Prisma models."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "User Model Pattern"
+        "text": "Canonical Auth.js Prisma Schema"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "User Model for Auth",
-        "content": "Define a User model compatible with Auth.js.",
-        "code": "model User {\n  id            String    @id @default(cuid())\n  name          String?\n  email         String    @unique\n  emailVerified DateTime?\n  image         String?\n  accounts      Account[]\n  sessions      Session[]\n}\n\nmodel Account {\n  id                String  @id @default(cuid())\n  userId            String\n  type              String\n  provider          String\n  providerAccountId String\n  user              User    @relation(fields: [userId], references: [id])\n\n  @@unique([provider, providerAccountId])\n}\n\nmodel Session {\n  id           String   @id @default(cuid())\n  sessionToken String   @unique\n  userId       String\n  expires      DateTime\n  user         User     @relation(fields: [userId], references: [id])\n}",
-        "language": "prisma"
+        "title": "schema.prisma Auth.js Models",
+        "content": "The required schema structure for NextAuth v5 with PostgreSQL.",
+        "language": "prisma",
+        "code": "model User {\n  id            String    @id @default(cuid())\n  name          String?\n  email         String?   @unique\n  emailVerified DateTime? @map(\"email_verified\")\n  image         String?\n  accounts      Account[]\n  sessions      Session[]\n\n  @@map(\"users\")\n}\n\nmodel Account {\n  id                String  @id @default(cuid())\n  userId            String  @map(\"user_id\")\n  type              String\n  provider          String\n  providerAccountId String  @map(\"provider_account_id\")\n  refresh_token     String? @db.Text\n  access_token      String? @db.Text\n  expires_at        Int?\n  token_type        String?\n  scope             String?\n  id_token          String? @db.Text\n  session_state     String?\n\n  user User @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([provider, providerAccountId])\n  @@map(\"accounts\")\n}\n\nmodel Session {\n  id           String   @id @default(cuid())\n  sessionToken String   @unique @map(\"session_token\")\n  userId       String   @map(\"user_id\")\n  expires      DateTime\n  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@map(\"sessions\")\n}\n\nmodel VerificationToken {\n  identifier String\n  token      String\n  expires    DateTime\n\n  @@unique([identifier, token])\n  @@map(\"verification_tokens\")\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Fetching the Authenticated User"
+        "text": "Configuring the Adapter in auth.ts"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Server Action with Auth",
-        "content": "Fetch the current user in a Server Action.",
-        "code": "'use server';\n\nimport { auth } from '@/auth';\nimport prisma from '@/lib/prisma';\n\nexport async function getCurrentUserProfile() {\n  const session = await auth();\n  if (!session?.user?.email) return null;\n\n  return prisma.user.findUnique({\n    where: { email: session.user.email }\n  });\n}",
-        "language": "typescript"
+        "title": "auth.ts",
+        "content": "Connecting PrismaAdapter to NextAuth v5 configuration.",
+        "language": "typescript",
+        "code": "import NextAuth from 'next-auth';\nimport { PrismaAdapter } from '@auth/prisma-adapter';\nimport { prisma } from '@/lib/prisma';\nimport Google from 'next-auth/providers/google';\n\nexport const { handlers, auth, signIn, signOut } = NextAuth({\n  adapter: PrismaAdapter(prisma),\n  providers: [Google],\n  session: { strategy: 'jwt' }, // Recommended for serverless performance\n});"
       }
     },
     {
-      "type": "callout",
+      "type": "summary-box",
       "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use the Auth.js adapter for Prisma to automatically sync accounts and sessions. Alternatively, use Clerk's webhook handlers to sync user data to your Prisma database."
+        "title": "Key Takeaways",
+        "points": [
+          "Use `@auth/prisma-adapter` to connect NextAuth v5 with Prisma.",
+          "The Auth.js schema requires `User`, `Account`, `Session`, and `VerificationToken` models.",
+          "Use JWT session strategy in serverless setups to avoid hitting the database on every HTTP request."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "prisma-in-nextjs-app-router",
-    "prisma-security-best-practices"
-  ],
-  "courseSlug": "prisma"
+    "prisma-security-best-practices",
+    "prisma-in-nextjs-app-router"
+  ]
 }

@@ -1,84 +1,149 @@
 {
   "id": "lesson-prisma-012",
   "slug": "create-update-delete-ops",
-  "moduleSlug": "prisma-queries-mutations",
+  "moduleSlug": "03-prisma-queries-mutations",
   "courseSlug": "prisma",
-  "title": "Create, Update, Delete Operations",
-  "description": "Use Prisma Client create, update, delete, and upsert methods to modify data.",
+  "title": "Create, Update, and Delete Operations",
+  "description": "Perform robust mutations using create, createMany, update, upsert, and delete with transaction safety and relational nesting.",
   "order": 2,
   "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
-    "prisma-client",
     "mutations",
-    "crud"
+    "create",
+    "update",
+    "upsert",
+    "delete"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client provides straightforward methods for creating, updating, and deleting records: `create`, `createMany`, `update`, `updateMany`, `delete`, `deleteMany`, and `upsert`."
+        "text": "Mutating data in Prisma is handled through explicit mutation methods. Beyond basic single-record insertions and deletions, Prisma supports **nested writes** (creating parent and child records in a single atomic database transaction) and **upserts** (updating a record if it exists, or inserting it if it does not)."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Create"
+        "text": "Mutation Operations Matrix"
       }
     },
     {
-      "type": "example",
+      "type": "table",
       "data": {
-        "title": "Create a Record",
-        "content": "Create a new user with a related profile.",
-        "code": "const user = await prisma.user.create({\n  data: {\n    email: 'bob@example.com',\n    name: 'Bob',\n    profile: {\n      create: { bio: 'Hello world' }\n    }\n  }\n});",
-        "language": "typescript"
+        "headers": [
+          "Method",
+          "Target Records",
+          "Key Feature",
+          "SQL Equivalent"
+        ],
+        "rows": [
+          [
+            "`create`",
+            "1 record",
+            "Supports nested relational writes",
+            "`INSERT INTO ... VALUES (...)`"
+          ],
+          [
+            "`createMany`",
+            "N records",
+            "High-performance batch insertion",
+            "`INSERT INTO ... VALUES (...), (...), (...)`"
+          ],
+          [
+            "`update`",
+            "1 record",
+            "Requires unique `where` identifier",
+            "`UPDATE ... WHERE id = $1`"
+          ],
+          [
+            "`updateMany`",
+            "N records",
+            "Batch updates with general filter",
+            "`UPDATE ... WHERE status = $1`"
+          ],
+          [
+            "`upsert`",
+            "1 record",
+            "Atomic insert or update",
+            "`INSERT ... ON CONFLICT (...) DO UPDATE`"
+          ],
+          [
+            "`delete`",
+            "1 record",
+            "Requires unique `where` identifier",
+            "`DELETE FROM ... WHERE id = $1`"
+          ],
+          [
+            "`deleteMany`",
+            "N records",
+            "Batch deletion with filter",
+            "`DELETE FROM ... WHERE ...`"
+          ]
+        ]
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Update and Delete"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Update and Delete",
-        "content": "Update a user and delete a post.",
-        "code": "const updatedUser = await prisma.user.update({\n  where: { id: 1 },\n  data: { name: 'Alice Updated' }\n});\n\nawait prisma.post.delete({\n  where: { id: 5 }\n});",
-        "language": "typescript"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Upsert"
+        "text": "Atomic Nested Writes"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "`upsert` updates a record if it exists, or creates it if it does not. This is useful for idempotent operations."
+        "text": "One of Prisma's most powerful capabilities is nested writes. You can create a parent record and multiple related child records in a single query invocation. Prisma automatically executes them within an internal transaction, ensuring complete atomicity."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Upsert Example",
-        "content": "Upsert a user by email.",
-        "code": "const user = await prisma.user.upsert({\n  where: { email: 'bob@example.com' },\n  update: { name: 'Bob Updated' },\n  create: { email: 'bob@example.com', name: 'Bob' }\n});",
-        "language": "typescript"
+        "title": "Nested Create: User with Initial Profile and Posts",
+        "content": "Creates the User, UserProfile, and multiple Posts atomically.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\nasync function registerUserWithContent() {\n  return await prisma.user.create({\n    data: {\n      email: 'alex.rivera@example.com',\n      name: 'Alex Rivera',\n      profile: {\n        create: {\n          bio: 'Fullstack Software Engineer',\n          avatarUrl: 'https://images.example.com/avatar.jpg',\n        }\n      },\n      posts: {\n        create: [\n          { title: 'Getting Started with Next.js 15', content: 'Modern fullstack architecture...' },\n          { title: 'Prisma Client Deep Dive', content: 'Understanding nested writes...' }\n        ]\n      }\n    },\n    include: {\n      profile: true,\n      posts: true\n    }\n  });\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Power of `upsert`"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`upsert` is essential for idempotency, background webhooks (e.g. Stripe checkout events), and OAuth profile synchronization. In PostgreSQL, Prisma compiles `upsert` directly into an `INSERT ... ON CONFLICT (...) DO UPDATE` statement."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OAuth Profile Sync with Upsert",
+        "content": "If the user exists, update their profile picture and last login; if not, create them.",
+        "language": "typescript",
+        "code": "const syncedUser = await prisma.user.upsert({\n  where: { email: 'oauth_user@gmail.com' },\n  update: {\n    lastLoginAt: new Date(),\n    avatarUrl: 'https://lh3.googleusercontent.com/...'\n  },\n  create: {\n    email: 'oauth_user@gmail.com',\n    name: 'Google User',\n    avatarUrl: 'https://lh3.googleusercontent.com/...'\n  }\n});"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Nested writes wrap insertions across multiple tables in a single database transaction.",
+          "`upsert` uses native PostgreSQL `ON CONFLICT` for race-condition-free synchronization.",
+          "`createMany` is drastically faster than running `create` in a `for` loop.",
+          "`deleteMany` and `updateMany` return `{ count: number }`."
+        ]
       }
     }
   ],
   "relatedLessons": [
     "prisma-client-queries",
     "filtering-and-sorting"
-  ],
-  "courseSlug": "prisma"
+  ]
 }

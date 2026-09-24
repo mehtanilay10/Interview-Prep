@@ -1,77 +1,94 @@
 {
   "id": "lesson-prisma-027",
   "slug": "transactions-and-interactive-transactions",
-  "moduleSlug": "prisma-advanced-features",
+  "moduleSlug": "06-prisma-advanced-features",
   "courseSlug": "prisma",
   "title": "Transactions and Interactive Transactions",
-  "description": "Use Prisma transactions and interactive transactions to ensure data consistency across multiple operations.",
+  "description": "Master sequential transactions and interactive transactions in Prisma with ACID guarantees, timeout controls, and rollback handling.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
     "transactions",
     "interactive-transactions",
-    "atomicity"
+    "acid",
+    "concurrency"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Transactions ensure that a series of database operations either all succeed or all fail together. Prisma supports both interactive transactions and sequential operations within a transaction."
+        "text": "In database systems, a transaction guarantees ACID compliance (Atomicity, Consistency, Isolation, Durability). If any step within a transaction fails, all preceding mutations are rolled back automatically, preventing corrupt or orphaned records. Prisma provides two transaction patterns: **Sequential Batched Transactions** and **Interactive Transactions**."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Interactive Transactions"
+        "text": "Pattern 1: Sequential Batched Transactions (`prisma.$transaction([])`)"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Interactive transactions use `$transaction` with an array of operations or a callback. The callback form is preferred for complex logic."
+        "text": "When you have independent database operations that do not depend on the return values of previous operations, pass an array of promises to `prisma.$transaction()`. Prisma executes them all within a single `BEGIN ... COMMIT` block in one network roundtrip."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Interactive Transaction",
-        "content": "Transfer credits between two users atomically.",
-        "code": "await prisma.$transaction(async (tx) => {\n  const sender = await tx.user.update({\n    where: { id: senderId },\n    data: { credits: { decrement: amount } }\n  });\n\n  const receiver = await tx.user.update({\n    where: { id: receiverId },\n    data: { credits: { increment: amount } }\n  });\n\n  return { sender, receiver };\n});",
-        "language": "typescript"
+        "title": "Sequential Transaction Array",
+        "content": "Deleting an account and resetting counters atomically.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\nasync function resetUserAccount(userId: string) {\n  const [deletedPosts, updatedUser] = await prisma.$transaction([\n    prisma.post.deleteMany({ where: { authorId: userId } }),\n    prisma.user.update({\n      where: { id: userId },\n      data: { status: 'RESET' }\n    })\n  ]);\n\n  return { deletedPostsCount: deletedPosts.count, updatedUser };\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "When to Use Transactions"
+        "text": "Pattern 2: Interactive Transactions (`prisma.$transaction(async (tx) => { ... })`)"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Transferring funds between accounts",
-          "Creating an order and updating inventory",
-          "Any operation where partial success would leave data inconsistent"
-        ]
+        "text": "When an operation requires conditional application logic based on the result of a previous query (e.g. checking a bank balance or verifying ticket inventory before deducting), use interactive transactions. Inside the callback, use the provided transaction client `tx`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Financial Transfer with Interactive Transaction",
+        "content": "Guarantees that sender has sufficient balance before transferring money.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\n\nexport async function transferFunds(fromUserId: string, toUserId: string, amount: number) {\n  return await prisma.$transaction(async (tx) => {\n    // 1. Fetch sender balance with check\n    const sender = await tx.account.findUniqueOrThrow({\n      where: { userId: fromUserId }\n    });\n\n    if (sender.balance < amount) {\n      throw new Error(`Insufficient funds: Balance is ${sender.balance}, requested ${amount}`);\n    }\n\n    // 2. Decrement sender balance\n    const updatedSender = await tx.account.update({\n      where: { userId: fromUserId },\n      data: { balance: { decrement: amount } }\n    });\n\n    // 3. Increment receiver balance\n    const updatedReceiver = await tx.account.update({\n      where: { userId: toUserId },\n      data: { balance: { increment: amount } }\n    });\n\n    // 4. Create ledger audit entry\n    const auditLog = await tx.ledgerEntry.create({\n      data: { fromUserId, toUserId, amount, status: 'COMPLETED' }\n    });\n\n    return { updatedSender, updatedReceiver, auditLog };\n  }, {\n    maxWait: 5000, // Maximum time to wait for a connection from the pool (5s)\n    timeout: 10000 // Maximum time transaction can run before automatic rollback (10s)\n  });\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "Note",
-        "text": "Prisma interactive transactions are not supported with SQLite in some versions. Use PostgreSQL for full transaction support in production."
+        "title": "Always Use the `tx` Instance",
+        "text": "Inside the `$transaction(async (tx) => { ... })` callback, you MUST invoke operations on `tx`, NOT `prisma`! Queries called on `prisma` will execute outside the transaction boundary and won't be rolled back if an error occurs."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use array-based `$transaction([...])` for concurrent independent mutations.",
+          "Use interactive `$transaction(async (tx) => { ... })` when steps depend on previous results.",
+          "Always perform operations using `tx` inside the callback.",
+          "Configure `maxWait` and `timeout` to prevent blocking database connections during heavy traffic."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "error-handling",
-    "prisma-with-server-actions"
-  ],
-  "courseSlug": "prisma"
+    "middleware-and-extensions",
+    "error-handling"
+  ]
 }

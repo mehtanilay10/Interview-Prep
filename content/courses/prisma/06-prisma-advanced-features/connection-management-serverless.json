@@ -1,77 +1,120 @@
 {
-  "id": "lesson-prisma-030",
+  "id": "lesson-prisma-032",
   "slug": "connection-management-serverless",
-  "moduleSlug": "prisma-advanced-features",
+  "moduleSlug": "06-prisma-advanced-features",
   "courseSlug": "prisma",
   "title": "Connection Management in Serverless",
-  "description": "Manage Prisma database connections effectively in serverless and Next.js environments.",
-  "order": 4,
+  "description": "Strategies for running Prisma in Vercel, AWS Lambda, Cloudflare Workers using Prisma Accelerate and Driver Adapters.",
+  "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 30,
   "tags": [
     "prisma",
     "serverless",
-    "nextjs",
-    "connection-management"
+    "vercel",
+    "aws-lambda",
+    "driver-adapters"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Serverless functions scale horizontally, which can quickly exhaust database connection pools if Prisma Client is instantiated on every invocation. Proper connection management is essential."
+        "text": "Serverless architectures (such as Vercel Functions, AWS Lambda, and Cloudflare Workers) create and destroy execution environments on demand. Traditional databases that expect long-lived TCP connections face two major hurdles in serverless environments: **connection exhaustion** caused by horizontal scaling spikes, and **cold start latency** caused by loading database drivers and initializing TLS handshakes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "The Singleton Pattern"
+        "text": "Modern Solutions for Prisma in Serverless"
       }
     },
     {
-      "type": "paragraph",
+      "type": "comparison-cards",
       "data": {
-        "text": "The singleton pattern reuses the same Prisma Client instance across function invocations, preventing connection leaks."
+        "title": "Serverless Connection Strategies",
+        "cards": [
+          {
+            "title": "Prisma Driver Adapters (@prisma/adapter-pg)",
+            "description": "Offloads networking from the Rust binary to pure JavaScript drivers (like `@neondatabase/serverless` or `pg`) via WebSockets or HTTP.",
+            "pros": [
+              "Runs on Cloudflare Workers and Edge runtimes",
+              "Avoids binary cold start overhead"
+            ],
+            "cons": [
+              "Requires preview feature flag"
+            ],
+            "tags": [
+              "Edge",
+              "Serverless",
+              "Open Source"
+            ]
+          },
+          {
+            "title": "Prisma Accelerate",
+            "description": "A managed global connection pool and edge caching layer hosted by Prisma.",
+            "pros": [
+              "Global connection pooling across all cloud regions",
+              "Automatic edge caching with `cacheStrategy: { ttl: 60 }`"
+            ],
+            "cons": [
+              "Commercial hosted service"
+            ],
+            "tags": [
+              "Global Cache",
+              "Managed",
+              "Zero Config"
+            ]
+          },
+          {
+            "title": "External Pooler (Neon / Supabase / AWS RDS Proxy)",
+            "description": "Self-managed or cloud-provider PgBouncer instance sitting directly in front of PostgreSQL.",
+            "pros": [
+              "Keeps architecture within your own cloud VPC",
+              "Compatible with standard Prisma Client"
+            ],
+            "cons": [
+              "Requires managing `directUrl` vs `url`"
+            ],
+            "tags": [
+              "VPC",
+              "PgBouncer",
+              "Standard"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Using Neon Driver Adapter in Next.js"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Singleton Prisma Client",
-        "content": "Create a singleton Prisma Client in a shared module.",
-        "code": "import { PrismaClient } from '@prisma/client';\n\nconst prisma = globalThis.prisma || new PrismaClient();\n\nif (process.env.NODE_ENV !== 'production') {\n  globalThis.prisma = prisma;\n}\n\nexport default prisma;",
-        "language": "typescript"
+        "title": "lib/prisma.ts with Neon Serverless Driver Adapter",
+        "content": "Enables low-latency connection pooling over WebSockets in serverless environments.",
+        "language": "typescript",
+        "code": "import { Pool } from '@neondatabase/serverless';\nimport { PrismaNeon } from '@prisma/adapter-neon';\nimport { PrismaClient } from '@prisma/client';\n\nconst connectionString = process.env.DATABASE_URL!;\n\n// Create Neon WebSocket pool\nconst pool = new Pool({ connectionString });\nconst adapter = new PrismaNeon(pool);\n\n// Pass adapter directly into PrismaClient\nexport const prisma = new PrismaClient({ adapter });"
       }
     },
     {
-      "type": "heading",
+      "type": "summary-box",
       "data": {
-        "level": 2,
-        "text": "Next.js Considerations"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "**App Router** — Use Prisma in Server Components, Server Actions, and Route Handlers only",
-          "**Pages Router** — Use Prisma in `getServerSideProps`, API routes, and server-side code",
-          "**Edge Runtime** — Prisma is not supported in Edge Runtime; use standard Node.js runtimes"
+        "title": "Key Takeaways",
+        "points": [
+          "Serverless cold starts and connection limits require specialized connection strategies.",
+          "Use Driver Adapters (`@prisma/adapter-neon` or `@prisma/adapter-pg`) for edge compatibility.",
+          "Always reuse the client singleton in `lib/prisma.ts` to share connection pools across warm lambdas."
         ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "warning",
-        "title": "Warning",
-        "text": "Never create a new PrismaClient() inside a route handler or Server Component without a singleton. This will exhaust your database connection pool under load."
       }
     }
   ],
   "relatedLessons": [
     "connection-pooling-pgbouncer",
-    "prisma-in-nextjs-app-router"
-  ],
-  "courseSlug": "prisma"
+    "setting-up-prisma-client"
+  ]
 }

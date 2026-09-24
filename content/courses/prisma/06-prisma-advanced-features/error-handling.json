@@ -1,66 +1,67 @@
 {
-  "id": "lesson-prisma-031",
+  "id": "lesson-prisma-030",
   "slug": "error-handling",
-  "moduleSlug": "prisma-advanced-features",
+  "moduleSlug": "06-prisma-advanced-features",
   "courseSlug": "prisma",
-  "title": "Error Handling with Prisma Client",
-  "description": "Handle Prisma Client errors including unique constraint violations, connection errors, and query failures.",
-  "order": 5,
-  "difficulty": "advanced",
-  "estimatedMinutes": 10,
+  "title": "Error Handling and Error Codes",
+  "description": "Handle PrismaClientKnownRequestError, unique constraint violations (P2002), and record not found errors (P2025) cleanly.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
   "tags": [
     "prisma",
     "error-handling",
-    "exceptions",
-    "best-practices"
+    "p2002",
+    "p2025",
+    "exception-handling"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Prisma Client throws typed errors for various failure scenarios. Understanding these errors and handling them appropriately is critical for building robust applications."
+        "text": "When database operations fail (e.g. duplicate unique key, foreign key violation, connection timeout), Prisma throws structured exceptions categorized into four distinct error classes. Knowing how to parse and map these errors to user-friendly HTTP status codes is essential for backend resilience."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Common Error Types"
+        "text": "The Four Prisma Error Classes"
       }
     },
     {
       "type": "table",
       "data": {
         "headers": [
-          "Error Code",
-          "Cause",
-          "Handling Strategy"
+          "Error Class",
+          "Trigger Scenario",
+          "Common HTTP Mapping"
         ],
         "rows": [
           [
-            "P2002",
-            "Unique constraint violation",
-            "Catch and return a user-friendly message"
+            "`PrismaClientKnownRequestError`",
+            "Known error with specific database error code (P2002, P2025)",
+            "400 Bad Request / 404 Not Found / 409 Conflict"
           ],
           [
-            "P2025",
-            "Record not found",
-            "Handle null results from findUnique/findFirst"
+            "`PrismaClientUnknownRequestError`",
+            "Database returned an error code not yet mapped by Prisma engine",
+            "500 Internal Server Error"
           ],
           [
-            "P2003",
-            "Foreign key constraint violation",
-            "Validate related records before creating"
+            "`PrismaClientRustPanicError`",
+            "Rust Query Engine crashed unexpectedly",
+            "500 Internal Server Error"
           ],
           [
-            "P1001",
-            "Connection error",
-            "Retry with exponential backoff"
+            "`PrismaClientInitializationError`",
+            "Failed to connect to database during startup (bad credentials, host down)",
+            "503 Service Unavailable"
           ],
           [
-            "P1008",
-            "Operation timeout",
-            "Increase query timeout or optimize query"
+            "`PrismaClientValidationError`",
+            "Missing required fields or incorrect argument types passed to method",
+            "400 Bad Request"
           ]
         ]
       }
@@ -69,30 +70,72 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Handling Errors"
+        "text": "Essential Error Codes to Memorize"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Code",
+          "Name",
+          "Meaning & Handling"
+        ],
+        "rows": [
+          [
+            "`P2002`",
+            "Unique constraint failed",
+            "Record with this value already exists (e.g. duplicate email). Return HTTP 409."
+          ],
+          [
+            "`P2003`",
+            "Foreign key constraint failed",
+            "Referenced parent record does not exist or cannot be deleted. Return HTTP 400."
+          ],
+          [
+            "`P2025`",
+            "Record not found",
+            "`findUniqueOrThrow` or `update` failed to find record. Return HTTP 404."
+          ],
+          [
+            "`P2024`",
+            "Connection timed out",
+            "Connection pool exhausted. Scale connection pool or inspect slow queries. Return HTTP 504."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Production Error Handler Helper"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Error Handling Example",
-        "content": "Handle unique constraint violations when creating a user.",
-        "code": "try {\n  const user = await prisma.user.create({\n    data: { email: 'alice@example.com', name: 'Alice' }\n  });\n} catch (error) {\n  if (error.code === 'P2002') {\n    console.error('A user with this email already exists');\n  } else {\n    throw error;\n  }\n}",
-        "language": "typescript"
+        "title": "Universal API Error Formatter",
+        "content": "Clean error mapping for Next.js Route Handlers and Server Actions.",
+        "language": "typescript",
+        "code": "import { Prisma } from '@prisma/client';\nimport { NextResponse } from 'next/server';\n\nexport function handlePrismaError(error: unknown) {\n  if (error instanceof Prisma.PrismaClientKnownRequestError) {\n    switch (error.code) {\n      case 'P2002': {\n        const target = (error.meta?.target as string[])?.join(', ') ?? 'field';\n        return NextResponse.json(\n          { error: `A record with this ${target} already exists.` },\n          { status: 409 }\n        );\n      }\n      case 'P2025':\n        return NextResponse.json(\n          { error: 'The requested resource was not found.' },\n          { status: 404 }\n        );\n      case 'P2003':\n        return NextResponse.json(\n          { error: 'Invalid relational dependency.' },\n          { status: 400 }\n        );\n    }\n  }\n\n  console.error('Unhandled Server Error:', error);\n  return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });\n}"
       }
     },
     {
-      "type": "callout",
+      "type": "summary-box",
       "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use a centralized error handler or wrapper function to map Prisma error codes to application-level error messages. This keeps your code DRY and user-friendly."
+        "title": "Key Takeaways",
+        "points": [
+          "Check for `instanceof Prisma.PrismaClientKnownRequestError` to handle database constraint errors.",
+          "`P2002` signals unique constraint violations (HTTP 409).",
+          "`P2025` signals entity not found (HTTP 404).",
+          "Never expose raw database stack traces directly to end users in production."
+        ]
       }
     }
   ],
   "relatedLessons": [
     "transactions-and-interactive-transactions",
-    "prisma-security-best-practices"
-  ],
-  "courseSlug": "prisma"
+    "query-logging-and-performance"
+  ]
 }

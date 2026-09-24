@@ -1,148 +1,106 @@
 {
   "id": "lesson-prisma-042",
   "slug": "fullstack-postgresql-prisma-nextjs",
-  "moduleSlug": "prisma-nextjs-integration",
+  "moduleSlug": "07-prisma-nextjs-integration",
   "courseSlug": "prisma",
-  "title": "Full-Stack PostgreSQL + Prisma + Next.js",
-  "description": "Build a complete full-stack flow using PostgreSQL, Prisma, Next.js Server Actions, Route Handlers, and authentication.",
+  "title": "Fullstack PostgreSQL + Prisma + Next.js Capstone",
+  "description": "Build an end-to-end production web application featuring Next.js 15, PostgreSQL, Prisma ORM, Server Actions, and authentication.",
   "order": 10,
   "difficulty": "advanced",
   "estimatedMinutes": 35,
   "tags": [
     "prisma",
-    "postgresql",
+    "capstone",
+    "fullstack",
     "nextjs",
-    "full-stack",
-    "server-actions",
-    "route-handlers"
+    "postgresql",
+    "architecture"
   ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "This lesson ties together everything you have learned. You will build a complete full-stack feature: a task management app using PostgreSQL, Prisma, Next.js Server Actions, Route Handlers, and session-based authentication."
+        "text": "In this comprehensive capstone lesson, we consolidate everything we've learned into a complete, production-grade fullstack web application. We'll design a project management system connecting Next.js 15 App Router, Neon/PostgreSQL, Prisma Client, Server Actions, and optimistic UI updates."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Project Setup"
+        "text": "End-to-End System Architecture"
       }
     },
     {
-      "type": "paragraph",
+      "type": "mermaid",
       "data": {
-        "text": "Start by defining your Prisma schema with User, Task, and Project models. Use relations to connect users to tasks and projects."
+        "id": "mermaid-capstone-architecture",
+        "caption": "Fullstack Architecture Flow",
+        "definition": "flowchart TD\n    A[React Client Component] -->|Form Submit / Server Action| B[Next.js Server Action]\n    B -->|Zod Validation| C[Validate Inputs]\n    C -->|prisma.project.create()| D[(Neon PostgreSQL)]\n    D -->|Transaction Commit| B\n    B -->|revalidatePath('/projects')| E[Next.js Cache Revalidation]\n    E -->|Stream Updated RSC| A"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "1. The Complete Schema (prisma/schema.prisma)"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Prisma Schema",
-        "content": "Define the schema for a task management app.",
-        "code": "generator client {\n  provider = \"prisma-client-js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel User {\n  id        String    @id @default(cuid())\n  email     String    @unique\n  name      String?\n  tasks     Task[]\n  projects  Project[]\n}\n\nmodel Project {\n  id          Int     @id @default(autoincrement())\n  name        String\n  description String?\n  ownerId     String\n  owner       User    @relation(fields: [ownerId], references: [id])\n  tasks       Task[]\n  createdAt   DateTime @default(now())\n}\n\nmodel Task {\n  id          Int      @id @default(autoincrement())\n  title       String\n  completed   Boolean  @default(false)\n  assigneeId  String?\n  projectId   Int\n  assignee    User?    @relation(fields: [assigneeId], references: [id])\n  project     Project  @relation(fields: [projectId], references: [id])\n  createdAt   DateTime @default(now())\n}",
-        "language": "prisma"
+        "title": "Project Management Schema",
+        "content": "Demonstrates enums, 1-N relations, indexes, and cascade behavior.",
+        "language": "prisma",
+        "code": "datasource db {\n  provider  = \"postgresql\"\n  url       = env(\"DATABASE_URL\")\n  directUrl = env(\"DIRECT_URL\")\n}\n\ngenerator client {\n  provider = \"prisma-client-js\"\n}\n\nenum Priority {\n  LOW\n  MEDIUM\n  HIGH\n  URGENT\n}\n\nmodel Project {\n  id          String   @id @default(uuid()) @db.Uuid\n  title       String   @db.VarChar(150)\n  description String?  @db.Text\n  createdAt   DateTime @default(now()) @map(\"created_at\") @db.Timestamptz\n  updatedAt   DateTime @updatedAt @map(\"updated_at\") @db.Timestamptz\n  tasks       Task[]\n\n  @@map(\"projects\")\n}\n\nmodel Task {\n  id          String   @id @default(uuid()) @db.Uuid\n  title       String   @db.VarChar(200)\n  isCompleted Boolean  @default(false) @map(\"is_completed\")\n  priority    Priority @default(MEDIUM)\n  projectId   String   @map(\"project_id\") @db.Uuid\n  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)\n  createdAt   DateTime @default(now()) @map(\"created_at\") @db.Timestamptz\n\n  @@index([projectId])\n  @@index([isCompleted])\n  @@map(\"tasks\")\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Server Actions"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Create Server Actions for creating tasks, toggling completion, and deleting tasks. Each action uses Prisma to mutate the database."
+        "text": "2. Server Action Mutation (app/actions/projects.ts)"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Server Actions",
-        "content": "Server Actions for task management.",
-        "code": "'use server';\n\nimport prisma from '@/lib/prisma';\nimport { auth } from '@/auth';\nimport { revalidateTag } from 'next/cache';\n\nexport async function createTask(formData: FormData) {\n  const session = await auth();\n  if (!session?.user) throw new Error('Unauthorized');\n\n  const title = formData.get('title') as string;\n  const projectId = parseInt(formData.get('projectId') as string);\n\n  const task = await prisma.task.create({\n    data: { title, projectId, assigneeId: session.user.id }\n  });\n\n  revalidateTag('tasks');\n  return task;\n}\n\nexport async function toggleTask(id: number) {\n  const task = await prisma.task.findUnique({ where: { id } });\n  if (!task) throw new Error('Task not found');\n\n  return prisma.task.update({\n    where: { id },\n    data: { completed: !task.completed }\n  });\n}\n\nexport async function deleteTask(id: number) {\n  await prisma.task.delete({ where: { id } });\n  revalidateTag('tasks');\n}",
-        "language": "typescript"
+        "title": "app/actions/projects.ts",
+        "content": "Type-safe mutation with Zod and cache invalidation.",
+        "language": "typescript",
+        "code": "'use server';\n\nimport { prisma } from '@/lib/prisma';\nimport { revalidatePath } from 'next/cache';\nimport { z } from 'zod';\n\nconst CreateTaskSchema = z.object({\n  title: z.string().min(3),\n  projectId: z.string().uuid(),\n  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),\n});\n\nexport async function createTaskAction(formData: FormData) {\n  const result = CreateTaskSchema.safeParse({\n    title: formData.get('title'),\n    projectId: formData.get('projectId'),\n    priority: formData.get('priority'),\n  });\n\n  if (!result.success) {\n    return { success: false, errors: result.error.flatten().fieldErrors };\n  }\n\n  try {\n    await prisma.task.create({\n      data: result.data,\n    });\n\n    revalidatePath(`/projects/${result.data.projectId}`);\n    return { success: true };\n  } catch (error) {\n    return { success: false, error: 'Failed to create task.' };\n  }\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Route Handlers"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Expose a REST API endpoint for tasks using Route Handlers. This allows external clients or server components to fetch and manipulate tasks."
+        "text": "3. Direct Data Fetching (app/projects/[id]/page.tsx)"
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Route Handler",
-        "content": "API route for tasks.",
-        "code": "import prisma from '@/lib/prisma';\n\nexport async function GET(request: Request) {\n  const { searchParams } = new URL(request.url);\n  const projectId = parseInt(searchParams.get('projectId') || '0');\n\n  const tasks = await prisma.task.findMany({\n    where: { projectId },\n    include: { assignee: true },\n    orderBy: { createdAt: 'desc' }\n  });\n\n  return Response.json(tasks);\n}",
-        "language": "typescript"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Client Integration"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Use Server Actions in client components to create and manage tasks. Use the Route Handler to fetch the task list."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Client Component",
-        "content": "A client component that displays and manages tasks.",
-        "code": "'use client';\n\nimport { createTask, toggleTask, deleteTask } from '@/app/actions';\nimport useSWR from 'swr';\n\nconst fetcher = (url: string) => fetch(url).then(r => r.json());\n\nexport function TaskList({ projectId }: { projectId: number }) {\n  const { data: tasks, mutate } = useSWR(\n    `/api/tasks?projectId=${projectId}`,\n    fetcher\n  );\n\n  async function handleCreate(formData: FormData) {\n    await createTask(formData);\n    mutate();\n  }\n\n  return (\n    <div>\n      <form action={handleCreate}>\n        <input name=\"title\" required />\n        <input type=\"hidden\" name=\"projectId\" value={projectId} />\n        <button type=\"submit\">Add Task</button>\n      </form>\n      <ul>\n        {tasks?.map((task) => (\n          <li key={task.id}>\n            <input\n              type=\"checkbox\"\n              checked={task.completed}\n              onChange={() => toggleTask(task.id)}\n            />\n            <span>{task.title}</span>\n            <button onClick={() => deleteTask(task.id)}>Delete</button>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}",
-        "language": "tsx"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Authentication Flow"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Use Auth.js to authenticate users. The session is available in Server Actions and Route Handlers, allowing you to associate tasks with the correct user."
+        "title": "app/projects/[id]/page.tsx",
+        "content": "Server Component fetching project with nested tasks.",
+        "language": "typescript",
+        "code": "import { prisma } from '@/lib/prisma';\nimport { notFound } from 'next/navigation';\n\ninterface ProjectPageProps {\n  params: Promise<{ id: string }>;\n}\n\nexport default async function ProjectPage({ params }: ProjectPageProps) {\n  const { id } = await params;\n\n  const project = await prisma.project.findUnique({\n    where: { id },\n    include: {\n      tasks: {\n        orderBy: [{ isCompleted: 'asc' }, { createdAt: 'desc' }],\n      },\n    },\n  });\n\n  if (!project) notFound();\n\n  return (\n    <div className=\"p-8 max-w-3xl mx-auto\">\n      <h1 className=\"text-3xl font-bold mb-2\">{project.title}</h1>\n      <p className=\"text-gray-600 mb-6\">{project.description}</p>\n\n      <h2 className=\"text-xl font-semibold mb-4\">Tasks ({project.tasks.length})</h2>\n      <ul className=\"space-y-2\">\n        {project.tasks.map((task) => (\n          <li key={task.id} className=\"p-3 border rounded flex items-center justify-between\">\n            <span className={task.isCompleted ? 'line-through text-gray-400' : ''}>\n              {task.title}\n            </span>\n            <span className=\"text-xs font-mono uppercase bg-gray-100 px-2 py-1 rounded\">\n              {task.priority}\n            </span>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
+        "title": "Capstone Summary",
         "points": [
-          "Prisma schema defines User, Project, and Task models with relations",
-          "Server Actions handle mutations (create, toggle, delete)",
-          "Route Handlers expose a REST API for fetching tasks",
-          "Client components use Server Actions and SWR for data fetching",
-          "Auth.js session ties tasks to authenticated users"
-        ],
-        "takeaway": "This full-stack flow demonstrates how PostgreSQL, Prisma, and Next.js work together to build a production-ready application."
+          "We configured a multi-table relational schema with enums, indexes, and cascades.",
+          "We built a robust Server Action with Zod validation and cache revalidation.",
+          "We queried data directly inside Next.js Server Components with complete type safety and zero client JS.",
+          "You now possess the foundational knowledge to build enterprise-grade fullstack web applications with Prisma and PostgreSQL."
+        ]
       }
     }
   ],
   "relatedLessons": [
-    "prisma-with-server-actions",
-    "prisma-route-handlers",
-    "prisma-with-authentication"
-  ],
-  "courseSlug": "prisma"
+    "prisma-in-nextjs-app-router",
+    "prisma-with-server-actions"
+  ]
 }

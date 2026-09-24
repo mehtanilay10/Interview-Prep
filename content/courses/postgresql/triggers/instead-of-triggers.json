@@ -1,59 +1,33 @@
 {
-  "id": "lesson-pg-067",
+  "id": "lesson-pg-079",
   "slug": "instead-of-triggers",
   "moduleSlug": "triggers",
   "courseSlug": "postgresql",
-  "title": "INSTEAD OF Triggers",
-  "description": "Use INSTEAD OF triggers for updatable views.",
+  "title": "INSTEAD OF Triggers on Complex Views",
+  "description": "Make complex multi-table views fully updatable and intercept writes using INSTEAD OF triggers.",
   "order": 3,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 35,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
   "tags": [
     "instead-of-triggers",
-    "views"
+    "views",
+    "updatable-views",
+    "abstraction"
   ],
   "blocks": [
     {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "INSTEAD OF Triggers"
-      }
-    },
-    {
       "type": "paragraph",
       "data": {
-        "text": "INSTEAD OF triggers replace the original operation on views."
+        "text": "While simple single-table views are automatically updatable, complex views containing `JOIN`s, aggregates, or `UNION`s are read-only. An **`INSTEAD OF` trigger** intercepts `INSERT`, `UPDATE`, or `DELETE` statements on the view and redirects mutations to the underlying base tables."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Instead of",
-        "content": "Make view updatable",
+        "title": "Making a User Profile View Updatable",
+        "content": "Splitting writes to users and profiles tables.",
         "language": "sql",
-        "code": "CREATE OR REPLACE VIEW active_users AS\nSELECT id, email, display_name\nFROM users\nWHERE deleted_at IS NULL;\n\nCREATE OR REPLACE FUNCTION active_users_ins()\nRETURNS TRIGGER\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  INSERT INTO users (email, display_name)\n  VALUES (NEW.email, NEW.display_name)\n  RETURNING id INTO NEW;\n  RETURN NEW;\nEND;\n$$;\n\nCREATE TRIGGER active_users_ins_trig\n  INSTEAD OF INSERT ON active_users\n  FOR EACH ROW\n  EXECUTE FUNCTION active_users_ins();"
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Tip",
-        "text": "Use INSTEAD OF for row-level security and view logic."
-      }
-    },
-    {
-      "type": "exercise",
-      "data": {
-        "title": "Exercise: Updatable View",
-        "description": "Make active_users view updatable.",
-        "steps": [
-          "Create view",
-          "Create INSTEAD OF trigger",
-          "Test insert"
-        ],
-        "expectedOutcome": "View supports inserts."
+        "code": "CREATE OR REPLACE FUNCTION insert_into_user_view()\nRETURNS TRIGGER AS $$\nDECLARE\n    v_user_id UUID;\nBEGIN\n    INSERT INTO users (email, name) VALUES (NEW.email, NEW.name) RETURNING id INTO v_user_id;\n    INSERT INTO profiles (user_id, bio) VALUES (v_user_id, NEW.bio);\n    RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER trg_user_view_insert\nINSTEAD OF INSERT ON user_directory_view\nFOR EACH ROW EXECUTE FUNCTION insert_into_user_view();"
       }
     },
     {
@@ -61,13 +35,15 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "INSTEAD OF replaces operation.",
-          "Use for updatable views.",
-          "Use for row-level security."
+          "`INSTEAD OF` triggers apply strictly to Views, not physical tables.",
+          "They intercept mutations and redirect writes to underlying relational tables.",
+          "Provides clean data abstraction for legacy systems."
         ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "simple-views",
+    "trigger-basics"
+  ]
 }
