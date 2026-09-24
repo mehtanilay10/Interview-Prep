@@ -1,0 +1,310 @@
+{
+  "id": "lesson-hld-notification-system",
+  "slug": "notification-system",
+  "moduleSlug": "notification-system",
+  "courseSlug": "hld-problems",
+  "title": "Notification System: Complete Architecture",
+  "description": "Design a multi-channel notification system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 60,
+  "tags": [
+    "hld",
+    "system-design",
+    "notificationsystem"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a multi-channel notification system like Firebase Cloud Messaging or Amazon SNS that can send email, SMS, push notifications (APNs/FCM), and in-app notifications to millions of users. The system must aggregate events to avoid spamming users, respect per-user channel preferences and quiet hours, support rich templates with variables, guarantee at-least-once delivery with deduplication, track delivery and engagement status, and handle 10 million notification sends per minute at peak load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Send notifications across four channels: email (SendGrid/SES), SMS (Twilio/SNS), mobile push (APNs/FCM), and in-app (SignalR/WebSocket)",
+          "Template engine: admins create notification templates with variables (e.g. \"Hi {{FirstName}}, your order {{OrderId}} shipped\"), preview rendered output, and A/B test variants",
+          "Per-user channel preferences: users opt in/out of email, SMS, push per notification category (Order, Security, Marketing)",
+          "Quiet hours: suppress non-critical notifications during user-configured local time windows",
+          "Event aggregation and digest mode: batch 5 events within a 5-minute window into a single digest email to prevent notification fatigue",
+          "Scheduled notifications: send a birthday greeting or renewal reminder at a specific time per user's timezone",
+          "Delivery status tracking: queued, sent, delivered (provider ack), bounced, failed, opened, clicked per channel",
+          "In-app notification center: React inbox with unread count badge, mark-as-read, archive, and push-to-mobile fallback",
+          "Admin campaign builder: target a user segment (e.g. \"all Pro plan users in EU\"), preview audience size, schedule send, and track delivery metrics",
+          "Webhook and API: other services can trigger notifications via a REST API with a notification type and payload"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "At-least-once delivery semantics: every queued notification is attempted at least once; duplicates are silently deduplicated at the user level",
+          "Sub-5 second dispatch latency for in-app notifications (SignalR push)",
+          "Sub-60 second delivery latency for email and SMS from event trigger to provider send",
+          "10 million notifications per minute sustained throughput across all channels",
+          "Per-user deduplication window of 30 minutes: same notification type + entity ID within 30 min = suppress duplicate",
+          "Provider failover: if SendGrid returns 5xx, automatically retry on Amazon SES within 10 seconds",
+          "Horizontal scalability of the dispatch layer: 100x burst for a marketing campaign to 10M users",
+          "Delivery receipt processing: process 5M+ provider delivery callbacks per hour without data loss",
+          "GDPR compliance: users can export all their notification history and request full deletion"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Implementation (Monolith)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Build an ASP.NET Core application with a single NotificationService namespace. Templates are stored as JSON in SQL Server. A background IHostedService polls a NotificationQueue table every 5 seconds and dispatches emails via SendGrid SDK and SMS via Twilio SDK. In-app notifications are pushed via SignalR from the same process. This validates template rendering, preference filtering, and provider SDK integration."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-notificationsystemcompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Notification System: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monolith Tech Stack",
+        "language": "text",
+        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n  - @microsoft/signalr for in-app real-time notification delivery\n\nBackend (ASP.NET Core Monolith):\n  - NotificationController: REST API for triggering notifications from other services\n  - INotificationTemplateEngine: RazorLight / Scriban for template rendering with variables\n  - Background NotificationWorker: polls NotificationQueue table every 5s, applies preference filter, dispatches\n  - SendGrid SDK for email, Twilio SDK for SMS, FirebaseAdmin for FCM/APNs\n  - SignalR for in-app push to online users\n  - Polly policies: Retry (3x), CircuitBreaker (10 failures / 30s), Timeout (30s) per provider\n  - SQL Server: NotificationTemplates, NotificationQueue, NotificationPreferences, NotificationDeliveryLog\n\nInfrastructure:\n  - Azure App Service or AWS ECS single-service deployment\n  - Azure SQL or RDS: templates, queue, preferences, delivery log\n  - Azure Cache for Redis: per-user preference cache, dedup window cache (SET with TTL)\n  - Single process — throughput limited by single worker thread pool"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scalable Implementation (Microservices)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Split the monolith into four microservices separated by concern. The Orchestrator Service evaluates preferences, deduplicates, and batches — it is the brain. The Provider Service handles the actual transport (SendGrid, Twilio, FCM) with circuit breakers and provider failover. The Preference Service manages per-user channel subscriptions, quiet hours, and category opt-ins. The Tracking Service ingests provider webhooks for delivery receipts and computes engagement metrics."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-notificationsystemcompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Notification System: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Core Microservices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "",
+        "items": [
+          "Orchestrator Service: The decision brain. Receives a trigger event (e.g. OrderShipped) via REST API or Kafka. Evaluates user preferences via Preference Service gRPC call. Applies the deduplication window check (Redis SET with TTL = 30 min keyed by userId:type:entityId). Applies quiet-hours rule based on user's timezone. Decides whether to send immediately, batch into a digest (using a 5-minute aggregation window), or suppress. Generates the final notification payload with rendered template variables and publishes a DispatchNotification command to the dispatch queue per channel.",
+          "Provider Service: The transport layer. Consumes DispatchNotification commands and routes to the correct provider: SendGrid for email (with template ID or raw HTML), Twilio for SMS, FCM for Android push, APNs for iOS push. Uses Polly for circuit-breaking: if SendGrid returns 5xx for 10 consecutive calls within 30 seconds, circuit opens and the notification is dead-lettered for manual or retry processing. Implements provider failover: email failures fall back to SES. Publishes ProviderSendResult events (success/failure with provider error code) consumed by Tracking Service.",
+          "Preference Service: Manages per-user notification preferences. Exposes a gRPC API: GetPreferences(userId) returns a NotificationPreferences proto (email: { orders: opt-in, marketing: opt-out, security: required }, push: { ... }, quietHours: { start: 22:00, end: 08:00, timezone: \"America/New_York\" }). Preferences are cached in Redis with 5-minute TTL and persisted in PostgreSQL. Exposes a React-admin-facing REST API for users to manage preferences.",
+          "Tracking Service: Ingests ProviderSendResult webhooks and SignalR delivery receipts. Stores per-notification delivery lifecycle in PostgreSQL: Queued → Sent → Delivered → Opened (email) / Clicked (email) / Failed. Computes channel-level delivery rate, open rate, and bounce rate. Exposes a REST API consumed by the admin analytics dashboard. Detects provider-level degradation (e.g., Twilio delivery rate drops below 90%) and emits a ProviderDegraded alert event.",
+          "Template Service: CRUD service for notification templates. Each template has: id, name, category (Order/Security/Marketing), channel, body template (Scriban/Liquid syntax), subject (email), variables schema, isActive, and A/B test variant config. Exposes a REST API consumed by the admin dashboard. On GET, renders the template with sample variables for live preview. Template versions are immutable — editing creates a new version; the active version is referenced by version ID."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "React Frontend Architecture"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React App Structure",
+        "language": "text",
+        "code": "src/\n  features/\n    NotificationSystem/\n      components/\n        NotificationCenter/   # In-app inbox: unread badge, mark-read, archive actions\n        NotificationItem/     # Individual notification card with icon, body, timestamp, read status\n        PreferencesPanel/     # Per-channel toggles per notification category\n        QuietHoursPicker/     # Time range picker with timezone dropdown\n        TemplateEditor/       # Body template with Scriban syntax highlighting, live preview\n        CampaignBuilder/      # Segment selector, audience size preview, schedule picker, send button\n        DeliveryMetrics/      # Per-channel delivery rate, open rate, provider comparison charts\n      hooks/\n        useNotifications.ts      # React Query infinite list + SignalR real-time new-item subscription\n        useNotificationPreferences.ts # Mutation + cache invalidation for preference changes\n        useTemplatePreview.ts    # Fetches rendered template with sample variables\n        useDeliveryMetrics.ts    # Polls analytics endpoint, feeds Recharts time-series\n      pages/\n        NotificationCenterPage.tsx\n        PreferencesPage.tsx\n        AdminTemplatesPage.tsx\n        AdminCampaignsPage.tsx\n        AdminAnalyticsPage.tsx\n      store/\n        notification-store.ts  # Zustand: unreadCount, filters, selected notification, preferences\n      types/\n        notification.ts        # Notification, DeliveryStatus, Preferences, Template, Campaign\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - useNotifications connects to SignalR for real-time inbox updates; new item triggers a toast + badge count\n  - PreferencesPanel saves with debounced React Query mutations and shows a 'saving' indicator\n  - CampaignBuilder shows a live audience-size estimate from the SegmentService before sending\n  - DeliveryMetrics uses Recharts with 10-second refresh for ops dashboards"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "ASP.NET Core Backend Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Orchestrator Service — Preference Evaluation + Dedup + Dispatch",
+        "language": "text",
+        "code": "// Orchestrator Service — processes a trigger event and decides whether to dispatch\npublic class NotificationOrchestrator\n{\n    private readonly IPreferenceClient _preferences;   // gRPC client to Preference Service\n    private readonly ITemplateEngine   _templates;    // Scriban-based template renderer\n    private readonly IDedupStore        _dedup;        // Redis SET for per-user dedup window\n    private readonly IEventBus          _eventBus;     // MassTransit outbox\n    private readonly IDateTimeProvider  _clock;\n\n    public async Task ProcessAsync(TriggerEvent evt, CancellationToken ct)\n    {\n        // 1. Fetch user preferences (cached in Redis by Preference Service)\n        var prefs = await _preferences.GetPreferencesAsync(evt.UserId);\n        if (prefs == null) return;\n\n        // 2. Check if user has opted out of this category for this channel\n        var channelPref = prefs.GetChannelPreference(evt.Category, evt.Channel);\n        if (channelPref == OptOutStatus.OptOut) return;\n\n        // 3. Check quiet hours (for non-critical categories only)\n        if (channelPref == OptOutStatus.QuietHours && IsInQuietHours(prefs, evt.UserId))\n        {\n            await RescheduleAfterQuietHours(evt, prefs.QuietHours);\n            return;\n        }\n\n        // 4. Dedup check: same user + category + entityId within 30 min window\n        var dedupKey = string.Format(\"dedup:{0}:{1}:{2}\", evt.UserId, evt.Category, evt.EntityId);\n        if (await _dedup.ExistsAsync(dedupKey))\n        {\n            _logger.LogInformation(\"Suppressed duplicate notification for {UserId} / {Category} / {EntityId}\",\n                evt.UserId, evt.Category, evt.EntityId);\n            return;\n        }\n        await _dedup.SetAsync(dedupKey, \"1\", expiry: TimeSpan.FromMinutes(30));\n\n        // 5. Render template with event payload variables\n        var template = await _templates.GetActiveTemplateAsync(evt.Category, evt.Channel);\n        var rendered = await _templates.RenderAsync(template, evt.Variables);\n\n        // 6. Publish dispatch command — outbox guarantees delivery even if the process crashes here\n        await _eventBus.Publish(new DispatchNotification\n        {\n            NotificationId = Guid.NewGuid(),\n            UserId = evt.UserId,\n            Channel = evt.Channel,\n            Subject = rendered.Subject,\n            Body = rendered.Body,\n            Category = evt.Category,\n            TriggeredAt = _clock.UtcNow,\n            IdempotencyKey = string.Format(\"{0}:{1}:{2}\", evt.UserId, evt.Category, evt.EntityId)\n        });\n    }\n\n    private bool IsInQuietHours(UserPreferences prefs, string userId)\n    {\n        var userTz = TimeZoneInfo.FindSystemTimeZoneById(prefs.Timezone);\n        var nowInUserTz = TimeZoneInfo.ConvertTime(_clock.UtcNow, userTz);\n        return nowInUserTz.TimeOfDay >= prefs.QuietHours.Start\n            && nowInUserTz.TimeOfDay <= prefs.QuietHours.End\n            && prefs.QuietHours.Enabled;\n    }\n\n    private async Task RescheduleAfterQuietHours(TriggerEvent evt, QuietHours quietHours)\n    {\n        var tz = TimeZoneInfo.FindSystemTimeZoneById(quietHours.Timezone);\n        var nowInUserTz = TimeZoneInfo.ConvertTime(_clock.UtcNow, tz);\n        var sendAt = nowInUserTz.Date.Add(quietHours.End);\n        if (sendAt <= _clock.UtcNow)\n            sendAt = sendAt.AddDays(1);\n\n        await _eventBus.Publish(new NotificationScheduled\n        {\n            OriginalEvent = evt,\n            ScheduledAt = sendAt.ToUniversalTime()\n        });\n    }\n}\n\n// MassTransit outbox — ensures DispatchNotification is persisted before ack\n// Configure in Program.cs:\n// builder.Services.AddMassTransit(x =>\n// {\n//     x.AddEntityFrameworkOutbox<AppDbContext>(o =>\n//     {\n//         o.QueryDelay = TimeSpan.FromSeconds(1);\n//         o.UsePostgres();\n//         o.DisableInboxCleanupService();\n//     });\n//     x.AddSchedulerStateMachine();\n//     x.UsingRabbitMq((context, cfg) => { cfg.ConfigureEndpoints(context); });\n// });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cloud Services Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure vs AWS Services",
+        "cards": [
+          {
+            "title": "In-App Push (Real-Time)",
+            "description": "Push in-app notifications to connected React clients via SignalR/WebSocket",
+            "tags": [
+              "Azure SignalR Service",
+              "AWS AppSync (subscriptions) / API Gateway WebSocket"
+            ],
+            "pros": [
+              "SignalR Service handles 1M+ concurrent connections with automatic scale-out",
+              "Connection groups enable efficient per-user push without broadcasting to all connections"
+            ],
+            "cons": [
+              "AWS AppSync requires a GraphQL schema even if only subscriptions are used"
+            ]
+          },
+          {
+            "title": "Email Provider Integration",
+            "description": "Transactional and bulk email delivery with reputation management and bounce handling",
+            "tags": [
+              "SendGrid (Azure Marketplace) / Azure Communication Services Email",
+              "Amazon SES"
+            ],
+            "pros": [
+              "SES has the lowest per-email cost at scale (~$0.10/10k) with dedicated IP pools",
+              "SendGrid has the most flexible template engine and webhook event formats"
+            ],
+            "cons": [
+              "SES sandbox mode requires production access request; SendGrid free tier has daily caps"
+            ]
+          },
+          {
+            "title": "SMS Provider Integration",
+            "description": "Transactional and promotional SMS with global reach and delivery receipts",
+            "tags": [
+              "Azure Communication Services SMS",
+              "Amazon SNS (SMS)"
+            ],
+            "pros": [
+              "ACS supports opt-in management and compliance checklists out-of-the-box",
+              "SNS supports SMS spending limits per region to prevent cost overruns"
+            ],
+            "cons": [
+              "SNS does not support two-way SMS in all regions; ACS has broader two-way coverage"
+            ]
+          },
+          {
+            "title": "Push Notifications (Mobile)",
+            "description": "APNs (iOS) and FCM (Android) push notification gateway with tag-based targeting",
+            "tags": [
+              "Azure Notification Hubs",
+              "Amazon SNS"
+            ],
+            "pros": [
+              "Notification Hubs handles per-platform device registration and tag-based broadcast elegantly",
+              "SNS supports SMS, email, mobile push, and HTTP webhooks in a single service"
+            ],
+            "cons": [
+              "Notification Hubs does not support per-notification delivery receipt by default"
+            ]
+          },
+          {
+            "title": "Message Queue",
+            "description": "Decouple event triggers from dispatch workers with priority lanes for critical vs marketing notifications",
+            "tags": [
+              "Azure Service Bus (Premium, topics + sessions)",
+              "Amazon SQS + SQS FIFO"
+            ],
+            "pros": [
+              "Service Bus Premium supports sessions for ordered per-user delivery and duplicate detection",
+              "SQS FIFO + MessageGroupId enables ordered per-user processing with exactly-once deduplication"
+            ],
+            "cons": [
+              "SQS FIFO has a 300 TPS per queue limit that requires sharding for high-volume campaigns"
+            ]
+          },
+          {
+            "title": "Database",
+            "description": "Persist notification history, preferences, templates, and delivery logs with strong consistency",
+            "tags": [
+              "Azure SQL Database / Cosmos DB PostgreSQL",
+              "Amazon RDS PostgreSQL / Aurora"
+            ],
+            "pros": [
+              "Azure SQL with temporal tables enables point-in-time audit of preference changes",
+              "Aurora Serverless v2 auto-scales for bulk campaign write spikes"
+            ],
+            "cons": [
+              "Aurora cluster storage scaling can lag behind sudden 10M-row write spikes"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When to Choose Microservices?",
+        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "At-least-once delivery + idempotency keys are the correct reliability primitive — never promise exactly-once across external providers",
+          "Per-user deduplication via Redis SET with TTL is simpler and more reliable than a distributed lock",
+          "Quiet hours require timezone-aware scheduling — never use UTC wall-clock for user-facing suppression",
+          "Provider failover (SendGrid → SES) must be transparent to the caller — the Provider Service owns retry logic",
+          "The MassTransit outbox pattern guarantees DispatchNotification durability without two-phase commit",
+          "Digest mode (5-min aggregation window) requires the Orchestrator to hold state in Redis sorted sets per user until the window closes"
+        ],
+        "takeaway": "Notification systems succeed on reliability and user experience, not raw throughput. Preference-aware dispatch with Redis dedup windows, an outbox-backed Orchestrator for crash safety, provider failover with circuit breakers, and timezone-aware quiet hours are the architectural decisions that keep users informed without spamming them."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

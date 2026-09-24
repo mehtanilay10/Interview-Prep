@@ -1,0 +1,294 @@
+{
+  "id": "lesson-hld-rate-limiter",
+  "slug": "rate-limiter",
+  "moduleSlug": "rate-limiter",
+  "courseSlug": "hld-problems",
+  "title": "Rate Limiter: Complete Architecture",
+  "description": "Design a high-performance rate limiter with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 60,
+  "tags": [
+    "hld",
+    "system-design",
+    "ratelimiter"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a distributed rate limiter that protects APIs and microservices from abuse. It must support multiple rate-limiting algorithms (token bucket, sliding window, fixed window), enforce limits by user ID, IP address, or API endpoint, allow hot-reloading of rules without restart, and serve rate-limit decisions in under 1 millisecond — all while scaling horizontally to handle 1 million requests per second at the data plane."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Support token bucket algorithm: allows burst up to bucket capacity, refills at a steady rate per second",
+          "Support sliding window log: track precise request timestamps within the window duration",
+          "Support sliding window counter: approximate O(1) counter-based sliding window with weighted average",
+          "Support fixed window counter: simplest algorithm with hard reset at window boundaries",
+          "Rate-limit key strategies: by authenticated user ID, by client IP address, by API endpoint + method, or composite keys (user + endpoint)",
+          "Tiered rate plans: Free tier (100 req/min), Pro tier (1000 req/min), Enterprise (custom), each applied per key",
+          "Hot-reload rate limit rules: API Gateway picks up rule changes within 5 seconds without restart",
+          "Return standard rate-limit headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After",
+          "Bypass list: allowlisted API keys, internal service mesh traffic, and health-check endpoints are exempt",
+          "Per-rule configuration: burst allowance, window duration, and penalty duration for repeated violators"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Sub-1ms latency for the rate-limit decision at P99 — the data plane must not add measurable API latency",
+          "99.99% availability: rate-limit checks must never block or crash the protected API path",
+          "Horizontal scalability to 1M+ rate-limit decisions per second per data-plane instance",
+          "Rule propagation latency under 5 seconds from config store to all gateway instances",
+          "Distributed consistency: counters sharded by key must not over-count across multiple gateway nodes",
+          "Graceful degradation: if Redis is unreachable, default to allow (fail-open) or deny (fail-closed) based on configured policy",
+          "Observability: per-rule violation metrics, per-client usage percentiles, and rule hit-rate dashboards"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Implementation (Monolith)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with an ASP.NET Core middleware that intercepts every HTTP request before it reaches the controller. Rate-limit state is stored in a local in-memory ConcurrentDictionary keyed by rate-limit key. Rules are loaded once at startup from a JSON config file. This validates algorithm correctness and middleware pipeline integration before introducing distributed state."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-ratelimitercompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Rate Limiter: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monolith Tech Stack",
+        "language": "text",
+        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core Monolith):\n  - Custom RateLimitMiddleware registered first in the pipeline\n  - In-memory ConcurrentDictionary<string, TokenBucket> for per-key counters\n  - IOptionsMonitor<RateLimitRules> for hot-reload of JSON config file\n  - System.Threading.SemaphoreSlim to serialize Redis writes in the distributed path\n  - Serilog with rate-limit event enrichment for violation logging\n  - Rules: List<RateLimitRule> loaded from appsettings.ratelimit.json at startup\n\nInfrastructure:\n  - Azure App Service or AWS ECS single-service deployment\n  - Redis (Azure Cache / ElastiCache) for shared state in the distributed path\n  - Single in-memory state — not suitable for multi-instance deployments"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scalable Implementation (Microservices)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The rate limiter data plane is best deployed as an API Gateway plugin or sidecar — it must be on the hot path. Split the supporting control plane into three microservices: RuleService manages rules, ConfigService distributes rules to gateways via Redis Pub/Sub, and AnalyticsService aggregates violation metrics. The decision logic itself is a Lua script executed atomically on Redis, giving sub-millisecond P99 latency."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-ratelimitercompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Rate Limiter: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Core Microservices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "",
+        "items": [
+          "RateCheckService (Data Plane): The actual rate-limit evaluation engine. In production, this is not a remote service call — it is a Lua script running on Redis invoked by the API Gateway or Envoy sidecar. The script receives the rate-limit key and rule ID, performs the algorithm atomically, and returns { allowed, remaining, resetAt }. For the monolith demo, this is the ASP.NET Core middleware calling Redis directly.",
+          "RuleService (Control Plane): CRUD API for rate limit rules. Each rule has: id, keyStrategy (userId, ip, endpoint, composite), algorithm (tokenBucket, slidingWindowLog, slidingWindowCounter, fixedWindow), limit, windowSeconds, burstCapacity, planTier. Rules are versioned; publishing a new version does not affect active rules until explicitly promoted. Exposes a REST API consumed by the admin dashboard.",
+          "ConfigService (Control Plane): Distributes the active rule snapshot to all gateway instances. Uses Redis Pub/Sub to push rule-update events. Each gateway subscribes and atomically swaps the in-memory rule dictionary. Falls back to polling Redis every 30 seconds if the Pub/Sub connection drops. Manages the rule promotion lifecycle (draft → active → deprecated).",
+          "AnalyticsService (Control Plane): Aggregates violation events streamed from all gateways via Kafka. Computes per-client, per-endpoint, and per-rule metrics: total requests, blocked count, block rate %, P99 latency of the rate-limit check itself. Powers the admin dashboard with Prometheus + Grafana or Azure Monitor Workbooks. Detects rule misconfigurations (e.g., a rule blocking 100% of traffic).",
+          "KeyResolverService (Control Plane): Resolves the composite rate-limit key from the incoming request context. A single request may produce multiple keys (e.g., key for user tier + key for endpoint + key for IP). The KeyResolver inspects the authenticated user JWT, the X-Forwarded-For header, and the request path/method, then returns an ordered list of keys and their matching rule IDs."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "React Frontend Architecture"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React App Structure",
+        "language": "text",
+        "code": "src/\n  features/\n    RateLimiter/\n      components/\n        RuleEditor/        # Create/edit rules: algorithm picker, tier selector\n        RuleTable/         # List rules with status (draft/active/deprecated), version\n        ViolationChart/    # Time-series chart of blocked requests per rule\n        ClientUsageTable/  # Per-client usage heatmap showing limit vs remaining\n        HotReloadIndicator/# Live dot showing last config-push timestamp per gateway\n      hooks/\n        useRateLimitRules.ts    # React Query infinite list with real-time WebSocket updates\n        useViolationMetrics.ts  # Polls analytics endpoint, feeds Recharts\n        useRulePromotion.ts     # Mutation + optimistic rule promotion with rollback\n      pages/\n        RulesPage.tsx           # Rule CRUD, promote/demote workflow\n        AnalyticsPage.tsx        # Dashboard: violations, top blocked clients, rule efficiency\n        GatewaysPage.tsx         # Gateway instance health, rule version per instance\n      store/\n        rule-store.ts           # Zustand: draft rules, active rule snapshot, promotion queue\n      types/\n        rule.ts                 # RateLimitRule, Algorithm, KeyStrategy, PlanTier\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - useRateLimitRules subscribes to WebSocket for live rule push events\n  - RuleEditor validates algorithm-specific constraints before saving (e.g. burst <= limit for token bucket)\n  - ViolationChart uses Recharts with 1-second refresh for ops dashboards\n  - HotReloadIndicator turns red if any gateway has not acknowledged the latest rule version in >10s"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "ASP.NET Core Backend Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token Bucket Lua Script for Redis (Sub-1ms Data Plane)",
+        "language": "text",
+        "code": "// Lua script: token bucket algorithm — executed atomically via Redis EVALSHA\n// Keys:   rate:{keyHash}  — Redis Hash storing bucket state\n// Args:   ruleId, capacity, refillRatePerSec, nowUnixMs, cost (request cost)\n// Returns: { allowed, remaining, resetUnixMs, retryAfterMs }\n\nconst tokenBucketLua = `\nlocal bucket = redis.call('HMGET', KEYS[1], 'tokens', 'lastRefill')\nlocal tokens = tonumber(bucket[1]) or ARGV[2]  -- start at full capacity\nlocal lastRefill = tonumber(bucket[2]) or ARGV[3]\nlocal now = tonumber(ARGV[3])\nlocal capacity = tonumber(ARGV[2])\nlocal refillRate = tonumber(ARGV[4])\nlocal cost = tonumber(ARGV[5]) or 1\n\n-- Refill: tokens += (now - lastRefill) * refillRate, capped at capacity\nlocal elapsedSec = math.max(0, (now - lastRefill) / 1000)\ntokens = math.min(capacity, tokens + elapsedSec * refillRate)\n\nlocal allowed = 0\nlocal remaining = tokens\nlocal retryAfterMs = 0\n\nif tokens >= cost then\n  tokens = tokens - cost\n  allowed = 1\n  remaining = tokens\nelse\n  -- deny: compute how long until one token is available\n  local deficit = cost - tokens\n  retryAfterMs = math.ceil((deficit / refillRate) * 1000)\nend\n\nredis.call('HMSET', KEYS[1], 'tokens', tokens, 'lastRefill', now)\nredis.call('PEXPIRE', KEYS[1], math.ceil(capacity / refillRate * 1000))\n\nlocal resetUnixMs = now + math.ceil((capacity - tokens) / refillRate * 1000)\nreturn { allowed, math.floor(remaining), resetUnixMs, retryAfterMs }\n`;\n\n// ASP.NET Core middleware using Redis Lua for the hot path\npublic class RateLimitMiddleware\n{\n    public async Task InvokeAsync(HttpContext context, RequestDelegate next, RateLimitConfig config)\n    {\n        // Skip bypassed paths (health checks, internal service mesh)\n        if (config.BypassPaths.Any(p => context.Request.Path.StartsWithSegments(p)))\n        {\n            await next(context);\n            return;\n        }\n\n        var key = await _keyResolver.ResolveKeyAsync(context); // e.g. \"user:12345\"\n        var rule = await _ruleStore.GetRuleForKeyAsync(key);   // cached in-memory per gateway\n        if (rule == null)\n        {\n            await next(context); // no rule = no limit\n            return;\n        }\n\n        var nowUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();\n        var result = await _redis.ExecuteLuaAsync(\n            LuaScript.Prepare(tokenBucketLua),\n            new RedisKey[] { string.Format(\"rate:{0}:{1}\", rule.Id, key) },\n            rule.Id, rule.BurstCapacity, nowUnixMs, rule.RefillRatePerSec, 1\n        );\n\n        var allowed = (int)result[0];\n        var remaining = (int)result[1];\n        var resetUnixMs = (long)result[2];\n        var retryAfterMs = (int)result[3];\n\n        context.Response.Headers[\"X-RateLimit-Limit\"] = rule.Limit.ToString();\n        context.Response.Headers[\"X-RateLimit-Remaining\"] = remaining.ToString();\n        context.Response.Headers[\"X-RateLimit-Reset\"] = resetUnixMs.ToString();\n\n        if (allowed == 0)\n        {\n            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;\n            context.Response.Headers[\"Retry-After\"] =\n                TimeSpan.FromMilliseconds(retryAfterMs).TotalSeconds.ToString(\"F0\");\n            await _violationLogger.LogAsync(key, rule.Id, context.Request.Path);\n            return;\n        }\n\n        await next(context);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cloud Services Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure vs AWS Services",
+        "cards": [
+          {
+            "title": "Rate Limit (Data Plane)",
+            "description": "Enforce rate limits at the edge or API gateway layer with minimal added latency",
+            "tags": [
+              "Azure API Management (rate-limit policy)",
+              "Amazon API Gateway (throttle / usage plans)"
+            ],
+            "pros": [
+              "Azure APIM supports quota-by-key and rate-limit-by-key policies declaratively",
+              "AWS API Gateway usage plans + throttles are natively IAM-integrated"
+            ],
+            "cons": [
+              "APIM standard tier has a 4ms baseline overhead per call",
+              "API Gateway per-region account limits require support ticket to raise"
+            ]
+          },
+          {
+            "title": "Distributed Config",
+            "description": "Distribute active rate-limit rules to all gateway nodes within 5 seconds",
+            "tags": [
+              "Azure App Configuration",
+              "AWS AppConfig (SSM Parameter Store)"
+            ],
+            "pros": [
+              "App Configuration push via Event Grid triggers rule reload in <5s",
+              "AppConfig validates JSON schemas before deploying a configuration"
+            ],
+            "cons": [
+              "Polling fallback required if push delivery is interrupted"
+            ]
+          },
+          {
+            "title": "Cache",
+            "description": "Token bucket and sliding window counters stored as Redis data structures with Lua CAS",
+            "tags": [
+              "Azure Cache for Redis",
+              "Amazon ElastiCache (Redis)"
+            ],
+            "pros": [
+              "Lua script execution is single-threaded and atomic — perfect for CAS counters",
+              "Redis Cluster mode shards keys across nodes for 1M+ ops/sec"
+            ],
+            "cons": [
+              "Keyspace eviction (maxmemory-policy) can lose rate-limit state during memory pressure"
+            ]
+          },
+          {
+            "title": "Event Streaming",
+            "description": "Stream violation and usage events from gateways to AnalyticsService",
+            "tags": [
+              "Azure Event Hubs",
+              "Amazon Kinesis Data Streams"
+            ],
+            "pros": [
+              "Event Hubs Capture auto-writes to ADLS for long-term violation audit",
+              "Kinesis Data Firehose delivers metrics directly to CloudWatch"
+            ],
+            "cons": [
+              "Throughput provisioning must be sized for peak request volume"
+            ]
+          },
+          {
+            "title": "Dashboard / Observability",
+            "description": "Real-time violation rate dashboards and per-rule efficiency metrics",
+            "tags": [
+              "Azure Monitor Workbooks + Application Insights",
+              "Amazon CloudWatch + Managed Grafana"
+            ],
+            "pros": [
+              "Application Insights automatically correlates rate-limit 429s with downstream service health",
+              "Managed Grafana pre-built dashboards for API Gateway throttles"
+            ],
+            "cons": [
+              "Grafana alert rules need separate maintenance from infrastructure IaC"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When to Choose Microservices?",
+        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "The rate-limit data plane must be sub-1ms — use a Redis Lua script, not a remote service call",
+          "Token bucket is the best general-purpose algorithm: it allows controlled bursts while maintaining a steady rate",
+          "Shard rate-limit keys across Redis cluster nodes to horizontally scale past a single Redis instance",
+          "Distribute rules via Redis Pub/Sub with a polling fallback — 5-second propagation is achievable",
+          "The control plane (RuleService, ConfigService, AnalyticsService) is separated from the data plane to keep the hot path lean",
+          "Graceful degradation (fail-open vs fail-closed) must be a configurable policy, not an accidental behavior"
+        ],
+        "takeaway": "Rate limiter design is a study in separating the ultra-fast data plane (Redis Lua, sub-1ms) from the management control plane (rules CRUD, analytics). Token bucket with Redis CAS counters, hot-pushed rule configuration, and multi-key sharding are the three decisions that determine whether your rate limiter adds measurable latency or disappears into the network."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

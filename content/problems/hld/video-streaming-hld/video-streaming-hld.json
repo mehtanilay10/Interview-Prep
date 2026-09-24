@@ -1,0 +1,306 @@
+{
+  "id": "lesson-hld-video-streaming-hld",
+  "slug": "video-streaming-hld",
+  "moduleSlug": "video-streaming-hld",
+  "courseSlug": "hld-problems",
+  "title": "Video Streaming Service: Complete Architecture",
+  "description": "Design a video streaming service with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 60,
+  "tags": [
+    "hld",
+    "system-design",
+    "videostreaminghld"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a video-on-demand and live streaming platform that accepts uploads from creators, transcodes videos into multiple bitrates and resolutions (HLS and DASH), stores content durably, and streams to millions of viewers with adaptive bitrate selection. The system must generate thumbnails, ingest closed captions, enforce DRM for premium content, and serve playback events for analytics."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Upload raw video files up to 10 GB with resumable multipart transfer",
+          "Transcode uploads into HLS and DASH renditions at 480p, 720p, 1080p, and 4K",
+          "Generate and cache thumbnail images at multiple timestamps",
+          "Serve adaptive bitrate streams with automatic quality switching based on bandwidth",
+          "Support live streaming with low latency (HLS LL or WebRTC ingest)",
+          "Ingest and burn closed captions (WebVTT and SRT) into video renditions",
+          "Apply DRM for premium content using Widevine and FairPlay",
+          "Track watch history, watch percentage, and playback errors for analytics",
+          "Enable search across titles, descriptions, and auto-generated transcripts"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "99.9% availability for playback endpoints; uploads tolerate intermittent drops",
+          "Sub-500ms HLS manifest delivery from edge cache",
+          "Transcode 1-hour 1080p video within 15 minutes of upload",
+          "Store petabytes of video and images with 99.999999999% durability",
+          "Scale to 1 million concurrent viewers per popular title",
+          "Support 10,000 simultaneous live streams",
+          "End-to-end encryption for premium content in transit and at rest",
+          "Analytics pipeline processes playback events in under 60 seconds"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Implementation (Monolith)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with a monolithic ASP.NET Core application that handles upload, metadata storage, transcoding job orchestration, and video serving. Use Azure Blob Storage or AWS S3 for raw and processed video files. The monolith keeps the content pipeline simple while you validate encoding profiles and streaming URLs."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-videostreamingservicecompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Video Streaming Service: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monolith Tech Stack",
+        "language": "text",
+        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - Minimal API or MVC Controllers\n  - Entity Framework Core for data access\n  - Azure SQL Database or AWS RDS for relational data\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service or AWS EC2/ECS\n  - Azure Blob Storage or AWS S3 for file assets\n  - Azure Monitor or AWS CloudWatch for logging\n  - Single database with tables for all domains"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scalable Implementation (Microservices)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When upload volume and concurrent viewership grow, split into microservices. Upload Service handles multipart uploads and generates presigned URLs. Transcoding Service consumes jobs from a queue and runs FFmpeg in isolated containers or serverless functions. Streaming Service serves HLS playlists and video segments from a CDN with DRM license enforcement. Metadata Service manages titles, descriptions, and search. Media Service owns the media library and watch history."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-videostreamingservicecompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Video Streaming Service: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Core Microservices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Upload Service: Accepts resumable multipart uploads, generates presigned URLs, validates file size and format, and emits TranscodeJob events to the queue.",
+          "Transcoding Service: Consumes transcode jobs, runs FFmpeg to produce HLS and DASH renditions, and stores segments and manifests in blob storage.",
+          "Streaming Service: Generates signed playback URLs, enforces DRM licenses (Widevine, FairPlay), serves HLS playlists, and emits watch events.",
+          "Metadata Service: Manages video metadata, titles, descriptions, tags, categories, and watch history. Powers search and recommendations.",
+          "Thumbnail Service: Extracts frames from videos at configured timestamps, generates sprite sheets for previews, and stores images in blob storage."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "React Frontend Architecture"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React App Structure",
+        "language": "text",
+        "code": "src/\n  features/\n    VideoStreamingHld/\n      api/           # API clients per service\n      components/     # Shared UI components\n      hooks/          # Custom hooks\n      pages/          # Route pages\n      store/          # Zustand/Jotai state\n      types/          # TypeScript interfaces\n  shared/\n    ui/              # Design system\n    lib/              # Utilities\n    hooks/            # Global hooks\n\nKey Patterns:\n  - Feature-based folder structure\n  - API Gateway as single entry point\n  - React Query for caching and background refetch\n  - WebSocket / SSE for real-time updates\n  - Error boundaries and retry logic"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "ASP.NET Core Backend Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Service Template (ASP.NET Core)",
+        "language": "text",
+        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"VideoStreamingHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapVideoStreamingHldEndpoints();\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cloud Services Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure vs AWS Services",
+        "cards": [
+          {
+            "title": "Compute",
+            "description": "Run containerized or serverless workloads",
+            "tags": [
+              "Azure App Service",
+              "Amazon EC2 / ECS / EKS"
+            ],
+            "pros": [
+              "Auto-scaling",
+              "Managed infrastructure"
+            ],
+            "cons": [
+              "Cold start latency"
+            ]
+          },
+          {
+            "title": "API Gateway",
+            "description": "Rate limiting, auth, and request routing",
+            "tags": [
+              "Azure API Management",
+              "Amazon API Gateway"
+            ],
+            "pros": [
+              "Built-in policies",
+              "Developer portal"
+            ],
+            "cons": [
+              "Additional latency"
+            ]
+          },
+          {
+            "title": "Cache",
+            "description": "In-memory caching for hot data",
+            "tags": [
+              "Azure Cache for Redis",
+              "Amazon ElastiCache (Redis)"
+            ],
+            "pros": [
+              "Sub-millisecond latency",
+              "Automatic eviction"
+            ],
+            "cons": [
+              "Memory cost"
+            ]
+          },
+          {
+            "title": "Database",
+            "description": "Primary data store for services",
+            "tags": [
+              "Azure Cosmos DB",
+              "Amazon DynamoDB"
+            ],
+            "pros": [
+              "Global distribution",
+              "Auto-scaling throughput"
+            ],
+            "cons": [
+              "Consistency model learning curve"
+            ]
+          },
+          {
+            "title": "Storage",
+            "description": "Blob storage for media and files",
+            "tags": [
+              "Azure Blob Storage",
+              "Amazon S3"
+            ],
+            "pros": [
+              "Infinite scale",
+              "Cheap archival tiers"
+            ],
+            "cons": [
+              "Eventual consistency for listings"
+            ]
+          },
+          {
+            "title": "Messaging",
+            "description": "Async communication between services",
+            "tags": [
+              "Azure Service Bus",
+              "Amazon SQS"
+            ],
+            "pros": [
+              "Decoupling",
+              "Buffering spikes"
+            ],
+            "cons": [
+              "Debugging async flows"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When to Choose Microservices?",
+        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "A Video Streaming Service system requires both simple and scalable designs",
+          "Monolith is fastest to validate; microservices are for scale",
+          "React + ASP.NET Core provides a robust full-stack foundation",
+          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
+          "Always design for failure: retries, circuit breakers, and fallbacks"
+        ],
+        "takeaway": "Video Streaming Service is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

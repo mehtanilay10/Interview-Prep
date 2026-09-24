@@ -1,0 +1,306 @@
+{
+  "id": "lesson-hld-payment-gateway-hld",
+  "slug": "payment-gateway-hld",
+  "moduleSlug": "payment-gateway-hld",
+  "courseSlug": "hld-problems",
+  "title": "Payment Gateway: Complete Architecture",
+  "description": "Design a payment gateway with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 60,
+  "tags": [
+    "hld",
+    "system-design",
+    "paymentgatewayhld"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a payment gateway that securely processes credit card, debit card, UPI, and wallet transactions for an e-commerce platform. The system must authorize payments, detect fraud in real time, reconcile daily settlements with banks, handle refunds and chargebacks, and maintain PCI DSS compliance. It must also expose webhooks for merchant systems and support idempotent retries across distributed failures."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Authorize and capture card and UPI payments through acquiring banks",
+          "Tokenize card data so plain card numbers never touch your servers",
+          "Run real-time fraud scoring using velocity, bin checks, and ML rules",
+          "Process refunds, partial refunds, and chargeback disputes",
+          "Settle transactions daily with reconciliation files sent to banks",
+          "Send webhooks to merchants on payment success, failure, and refund",
+          "Support multiple payment methods: Visa, Mastercard, UPI, Apple Pay, wallets",
+          "Provide a dashboard for ops teams to search transactions and replay failed webhooks",
+          "Support idempotent retries so duplicate API calls do not create duplicate charges"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "99.95% availability for the authorization path; outages must not block checkout",
+          "Sub-100ms p99 authorization latency end-to-end including acquiring bank round-trip",
+          "Daily settlement batch completes within 2 hours of bank cutoff time",
+          "PCI DSS scope minimization: card data never lands in app databases",
+          "Immutable audit logs for all payment events with 7-year retention",
+          "Idempotency keys prevent double-charge on retry from network drops",
+          "Horizontal scaling to handle Black Friday spikes (10,000 TPS authorization)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Implementation (Monolith)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with a monolithic ASP.NET Core application. All payment domains—authorization, fraud, settlement, refund, and notification—run in a single process backed by a single relational database. This is the fastest way to validate the payment data model and banking integration contracts while keeping PCI scope as small as possible."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-paymentgatewaycompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Payment Gateway: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_PaymentService[Payment Service]\n        MS_FraudDetectionService[Fraud Detection Service]\n        MS_SettlementService[Settlement Service]\n        MS_NotificationService[Notification Service]\n        MS_LedgerService[Ledger Service]\n        MS_RefundService[Refund Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_FraudDetectionService\n        MS_FraudDetectionService --> MS_DB\n        MS_FraudDetectionService --> MS_Queue\n        MS_FraudDetectionService --> MS_Cache\n        MS_LB --> MS_SettlementService\n        MS_SettlementService --> MS_DB\n        MS_SettlementService --> MS_Queue\n        MS_SettlementService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LedgerService\n        MS_LedgerService --> MS_DB\n        MS_LedgerService --> MS_Queue\n        MS_LedgerService --> MS_Cache\n        MS_LB --> MS_RefundService\n        MS_RefundService --> MS_DB\n        MS_RefundService --> MS_Queue\n        MS_RefundService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monolith Tech Stack",
+        "language": "text",
+        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n\nBackend (ASP.NET Core):\n  - Minimal API or MVC Controllers\n  - Entity Framework Core for data access\n  - Azure SQL Database or AWS RDS for relational data\n  - Built-in DI, logging, and health checks\n\nInfrastructure:\n  - Azure App Service or AWS EC2/ECS\n  - Azure Blob Storage or AWS S3 for file assets\n  - Azure Monitor or AWS CloudWatch for logging\n  - Single database with tables for all domains"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scalable Implementation (Microservices)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "At scale, split the monolith into independently deployable microservices. The Payment Service owns authorization and capture. Fraud Detection runs ML rules asynchronously without blocking checkout. Settlement runs nightly batches. Ledger owns financial double-entry. Refund handles returns and chargebacks. Notification delivers webhooks and emails. Each service uses async messaging so failures in settlement or refund do not stall payment authorization."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-paymentgatewaycompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Payment Gateway: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_PaymentService[Payment Service]\n        MS_FraudDetectionService[Fraud Detection Service]\n        MS_SettlementService[Settlement Service]\n        MS_NotificationService[Notification Service]\n        MS_LedgerService[Ledger Service]\n        MS_RefundService[Refund Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_FraudDetectionService\n        MS_FraudDetectionService --> MS_DB\n        MS_FraudDetectionService --> MS_Queue\n        MS_FraudDetectionService --> MS_Cache\n        MS_LB --> MS_SettlementService\n        MS_SettlementService --> MS_DB\n        MS_SettlementService --> MS_Queue\n        MS_SettlementService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LedgerService\n        MS_LedgerService --> MS_DB\n        MS_LedgerService --> MS_Queue\n        MS_LedgerService --> MS_Cache\n        MS_LB --> MS_RefundService\n        MS_RefundService --> MS_DB\n        MS_RefundService --> MS_Queue\n        MS_RefundService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Core Microservices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Payment Service: Authorizes and captures payments via acquiring bank APIs. Enforces idempotency keys and PCI-safe token handling.",
+          "Fraud Detection Service: Evaluates transaction risk using velocity rules, bin checks, device fingerprint, and ML models. Returns approve/challenge/block decisions.",
+          "Settlement Service: Runs nightly batches to match authorized transactions with bank settlement files and posts cash movements.",
+          "Ledger Service: Maintains immutable double-entry financial records for every payment, fee, refund, and adjustment.",
+          "Notification Service: Delivers webhooks and email/SMS alerts to merchants and customers on payment lifecycle events.",
+          "Refund Service: Handles full and partial refunds, chargeback intake, and dispute evidence workflows."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "React Frontend Architecture"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React App Structure",
+        "language": "text",
+        "code": "src/\n  features/\n    PaymentGatewayHld/\n      api/           # API clients per service\n      components/     # Shared UI components\n      hooks/          # Custom hooks\n      pages/          # Route pages\n      store/          # Zustand/Jotai state\n      types/          # TypeScript interfaces\n  shared/\n    ui/              # Design system\n    lib/              # Utilities\n    hooks/            # Global hooks\n\nKey Patterns:\n  - Feature-based folder structure\n  - API Gateway as single entry point\n  - React Query for caching and background refetch\n  - WebSocket / SSE for real-time updates\n  - Error boundaries and retry logic"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "ASP.NET Core Backend Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Service Template (ASP.NET Core)",
+        "language": "text",
+        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"PaymentGatewayHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapPaymentGatewayHldEndpoints();\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cloud Services Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure vs AWS Services",
+        "cards": [
+          {
+            "title": "Compute",
+            "description": "Run containerized or serverless workloads",
+            "tags": [
+              "Azure App Service",
+              "Amazon EC2 / ECS / EKS"
+            ],
+            "pros": [
+              "Auto-scaling",
+              "Managed infrastructure"
+            ],
+            "cons": [
+              "Cold start latency"
+            ]
+          },
+          {
+            "title": "API Gateway",
+            "description": "Rate limiting, auth, and request routing",
+            "tags": [
+              "Azure API Management",
+              "Amazon API Gateway"
+            ],
+            "pros": [
+              "Built-in policies",
+              "Developer portal"
+            ],
+            "cons": [
+              "Additional latency"
+            ]
+          },
+          {
+            "title": "Cache",
+            "description": "In-memory caching for hot data",
+            "tags": [
+              "Azure Cache for Redis",
+              "Amazon ElastiCache (Redis)"
+            ],
+            "pros": [
+              "Sub-millisecond latency",
+              "Automatic eviction"
+            ],
+            "cons": [
+              "Memory cost"
+            ]
+          },
+          {
+            "title": "Database",
+            "description": "Primary data store for services",
+            "tags": [
+              "Azure Cosmos DB",
+              "Amazon DynamoDB"
+            ],
+            "pros": [
+              "Global distribution",
+              "Auto-scaling throughput"
+            ],
+            "cons": [
+              "Consistency model learning curve"
+            ]
+          },
+          {
+            "title": "Storage",
+            "description": "Blob storage for media and files",
+            "tags": [
+              "Azure Blob Storage",
+              "Amazon S3"
+            ],
+            "pros": [
+              "Infinite scale",
+              "Cheap archival tiers"
+            ],
+            "cons": [
+              "Eventual consistency for listings"
+            ]
+          },
+          {
+            "title": "Messaging",
+            "description": "Async communication between services",
+            "tags": [
+              "Azure Service Bus",
+              "Amazon SQS"
+            ],
+            "pros": [
+              "Decoupling",
+              "Buffering spikes"
+            ],
+            "cons": [
+              "Debugging async flows"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When to Choose Microservices?",
+        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "A Payment Gateway system requires both simple and scalable designs",
+          "Monolith is fastest to validate; microservices are for scale",
+          "React + ASP.NET Core provides a robust full-stack foundation",
+          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
+          "Always design for failure: retries, circuit breakers, and fallbacks"
+        ],
+        "takeaway": "Payment Gateway is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

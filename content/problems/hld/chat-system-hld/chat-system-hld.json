@@ -1,0 +1,294 @@
+{
+  "id": "lesson-hld-chat-system-hld",
+  "slug": "chat-system-hld",
+  "moduleSlug": "chat-system-hld",
+  "courseSlug": "hld-problems",
+  "title": "Chat System: Complete Architecture",
+  "description": "Design a scalable real-time chat system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 60,
+  "tags": [
+    "hld",
+    "system-design",
+    "chatsystemhld"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a real-time chat system like Slack or WhatsApp that supports 1:1 direct messages, group conversations with up to 50,000 members, online presence indicators, typing indicators, read receipts, and end-to-end encryption for sensitive channels. The system must handle 100M+ concurrent WebSocket connections and 10B+ messages per day with sub-100ms delivery latency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Users can send and receive text messages in real-time via WebSocket or SSE fallback",
+          "Users can create 1:1 conversations and group channels with member lists and roles",
+          "Users can see online/offline/away presence status for contacts and group members",
+          "Users see typing indicators when another user is composing a message",
+          "Messages show delivery status: sent, delivered, read (double-check marks)",
+          "Users can share images, files, and voice notes with preview generation",
+          "Offline users receive queued messages on reconnect with proper message ordering",
+          "Users can search message history by keyword within a conversation",
+          "Admins can archive, pin, and delete messages in channels they manage",
+          "Push notifications on mobile when the app is backgrounded or closed"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Sub-100ms end-to-end message delivery between two online users on the same region",
+          "99.99% message delivery rate — no silent drops; duplicates acceptable at most once",
+          "Support 100M concurrent persistent WebSocket connections across all regions",
+          "Messages maintain total causal ordering per 1:1 conversation; group chat uses per-sender ordering",
+          "Presence status updates propagate to all conversation members within 5 seconds",
+          "Offline message queue can hold 10,000 messages per user without message loss",
+          "Horizontal scalability: add hub nodes without dropping active connections",
+          "Message history is paginated with cursor-based pagination, not offset"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Basic Implementation (Monolith)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Build a monolithic ASP.NET Core application using SignalR for real-time messaging. All chat state — connections, message history, presence, and user data — lives in a single SQL Server database. A background hosted service runs a connection map to route SignalR messages. This validates the WebSocket lifecycle, message persistence, and basic presence logic before splitting."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-chatsystemcompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monolith Tech Stack",
+        "language": "text",
+        "code": "Frontend:\n  - React 18 with TypeScript\n  - Vite for build tooling\n  - Tailwind CSS for styling\n  - React Query for server state\n  - @microsoft/signalr for WebSocket connection management\n\nBackend (ASP.NET Core Monolith):\n  - SignalR Hub (ChatHub) for real-time message routing\n  - Entity Framework Core with SQL Server for message history\n  - StackExchange.Redis for presence map (key: userId, TTL: heartbeat interval)\n  - Background IHostedService for connection tracking and broadcast fan-out\n  - Azure SignalR Service sticky session via ScaleoutMode = Default\n  - Cloudflare R2 / Azure Blob for media message storage\n\nInfrastructure:\n  - Azure App Service with ARR affinity disabled (SignalR scale-out)\n  - Azure SQL Database with row-level security for conversation isolation\n  - Azure Cache for Redis for presence and typing indicator hot state\n  - Azure SignalR Service (managed) for automatic hub connection scale-out\n  - Single database: Conversations, Messages, Participants, Presence"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scalable Implementation (Microservices)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Split the monolith into five microservices. The Message Service is write-heavy — it uses a partitioned message table with conversation ID as the partition key. The Presence Service uses Redis with sub-second TTL heartbeats. The Delivery Service maintains an offline queue per user connection node. Azure SignalR Service or AWS AppSync replace self-hosted SignalR, enabling multi-instance fan-out without sticky sessions."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-chatsystemcompletearchitecture-combined",
+        "caption": "Combined architecture diagram for Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
+        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Core Microservices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "",
+        "items": [
+          "Message Service: The write path. Accepts messages via REST (HTTP fallback) or SignalR gateway events. Persists messages in PostgreSQL with conversation_id + server_timestamp as the primary sort key. Generates a client-provided UUID (client_msg_id) for idempotent deduplication on the server. Emits MessageSent events to Kafka for downstream consumers. Uses database partitioning by conversation_id for horizontal read scaling.",
+          "Presence Service: Tracks online status using Redis SET per conversation with a per-user key TTL of 30 seconds. Clients send a heartbeat via REST every 15 seconds. When a user's heartbeat TTL expires, Presence Service emits a UserWentOffline event to all conversation members via SignalR. Presence state is eventually consistent — a user may briefly show as offline during a brief network blip.",
+          "Delivery Service: Manages offline message queues partitioned by user_id. On reconnect, the client sends a last_received_message_id cursor; Delivery Service returns all messages newer than that cursor in a single batch. For group chats, the delivery fan-out is done asynchronously via a consumer group pattern to avoid slowing down the write path. Uses Sorted Sets in Redis keyed by user_id for O(log n) queue reads.",
+          "Media Service: Handles image, voice note, and file uploads. Generates multi-resolution thumbnails using ImageSharp. Returns a signed CDN URL to the sender, which is stored as the message attachment. Enforces per-user upload quotas and file-type restrictions. Publishes MediaUploaded events for content-moderation scanning via Azure Content Safety or AWS Rekognition.",
+          "User Service: Manages user profiles, avatars, contact lists, and block lists. Returns lightweight user presence snippets (name, avatar URL, online status) consumed by the Message Service to enrich message payloads before fan-out. Exposes gRPC for low-latency profile lookups during message dispatch."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "React Frontend Architecture"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React App Structure",
+        "language": "text",
+        "code": "src/\n  features/\n    ChatSystemHld/\n      components/\n        ChatWindow/       # Message list + input, uses virtualization\n        ConversationList/ # Sidebar with unread badges, last message preview\n        MessageBubble/    # Text, image, file, read-receipt double-checks\n        PresenceDot/      # Green/gray dot, animated for typing\n        TypingIndicator/ # 'Alice is typing...' with debounce\n      hooks/\n        useChatConnection.ts  # SignalR connection with auto-reconnect + backoff\n        useMessagePagination.ts # Cursor-based infinite scroll up\n        usePresence.ts        # Subscribes to presence events per conversation\n        useTypingIndicator.ts # Emits typing start/stop with debounce\n        useOfflineQueue.ts    # Queues messages in IndexedDB when offline\n      store/\n        chat-store.ts         # Zustand: conversations, active conversation, draft messages\n        connection-store.ts   # Tracks SignalR reconnection state\n      pages/\n        ChatPage.tsx\n        ConversationPage.tsx\n        SettingsPage.tsx  # Notification preferences, block list\n      types/\n        message.ts\n        conversation.ts\n  shared/\n    ui/\n    lib/\n    hooks/\n\nKey Patterns:\n  - useChatConnection handles SignalR reconnect with exponential backoff (1s -> 30s max)\n  - Message list uses react-virtuoso for 100k+ message performance\n  - useOfflineQueue persists unsent messages to IndexedDB, flushes on reconnect\n  - Typing indicator debounces emit by 3s; stops after 5s of inactivity\n  - Optimistic message append with rollback on SendMessage error"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "ASP.NET Core Backend Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SignalR Hub with Idempotent Message Ingestion",
+        "language": "text",
+        "code": "// ChatHub — routes incoming WebSocket messages to Message Service\npublic class ChatHub : Hub\n{\n    private readonly IConnectionMapping _connections;\n    private readonly IEventBus _eventBus;\n    private readonly IIdempotencyStore _idempotency;\n\n    public ChatHub(IConnectionMapping connections, IEventBus eventBus, IIdempotencyStore idempotency)\n    {\n        _connections = connections;\n        _eventBus = eventBus;\n        _idempotency = idempotency;\n    }\n\n    // Client sends: { clientMsgId, conversationId, text, timestamp }\n    public async Task SendMessage(OutgoingMessage message)\n    {\n        // Idempotency guard: same clientMsgId within 24h = duplicate, ignore\n        if (await _idempotency.ExistsAsync(message.ClientMsgId, TimeSpan.FromHours(24)))\n            return;\n        await _idempotency.RecordAsync(message.ClientMsgId, TimeSpan.FromHours(24));\n\n        var serverMsgId = Guid.NewGuid();\n        var serverTimestamp = DateTime.UtcNow;\n\n        var msg = new ChatMessage\n        {\n            MessageId = serverMsgId,\n            ConversationId = message.ConversationId,\n            SenderId = Context.UserIdentifier,\n            Text = message.Text,\n            ClientMsgId = message.ClientMsgId,\n            SentAt = serverTimestamp,\n            Status = MessageStatus.Sent\n        };\n\n        // Persist + broadcast atomically via outbox pattern\n        await _eventBus.Publish(new MessagePersisted(msg));\n\n        // Ack to sender only — fan-out happens via consumer group\n        await Clients.Caller.SendAsync(\"MessageAck\", new { serverMsgId = serverMsgId, serverTimestamp = serverTimestamp });\n    }\n\n    public override async Task OnDisconnectedAsync(Exception? exception)\n    {\n        var userId = Context.UserIdentifier;\n        _connections.Remove(userId, Context.ConnectionId);\n\n        if (!_connections.IsUserOnline(userId))\n        {\n            await _eventBus.Publish(new UserWentOffline(userId, DateTime.UtcNow));\n        }\n        await base.OnDisconnectedAsync(exception);\n    }\n}\n\n// Presence heartbeat endpoint — called by client every 15s\napp.MapPost(\"/api/presence/heartbeat\", async (HttpContext ctx, RedisDb redis) =>\n{\n    var userId = ctx.User.FindFirst(ClaimTypes.NameIdentifier)!.Value;\n    var key = string.Format(\"presence:user:{0}\", userId);\n    await redis.KeyExpireAsync(key, TimeSpan.FromSeconds(30));\n    await redis.KeyPersistAsync(key); // reset TTL\n    return Results.Ok();\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cloud Services Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure vs AWS Services",
+        "cards": [
+          {
+            "title": "Real-Time Hub",
+            "description": "Managed WebSocket pub/sub with automatic multi-instance scale-out for SignalR",
+            "tags": [
+              "Azure SignalR Service",
+              "Amazon AppSync (WebSocket subscriptions)"
+            ],
+            "pros": [
+              "No sticky sessions required — SDK handles connection routing",
+              "Built-in backplane for broadcasting across hub instances"
+            ],
+            "cons": [
+              "Azure SignalR is opinionated; AppSync requires GraphQL schema"
+            ]
+          },
+          {
+            "title": "Event Streaming",
+            "description": "Consume message events for delivery tracking, push notifications, and analytics",
+            "tags": [
+              "Azure Event Hubs",
+              "Amazon Kinesis Data Streams"
+            ],
+            "pros": [
+              "Partitioned by conversation_id for ordered per-conversation consumption",
+              "Retention supports replay for delivery audit and compliance"
+            ],
+            "cons": [
+              "Consumer group coordination adds operational complexity"
+            ]
+          },
+          {
+            "title": "Cache",
+            "description": "Presence heartbeats, typing indicators, and active conversation read-cursors",
+            "tags": [
+              "Azure Cache for Redis",
+              "Amazon ElastiCache (Redis)"
+            ],
+            "pros": [
+              "Keyspace notifications for presence expiry events",
+              "Sub-millisecond SET/GET for typing indicator broadcast"
+            ],
+            "cons": [
+              "Redis Cluster mode required for >250k writes/sec"
+            ]
+          },
+          {
+            "title": "Database",
+            "description": "Append-only message history partitioned by conversation_id",
+            "tags": [
+              "Azure Cosmos DB (PostgreSQL API)",
+              "Amazon DynamoDB / Aurora PostgreSQL"
+            ],
+            "pros": [
+              "Cosmos PostgreSQL inherits pgvector for semantic message search",
+              "DynamoDB provides single-digit ms reads at any scale"
+            ],
+            "cons": [
+              "Cosmos DB RU/s budgeting for unpredictable group-chat fan-out"
+            ]
+          },
+          {
+            "title": "Push Notifications",
+            "description": "Background push to iOS/Android when app is backgrounded",
+            "tags": [
+              "Azure Notification Hubs",
+              "Amazon SNS"
+            ],
+            "pros": [
+              "Notification Hubs handles per-platform registration and tag targeting",
+              "SNS supports SMS and mobile in addition to APNs/FCM"
+            ],
+            "cons": [
+              "SNS topic-per-conversation does not scale to 100M channels"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "When to Choose Microservices?",
+        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Message delivery is a fan-out problem: use a managed SignalR/AppSync hub, not self-hosted WebSockets at scale",
+          "Client-generated message IDs are the simplest idempotency mechanism — deduplicate on arrival",
+          "Cursor-based pagination (not OFFSET) is mandatory for conversations with 100k+ messages",
+          "Presence must be eventually consistent — use Redis TTL heartbeats, not in-memory maps",
+          "Offline delivery requires a per-user, per-device queue; flush on reconnect using last_received_id",
+          "The write path (message ingestion) must not wait for fan-out — use an outbox + consumer group pattern"
+        ],
+        "takeaway": "Chat systems are connection-heavy, write-heavy distributed systems. Managed real-time hubs, Redis-backed presence with TTL heartbeats, an outbox pattern for durable writes, and cursor-based message pagination are the architectural pillars that separate a functional prototype from a system that handles 100M concurrent connections."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}
