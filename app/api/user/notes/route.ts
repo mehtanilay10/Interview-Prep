@@ -29,7 +29,7 @@ export async function GET() {
     },
   });
 
-  const notes = rows.map((row) => ({
+  const notes = rows.map((row: { courseSlug: string; moduleSlug: string; lessonSlug: string; content: string; updatedAt: Date }) => ({
     courseSlug: row.courseSlug,
     moduleSlug: row.moduleSlug,
     lessonSlug: row.lessonSlug,

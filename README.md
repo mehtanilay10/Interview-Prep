@@ -1,6 +1,6 @@
 # Interview Prep
 
-A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, and SQL problem sets. Built with Next.js 15, TypeScript, and Tailwind CSS.
+A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, and SQL problem sets. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
 
 ---
 
@@ -8,13 +8,14 @@ A production-ready educational web app for software engineering interview prepar
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
+| UI Library | React 19 |
 | Language | TypeScript (strict) |
 | Styling | Tailwind CSS with GitHub-inspired design |
 | Dark Mode | next-themes (`class` strategy) |
 | Diagrams | Mermaid (client-side dynamic import) |
 | Auth | NextAuth v5 / Auth.js (Google OAuth, Prisma Adapter) |
-| Database | Neon PostgreSQL |
+| Database | Neon PostgreSQL via Prisma |
 | Progress | Hybrid: localStorage (logged out) + Neon DB (logged in) |
 | Content | TypeScript structured files in `/content/` |
 
@@ -82,127 +83,164 @@ yarn test:content
 
 ```
 interview-prep/
-├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout (AuthProvider, ThemeProvider, Navbar, Footer)
-│   ├── page.tsx                  # Home page
-│   ├── globals.css               # Global styles + CSS custom properties
-│   ├── sitemap.ts                # Auto-generated sitemap
-│   ├── login/page.tsx            # Google sign-in page
+├── app/                                    # Next.js App Router pages
+│   ├── layout.tsx                          # Root layout (AuthProvider, ThemeProvider, Navbar, Footer)
+│   ├── page.tsx                            # Home page
+│   ├── globals.css                         # Global styles + CSS custom properties
+│   ├── sitemap.ts                          # Auto-generated sitemap
+│   ├── login/page.tsx                      # Google sign-in page
 │   ├── progress/
-│   │   ├── page.tsx              # Progress dashboard (server)
-│   │   └── ProgressDashboardClient.tsx  # Progress dashboard (client)
+│   │   ├── page.tsx                        # Progress dashboard (server)
+│   │   └── ProgressDashboardClient.tsx     # Progress dashboard (client)
+│   ├── search/page.tsx                     # Search page
+│   ├── internal/article-compare/page.tsx   # Internal side-by-side article comparison tool (noindex)
 │   ├── api/
-│   │   ├── auth/[...nextauth]/route.ts  # NextAuth API route
-│   │   ├── progress/route.ts     # Progress CRUD API
-│   │   ├── bookmarks/route.ts    # Bookmarks CRUD API
-│   │   └── last-path/route.ts    # Last-visited path API
+│   │   ├── auth/[...nextauth]/route.ts     # NextAuth API route
+│   │   ├── progress/route.ts               # Progress CRUD API
+│   │   ├── bookmarks/route.ts              # Bookmarks CRUD API
+│   │   ├── last-path/route.ts              # Last-visited path API
+│   │   ├── user/theme/route.ts             # User theme preference API
+│   │   ├── user/offline-queue/route.ts     # Offline action queue API
+│   │   ├── user/notes/route.ts             # Lesson notes API
+│   │   └── search/route.ts                 # Search API
 │   ├── courses/
-│   │   ├── page.tsx              # Course listing
+│   │   ├── page.tsx                        # Course listing
 │   │   └── [courseSlug]/
-│   │       ├── page.tsx          # Course overview
+│   │       ├── page.tsx                    # Course overview
 │   │       └── [moduleSlug]/
-│   │           ├── page.tsx      # Module overview
+│   │           ├── page.tsx                # Module overview
 │   │           └── [lessonSlug]/
-│   │               └── page.tsx  # Lesson detail
+│   │               └── page.tsx            # Lesson detail
 │   ├── problems/
-│   │   ├── page.tsx              # Problems listing
+│   │   ├── page.tsx                        # Problems listing
 │   │   └── [courseSlug]/
-│   │       ├── page.tsx          # Problem course overview
+│   │       ├── page.tsx                    # Problem course overview
 │   │       └── [moduleSlug]/
-│   │           ├── page.tsx      # Problem module overview
+│   │           ├── page.tsx                # Problem module overview
 │   │           └── [lessonSlug]/
-│   │               └── page.tsx  # Problem lesson
+│   │               └── page.tsx            # Problem lesson
 │   ├── interview-questions/
-│   │   ├── page.tsx              # Interview question listing
+│   │   ├── page.tsx                        # Interview question listing
 │   │   └── [technology]/
-│   │       ├── page.tsx          # Technology-specific questions
+│   │       ├── page.tsx                    # Technology-specific questions
 │   │       └── [slug]/
-│   │           └── page.tsx      # Individual question
-│   ├── cheatsheet/
-│   │   ├── page.tsx              # Cheat sheet listing
-│   │   └── [technology]/
-│   │       └── page.tsx          # Individual cheat sheet
-│   ├── search/page.tsx           # Search page
-│   └── internal/
-│       └── article-compare/
-│           └── page.tsx          # Internal side-by-side article comparison tool (noindex)
+│   │           └── page.tsx                # Individual question
+│   └── cheatsheet/
+│       ├── page.tsx                        # Cheat sheet listing
+│       └── [technology]/
+│           └── page.tsx                    # Individual cheat sheet
 │
 ├── components/
 │   ├── layout/
-│   │   ├── Navbar.tsx            # Sticky top nav with mobile menu + auth user menu
-│   │   ├── Footer.tsx            # Site footer with link columns
-│   │   ├── Breadcrumbs.tsx       # Breadcrumb navigation
-│   │   └── LessonSidebar.tsx     # Course/module/lesson sidebar
+│   │   ├── Navbar.tsx                      # Sticky top nav with mobile menu + auth user menu
+│   │   ├── Footer.tsx                      # Site footer with link columns
+│   │   ├── Breadcrumbs.tsx                 # Breadcrumb navigation
+│   │   ├── LessonSidebar.tsx               # Course/module/lesson sidebar
+│   │   └── MobileLessonDrawer.tsx          # Mobile lesson drawer
 │   ├── ui/
-│   │   ├── DifficultyBadge.tsx   # Beginner/Intermediate/Advanced badge
-│   │   ├── ReadingTimeBadge.tsx  # "12 min" reading time indicator
-│   │   ├── CalloutBox.tsx        # Info/tip/warning/note callouts
-│   │   ├── SearchBar.tsx         # Reusable search input
-│   │   ├── FilterBar.tsx         # Pill-style filter buttons
-│   │   ├── EmptyState.tsx        # Empty list / no results state
-│   │   ├── ThemeToggle.tsx       # Dark/light mode button
-│   │   ├── BookmarkButton.tsx    # Bookmark toggle with sign-in gating
-│   │   └── ThemeProvider.tsx     # next-themes wrapper
+│   │   ├── DifficultyBadge.tsx             # Beginner/Intermediate/Advanced badge
+│   │   ├── ReadingTimeBadge.tsx            # "12 min" reading time indicator
+│   │   ├── CalloutBox.tsx                  # Info/tip/warning/note callouts
+│   │   ├── SearchBar.tsx                   # Reusable search input
+│   │   ├── SearchSuggestions.tsx           # Search input with suggestions
+│   │   ├── FilterBar.tsx                   # Pill-style filter buttons
+│   │   ├── EmptyState.tsx                  # Empty list / no results state
+│   │   ├── ThemeToggle.tsx                 # Dark/light mode button
+│   │   ├── ThemeProvider.tsx               # next-themes wrapper
+│   │   ├── BookmarkButton.tsx              # Bookmark toggle with sign-in gating
+│   │   ├── ContinuePrompt.tsx              # Resume last-visited lesson prompt
+│   │   ├── SkipLink.tsx                    # Skip to main content link
+│   │   ├── OfflineIndicator.tsx            # Offline status banner
+│   │   ├── PWARegistration.tsx             # Service worker registration
+│   │   ├── PWAInstallButton.tsx            # In-app install prompt
+│   │   ├── Logo.tsx                        # App logo
+│   │   ├── ErrorBoundary.tsx               # Error boundary fallback
+│   │   ├── Skeleton.tsx                    # Loading skeleton
+│   │   ├── PrintButton.tsx                 # Print lesson button
+│   │   └── PdfDownloadButton.tsx           # Download lesson as PDF
 │   ├── auth/
-│   │   ├── AuthProvider.tsx      # SessionProvider wrapper for NextAuth
-│   │   └── SignInPrompt.tsx      # Inline sign-in modal for gated actions
+│   │   ├── AuthProvider.tsx                # SessionProvider wrapper for NextAuth
+│   │   └── SignInPrompt.tsx                # Inline sign-in modal for gated actions
 │   ├── course/
-│   │   ├── ModuleCard.tsx        # Module card (grid or compact)
-│   │   ├── LessonCard.tsx        # Lesson card (grid or list)
-│   │   ├── TableOfContents.tsx   # Sticky ToC with active tracking
-│   │   ├── ProgressTracker.tsx   # Mark complete + module progress bar
-│   │   └── RoadmapTimeline.tsx   # Phase-based roadmap visual
+│   │   ├── ModuleCard.tsx                  # Module card (grid or compact)
+│   │   ├── LessonCard.tsx                  # Lesson card (grid or list)
+│   │   ├── TableOfContents.tsx             # Sticky ToC with active tracking
+│   │   ├── ProgressTracker.tsx             # Mark complete + module progress bar
+│   │   └── MobileProgressAndContents.tsx   # Mobile progress drawer
 │   ├── content/
-│   │   ├── ContentBlockRenderer.tsx  # Main lesson block renderer
-│   │   ├── MermaidRenderer.tsx       # Client-side Mermaid diagram
-│   │   ├── FAQAccordion.tsx          # Expandable FAQ items
-│   │   ├── PromptCard.tsx            # Prompt template with copy button
-│   │   ├── ProjectCard.tsx           # Mini project card
-│   │   ├── ToolComparisonCard.tsx    # Tool entry with features table
-│   │   └── GlossarySearch.tsx        # Live-filtered glossary list
-│   └── sections/
-│       ├── HeroSection.tsx       # Home page hero
-│       └── SectionHeader.tsx     # Reusable eyebrow+title+description
+│   │   ├── ContentBlockRenderer.tsx        # Main lesson block renderer
+│   │   ├── MermaidRenderer.tsx             # Client-side Mermaid diagram
+│   │   ├── MermaidModal.tsx                # Full-screen Mermaid modal
+│   │   ├── ImageModal.tsx                  # Zoomable image modal
+│   │   └── FurtherReading.tsx              # Further reading links section
+│   ├── sections/
+│   │   ├── HeroSection.tsx                 # Home page hero
+│   │   └── SectionHeader.tsx               # Reusable eyebrow+title+description
+│   ├── progress/
+│   │   ├── ProgressProvider.tsx            # Hybrid progress context (localStorage + DB)
+│   │   └── LessonActions.tsx               # Lesson action buttons
+│   ├── problems/
+│   │   └── ProblemFilters.tsx              # Problem difficulty/status filters
+│   ├── lesson/
+│   │   ├── LessonNotes.tsx                 # Lesson notes container
+│   │   ├── LessonNotesButton.tsx           # Notes toggle button
+│   │   ├── LessonNotesSection.tsx          # Notes display section
+│   │   ├── NotesModal.tsx                  # Notes editor modal
+│   │   ├── NotesModalContext.tsx           # Notes modal context
+│   │   └── OfflineSaveButton.tsx           # Offline save indicator
+│   ├── bookmarks/
+│   │   └── BookmarkProvider.tsx            # Hybrid bookmark context (localStorage + DB)
+│   ├── internal/
+│   │   └── ArticleCompareClient.tsx        # Side-by-side article comparison
+│   └── app/
+│       └── ErrorBoundaryWrapper.tsx        # Error boundary wrapper for page content
 │
-├── content/                      # All course content (JSON/TypeScript files)
-│   ├── courses/                  # Structured courses
-│   ├── problems/                 # Coding problems (C#, SQL)
-│   ├── interview-qa/             # Interview Q&A by technology
-│   ├── cheatsheet/               # Cheat sheets by technology
-│   ├── modules/index.ts          # Module definitions
-│   ├── lessons/index.ts          # Lesson definitions + content blocks
-│   └── ...
+├── content/                                # All course content (JSON/TypeScript files)
+│   ├── courses/                            # Structured courses
+│   ├── problems/                           # Coding problems (C#, SQL)
+│   ├── interview-qa/                       # Interview Q&A by technology
+│   ├── cheatsheet/                         # Cheat sheets by technology
+│   ├── modules/index.ts                    # Auto-generated module definitions
+│   ├── lessons/index.ts                    # Auto-generated lesson definitions + content blocks
+│   └── courses/index.ts                    # Auto-generated course exports
 │
 ├── hooks/
-│   ├── useProgress.ts            # Hybrid progress tracking (localStorage + Neon DB)
-│   ├── useBookmarks.ts           # Hybrid bookmark tracking (localStorage + Neon DB)
-│   └── useLocalStorage.ts        # Generic typesafe localStorage hook
+│   ├── useProgress.ts                      # Hybrid progress tracking (localStorage + Neon DB)
+│   ├── useBookmarks.ts                     # Hybrid bookmark tracking (localStorage + Neon DB)
+│   ├── useLocalStorage.ts                  # Generic typesafe localStorage hook
+│   ├── useUserTheme.ts                     # User theme preference hook
+│   ├── useOfflineQueue.ts                  # Offline action queue hook
+│   └── useLessonNotes.ts                   # Lesson notes hook
 │
 ├── lib/
-│   ├── content.ts                # Content loading helpers + search
-│   ├── utils.ts                  # General utilities (cn, slugify, etc.)
-│   ├── seo.ts                    # Metadata builders for pages
-│   ├── prisma.ts                 # Singleton Prisma PostgreSQL client
-│   └── auth.ts                   # NextAuth server helpers
+│   ├── content.ts                          # Content loading helpers + search
+│   ├── utils.ts                            # General utilities (cn, slugify, etc.)
+│   ├── seo.ts                              # Metadata builders for pages
+│   ├── prisma.ts                           # Singleton Prisma PostgreSQL client
+│   ├── auth.ts                             # NextAuth server helpers
 │
 ├── types/
-│   └── index.ts                  # All TypeScript interfaces
+│   └── index.ts                            # All TypeScript interfaces
 │
 ├── prisma/
-│   ├── schema.prisma             # Prisma data model
-│   └── migrations/               # Versioned database migrations
+│   ├── schema.prisma                       # Prisma data model
+│   └── migrations/                         # Versioned database migrations
 │
 ├── scripts/
-│   └── schema.sql                # Idempotent PostgreSQL schema equivalent
+│   ├── schema.sql                          # Idempotent PostgreSQL schema equivalent
+│   ├── vercel-build.js                     # Vercel build entrypoint
+│   └── generate-content-indices.ts         # Regenerate content index files
 │
-├── auth.ts                       # NextAuth v5 configuration
-├── public/                       # Static assets
-├── README.md
-├── AGENTS.md
+├── auth.ts                                 # NextAuth v5 configuration
+├── public/
+│   └── manifest.json                       # PWA manifest
 ├── next.config.ts
 ├── tailwind.config.ts
 ├── tsconfig.json
-└── package.json
+├── package.json
+├── README.md
+├── AGENTS.md
+└── eslint.config.js
 ```
 
 ---
@@ -219,7 +257,7 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 ### Content areas
 
 | Area | Path | Purpose |
-|---|---|
+|---|---|---|
 | Courses | `content/courses/` | Structured learning modules |
 | Problems | `content/problems/` | Coding problems with multiple solutions |
 | Interview Q&A | `content/interview-qa/` | Technology-grouped interview questions |
@@ -229,21 +267,21 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 
 1. Create the lesson JSON file in the appropriate module folder
 2. Add the lesson slug to the module's `lessonSlugs` array in the module's `content.json`
-3. Run `npm run generate:content` to regenerate index files (or just run `npm run dev` / `npm run build`, which trigger it automatically via `predev`/`prebuild`)
+3. Run `yarn generate:content` to regenerate index files (or just run `yarn dev` / `yarn build`, which trigger it automatically via `predev`/`prebuild`)
 
 ### Adding a new module
 
 1. Create `content/[area]/[courseSlug]/[moduleSlug]/content.json`
 2. Create lesson JSON files in the module folder
 3. Add the module slug to the course's `moduleSlugs` array
-4. Run `npm run generate:content` to regenerate index files
+4. Run `yarn generate:content` to regenerate index files
 
 ### Adding a new course
 
 1. Create `content/[area]/[courseSlug]/content.json`
 2. Add module folders with `content.json` and lesson JSON files
 3. Update `app/sitemap.ts` if needed
-4. Run `npm run generate:content` to regenerate index files (or just run `npm run dev` / `npm run build`, which trigger it automatically via `predev`/`prebuild`)
+4. Run `yarn generate:content` to regenerate index files (or just run `yarn dev` / `yarn build`, which trigger it automatically via `predev`/`prebuild`)
 
 ### Content blocks
 
@@ -268,6 +306,7 @@ Lessons are composed of typed `ContentBlock[]`. Available block types:
 | `summary-box` | Summary with bullet points |
 | `faq-block` | Inline FAQ items; use `items` with `question`/`answer` objects |
 | `divider` | Horizontal rule |
+| `image` | Zoomable content images opened in a modal |
 
 ---
 
@@ -296,7 +335,8 @@ Progress and bookmarks use a **hybrid storage** approach:
 - **Logged in:** Stored in Neon PostgreSQL and synced across devices.
 - On first login, local data is automatically migrated to the server.
 
-Use the `useProgress()` and `useBookmarks()` hooks in any client component:
+Use the `useProgress()` and `useBookmarks()` context hooks in any client component wrapped by `ProgressProvider` / `BookmarkProvider`:
+
 ```typescript
 const { isCompleted, markComplete, getModuleProgress } = useProgress();
 const { toggleBookmark, isBookmarked } = useBookmarks();

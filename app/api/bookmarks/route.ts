@@ -36,7 +36,7 @@ export async function GET() {
     },
   });
 
-  const items = rows.map((row) => ({
+  const items = rows.map((row: { id: string; type: BookmarkType; slug: string; title: string; courseSlug: string; moduleSlug: string; addedAt: Date }) => ({
     id: row.id,
     type: row.type,
     slug: row.slug,

@@ -29,7 +29,7 @@ export async function GET() {
     },
   });
 
-  const queue = rows.map((row) => ({
+  const queue = rows.map((row: { courseSlug: string; moduleSlug: string; lessonSlug: string; title: string; queuedAt: Date }) => ({
     courseSlug: row.courseSlug,
     moduleSlug: row.moduleSlug,
     lessonSlug: row.lessonSlug,

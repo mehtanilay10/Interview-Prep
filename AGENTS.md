@@ -8,13 +8,14 @@ Read this before making any changes.
 
 ## Project overview
 
-Interview Prep is a **Next.js 15 + TypeScript educational web app** for teaching software engineering interview preparation. It includes:
+Interview Prep is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering interview preparation. It includes:
 - Structured courses (C#, SQL, React, ASP.NET Core, OOP, etc.)
 - Coding problems with multiple solutions (`content/problems/`)
 - Interview Q&A organized by technology (`content/interview-qa/`)
 - Cheat sheets for quick reference (`content/cheatsheet/`)
 - User authentication via **NextAuth v5** with **Google OAuth**
 - Per-user progress and bookmarks stored in **Neon PostgreSQL**
+- PWA support via `@ducanh2912/next-pwa`
 
 ---
 
@@ -85,28 +86,28 @@ content/
     [technology]/
       content.json          # Module metadata (one module per technology)
       cheatsheet.json       # Lesson file (slug: "cheatsheet"), code-only examples
-  courses/index.ts          # Exports all courses (does NOT include cheatsheet/interview-qa/problems)
-  modules/index.ts          # Exports all modules (courses + problems + cheatsheet + interview-qa)
-  lessons/index.ts          # Exports all lessons (courses + problems + cheatsheet + interview-qa)
+  courses/index.ts          # Auto-generated exports all courses (does NOT include cheatsheet/interview-qa/problems)
+  modules/index.ts          # Auto-generated exports all modules (courses + problems + cheatsheet + interview-qa)
+  lessons/index.ts          # Auto-generated exports all lessons (courses + problems + cheatsheet + interview-qa)
 ```
 
 ### Adding a course
 1. Create `content/courses/[courseSlug]/content.json`
 2. Add module folders with `content.json` and lesson JSON files
 3. Update `app/sitemap.ts` if needed
-4. Run `npm run generate:content` to regenerate index files (or just run `npm run dev` / `npm run build`, which trigger it automatically via `predev`/`prebuild`)
+4. Run `yarn generate:content` to regenerate index files (or just run `yarn dev` / `yarn build`, which trigger it automatically via `predev`/`prebuild`)
 
 ### Adding a module
 1. Create `content/courses/[courseSlug]/[moduleSlug]/content.json`
 2. Create lesson JSON files in the module folder
 3. Add module slug to the course's `moduleSlugs` array in `content/courses/[courseSlug]/content.json`
-4. Run `npm run generate:content` to regenerate index files
+4. Run `yarn generate:content` to regenerate index files
 
 ### Adding a lesson
 1. Create `content/courses/[courseSlug]/[moduleSlug]/[lessonSlug].json`
 2. Add lesson slug to the module's `lessonSlugs` array in `content/courses/[courseSlug]/[moduleSlug]/content.json`
 3. Ensure `courseSlug` and `moduleSlug` match the parent directories
-4. Run `npm run generate:content` to regenerate index files
+4. Run `yarn generate:content` to regenerate index files
 
 ### Special content areas
 
@@ -193,7 +194,7 @@ Whenever you add a new top-level page:
 Module order within a course is determined by the `order` field in each module's `content.json`.
 - Always set explicit numeric `order` values when creating or reorganizing modules.
 - `getModulesByCourse()` and `getLessonsForCourse()` sort by `module.order`, so missing or `null` values produce unstable ordering.
-- The PostgreSQL course was recently reordered using explicit `order` values 1-19.
+- The `postgresql` course has 19 modules, each with explicit `order` values.
 
 ## Authentication and user data
 
@@ -201,14 +202,18 @@ Module order within a course is determined by the `order` field in each module's
 - Progress, bookmarks, and last-visited path require login to persist to the server.
 - Logged-out users fall back to `localStorage` for these features.
 - When a logged-out user tries to bookmark or mark complete, show the inline `SignInPrompt` component — do not redirect automatically.
-- The `useProgress()` and `useBookmarks()` hooks are hybrid: they read/write `localStorage` when logged out, and sync with Prisma-backed APIs when logged in.
+- `useProgress()` and `useBookmarks()` are context-based hooks from `ProgressProvider` and `BookmarkProvider`. When logged in, they sync with Prisma-backed APIs; when logged out, they read/write `localStorage` only.
 - `ContinuePrompt` uses the DB for logged-in users and `localStorage` for logged-out users.
-- Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** and the **Prisma Adapter**.
+- Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** (`openid profile email` scopes, offline access, consent prompt) and the **Prisma Adapter**.
 - User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; migrations are in `prisma/migrations/`, and `scripts/schema.sql` is an idempotent SQL equivalent. The Auth.js adapter tables are `accounts`, `sessions`, `verification_tokens`, and `authenticators`.
 - API routes for user data:
   - `app/api/progress/route.ts` — GET/POST/DELETE progress
   - `app/api/bookmarks/route.ts` — GET/POST/DELETE bookmarks
   - `app/api/last-path/route.ts` — GET/POST last visited path
+  - `app/api/user/theme/route.ts` — GET/POST user theme preference
+  - `app/api/user/offline-queue/route.ts` — GET/POST offline action queue
+  - `app/api/user/notes/route.ts` — GET/POST/DELETE lesson notes
+  - `app/api/search/route.ts` — GET search
 - The progress dashboard at `/progress` is a protected route that redirects unauthenticated users to `/login`.
 
 ---
@@ -220,6 +225,7 @@ Module order within a course is determined by the `order` field in each module's
 - Run `yarn typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
 - SEO metadata helpers (`buildMetadata`, `buildLessonMetadata`, `buildModuleMetadata`) live in `lib/seo.ts`
+- Auth helpers live in `lib/auth.ts`
 
 ---
 
@@ -236,7 +242,7 @@ Module order within a course is determined by the `order` field in each module's
 ## Code blocks and syntax highlighting
 
 - Use `react-shiki` (`ShikiHighlighter` from `react-shiki`) for syntax highlighting — it is the only code-highlighting dependency in this project
-- Code blocks are rendered in `components/content/ContentBlockRenderer.tsx` via the `CustomCodeBlock` component
+- Code blocks are rendered in `components/content/ContentBlockRenderer.tsx` via the `CustomCodeBlock` component (loaded with `dynamic()` to avoid SSR)
 - The active theme is driven by `next-themes` (`useTheme()`): `github-dark` in dark mode, `github-light` in light mode
 - Do NOT import `prismjs` directly — it is no longer a dependency
 - Do NOT use `react-code-block` — it has been removed
@@ -245,6 +251,10 @@ Module order within a course is determined by the `order` field in each module's
 ### Cheatsheet example blocks
 Cheatsheet `example` blocks are code-only: store the snippet in the `code` field, always include
 a correct `language` tag, and avoid duplicate content.
+
+### Image blocks
+Content `image` blocks render a plain `<img>` inside a zoomable button that opens an `ImageModal`.
+An `eslint-disable-next-line @next/next/no-img-element` comment is used because the `src` comes from lesson content. Follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
 
 ---
 
@@ -256,6 +266,17 @@ a correct `language` tag, and avoid duplicate content.
 - Give each diagram a unique `id`
 - Keep diagrams focused — one concept per diagram
 - Mermaid is loaded dynamically (client-side only) via `dynamic()` in `MermaidRenderer.tsx`
+
+---
+
+## PWA
+
+- The app uses `@ducanh2912/next-pwa` configured in `next.config.ts`
+- Service worker registration is disabled by default in development. To test installability, set `NEXT_PUBLIC_ENABLE_PWA_DEV=true` when running `yarn dev`
+- Mobile browsers require a secure context for service worker installability. `localhost` is allowed; LAN IPs like `http://192.168.x.x:3000` are not unless served over HTTPS
+- The manifest lives at `public/manifest.json`
+- `PWARegistration` handles SW registration in the root layout
+- `PWAInstallButton` provides an in-app install prompt
 
 ---
 
@@ -291,11 +312,13 @@ Utility scripts in `scripts/` help keep content consistent:
 - **Hydration mismatches**: Any component that reads from `localStorage` or uses `window` must have `'use client'` and handle SSR gracefully (see `hooks/useLocalStorage.ts` for the pattern). The `ContinuePrompt` component additionally branches between DB and `localStorage` based on the NextAuth session status.
 - **Mermaid SSR**: `mermaid` package cannot be imported server-side — always use the dynamic import pattern in `MermaidRenderer.tsx`
 - **`next/link` vs `<a>`**: Use `next/link` for internal links; `<a target="_blank" rel="noopener noreferrer">` for external
-- **Image optimization**: Prefer `next/image` for static/optimized images. The `image` ContentBlock renders content images with a plain `<img>` element (with an `@next/next/no-img-element` eslint-disable comment) because the `src` comes from lesson content and is opened in a modal; follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
+- **Image optimization**: Content `image` blocks render with a plain `<img>` element (with an `@next/next/no-img-element` eslint-disable comment) because the `src` comes from lesson content and is opened in a modal; follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
 - **Generate static params**: When adding a new dynamic route, implement `generateStaticParams()` for build-time generation
 - **Content indexing**: When adding lessons/modules, always update the corresponding `index.ts` files in `content/`. The build will not automatically discover new content files.
-- **Auth-aware hooks**: `useProgress` and `useBookmarks` are hybrid hooks. When logged in, they fetch from and write to `/api/progress` and `/api/bookmarks`. When logged out, they read/write `localStorage` only. Do not bypass these hooks with direct DB calls in client components.
+- **Auth-aware hooks**: `useProgress` and `useBookmarks` are context-based hooks provided by `ProgressProvider` and `BookmarkProvider`. When logged in, they fetch from and write to `/api/progress` and `/api/bookmarks`. When logged out, they read/write `localStorage` only. Do not bypass these hooks with direct DB calls in client components.
 - **Sign-in gating**: Do not redirect unauthenticated users away from the app. Show the inline `SignInPrompt` component when they try to use bookmark/progress features.
+- **Error boundaries**: Wrap risky client-side rendering in `ErrorBoundaryWrapper` (`components/app/ErrorBoundaryWrapper.tsx`) to show a friendly fallback instead of crashing the whole page.
+- **Offline support**: `OfflineIndicator` is rendered in the root layout to notify users when they are offline. The `useOfflineQueue` hook queues mutations for later sync.
 
 ---
 

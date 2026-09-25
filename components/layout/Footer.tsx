@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Github, ExternalLink, ChevronDown } from 'lucide-react';
+import { GitBranch, ExternalLink, ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 
@@ -118,7 +118,7 @@ export function Footer() {
             rel="noopener noreferrer"
             className="flex items-center gap-1 transition-colors hover:text-fg-default"
           >
-            <Github className="h-3.5 w-3.5" aria-hidden="true" />
+            <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
             GitHub
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </a>
