@@ -13,24 +13,69 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Web Workers and CPU-heavy browser work** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with web workers and cpu-heavy browser work."
+        "text": "Web Workers enable JavaScript to run operations in background threads, keeping the main thread free for user interactions. This is essential for CPU-intensive tasks like data processing, image manipulation, and complex calculations that would otherwise block the UI."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Main Thread Problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "JavaScript is single-threaded, meaning all code runs on the main thread. CPU-intensive operations block this thread, causing UI freezing, janky animations, and unresponsive user interactions. Web Workers solve this by providing true multi-threading capabilities."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Main Thread Blocking Example",
+        "content": "How CPU work blocks the main thread.",
+        "language": "javascript",
+        "code": "// Bad: CPU work blocks main thread\nfunction heavyComputation() {\n  const start = performance.now();\n  \n  // Simulate heavy computation\n  let result = 0;\n  for (let i = 0; i < 1000000000; i++) {\n    result += Math.sqrt(i);\n  }\n  \n  const duration = performance.now() - start;\n  console.log(`Computation took ${duration}ms`);\n  \n  return result;\n}\n\n// When this runs, the entire UI freezes\nconst result = heavyComputation();\n// User cannot click, scroll, or interact during computation"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Web Workers Fundamentals"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Web Workers run in separate threads with their own memory space. They communicate with the main thread via message passing, enabling parallel processing without blocking the UI."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic Web Worker",
+        "content": "Create and use a simple web worker.",
+        "language": "javascript",
+        "code": "// worker.js (separate file)\nself.onmessage = function(e) {\n  const data = e.data;\n  \n  // Perform heavy computation\n  let result = 0;\n  for (let i = 0; i < data.iterations; i++) {\n    result += Math.sqrt(i);\n  }\n  \n  // Send result back to main thread\n  self.postMessage({ result });\n};\n\n// main.js\nfunction runComputationInWorker() {\n  const worker = new Worker('worker.js');\n  \n  worker.onmessage = function(e) {\n    console.log('Worker result:', e.data.result);\n    worker.terminate(); // Clean up worker\n  };\n  \n  worker.onerror = function(error) {\n    console.error('Worker error:', error);\n  };\n  \n  // Send data to worker\n  worker.postMessage({ iterations: 1000000000 });\n  \n  // Main thread remains responsive\n  console.log('Computation started in worker');\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Web Worker Limitations"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of web workers and cpu-heavy browser work",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "No DOM access - workers cannot manipulate the DOM",
+          "No window object - limited to self and worker APIs",
+          "Same-origin policy - workers must be from same domain",
+          "Communication overhead - message passing has performance cost",
+          "Not suitable for all tasks - small computations may not benefit"
         ]
       }
     },
@@ -38,21 +83,170 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Inline Web Workers"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding web workers and cpu-heavy browser work is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "For small projects or prototypes, you can create inline workers using Blob URLs. This avoids separate worker files but is less maintainable for production code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inline Worker with Blob",
+        "content": "Create a worker without a separate file.",
+        "language": "javascript",
+        "code": "function createInlineWorker(workerCode) {\n  const blob = new Blob([workerCode], { type: 'application/javascript' });\n  const workerUrl = URL.createObjectURL(blob);\n  return new Worker(workerUrl);\n}\n\nconst workerCode = `\n  self.onmessage = function(e) {\n    const data = e.data;\n    // Perform computation\n    const result = data.numbers.reduce((sum, num) => sum + num, 0);\n    self.postMessage({ result });\n  };\n`;\n\nconst worker = createInlineWorker(workerCode);\n\nworker.onmessage = function(e) {\n  console.log('Result:', e.data.result);\n  URL.revokeObjectURL(workerUrl); // Clean up\n};\n\nworker.postMessage({ numbers: [1, 2, 3, 4, 5] });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Worker Use Cases"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Image Processing Worker",
+        "content": "Process images in background thread.",
+        "language": "javascript",
+        "code": "// imageWorker.js\nself.onmessage = function(e) {\n  const { imageData, operation } = e.data;\n  \n  // Process image data\n  const processedData = applyImageOperation(imageData, operation);\n  \n  self.postMessage({ processedData }, [processedData.data.buffer]);\n};\n\nfunction applyImageOperation(imageData, operation) {\n  const data = imageData.data;\n  \n  for (let i = 0; i < data.length; i += 4) {\n    if (operation === 'grayscale') {\n      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;\n      data[i] = avg;     // R\n      data[i + 1] = avg; // G\n      data[i + 2] = avg; // B\n    }\n    // Add other operations...\n  }\n  \n  return imageData;\n}\n\n// main.js\nfunction processImage(imageElement) {\n  const canvas = document.createElement('canvas');\n  const ctx = canvas.getContext('2d');\n  \n  canvas.width = imageElement.width;\n  canvas.height = imageElement.height;\n  ctx.drawImage(imageElement, 0, 0);\n  \n  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);\n  \n  const worker = new Worker('imageWorker.js');\n  \n  worker.onmessage = function(e) {\n    ctx.putImageData(e.data.processedData, 0, 0);\n    imageElement.src = canvas.toDataURL();\n    worker.terminate();\n  };\n  \n  worker.postMessage({ imageData, operation: 'grayscale' });\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Data Processing Worker",
+        "content": "Process large datasets in background.",
+        "language": "javascript",
+        "code": "// dataWorker.js\nself.onmessage = function(e) {\n  const { data, operation } = e.data;\n  \n  try {\n    const result = processData(data, operation);\n    self.postMessage({ success: true, result });\n  } catch (error) {\n    self.postMessage({ success: false, error: error.message });\n  }\n};\n\nfunction processData(data, operation) {\n  switch (operation) {\n    case 'filter':\n      return data.filter(item => item.value > 100);\n    case 'sort':\n      return [...data].sort((a, b) => a.value - b.value);\n    case 'aggregate':\n      return data.reduce((sum, item) => sum + item.value, 0);\n    default:\n      throw new Error('Unknown operation');\n  }\n}\n\n// main.js\nfunction processLargeDataset(dataset) {\n  const worker = new Worker('dataWorker.js');\n  \n  worker.onmessage = function(e) {\n    if (e.data.success) {\n      console.log('Processed result:', e.data.result);\n    } else {\n      console.error('Processing failed:', e.data.error);\n    }\n    worker.terminate();\n  };\n  \n  worker.postMessage({ data: dataset, operation: 'sort' });\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React with Web Workers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Integrating Web Workers with React requires careful lifecycle management. Workers should be created in useEffect and cleaned up to prevent memory leaks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React Worker Hook",
+        "content": "Custom hook for worker management.",
+        "language": "javascript",
+        "code": "import { useState, useEffect, useRef } from 'react';\n\nfunction useWorker(workerCode, dependencies = []) {\n  const [result, setResult] = useState(null);\n  const [error, setError] = useState(null);\n  const [isProcessing, setIsProcessing] = useState(false);\n  const workerRef = useRef(null);\n  \n  useEffect(() => {\n    // Create worker from inline code\n    const blob = new Blob([workerCode], { type: 'application/javascript' });\n    const workerUrl = URL.createObjectURL(blob);\n    const worker = new Worker(workerUrl);\n    \n    workerRef.current = worker;\n    \n    worker.onmessage = (e) => {\n      if (e.data.success) {\n        setResult(e.data.result);\n      } else {\n        setError(e.data.error);\n      }\n      setIsProcessing(false);\n    };\n    \n    worker.onerror = (error) => {\n      setError(error.message);\n      setIsProcessing(false);\n    };\n    \n    return () => {\n      worker.terminate();\n      URL.revokeObjectURL(workerUrl);\n    };\n  }, [workerCode, ...dependencies]);\n  \n  const execute = (data) => {\n    setIsProcessing(true);\n    setError(null);\n    workerRef.current.postMessage(data);\n  };\n  \n  return { result, error, isProcessing, execute };\n}\n\n// Usage\nfunction DataProcessorComponent() {\n  const workerCode = `\n    self.onmessage = function(e) {\n      const data = e.data;\n      const result = data.reduce((sum, num) => sum + num, 0);\n      self.postMessage({ success: true, result });\n    };\n  `;\n  \n  const { result, isProcessing, execute } = useWorker(workerCode);\n  \n  const processData = () => {\n    const largeArray = Array.from({ length: 1000000 }, (_, i) => i);\n    execute(largeArray);\n  };\n  \n  return (\n    <div>\n      <button onClick={processData} disabled={isProcessing}>\n        {isProcessing ? 'Processing...' : 'Process Data'}\n      </button>\n      {result !== null && <div>Result: {result}</div>}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Worker Communication Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Efficient communication between main thread and workers is crucial. Use structured cloning for complex data, transferables for large buffers, and batch operations to minimize communication overhead."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Transferable Objects",
+        "content": "Efficiently transfer large data with zero-copy.",
+        "language": "javascript",
+        "code": "// Using transferables for large data\nfunction processLargeArray(mainData) {\n  const worker = new Worker('arrayWorker.js');\n  \n  worker.onmessage = function(e) {\n    const processedData = e.data.result;\n    console.log('Processed:', processedData.length);\n    worker.terminate();\n  };\n  \n  // Transfer array buffer (zero-copy)\n  worker.postMessage(\n    { data: mainData },\n    [mainData.buffer] // Transfer ownership\n  );\n  \n  // mainData is now empty (transferred to worker)\n}\n\n// arrayWorker.js\nself.onmessage = function(e) {\n  const { data } = e.data;\n  \n  // Process data\n  const processed = data.map(item => item * 2);\n  \n  // Transfer back\n  self.postMessage(\n    { result: processed },\n    [processed.buffer]\n  );\n};"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Worker Pool Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For multiple parallel tasks, use a worker pool to manage worker lifecycles and balance load across available workers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Simple Worker Pool",
+        "content": "Manage multiple workers for parallel processing.",
+        "language": "javascript",
+        "code": "class WorkerPool {\n  constructor(workerScript, poolSize = navigator.hardwareConcurrency || 4) {\n    this.workerScript = workerScript;\n    this.poolSize = poolSize;\n    this.workers = [];\n    this.taskQueue = [];\n    this.activeWorkers = 0;\n    \n    this.initialize();\n  }\n  \n  initialize() {\n    for (let i = 0; i < this.poolSize; i++) {\n      const worker = new Worker(this.workerScript);\n      worker.onmessage = this.handleWorkerMessage.bind(this);\n      this.workers.push({ worker, busy: false });\n    }\n  }\n  \n  handleWorkerMessage(e) {\n    const worker = this.workers.find(w => w.worker === e.target);\n    if (worker) {\n      worker.busy = false;\n      this.activeWorkers--;\n      \n      // Resolve the task promise\n      const task = this.taskQueue.find(t => t.worker === worker);\n      if (task) {\n        task.resolve(e.data);\n        this.taskQueue = this.taskQueue.filter(t => t !== task);\n      }\n      \n      this.processQueue();\n    }\n  }\n  \n  async execute(data) {\n    return new Promise((resolve) => {\n      this.taskQueue.push({ data, resolve, worker: null });\n      this.processQueue();\n    });\n  }\n  \n  processQueue() {\n    while (this.taskQueue.length > 0 && this.activeWorkers < this.poolSize) {\n      const availableWorker = this.workers.find(w => !w.busy);\n      if (availableWorker) {\n        const task = this.taskQueue.shift();\n        task.worker = availableWorker;\n        availableWorker.busy = true;\n        this.activeWorkers++;\n        availableWorker.worker.postMessage(task.data);\n      } else {\n        break;\n      }\n    }\n  }\n  \n  terminate() {\n    this.workers.forEach(({ worker }) => worker.terminate());\n    this.workers = [];\n  }\n}\n\n// Usage\nconst pool = new WorkerPool('worker.js', 4);\n\nconst tasks = [1, 2, 3, 4, 5, 6, 7, 8].map(async (num) => {\n  const result = await pool.execute({ num });\n  console.log('Task', num, 'result:', result);\n});\n\nawait Promise.all(tasks);\npool.terminate();"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with web workers and cpu-heavy browser work, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Worker Overhead",
+        "text": "Workers have creation and communication overhead. Use them for CPU-intensive tasks (50ms+), not for simple operations. Measure performance to ensure workers actually improve your specific use case."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Modern Alternatives"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Modern alternatives to traditional Web Workers include OffscreenCanvas for rendering, Worklets for specialized tasks, and browser-native APIs for specific use cases."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Web Worker",
+            "definition": "JavaScript API that enables running scripts in background threads, separate from the main thread."
+          },
+          {
+            "term": "Main Thread",
+            "definition": "The primary browser thread where UI rendering and user interactions occur."
+          },
+          {
+            "term": "Transferable Objects",
+            "definition": "Objects that can be transferred between workers and main thread with zero-copy, improving performance for large data transfers."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Web Workers enable parallel processing to keep the main thread responsive",
+          "Use workers for CPU-intensive tasks (50ms+ computation time)",
+          "Workers cannot access DOM - communicate via message passing",
+          "Clean up workers properly to prevent memory leaks",
+          "Use transferable objects for efficient large data transfers",
+          "Consider worker pools for multiple parallel tasks",
+          "Measure performance to ensure workers provide actual benefit",
+          "React requires careful worker lifecycle management with useEffect"
+        ],
+        "takeaway": "Web Workers are essential for maintaining responsive UIs during CPU-intensive operations, but require careful implementation and performance measurement."
       }
     }
   ],
