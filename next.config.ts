@@ -11,9 +11,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    optimizePackageImports: ['lucide-react'],
-  },
+  turbopack: {},
 };
 
 const pwaConfig = {
