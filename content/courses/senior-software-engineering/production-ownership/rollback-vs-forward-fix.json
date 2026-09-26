@@ -13,24 +13,79 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Rollback vs forward fix** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rollback vs forward fix."
+        "text": "**Rollback versus forward fix** is the fundamental incident mitigation decision. Rollback restores a known-good state in minutes. Forward fix deploys a patch that preserves the new feature but takes longer. This lesson teaches you to choose the right strategy based on impact, urgency, and system design."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What Is a Rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rollback reverts the system to a previous known-good state. In Kubernetes, it means rolling the deployment back to the last successful ReplicaSet. In a database migration, it means restoring from a backup. In a feature flag system, it means disabling the flag. Rollbacks are fast, safe, and reversible. They are the default choice for any deployment-induced incident."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Rollback",
+            "definition": "Reverting to a previous known-good state to stop user impact quickly."
+          },
+          {
+            "term": "Forward Fix",
+            "definition": "Deploying a patch that fixes the issue while preserving the current state."
+          },
+          {
+            "term": "Hotfix",
+            "definition": "An emergency fix deployed outside the normal release cycle."
+          },
+          {
+            "term": "Blue-Green Deployment",
+            "definition": "A deployment strategy that keeps two environments and switches traffic between them."
+          },
+          {
+            "term": "Canary Deployment",
+            "definition": "A deployment strategy that releases to a small percentage of users first."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Senior Engineer Mindset",
+        "text": "Rollback first, fix forward second. Never try to fix forward during an active incident unless rollback is impossible. The goal is to stop user impact as fast as possible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategies depend on the deployment mechanism. Kubernetes supports native rollback with kubectl rollout undo. CI/CD pipelines such as GitHub Actions or CircleCI can trigger automated rollback on failure. Feature flags provide instant rollback without redeploying. Database rollbacks require backups and careful migration design. Choose the strategy that matches your deployment architecture."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the core differences between rollback and forward fix",
-          "Know when to choose rollback over forward fix",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Kubernetes: kubectl rollout undo deployment/<name>",
+          "CI/CD: automated rollback on canary failure",
+          "Feature flags: instant kill without redeploy",
+          "Database: restore from backup or use reversible migrations",
+          "Infrastructure: Terraform apply with previous state"
         ]
       }
     },
@@ -38,21 +93,1654 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Automated Rollback"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rollback vs forward fix is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Automated rollback removes human delay from the mitigation process. Configure canary analysis to automatically roll back when the error rate exceeds the SLO. Prometheus can trigger a rollback webhook when a PromQL alert fires. Argo Rollouts provides progressive delivery with automated rollback. The on-call engineer still investigates, but the system stops the bleeding."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Argo Rollouts Automated Rollback",
+        "content": "Configure Argo Rollouts to automatically roll back when the canary error rate exceeds the threshold.",
+        "code": "apiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata:\n  name: payment-service\nspec:\n  replicas: 5\n  strategy:\n    canary:\n      steps:\n      - setWeight: 10\n      - pause: {duration: 5m}\n      - setWeight: 50\n      - pause: {duration: 10m}\n      analysis:\n        templates:\n        - templateName: success-rate\n        args:\n        - name: service-name\n          value: payment-service\n      # Auto-rollback if success rate drops below 99%"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Feature Flag Rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Feature flags provide the fastest rollback mechanism because they do not require redeployment. Kill the flag and the feature is disabled for all users within seconds. Every new feature should be behind a flag by default. The flag kill command should be in the runbook and tested in staging."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Launch new features behind feature flags",
+          "Document the flag kill command in the runbook",
+          "Test the flag kill in staging",
+          "Kill the flag first during incidents, investigate second"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Database Rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Database rollbacks are the hardest because data is mutable. A schema migration that drops a column is irreversible unless you have a backup. Use reversible migrations: up and down scripts. Test the down script in staging before deploying to production. Take a backup before every migration. If the migration fails, restore the backup."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Database Rollback Risk",
+        "text": "Never deploy a destructive migration without a tested rollback plan. Data loss is irreversible and will destroy user trust."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Forward Fix Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Forward fix deploys a patch that fixes the issue without losing the current state. It is preferred when rollback would lose important data or functionality. For example, if a payment feature is partially deployed and users have transactions in flight, rolling back would lose those transactions. A forward fix preserves the transactions while fixing the bug."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use forward fix when rollback would lose data or functionality",
+          "Deploy the fix through the normal CI/CD pipeline",
+          "Verify the fix with canary analysis before full rollout",
+          "Monitor the SLI for 30 minutes after deployment"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Decision Framework"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use this framework to decide between rollback and forward fix. First, can you roll back? If yes, roll back. If rollback would lose data or functionality, consider a forward fix. Second, how long will the forward fix take? If it takes more than 30 minutes, roll back and fix later. Third, what is the user impact? If impact is severe, roll back immediately."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rollback vs Forward Fix Decision Tree",
+        "content": "Use this decision tree to choose the right mitigation strategy under pressure.",
+        "code": "def choose_strategy(can_rollback, rollback_data_loss, fix_time_minutes, severity):\n    if not can_rollback:\n        return \"Forward fix (rollback impossible)\"\n    if rollback_data_loss and severity == \"SEV-1\":\n        return \"Forward fix (data loss prevents rollback)\"\n    if fix_time_minutes <= 30:\n        return \"Forward fix (fast enough)\"\n    return \"Rollback (safest and fastest)\"\n\n# Examples\nprint(choose_strategy(True, False, 15, \"SEV-1\"))  # Rollback\nprint(choose_strategy(True, True, 15, \"SEV-1\"))   # Forward fix"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback Trade-Offs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback is fast and safe but loses the new feature. If the feature is critical to the business, losing it might be worse than the incident. For example, rolling back a new checkout flow during Black Friday would cost more in lost sales than the incident itself. In that case, forward fix is the better choice despite the longer time to recover."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Strategy",
+          "Time to Recovery",
+          "Data Loss Risk",
+          "Feature Preservation",
+          "Best For"
+        ],
+        "rows": [
+          [
+            "Rollback",
+            "Minutes",
+            "Low",
+            "Loses new feature",
+            "Any deployment-induced incident"
+          ],
+          [
+            "Forward fix",
+            "Hours",
+            "Medium",
+            "Preserves feature",
+            "Feature has in-flight data"
+          ],
+          [
+            "Hotfix",
+            "30 to 60 minutes",
+            "Low",
+            "Preserves feature",
+            "Critical fix with data at risk"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hotfix Deployment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A hotfix is an emergency deployment that bypasses the normal release process. It should be used sparingly and with extra review. The hotfix branch should be small: one or two commits that fix the specific issue. Require at least one reviewer, run the full test suite, and deploy with canary analysis. Document the hotfix in the postmortem."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Hotfix branch: small, focused, one or two commits",
+          "Require at least one reviewer",
+          "Run full test suite",
+          "Deploy with canary analysis",
+          "Document in postmortem"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Error Budget"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollbacks consume error budget because they represent unplanned downtime or degraded service. Track rollback frequency and duration alongside error budget metrics. If the team rolls back more than once per month, the deployment process needs improvement. Use rollback data to justify investment in CI/CD, canary deployments, and automated testing."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Rollback Frequency",
+        "text": "Track rollback frequency as a reliability metric. More than one rollback per month signals a deployment process problem."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Deployment Safety"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The best rollback is the one you never need. Invest in deployment safety to reduce rollback frequency. Use canary deployments, automated testing, and feature flags. Run integration tests in staging that mirror production. Require code review for all changes. The safer the deployment, the less often you need to roll back."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Use canary deployments with automated rollback",
+          "Run integration tests in staging",
+          "Require code review for all changes",
+          "Use feature flags to decouple deployment from launch",
+          "Monitor the first 30 minutes after deployment"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Data Consistency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback can cause data inconsistency if the new deployment wrote data that the old version cannot read. For example, if a new version changes the schema and the old version tries to read the new format, the rollback causes errors. Design migrations to be backward compatible: add new columns before dropping old ones, and never change the meaning of existing fields."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use backward-compatible migrations",
+          "Add new columns before dropping old ones",
+          "Never change the meaning of existing fields",
+          "Test rollback scenarios in staging"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Stateful Services"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Stateful services such as databases and message queues are harder to roll back than stateless services. A database schema change might be irreversible. A message queue consumer that processes messages in a new format cannot be rolled back without losing messages. For stateful services, prefer forward fixes with careful state management."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Stateful Rollback",
+        "text": "Rollback of stateful services requires careful planning. Use reversible migrations, dual-write patterns, and feature flags to minimize rollback risk."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Infrastructure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Infrastructure changes such as Terraform or CloudFormation deployments can be rolled back using version control. Terraform supports plan and apply with state snapshots. If an infrastructure change causes an incident, revert the code and re-apply. Use immutable infrastructure where possible: replace instances rather than modifying them in place."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Use immutable infrastructure where possible",
+          "Take state snapshots before infrastructure changes",
+          "Revert code and re-apply for rollback",
+          "Test infrastructure changes in staging"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Forward Fix and Hotfix Process"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The hotfix process should be lightweight but safe. Create a hotfix branch from the current production tag. Cherry-pick the fix commit. Require at least one reviewer. Run the test suite. Deploy with canary analysis. Merge the hotfix back to main after deployment. Document the hotfix in the postmortem and the changelog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hotfix Process",
+        "content": "Follow this lightweight but safe hotfix process for emergency fixes.",
+        "code": "# Hotfix process\ngit checkout -b hotfix/payment-timeout production\ngit cherry-pick <fix-commit>\n# Require one reviewer\n# Run tests\ngit push origin hotfix/payment-timeout\n# Deploy with canary\n# Monitor for 30 minutes\n# Merge back to main\ngit checkout main\ngit merge hotfix/payment-timeout"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Forward Fix and Data Migration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Forward fixes that involve data migrations require extra care. The migration should be idempotent, reversible, and tested on a copy of production data. Run the migration in batches to avoid locking the table. Monitor the migration progress and have a rollback plan. If the migration fails, stop and investigate before retrying."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Make migrations idempotent and reversible",
+          "Test on a copy of production data",
+          "Run in batches to avoid locking",
+          "Monitor progress and have a rollback plan"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Canary Deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Canary deployments reduce the need for rollback by catching issues before they reach all users. Release to 1 percent of users, monitor the SLI, and only expand if healthy. If the SLI dips, the canary automatically rolls back. This limits the blast radius and preserves the error budget."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rollback vs forward fix, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Canary Strategy",
+        "text": "Use a canary strategy of 1 percent, 5 percent, 25 percent, 50 percent, 100 percent. Pause at each stage for 5 to 30 minutes and monitor the SLI."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Feature Flags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Feature flags are the ultimate rollback mechanism because they require no redeployment. Kill the flag and the feature is disabled for all users within seconds. Every new feature should be behind a flag by default. The flag kill command should be in the runbook and tested in staging."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Launch all new features behind feature flags",
+          "Document the flag kill command in the runbook",
+          "Test flag kill in staging before production",
+          "Use flags for A/B testing and gradual rollout"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Blue-Green Deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Blue-green deployments provide instant rollback by keeping two environments. Deploy to green while blue serves production. Switch traffic to green when healthy. If green has issues, switch back to blue instantly. The trade-off is cost: you run two full environments. Use blue-green for critical services where downtime is unacceptable."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Deploy to green while blue serves production",
+          "Switch traffic to green when healthy",
+          "Switch back to blue instantly if green has issues",
+          "Use for critical services where downtime is unacceptable"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Shadow Traffic"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Shadow traffic lets you test the new version without affecting users. Mirror production traffic to the new version and compare responses. If the new version produces errors, fix them before switching traffic. Shadow traffic reduces the need for rollback by catching issues earlier."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Shadow Traffic",
+        "text": "Use shadow traffic to validate new deployments before switching user traffic. Catch issues before they become incidents."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Observability"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Good observability makes rollback decisions faster. Dashboards that show error rate, latency, and resource utilization let the on-call engineer assess the situation in seconds. Automated alerts that trigger rollback webhooks remove human delay. Invest in observability as a rollback enabler."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Build dashboards that show key rollback indicators",
+          "Configure alerts that trigger rollback webhooks",
+          "Use distributed tracing to validate rollback success",
+          "Monitor the SLI for 30 minutes after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Testing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Test rollback procedures regularly. A rollback that works in theory but fails in production is useless. Run rollback drills in staging. Verify that the database can be restored, the feature flag can be killed, and the deployment can be undone. Test the rollback at least once per quarter."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Run rollback drills in staging quarterly",
+          "Verify database restore procedures",
+          "Verify feature flag kill procedures",
+          "Verify Kubernetes rollback commands"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Postmortems"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every rollback should be documented in the postmortem. How long did the rollback take? Did it restore service completely? Were there any side effects? Use rollback data to improve the deployment process. If rollbacks are frequent, the team needs to invest in deployment safety."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rollback Postmortem Section",
+        "content": "Include a rollback section in every postmortem. This ensures the team learns from every rollback.",
+        "code": "## Rollback Details\n- Strategy: kubectl rollout undo\n- Time to execute: 3 minutes\n- Time to recovery: 8 minutes\n- Side effects: none\n- Root cause: missing circuit breaker\n- Prevention: add circuit breaker and automated rollback"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Organizational Culture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A culture that celebrates fast rollback produces more reliable systems. If engineers are punished for rolling back, they will hesitate and user impact will increase. Celebrate rollbacks that prevent larger incidents. Reward teams that reduce rollback frequency through better deployment practices."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Rollback Culture",
+        "text": "Celebrate rollbacks that prevent larger incidents. The team that rolls back fast and learns quickly is more reliable than the team that hesitates."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Cost"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollbacks cost money in downtime, engineering time, and reputation. A 10-minute rollback on a $1 million monthly revenue stream costs approximately $700 in direct revenue. The engineering team spends hours investigating and fixing. The reputational cost is harder to quantify but real. Use rollback cost to justify investment in deployment safety."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Track rollback frequency and duration",
+          "Calculate direct and indirect cost of each rollback",
+          "Use cost data to justify deployment safety investments",
+          "Report rollback metrics in engineering reviews"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Compliance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Regulatory frameworks require evidence of incident response and remediation. Rollback procedures and logs serve as evidence of compliance. Document rollback procedures in the runbook, log every rollback event, and retain logs for at least 12 months."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rollback Log Format",
+        "content": "Log every rollback event with sufficient detail for compliance and postmortem analysis.",
+        "code": "rollback_log = {\n    \"timestamp\": \"2024-01-15T14:12:00Z\",\n    \"service\": \"payment-service\",\n    \"strategy\": \"kubectl rollout undo\",\n    \"trigger\": \"SEV-1: payment gateway timeout\",\n    \"duration_seconds\": 180,\n    \"recovery_time_seconds\": 480,\n    \"side_effects\": \"None\",\n    \"performed_by\": \"Alice (on-call)\"\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Chaos Engineering"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Chaos engineering validates rollback procedures by injecting failures in production. Kill an instance and verify that the system recovers automatically. Inject latency and verify that circuit breakers trip. Chaos experiments turn theoretical rollback procedures into proven practices."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Run chaos experiments in production with canary blast radius",
+          "Verify automated rollback triggers correctly",
+          "Verify manual rollback procedures work under pressure",
+          "Document chaos experiment results in the incident knowledge base"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Disaster Recovery"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback is a key component of disaster recovery. If a region fails, roll back to the previous region. If a database migration corrupts data, roll back to the backup. Test rollback procedures in disaster recovery drills. The goal is to recover within the RTO target using only documented, tested procedures."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Include rollback in disaster recovery plans",
+          "Test rollback procedures in DR drills",
+          "Verify rollback meets RTO targets",
+          "Document rollback in the runbook"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Multi-Region"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Multi-region architectures enable rollback by traffic shifting. If a region fails, shift 100 percent of traffic to the healthy region. This is a form of rollback at the infrastructure level. Test traffic shifting in disaster recovery drills. Ensure DNS TTL is low enough to support fast failover."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "DNS Failover",
+        "text": "Set DNS TTL to 60 seconds during normal operation to support fast failover. Test failover quarterly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and Vendor Lock-In"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Vendor lock-in can make rollback harder. If your database is managed by a single cloud provider and the provider has an outage, you cannot roll back to another provider without significant effort. Mitigate vendor lock-in by using open standards, multi-cloud architectures, and abstraction layers that allow you to switch providers."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Rollback first, fix forward second.",
+          "Automated rollback reduces mean time to recovery.",
+          "Feature flags provide instant rollback without redeployment.",
+          "Database rollbacks require reversible migrations and backups.",
+          "Test rollback procedures regularly.",
+          "Use rollback data to justify deployment safety investments."
+        ],
+        "takeaway": "Mastering rollback and forward fix decisions minimizes user impact and builds confidence in the deployment process."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "When should I roll back versus fix forward?",
+            "answer": "Roll back first unless rollback would lose data or the fix takes less than 30 minutes."
+          },
+          {
+            "question": "How do I automate rollback?",
+            "answer": "Use canary analysis with automated rollback triggers. Configure Argo Rollouts, Flagger, or custom Prometheus alerts."
+          },
+          {
+            "question": "What if the rollback fails?",
+            "answer": "Have a backup plan: manual traffic shifting, feature flag kill, or infrastructure failover. Test all options in staging."
+          },
+          {
+            "question": "How do I test rollback procedures?",
+            "answer": "Run rollback drills in staging quarterly. Simulate incidents and verify the team can recover within the RTO."
+          },
+          {
+            "question": "What is the cost of rollbacks?",
+            "answer": "Track rollback frequency and duration. Use the data to justify investment in deployment safety and automated testing."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for blue-green deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for blue-green deployments requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for canary deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for canary deployments requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for feature flags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for feature flags requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for dark launches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for dark launches requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for A/B tests"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for A/B tests requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for migrations requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for schema changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for schema changes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for data transformations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for data transformations requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for infrastructure changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for infrastructure changes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for configuration changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for configuration changes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for security patches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for security patches requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for emergency fixes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for emergency fixes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for hotfixes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for hotfixes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for patch releases"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for patch releases requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for minor versions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for minor versions requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for major versions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for major versions requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for breaking changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for breaking changes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for non-breaking changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for non-breaking changes requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for experimental features"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for experimental features requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback strategy for beta features"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback strategy for beta features requires careful planning and testing. Ensure your rollback procedures are documented and tested regularly."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Document rollback procedure",
+          "Test in staging",
+          "Automate where possible",
+          "Monitor after rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and blue-green deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and blue-green deployments requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and canary deployments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and canary deployments requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and feature flags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and feature flags requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and dark launches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and dark launches requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and A/B testing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and A/B testing requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and gradual rollouts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and gradual rollouts requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and immutable infrastructure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and immutable infrastructure requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and infrastructure as code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and infrastructure as code requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and GitOps"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and GitOps requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and policy as code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and policy as code requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and configuration management"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and configuration management requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and secret rotation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and secret rotation requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and certificate management"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and certificate management requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and DNS management"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and DNS management requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and load balancer configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and load balancer configuration requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and CDN purging"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and CDN purging requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and cache invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and cache invalidation requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and search index rebuilding"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and search index rebuilding requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and ML model rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and ML model rollback requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rollback and feature store consistency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rollback and feature store consistency requires understanding the deployment mechanism and its rollback capabilities."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Understand deployment mechanism",
+          "Test rollback procedures",
+          "Automate where possible",
+          "Monitor rollback effectiveness"
+        ]
       }
     }
   ],

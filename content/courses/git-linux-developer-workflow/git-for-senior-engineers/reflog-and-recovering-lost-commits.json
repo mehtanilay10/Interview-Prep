@@ -13,46 +13,1664 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Reflog and recovering lost commits** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with reflog and recovering lost commits."
+        "text": "Reflog is Git's safety net. It records every update to the tip of branches and other references, making it possible to recover commits that seem lost forever."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Lesson Scope",
+        "text": "This lesson covers reflog anatomy, recovering deleted branches, restoring lost commits, cleaning up reflog, and building team recovery workflows."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of reflog and recovering lost commits",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "What Is Reflog?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding reflog and recovering lost commits is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Reflog stands for reference log. Every time a branch moves, HEAD changes, or a commit is added or removed, Git records the event in a reflog. Each reference has its own reflog, and there is also a global HEAD reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing the Reflog",
+        "code": "git reflog",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Reflog Output",
+        "code": "abc1234 HEAD@{0}: checkout: moving from main to feature/auth\ndef5678 HEAD@{1}: commit: fix(auth): add token validation\nghi9012 HEAD@{2}: rebase -i (finish): returning to refs/heads/main\njkl3456 HEAD@{3}: pull: origin main: fast-forward",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reflog Anatomy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each reflog entry has a reference name, an index, the old and new SHA values, and a description of what happened. The index counts backward from the current state: HEAD@{0} is now, HEAD@{1} is the previous state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting a Reflog Entry",
+        "code": "git reflog show main\n\n# Output:\n# abc1234 main@{0}: commit: feat: add dashboard\n# def5678 main@{1}: rebase finished: refs/heads/main onto origin/main\n# ghi9012 main@{2}: branch: created from origin/main",
+        "language": "text"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with reflog and recovering lost commits, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Reflog Is Local",
+        "text": "Reflog lives only in your local repository. It is not shared via push or pull. If you clone a fresh copy of the repository, the reflog is empty."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering a Deleted Branch"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you accidentally delete a branch, its commits are not immediately gone. Git retains them as unreachable objects until garbage collection runs. Use reflog to find the tip commit and recreate the branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Deleted Branch",
+        "code": "# Oops, deleted the branch\ngit branch -D feature/auth\n\n# Find the lost commit in reflog\ngit reflog\n\n# Recreate the branch at the lost commit\ngit branch feature-auth-recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering a Lost Commit"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a commit is not on any branch, it is still in the repository as long as it appears in a reflog. Find the commit hash and create a new branch or cherry-pick it onto an existing branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Lost Commit",
+        "code": "# Find the commit in reflog\ngit reflog | grep \"lost work\"\n\n# Recover it onto a new branch\ngit checkout -b recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Garbage Collection Removes Unreachable Objects",
+        "text": "Git periodically runs gc to prune objects that are not reachable from any branch or reflog. If you wait too long, unreachable commits may be permanently deleted."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Garbage Collection and Expiration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git reflog entries expire after 90 days by default for reachable commits and 30 days for unreachable commits. After expiration, git gc may prune the associated objects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reflog Expiry Configuration",
+        "code": "# Expire reachable entries after 90 days\ngit config gc.reflogExpire 90.days\n\n# Expire unreachable entries after 30 days\ngit config gc.reflogExpireUnreachable 30.days\n\n# Run garbage collection manually\ngit gc --prune=now",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The fsck Command"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git fsck verifies the connectivity and integrity of objects in the repository. It lists dangling commits that are not referenced by any branch, which is useful when hunting for lost work outside of reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Dangling Commits",
+        "code": "git fsck --lost-found\n\n# Output:\n# dangling commit abc1234\n# dangling commit def5678",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering After a Bad Reset"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git reset --hard discards working tree changes and moves the branch pointer. If you reset accidentally, the old branch tip is still in reflog. Restore it with git reset --hard HEAD@{1}."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering After a Hard Reset",
+        "code": "# Accidentally ran\ngit reset --hard HEAD~3\n\n# Recover the lost state\ngit reset --hard HEAD@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncommitted Work Is Lost Forever",
+        "text": "Reflog does not track uncommitted changes in the working tree. If you reset --hard without committing first, uncommitted work is gone. Commit or stash before dangerous operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering After a Bad Rebase"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rebase that goes wrong can leave you in a detached HEAD or with lost commits. Use reflog to find the original branch position and reset to it, or use git rebase --abort if the rebase is still in progress."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "code": "# Rebase broke the branch\ngit reflog\n\n# Find main@{1} before the rebase\ngit branch -f main main@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Orphaned Commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Orphaned commits exist in the object database but are not reachable from any branch, tag, or reflog entry. They are candidates for garbage collection. Use git fsck or git log --walk-reflogs to locate them."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Orphaned Commits",
+        "code": "git fsck --full --no-reflogs | grep commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cleaning Up Reflog"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Over time, reflog accumulates stale entries. You can expire reflog entries manually or let Git handle it automatically. A clean reflog makes it easier to find the commit you actually want."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expiring Reflog Entries",
+        "code": "# Expire entries older than 14 days immediately\ngit reflog expire --expire=14.days --all\n\n# Run garbage collection\ngit reflog delete --rewrite HEAD@{10}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Preventing Lost Commits"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit frequently so work is preserved in the object database",
+          "Push branches to a remote for off-site backup",
+          "Use git stash for uncommitted work before switching branches",
+          "Avoid git reset --hard unless you are certain",
+          "Tag important milestones so they are easy to find"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pushing for Backup",
+        "code": "git push origin feature/auth --set-upstream",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Team Recovery Workflows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a team member loses commits, they can share their reflog output with a lead. The lead helps identify the correct commit hash and instructs the developer on how to restore it."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Share reflog output in a support ticket or Slack thread",
+          "Identify the commit hash from the reflog description",
+          "Create a recovery branch at the identified commit",
+          "Push the recovery branch to origin for collaboration",
+          "Investigate the root cause to prevent recurrence"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Team Recovery Request",
+        "code": "## Lost Commit Recovery Request\n\n### Reporter\n@developer\n### Lost Commit Description\n\"fix(auth): handle expired refresh tokens\"\n### Approximate Date\n2026-09-20\n\n### Recovery Steps\n1. Run git reflog\n2. Identify commit hash\n3. Create recovery branch\n4. Push to origin",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reflog and Auditing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is useful for auditing repository activity. You can see when branches were created, deleted, or moved. This is helpful during incident response."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing Recent Activity",
+        "code": "git reflog | head -20",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reflog in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CI environments typically do not have meaningful reflogs because they perform fresh clones. For recovery in CI, rely on fetched tags, fetched branches, and commit hashes passed as parameters."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Tag CI Builds",
+        "text": "Tag CI builds with the commit SHA so you can always return to the exact source state, even if branches move."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's built-in safety net. It records every reference update, making it possible to recover from accidental deletions, bad resets, and failed rebases."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git reflog to view reference update history",
+          "Recover lost branches or commits by recreating them at the reflog entry",
+          "Reflog entries expire; act quickly after a mistake",
+          "Push frequently to remote as a backup strategy"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's safety net. It records every update to the tip of branches and other references, making it possible to recover commits that seem lost forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What Is Reflog?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog stands for reference log. Every time a branch moves, HEAD changes, or a commit is added or removed, Git records the event in a reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing the Reflog",
+        "code": "git reflog",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Reflog Output",
+        "code": "abc1234 HEAD@{0}: checkout: moving from main to feature/auth\ndef5678 HEAD@{1}: commit: fix(auth): add token validation\nghi9012 HEAD@{2}: rebase -i (finish): returning to refs/heads/main\njkl3456 HEAD@{3}: pull: origin main: fast-forward",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog Anatomy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each reflog entry has a reference name, an index, the old and new SHA values, and a description. The index counts backward: HEAD@{0} is now, HEAD@{1} is the previous state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting a Reflog Entry",
+        "code": "git reflog show main\n\n# Output:\n# abc1234 main@{0}: commit: feat: add dashboard\n# def5678 main@{1}: rebase finished: refs/heads/main onto origin/main",
+        "language": "text"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Reflog Is Local",
+        "text": "Reflog lives only in your local repository. It is not shared via push or pull."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Deleted Branch"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you accidentally delete a branch, its commits are not immediately gone. Git retains them as unreachable objects until garbage collection runs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Deleted Branch",
+        "code": "# Oops, deleted the branch\ngit branch -D feature/auth\n\n# Find the lost commit in reflog\ngit reflog\n\n# Recreate the branch at the lost commit\ngit branch feature-auth-recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Lost Commit"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a commit is not on any branch, it is still in the repository as long as it appears in a reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Lost Commit",
+        "code": "# Find the commit in reflog\ngit reflog | grep \"lost work\"\n\n# Recover it onto a new branch\ngit checkout -b recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Garbage Collection Removes Unreachable Objects",
+        "text": "Git periodically runs gc to prune objects that are not reachable from any branch or reflog."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Garbage Collection and Expiration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git reflog entries expire after 90 days by default for reachable commits and 30 days for unreachable commits."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reflog Expiry Configuration",
+        "code": "# Expire reachable entries after 90 days\ngit config gc.reflogExpire 90.days\n\n# Expire unreachable entries after 30 days\ngit config gc.reflogExpireUnreachable 30.days\n\n# Run garbage collection manually\ngit gc --prune=now",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "The fsck Command"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git fsck verifies the connectivity and integrity of objects in the repository. It lists dangling commits that are not referenced by any branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Dangling Commits",
+        "code": "git fsck --lost-found\n\n# Output:\n# dangling commit abc1234\n# dangling commit def5678",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Reset"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git reset --hard discards working tree changes and moves the branch pointer. If you reset accidentally, the old branch tip is still in reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering After a Hard Reset",
+        "code": "# Accidentally ran\ngit reset --hard HEAD~3\n\n# Recover the lost state\ngit reset --hard HEAD@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncommitted Work Is Lost Forever",
+        "text": "Reflog does not track uncommitted changes in the working tree."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Rebase"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rebase that goes wrong can leave you in a detached HEAD or with lost commits. Use reflog to find the original branch position."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "code": "# Rebase broke the branch\ngit reflog\n\n# Find main@{1} before the rebase\ngit branch -f main main@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Orphaned Commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Orphaned commits exist in the object database but are not reachable from any branch, tag, or reflog entry. They are candidates for garbage collection."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Orphaned Commits",
+        "code": "git fsck --full --no-reflogs | grep commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cleaning Up Reflog"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Over time, reflog accumulates stale entries. You can expire reflog entries manually or let Git handle it automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expiring Reflog Entries",
+        "code": "# Expire entries older than 14 days immediately\ngit reflog expire --expire=14.days --all",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preventing Lost Commits"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit frequently so work is preserved in the object database",
+          "Push branches to a remote for off-site backup",
+          "Use git stash for uncommitted work before switching branches",
+          "Avoid git reset --hard unless you are certain",
+          "Tag important milestones so they are easy to find"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Team Recovery Workflows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a team member loses commits, they can share their reflog output with a lead. The lead helps identify the correct commit hash and instructs the developer on how to restore it."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Share reflog output in a support ticket or Slack thread",
+          "Identify the commit hash from the reflog description",
+          "Create a recovery branch at the identified commit",
+          "Push the recovery branch to origin for collaboration",
+          "Investigate the root cause to prevent recurrence"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog and Auditing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is useful for auditing repository activity. You can see when branches were created, deleted, or moved."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing Recent Activity",
+        "code": "git reflog | head -20",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CI environments typically do not have meaningful reflogs because they perform fresh clones. For recovery in CI, rely on fetched tags, fetched branches, and commit hashes passed as parameters."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Tag CI Builds",
+        "text": "Tag CI builds with the commit SHA so you can always return to the exact source state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's built-in safety net. It records every reference update, making it possible to recover from accidental deletions, bad resets, and failed rebases."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git reflog to view reference update history",
+          "Recover lost branches or commits by recreating them at the reflog entry",
+          "Reflog entries expire; act quickly after a mistake",
+          "Push frequently to remote as a backup strategy"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's safety net. It records every update to the tip of branches and other references, making it possible to recover commits that seem lost forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What Is Reflog?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog stands for reference log. Every time a branch moves, HEAD changes, or a commit is added or removed, Git records the event in a reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing the Reflog",
+        "code": "git reflog",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Reflog Output",
+        "code": "abc1234 HEAD@{0}: checkout: moving from main to feature/auth\ndef5678 HEAD@{1}: commit: fix(auth): add token validation\nghi9012 HEAD@{2}: rebase -i (finish): returning to refs/heads/main\njkl3456 HEAD@{3}: pull: origin main: fast-forward",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog Anatomy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each reflog entry has a reference name, an index, the old and new SHA values, and a description. The index counts backward: HEAD@{0} is now, HEAD@{1} is the previous state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting a Reflog Entry",
+        "code": "git reflog show main\n\n# Output:\n# abc1234 main@{0}: commit: feat: add dashboard\n# def5678 main@{1}: rebase finished: refs/heads/main onto origin/main",
+        "language": "text"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Reflog Is Local",
+        "text": "Reflog lives only in your local repository. It is not shared via push or pull."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Deleted Branch"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you accidentally delete a branch, its commits are not immediately gone. Git retains them as unreachable objects until garbage collection runs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Deleted Branch",
+        "code": "# Oops, deleted the branch\ngit branch -D feature/auth\n\n# Find the lost commit in reflog\ngit reflog\n\n# Recreate the branch at the lost commit\ngit branch feature-auth-recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Lost Commit"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a commit is not on any branch, it is still in the repository as long as it appears in a reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Lost Commit",
+        "code": "# Find the commit in reflog\ngit reflog | grep \"lost work\"\n\n# Recover it onto a new branch\ngit checkout -b recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Garbage Collection Removes Unreachable Objects",
+        "text": "Git periodically runs gc to prune objects that are not reachable from any branch or reflog."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Garbage Collection and Expiration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git reflog entries expire after 90 days by default for reachable commits and 30 days for unreachable commits."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reflog Expiry Configuration",
+        "code": "# Expire reachable entries after 90 days\ngit config gc.reflogExpire 90.days\n\n# Expire unreachable entries after 30 days\ngit config gc.reflogExpireUnreachable 30.days\n\n# Run garbage collection manually\ngit gc --prune=now",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "The fsck Command"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git fsck verifies the connectivity and integrity of objects in the repository. It lists dangling commits that are not referenced by any branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Dangling Commits",
+        "code": "git fsck --lost-found\n\n# Output:\n# dangling commit abc1234\n# dangling commit def5678",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Reset"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git reset --hard discards working tree changes and moves the branch pointer. If you reset accidentally, the old branch tip is still in reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering After a Hard Reset",
+        "code": "# Accidentally ran\ngit reset --hard HEAD~3\n\n# Recover the lost state\ngit reset --hard HEAD@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncommitted Work Is Lost Forever",
+        "text": "Reflog does not track uncommitted changes in the working tree. Commit or stash before dangerous operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Rebase"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rebase that goes wrong can leave you in a detached HEAD or with lost commits. Use reflog to find the original branch position."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "code": "# Rebase broke the branch\ngit reflog\n\n# Find main@{1} before the rebase\ngit branch -f main main@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Orphaned Commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Orphaned commits exist in the object database but are not reachable from any branch, tag, or reflog entry. They are candidates for garbage collection."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Orphaned Commits",
+        "code": "git fsck --full --no-reflogs | grep commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cleaning Up Reflog"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Over time, reflog accumulates stale entries. You can expire reflog entries manually or let Git handle it automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expiring Reflog Entries",
+        "code": "# Expire entries older than 14 days immediately\ngit reflog expire --expire=14.days --all",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preventing Lost Commits"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit frequently so work is preserved in the object database",
+          "Push branches to a remote for off-site backup",
+          "Use git stash for uncommitted work before switching branches",
+          "Avoid git reset --hard unless you are certain",
+          "Tag important milestones so they are easy to find"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Team Recovery Workflows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a team member loses commits, they can share their reflog output with a lead. The lead helps identify the correct commit hash and instructs the developer on how to restore it."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Share reflog output in a support ticket or Slack thread",
+          "Identify the commit hash from the reflog description",
+          "Create a recovery branch at the identified commit",
+          "Push the recovery branch to origin for collaboration",
+          "Investigate the root cause to prevent recurrence"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog and Auditing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is useful for auditing repository activity. You can see when branches were created, deleted, or moved."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing Recent Activity",
+        "code": "git reflog | head -20",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CI environments typically do not have meaningful reflogs because they perform fresh clones. For recovery in CI, rely on fetched tags, fetched branches, and commit hashes passed as parameters."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Tag CI Builds",
+        "text": "Tag CI builds with the commit SHA so you can always return to the exact source state, even if branches move."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's built-in safety net. It records every reference update, making it possible to recover from accidental deletions, bad resets, and failed rebases."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git reflog to view reference update history",
+          "Recover lost branches or commits by recreating them at the reflog entry",
+          "Reflog entries expire; act quickly after a mistake",
+          "Push frequently to remote as a backup strategy"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's safety net. It records every update to the tip of branches and other references, making it possible to recover commits that seem lost forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What Is Reflog?"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing the Reflog",
+        "code": "git reflog",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Reflog Output",
+        "code": "abc1234 HEAD@{0}: checkout: moving from main to feature/auth\ndef5678 HEAD@{1}: commit: fix(auth): add token validation\nghi9012 HEAD@{2}: rebase -i (finish): returning to refs/heads/main\njkl3456 HEAD@{3}: pull: origin main: fast-forward",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog Anatomy"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting a Reflog Entry",
+        "code": "git reflog show main\n\n# Output:\n# abc1234 main@{0}: commit: feat: add dashboard\n# def5678 main@{1}: rebase finished: refs/heads/main onto origin/main",
+        "language": "text"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Reflog Is Local",
+        "text": "Reflog lives only in your local repository. It is not shared via push or pull."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Deleted Branch"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Deleted Branch",
+        "code": "# Oops, deleted the branch\ngit branch -D feature/auth\n\n# Find the lost commit in reflog\ngit reflog\n\n# Recreate the branch at the lost commit\ngit branch feature-auth-recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Lost Commit"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Lost Commit",
+        "code": "# Find the commit in reflog\ngit reflog | grep \"lost work\"\n\n# Recover it onto a new branch\ngit checkout -b recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Garbage Collection Removes Unreachable Objects",
+        "text": "Git periodically runs gc to prune objects that are not reachable from any branch or reflog."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Garbage Collection and Expiration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reflog Expiry Configuration",
+        "code": "# Expire reachable entries after 90 days\ngit config gc.reflogExpire 90.days\n\n# Expire unreachable entries after 30 days\ngit config gc.reflogExpireUnreachable 30.days\n\n# Run garbage collection manually\ngit gc --prune=now",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "The fsck Command"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Dangling Commits",
+        "code": "git fsck --lost-found\n\n# Output:\n# dangling commit abc1234\n# dangling commit def5678",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Reset"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering After a Hard Reset",
+        "code": "# Accidentally ran\ngit reset --hard HEAD~3\n\n# Recover the lost state\ngit reset --hard HEAD@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncommitted Work Is Lost Forever",
+        "text": "Reflog does not track uncommitted changes in the working tree. Commit or stash before dangerous operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Rebase"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "code": "# Rebase broke the branch\ngit reflog\n\n# Find main@{1} before the rebase\ngit branch -f main main@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Orphaned Commits"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Orphaned Commits",
+        "code": "git fsck --full --no-reflogs | grep commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cleaning Up Reflog"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expiring Reflog Entries",
+        "code": "# Expire entries older than 14 days immediately\ngit reflog expire --expire=14.days --all",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preventing Lost Commits"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit frequently so work is preserved in the object database",
+          "Push branches to a remote for off-site backup",
+          "Use git stash for uncommitted work before switching branches",
+          "Avoid git reset --hard unless you are certain",
+          "Tag important milestones so they are easy to find"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Team Recovery Workflows"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Share reflog output in a support ticket or Slack thread",
+          "Identify the commit hash from the reflog description",
+          "Create a recovery branch at the identified commit",
+          "Push the recovery branch to origin for collaboration",
+          "Investigate the root cause to prevent recurrence"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog and Auditing"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing Recent Activity",
+        "code": "git reflog | head -20",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog in CI"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Tag CI Builds",
+        "text": "Tag CI builds with the commit SHA so you can always return to the exact source state, even if branches move."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's built-in safety net. It records every reference update, making it possible to recover from accidental deletions, bad resets, and failed rebases."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git reflog to view reference update history",
+          "Recover lost branches or commits by recreating them at the reflog entry",
+          "Reflog entries expire; act quickly after a mistake",
+          "Push frequently to remote as a backup strategy"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's safety net. It records every update to the tip of branches and other references, making it possible to recover commits that seem lost forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What Is Reflog?"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing the Reflog",
+        "code": "git reflog",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sample Reflog Output",
+        "code": "abc1234 HEAD@{0}: checkout: moving from main to feature/auth\ndef5678 HEAD@{1}: commit: fix(auth): add token validation\nghi9012 HEAD@{2}: rebase -i (finish): returning to refs/heads/main\njkl3456 HEAD@{3}: pull: origin main: fast-forward",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog Anatomy"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting a Reflog Entry",
+        "code": "git reflog show main\n\n# Output:\n# abc1234 main@{0}: commit: feat: add dashboard\n# def5678 main@{1}: rebase finished: refs/heads/main onto origin/main",
+        "language": "text"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Reflog Is Local",
+        "text": "Reflog lives only in your local repository. It is not shared via push or pull."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Deleted Branch"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Deleted Branch",
+        "code": "# Oops, deleted the branch\ngit branch -D feature/auth\n\n# Find the lost commit in reflog\ngit reflog\n\n# Recreate the branch at the lost commit\ngit branch feature-auth-recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering a Lost Commit"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Lost Commit",
+        "code": "# Find the commit in reflog\ngit reflog | grep \"lost work\"\n\n# Recover it onto a new branch\ngit checkout -b recovery abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Garbage Collection Removes Unreachable Objects",
+        "text": "Git periodically runs gc to prune objects that are not reachable from any branch or reflog."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Garbage Collection and Expiration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reflog Expiry Configuration",
+        "code": "# Expire reachable entries after 90 days\ngit config gc.reflogExpire 90.days\n\n# Expire unreachable entries after 30 days\ngit config gc.reflogExpireUnreachable 30.days\n\n# Run garbage collection manually\ngit gc --prune=now",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "The fsck Command"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Dangling Commits",
+        "code": "git fsck --lost-found\n\n# Output:\n# dangling commit abc1234\n# dangling commit def5678",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Reset"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering After a Hard Reset",
+        "code": "# Accidentally ran\ngit reset --hard HEAD~3\n\n# Recover the lost state\ngit reset --hard HEAD@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Uncommitted Work Is Lost Forever",
+        "text": "Reflog does not track uncommitted changes in the working tree. Commit or stash before dangerous operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Recovering After a Bad Rebase"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "code": "# Rebase broke the branch\ngit reflog\n\n# Find main@{1} before the rebase\ngit branch -f main main@{1}",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Orphaned Commits"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Orphaned Commits",
+        "code": "git fsck --full --no-reflogs | grep commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Cleaning Up Reflog"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expiring Reflog Entries",
+        "code": "# Expire entries older than 14 days immediately\ngit reflog expire --expire=14.days --all",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preventing Lost Commits"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit frequently so work is preserved in the object database",
+          "Push branches to a remote for off-site backup",
+          "Use git stash for uncommitted work before switching branches",
+          "Avoid git reset --hard unless you are certain",
+          "Tag important milestones so they are easy to find"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Team Recovery Workflows"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Share reflog output in a support ticket or Slack thread",
+          "Identify the commit hash from the reflog description",
+          "Create a recovery branch at the identified commit",
+          "Push the recovery branch to origin for collaboration",
+          "Investigate the root cause to prevent recurrence"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog and Auditing"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing Recent Activity",
+        "code": "git reflog | head -20",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Reflog in CI"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Tag CI Builds",
+        "text": "Tag CI builds with the commit SHA so you can always return to the exact source state, even if branches move."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reflog is Git's built-in safety net. It records every reference update, making it possible to recover from accidental deletions, bad resets, and failed rebases."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git reflog to view reference update history",
+          "Recover lost branches or commits by recreating them at the reflog entry",
+          "Reflog entries expire; act quickly after a mistake",
+          "Push frequently to remote as a backup strategy"
+        ]
       }
     }
   ],

@@ -68,6 +68,55 @@ const DARK_COLOR_MAP: Record<string, string> = {
   '#fff': '#e6edf3',
 };
 
+function getDiagramType(definition: string): string {
+  const firstLine = definition.split('\n')[0]?.trim() || '';
+  if (firstLine.startsWith('flowchart') || firstLine.startsWith('graph')) return 'flowchart';
+  if (firstLine.startsWith('sequenceDiagram')) return 'sequence';
+  if (firstLine.startsWith('classDiagram')) return 'class';
+  if (firstLine.startsWith('stateDiagram')) return 'state';
+  if (firstLine.startsWith('erDiagram')) return 'er';
+  if (firstLine.startsWith('gantt')) return 'gantt';
+  if (firstLine.startsWith('pie')) return 'pie';
+  if (firstLine.startsWith('mindmap')) return 'mindmap';
+  if (firstLine.startsWith('timeline')) return 'timeline';
+  if (firstLine.startsWith('gitGraph')) return 'gitgraph';
+  if (firstLine.startsWith('journey')) return 'journey';
+  if (firstLine.startsWith('sankey')) return 'sankey';
+  if (firstLine.startsWith('xyChart')) return 'xychart';
+  if (firstLine.startsWith('block')) return 'block';
+  if (firstLine.startsWith('packet')) return 'packet';
+  if (firstLine.startsWith('radar')) return 'radar';
+  if (firstLine.startsWith('requirement')) return 'requirement';
+  return 'default';
+}
+
+const DIAGRAM_BG: Record<string, { light: string; dark: string }> = {
+  flowchart: { light: '#f0f9ff', dark: '#0d2d45' },
+  sequence: { light: '#f0fdf4', dark: '#0d2e1a' },
+  class: { light: '#faf5ff', dark: '#1e0a3c' },
+  state: { light: '#fff7ed', dark: '#2d1500' },
+  er: { light: '#f0fdfa', dark: '#0f2d1a' },
+  gantt: { light: '#fffbeb', dark: '#2a1f00' },
+  pie: { light: '#fdf2f8', dark: '#2d0b0b' },
+  mindmap: { light: '#f5f3ff', dark: '#1e0a3c' },
+  timeline: { light: '#fefce8', dark: '#272000' },
+  gitgraph: { light: '#f6f8fa', dark: '#161b22' },
+  journey: { light: '#fff1f2', dark: '#2d0f0f' },
+  sankey: { light: '#eff6ff', dark: '#0f2a40' },
+  xychart: { light: '#f8fafc', dark: '#1f242b' },
+  block: { light: '#f8fafc', dark: '#161b22' },
+  packet: { light: '#f0fdfa', dark: '#0f2d1a' },
+  radar: { light: '#faf5ff', dark: '#1e0a3c' },
+  requirement: { light: '#fff7ed', dark: '#2a1f00' },
+  default: { light: '#f6f8fa', dark: '#161b22' },
+};
+
+function getDiagramBackground(definition: string, theme: 'light' | 'dark'): string {
+  const type = getDiagramType(definition);
+  const colors = DIAGRAM_BG[type] || DIAGRAM_BG.default;
+  return theme === 'dark' ? colors.dark : colors.light;
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -143,11 +192,15 @@ export function MermaidRenderer({ definition, caption, className }: MermaidRende
     };
   }, [definition, resolvedTheme]);
 
-  const handleClose = useCallback(() => setIsModalOpen(false), []);
+   const handleClose = useCallback(() => setIsModalOpen(false), []);
+
+  const diagramBg = resolvedTheme
+    ? getDiagramBackground(definition, resolvedTheme === 'dark' ? 'dark' : 'light')
+    : undefined;
 
   if (status === 'error') {
     return (
-      <div className={cn('my-4 rounded-lg border border-danger-muted bg-danger-subtle p-4', className)}>
+      <div className={cn('my-8 rounded-lg border border-danger-muted bg-danger-subtle p-6', className)}>
         <p className="text-sm font-medium text-danger-fg">Diagram rendering failed</p>
         <pre className="mt-1 text-xs text-fg-muted overflow-x-auto">{error}</pre>
       </div>
@@ -156,17 +209,18 @@ export function MermaidRenderer({ definition, caption, className }: MermaidRende
 
   return (
     <>
-      <figure className={cn('my-6', className)}>
+      <figure className={cn('my-8', className)}>
         <div
           className={cn(
-            'relative rounded-xl border border-border bg-canvas-subtle p-4 overflow-x-auto',
-            status === 'loading' && 'min-h-[120px] animate-pulse',
+            'relative rounded-xl border border-border overflow-x-auto',
+            status === 'loading' && 'min-h-[160px] animate-pulse',
             'flex items-center justify-center'
           )}
+          style={diagramBg ? { backgroundColor: diagramBg } : undefined}
         >
           <div
+            className="mermaid mermaid-diagram max-w-full p-6 md:p-8"
             ref={containerRef}
-            className="mermaid mermaid-diagram max-w-full"
             aria-label={caption ?? 'Diagram'}
           />
 

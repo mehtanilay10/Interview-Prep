@@ -4,33 +4,86 @@
   "moduleSlug": "git-for-senior-engineers",
   "courseSlug": "git-linux-developer-workflow",
   "title": "Cherry-pick, revert and reset",
-  "description": "Learn about Cherry-pick, revert and reset. Master the concepts, patterns, and best practices.",
+  "description": "Deep dive into git cherry-pick, git revert, and git reset. Learn the differences between soft, mixed, and hard resets, when to use each command, and how to safely undo changes without losing work.",
   "order": 4,
   "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 45,
+  "tags": [
+    "git",
+    "cherry-pick",
+    "revert",
+    "reset",
+    "reflog",
+    "undo",
+    "history-rewriting",
+    "commit-management"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Cherry-pick, revert and reset** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with cherry-pick, revert and reset."
+        "text": "**Cherry-pick, revert, and reset** are Git's three primary tools for manipulating commit history. Each serves a distinct purpose: cherry-pick copies a commit to another branch, revert creates a new commit that undoes a previous one, and reset moves the branch pointer to a different commit. Senior engineers must know when to use each, how they affect shared history, and how to recover from mistakes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Three Undo Tools Overview"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
+      "data": {
+        "text": "Git provides multiple ways to undo work because each situation demands a different approach. The wrong tool can cause data loss, break teammate branches, or create confusing history. Understanding the nuances of cherry-pick, revert, and reset is essential for safe history management."
+      }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
         "items": [
-          "Understand the fundamental principles of cherry-pick, revert and reset",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          {
+            "title": "git cherry-pick",
+            "pros": [
+              "Applies specific commits to another branch",
+              "Preserves original commit metadata (author, date)",
+              "Useful for backporting fixes"
+            ],
+            "cons": [
+              "Creates duplicate commits with different SHA-1s",
+              "Can cause conflicts if context differs",
+              "Rewrites branch history if applied to current branch"
+            ],
+            "bestFor": "Backporting fixes, applying selective changes across branches"
+          },
+          {
+            "title": "git revert",
+            "pros": [
+              "Safe for shared/public branches",
+              "Creates an inverse commit (does not rewrite history)",
+              "Always reversible"
+            ],
+            "cons": [
+              "Creates extra commits in history",
+              "Does not remove the original commit",
+              "Can clutter history with many reverts"
+            ],
+            "bestFor": "Undoing public changes, safe undo on shared branches"
+          },
+          {
+            "title": "git reset",
+            "pros": [
+              "Cleanly removes commits from current branch",
+              "Three modes (soft/mixed/hard) for flexibility",
+              "Fast and direct"
+            ],
+            "cons": [
+              "Rewrites history—dangerous on shared branches",
+              "Hard reset can permanently lose work",
+              "Requires force push to update remote"
+            ],
+            "bestFor": "Local cleanup, undoing uncommitted work, rebase preparation"
+          }
         ]
       }
     },
@@ -38,21 +91,623 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "git cherry-pick Deep Dive"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding cherry-pick, revert and reset is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Git cherry-pick takes one or more commits from one branch and applies them as new commits on the current branch. This is useful for backporting bug fixes to release branches or selectively applying changes without merging an entire feature branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cherry-Pick a Single Commit",
+        "content": "Applying a bug fix from main to a release branch",
+        "language": "bash",
+        "code": "# On the release branch\ngit checkout release/v1.2\n\n# Find the commit hash from main\ngit log main --oneline\n# Output:\n# a1b2c3d Fix payment timeout error\n# e4f5g6h Add user profile page\n# ...\n\n# Cherry-pick the fix\ngit cherry-pick a1b2c3d\n\n# If conflicts occur, resolve them and continue\ngit cherry-pick --continue\n\n# Or abort the cherry-pick\ngit cherry-pick --abort"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cherry-Pick Conflicts",
+        "text": "Cherry-pick replays the commit changes on top of your current branch. If the surrounding code has changed, the patch may not apply cleanly. Conflicts are common when cherry-picking across divergent branches."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cherry-Pick Multiple Commits",
+        "content": "Applying a range of commits from another branch",
+        "language": "bash",
+        "code": "# Cherry-pick a range of commits (oldest first)\ngit cherry-pick a1b2c3d^..e4f5g6h\n\n# Cherry-pick multiple non-consecutive commits\ngit cherry-pick a1b2c3d e4f5g6h i7j8k9l\n\n# Cherry-pick and squash into one commit\ngit cherry-pick --squash a1b2c3d\ngit commit -m \"chore: apply security fix from main\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "git revert Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git revert creates a new commit that undoes the changes introduced by a previous commit. Unlike reset, revert does not remove the original commit—it adds an inverse commit. This makes revert safe for public branches where rewriting history would break teammates."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Revert a Single Commit",
+        "content": "Undoing a faulty commit safely on a shared branch",
+        "language": "bash",
+        "code": "# Find the commit to revert\ngit log --oneline\n# a1b2c3d feat(auth): add OAuth2 login\n# e4f5g6h fix(api): correct timeout handling\n\n# Revert it (creates a new commit)\ngit revert a1b2c3d\n\n# Git opens an editor for the revert commit message:\n# Revert \"feat(auth): add OAuth2 login\"\n# This reverts commit a1b2c3d.\n\n# Push safely—no force needed\ngit push origin main"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Revert a Merge Commit",
+        "content": "Reverting a merge requires specifying which parent to revert to",
+        "language": "bash",
+        "code": "# A merge commit has two parents. Revert to the first parent (mainline):\n\ngit revert -m 1 a1b2c3d\n\n# -m 1 means 'use the first parent as the mainline'\n# This undoes the merge but keeps the branch history intact\n\n# For a complex revert of multiple commits:\ngit revert --no-commit a1b2c3d e4f5g6h\ngit commit -m \"revert: undo auth feature and api timeout fix\""
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Revert Merge vs Reset Merge",
+        "text": "If you accidentally merged a bad PR, revert is safer than reset. Reset would require force-pushing and would break anyone who pulled the merge. Revert adds a new commit that undoes the changes, preserving history."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "git reset Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git reset moves the current branch pointer to a specified commit, optionally updating the staging area and working directory. It has three modes: soft (moves branch, keeps changes staged), mixed (moves branch, unstages changes), and hard (moves branch, discards all changes)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "git reset Modes Comparison",
+        "content": "Visualizing the three reset modes",
+        "language": "bash",
+        "code": "# Assume HEAD is at C3, and you want to go back to C1\n#\n#   C1 --- C2 --- C3 (HEAD -> main)\n#\n\n# Soft reset: HEAD moves to C1, changes stay staged\ngit reset --soft C1\n#   C1 (HEAD -> main) --- C2 --- C3 (staged)\n\n# Mixed reset (default): HEAD moves to C1, changes unstaged\ngit reset C1  # or --mixed C1\n#   C1 (HEAD -> main) --- C2 --- C3 (unstaged in working directory)\n\n# Hard reset: HEAD moves to C1, all changes lost\ngit reset --hard C1\n#   C1 (HEAD -> main)\n#   (C2 and C3 are gone from this branch—but still in reflog!)"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Hard Reset Destroys Work",
+        "text": "git reset --hard permanently discards uncommitted changes and removes commits from the branch. Before using --hard, ensure your work is either committed or stashed. Use git reflog to recover if you make a mistake."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Undo Scenarios"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every developer faces undo situations. Here is a decision tree for choosing the right tool based on whether the changes are committed, pushed, or shared."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "title": "Undo Decision Matrix",
+        "headers": [
+          "Scenario",
+          "Tool",
+          "Command",
+          "Safe on Shared Branch?"
+        ],
+        "rows": [
+          [
+            "Undo last commit, keep changes",
+            "reset --soft",
+            "git reset --soft HEAD~1",
+            "No"
+          ],
+          [
+            "Undo last commit, unstage changes",
+            "reset --mixed",
+            "git reset HEAD~1",
+            "No"
+          ],
+          [
+            "Undo last commit, discard everything",
+            "reset --hard",
+            "git reset --hard HEAD~1",
+            "No"
+          ],
+          [
+            "Undo a pushed commit",
+            "revert",
+            "git revert <commit-hash>",
+            "Yes"
+          ],
+          [
+            "Apply a fix from another branch",
+            "cherry-pick",
+            "git cherry-pick <hash>",
+            "Yes"
+          ],
+          [
+            "Undo the last 5 commits locally",
+            "reset",
+            "git reset --soft HEAD~5",
+            "No"
+          ],
+          [
+            "Undo a merge commit",
+            "revert -m",
+            "git revert -m 1 <merge-hash>",
+            "Yes"
+          ],
+          [
+            "Accidentally reset --hard",
+            "reflog",
+            "git reflog; git reset --hard <hash>",
+            "N/A"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Understanding git reflog"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git reflog is the safety net for almost every destructive operation. It records every movement of HEAD and branch references. Even if you hard reset or delete a branch, reflog can recover the commits if they are still within the reflog expiration period (default: 90 days)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading git reflog",
+        "content": "Inspecting and using reflog to recover lost commits",
+        "language": "bash",
+        "code": "# View reflog for HEAD\ngit reflog\n\n# Output:\n# a1b2c3d HEAD@{0}: checkout: moving from feature to main\n# e4f5g6h HEAD@{1}: commit: add user profile\n# i7j8k9l HEAD@{2}: rebase -i (finish): returning to refs/heads/main\n# ...\n\n# Recover a lost commit by resetting to its reflog entry\ngit reset --hard HEAD@{2}\n\n# View reflog for a specific branch\ngit reflog show feature/old-branch\n\n# Show when a specific commit was last referenced\ngit reflog | grep a1b2c3d"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with cherry-pick, revert and reset, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Recovering After git reset --hard",
+        "text": "If you accidentally run git reset --hard, immediately run git reflog to find the previous HEAD position. Then run git reset --hard HEAD@{1} to restore. The 90-day reflog window gives you plenty of time to recover."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resetting vs Reverting: When to Choose What"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The choice between reset and revert depends entirely on whether the branch is shared. On a local branch with no collaborators, reset is fast and clean. On a shared branch, revert is safe because it does not rewrite public history."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Reset vs Revert Decision Guide",
+        "items": [
+          "**Local branch, unpushed commits**: Use reset --soft or --mixed to clean up before pushing",
+          "**Local branch, pushed commits**: Use revert to avoid force-pushing",
+          "**Shared branch, your own commits**: Use revert unless you coordinate with the team",
+          "**Shared branch, someone else's commits**: Always use revert",
+          "**Accidental merge**: Use revert -m 1, not reset",
+          "**Rebase gone wrong**: Use reflog to find the original HEAD"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Undo Scenario Practice",
+        "description": "Practice choosing the right undo tool for common Git emergencies.",
+        "steps": [
+          "Scenario 1: You committed sensitive credentials to main. Fix with revert (safe) or reset (requires force push coordination).",
+          "Scenario 2: You rebased interactively and lost 3 commits. Fix with git reflog.",
+          "Scenario 3: A teammate merged a broken feature. Fix with git revert on main.",
+          "Scenario 4: You made 5 messy commits on a feature branch. Fix with git reset --soft HEAD~5, then recommit cleanly.",
+          "Scenario 5: You cherry-picked a commit to the wrong branch. Fix with git reset --hard HEAD~1 on that branch."
+        ],
+        "expectedOutcome": "You can correctly identify the tool for each scenario and execute the commands safely."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cherry-Pick Advanced Techniques"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cherry-pick has several advanced options for complex workflows. The --squash option applies changes without creating a commit. The -x option appends a cherry-pick reference to the commit message. The --onto option allows cherry-picking to a completely different branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cherry-Pick with Squash",
+        "content": "Applying changes without creating a new commit",
+        "language": "bash",
+        "code": "# Apply changes from a commit but stage them without committing\ngit cherry-pick --squash a1b2c3d\n\n# Resolve any conflicts, then:\ngit add .\ngit commit -m \"feat: backport user profile improvements to release\"\n\n# Benefits:\n# - Clean single commit on target branch\n# - Original commit message can be rewritten\n# - No duplicate commit hashes in history"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cherry-Pick to Different Branch",
+        "content": "Using --onto to cherry-pick to a branch other than HEAD",
+        "language": "bash",
+        "code": "# Cherry-pick from main onto a feature branch without switching HEAD\ngit cherry-pick --onto feature/dashboard a1b2c3d^ a1b2c3d\n\n# Syntax: git cherry-pick --onto <target-branch> <upstream> <commit>\n# This applies commit a1b2c3d to feature/dashboard"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Revert Advanced Techniques"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reverting multiple commits, reverting merges, and creating revert commits without automatically committing are advanced scenarios that require specific flags."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Revert Multiple Commits at Once",
+        "content": "Undoing a series of commits in a single revert commit",
+        "language": "bash",
+        "code": "# Revert multiple commits without committing each one\ngit revert --no-commit a1b2c3d e4f5g6h i7j8k9l\n\ngit commit -m \"revert: undo auth refactor and api timeout changes\"\n\n# This creates ONE revert commit instead of three"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Revert a Range of Commits",
+        "content": "Undoing all commits in a range",
+        "language": "bash",
+        "code": "# Revert everything from HEAD~10 to HEAD~5 (6 commits)\ngit revert --no-commit HEAD~10..HEAD~5\ngit commit -m \"revert: undo commits from last sprint\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reset Advanced Techniques"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reset interacts with the staging area, working directory, and branch pointer. Understanding exactly what changes at each level is crucial for avoiding data loss."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Reset Mode Cheat Sheet",
+        "items": [
+          "git reset --soft HEAD~1: Undo last commit, keep all changes staged",
+          "git reset HEAD~1 (mixed): Undo last commit, keep changes unstaged",
+          "git reset --hard HEAD~1: Undo last commit, discard all changes",
+          "git reset --hard origin/main: Force local main to match remote",
+          "git reset --hard HEAD: Discard all uncommitted changes (dangerous)"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Squashing Commits with Reset",
+        "content": "Combining multiple commits into one using reset --soft",
+        "language": "bash",
+        "code": "# You have 4 messy commits and want to combine them\ngit reset --soft HEAD~4\n\n# All changes from the 4 commits are now staged\ngit commit -m \"feat(auth): implement complete OAuth2 login flow\"\n\n# Result: one clean commit instead of four"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Reset and Force Push",
+        "text": "After a reset, your local branch has diverged from the remote. You must force push. Use --force-with-lease to prevent overwriting your teammates' work. Never force push to main without team coordination."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Working with Stash and Undo"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The git stash is another safety net. If you need to undo uncommitted work temporarily, stash it. You can apply or pop the stash later. Stashes are also recorded in reflog."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Stash as a Safety Net",
+        "content": "Using stash before destructive operations",
+        "language": "bash",
+        "code": "# Before a risky operation, stash everything\ngit stash push -m \"backup before reset\"\n\n# Perform the reset\ngit reset --hard HEAD~3\n\n# If you need the work back:\ngit stash list\n# stash@{0}: backup before reset\n\ngit stash pop stash@{0}\n\n# Stash also appears in reflog:\ngit reflog | grep stash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recovering from Common Mistakes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every senior engineer has made Git mistakes. The difference between panic and confidence is knowing the recovery commands. Here are the most common mistakes and their fixes."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Git Mistakes and Fixes",
+        "items": [
+          "**Accidentally committed to main**: git reset --soft HEAD~1, then git checkout -b feature/xxx, git commit, git push -u origin feature/xxx",
+          "**Force pushed and lost commits**: git reflog, find the lost commit, git reset --hard <reflog-hash>",
+          "**Merged wrong branch**: git reset --hard HEAD~1, then merge the correct branch",
+          "**Cherry-pick conflict abandoned**: git cherry-pick --abort returns to original state",
+          "**Reset --hard on wrong branch**: git reflog on that branch, find previous HEAD, reset back",
+          "**Deleted a branch with unmerged work**: git reflog, find the branch tip, git branch <name> <hash>"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Recovery Drills",
+        "description": "Set up a test repository and practice recovering from each mistake scenario. Time yourself—senior engineers recover in under 60 seconds.",
+        "steps": [
+          "Create a test repo with 5-10 commits",
+          "Practice each recovery scenario from the list above",
+          "Use git reflog to verify recovery",
+          "Measure your recovery time for each scenario",
+          "Write the commands in a personal cheat sheet"
+        ],
+        "expectedOutcome": "A personal recovery cheat sheet with commands you can execute without thinking."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Understanding Git's Object Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To truly master undo operations, you must understand Git's object model: blobs (file content), trees (directories), commits (snapshots with metadata), and tags (named references). Every undo operation manipulates these objects."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Git Objects and Undo",
+        "items": [
+          "**Blob**: Immutable file content. Never deleted by undo operations (only by gc).",
+          "**Tree**: Directory structure. Rebuilt when commits change.",
+          "**Commit**: Immutable snapshot. Reset moves the branch pointer; commits still exist until gc.",
+          "**Tag**: Named reference to a commit. Deleted tags can be recovered via reflog if recently deleted.",
+          "**Ref**: Branch or tag name pointing to a commit. Reset and branch operations manipulate refs."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Git Object Model Visualization",
+        "content": "How commits, trees, and blobs relate",
+        "language": "text",
+        "code": "Commit a1b2c3d\n  |\n  +-- Tree (root directory)\n  |     |\n  |     +-- src/\n  |     |     +-- Tree (src directory)\n  |     |           |\n  |     |           +-- Blob \"index.ts\" (file content)\n  |     |           +-- Blob \"utils.ts\" (file content)\n  |     |\n  |     +-- package.json (Blob)\n  |\n  +-- Parent: e4f5g6h\n  +-- Author: Jane Doe <jane@example.com>\n  +-- Date: 2024-01-15\n  +-- Message: feat(auth): add login page"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Garbage Collection",
+        "text": "Git's garbage collector (git gc) removes unreachable objects. Commits that are no longer referenced by any branch, tag, or reflog entry become eligible for deletion. The default reflog expiration is 90 days, giving you a long window to recover."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Undo Workflow Diagrams"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cherry-pick-flow",
+        "caption": "Cherry-pick workflow from main to release branch.",
+        "language": "mermaid",
+        "code": "gitGraph\n    commit id: \"Release base\"\n    branch release-v1.2\n    checkout release-v1.2\n    commit id: \"Release prep\"\n    checkout main\n    commit id: \"Fix auth bug\"\n    commit id: \"Add dashboard\"\n    checkout release-v1.2\n    cherry-pick id: \"Fix auth bug\"\n    commit id: \"Backport applied\""
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "revert-flow",
+        "caption": "Revert creates an inverse commit without rewriting history.",
+        "language": "mermaid",
+        "code": "gitGraph\n    commit id: \"C1\"\n    commit id: \"C2 (bad)\"\n    commit id: \"C3 (revert C2)\"\n    note over C2: Bad commit stays in history\n    note over C3: Revert undoes changes, new commit added"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "reset-modes",
+        "caption": "How the three reset modes affect the branch and working directory.",
+        "language": "mermaid",
+        "code": "gitGraph\n    commit id: \"C1\"\n    commit id: \"C2\"\n    commit id: \"C3 (HEAD)\"\n    branch reset-soft\n    checkout reset-soft\n    gitReset \"soft\" id: \"C1\"\n    branch reset-mixed\n    checkout reset-mixed\n    gitReset \"mixed\" id: \"C1\"\n    branch reset-hard\n    checkout reset-hard\n    gitReset \"hard\" id: \"C1\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices for History Management"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "History Management Rules",
+        "items": [
+          "Never reset or rebase a branch that others are working on",
+          "Prefer revert over reset on shared branches",
+          "Use cherry-pick for selective backports, not for entire features",
+          "Keep feature branches short to minimize the need for complex history operations",
+          "Write descriptive commit messages so cherry-picked commits are self-explanatory",
+          "Use git reflog as your first response to any 'lost work' panic",
+          "Configure git config --global rerere.enabled true to auto-resolve repeated conflicts"
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Undo Safety Checklist",
+        "items": [
+          {
+            "text": "Verified the branch is local (not shared) before using reset",
+            "hint": "Run git branch -vv to see tracking status"
+          },
+          {
+            "text": "Created a backup branch before destructive operations",
+            "hint": "git branch backup-before-reset"
+          },
+          {
+            "text": "Checked reflog after any operation that felt wrong",
+            "hint": "git reflog immediately, do not make more changes"
+          },
+          {
+            "text": "Used --force-with-lease instead of --force",
+            "hint": "git push --force-with-lease origin main"
+          },
+          {
+            "text": "Communicated before force-pushing to shared branches",
+            "hint": "Post in team chat: 'Force pushing main to fix commit order'"
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Advanced Scenarios"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real-world Git workflows often involve combinations of these tools. Understanding how cherry-pick, revert, and reset interact with rebase, merge, and stash makes you a more confident Git user."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering from a Bad Rebase",
+        "content": "Using reflog to recover after a rebase conflict disaster",
+        "language": "bash",
+        "code": "# You ran: git rebase main\n# Conflicts everywhere. You resolved some, then accidentally aborted\n# or lost commits. Here's the recovery:\n\n# Step 1: Check reflog for the pre-rebase HEAD\ngit reflog\n# abc1234 HEAD@{0}: rebase -i (finish): returning to refs/heads/feature\n# def5678 HEAD@{1}: rebase -i (start): checkout main\n# 1234567 HEAD@{2}: commit: add user profile (original position)\n\n# Step 2: Reset to the original position\ngit reset --hard HEAD@{2}\n\n# Your branch is back to where it was before the rebase.\n# Now you can retry the rebase more carefully."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "What is the difference between git reset and git revert?",
+            "answer": "git reset moves the branch pointer backward, removing commits from the branch history. git revert creates new commits that undo the changes. Reset rewrites history; revert adds to it. Use reset for local cleanup, revert for public branches."
+          },
+          {
+            "question": "Can I undo a git reset --hard?",
+            "answer": "Yes, if the commits were recent. Run git reflog to find the previous HEAD, then git reset --hard HEAD@{1}. If reflog has expired (default 90 days), recovery is much harder."
+          },
+          {
+            "question": "Does cherry-pick copy the commit author?",
+            "answer": "Yes. cherry-pick preserves the original author and date. The new commit has a different SHA-1 hash because it has a different parent and timestamp, but the author is unchanged."
+          },
+          {
+            "question": "What happens if I cherry-pick a commit that is already in the branch?",
+            "answer": "Git will say 'commit X is already up to date' and skip it. The commit is not duplicated. If you force it with --allow-empty, it creates an empty commit."
+          },
+          {
+            "question": "How do I revert a revert?",
+            "answer": "Reverting a revert re-applies the original changes. Find the revert commit hash with git log, then run git revert <revert-commit-hash>. This creates a third commit in the chain."
+          },
+          {
+            "question": "Is git reset --soft the same as git commit --amend?",
+            "answer": "Similar but not identical. --soft HEAD~1 undoes the last commit but keeps all changes staged. --amend replaces the last commit with new staged changes. Use --soft when you want to reorder or split commits."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cherry-pick applies specific commits to another branch—useful for backports",
+          "Revert creates an inverse commit—safe for shared branches",
+          "Reset moves the branch pointer—fast but rewrites history",
+          "Hard reset discards work; soft reset keeps it staged",
+          "Reflog is your safety net for almost every mistake",
+          "Never reset or rebase branches that others are using"
+        ],
+        "takeaway": "Mastering cherry-pick, revert, and reset gives you surgical control over Git history. Use revert for safety, reset for cleanup, and cherry-pick for selective application."
       }
     }
   ],

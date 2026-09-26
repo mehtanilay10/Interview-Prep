@@ -13,24 +13,369 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Git bisect for regression investigation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with git bisect for regression investigation."
+        "text": "Git bisect uses binary search to pinpoint the exact commit that introduced a regression. Instead of checking out every commit manually, bisect narrows the search space exponentially, turning a hours-long investigation into minutes."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Lesson Scope",
+        "text": "This lesson covers manual bisect, automated bisect with shell scripts, handling merge commits, and integrating bisect into CI."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How Binary Search Works in Git"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Binary search is a divide-and-conquer strategy. Git checks out a middle commit, you mark it as good or bad, and the search space halves. After log2(N) steps, the first bad commit is identified."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Binary Search Analogy",
+        "code": "Imagine a book with 1,000 pages. You do not read every page. You open to the middle, decide if the answer is before or after that page, and repeat. Git bisect does the same with commits.",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Starting a Bisect Session"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before starting, you need two references: a known good commit and a known bad commit. Git uses these anchors to define the search range."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Starting Bisect",
+        "code": "git bisect start\n\ngit bisect bad HEAD\n\ngit bisect good v2.3.0\n\n# Git now checks out a middle commit",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Finding Good and Bad Commits",
+        "text": "Use git log, git tag, or git describe to locate approximate good and bad commits. The more accurate the anchors, the faster bisect converges."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Marking Commits During Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After Git checks out a middle commit, test it. If the regression is present, mark it bad. If the code works, mark it good."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Marking Commits",
+        "code": "# Test the current checkout...\n\n# If the bug is present\ngit bisect bad\n\n# If the bug is not present\ngit bisect good",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bisect Output"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When the search finishes, Git reports the first bad commit, its hash, author, date, and message. You can immediately inspect the diff with git show."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Result",
+        "code": "git bisect log\n\nabc1234 is the first bad commit\ncommit abc1234\nAuthor: Jane Doe <jane@example.com>\nDate:   Mon Sep 10 14:32:00 2026\n\n    fix(parser): optimize regex for edge cases\n\n    Introduces a regression when parsing nested arrays.",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resetting After Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always end a bisect session by returning to your original branch. Git bisect reset checks out the branch you were on before starting bisect and removes the temporary bisect state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resetting Bisect",
+        "code": "git bisect reset",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Do Not Forget to Reset",
+        "text": "Leaving a bisect session active can confuse teammates who see an unexpected detached HEAD in the repository."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automated Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you can write a script that exits 0 when the code is good and 1 when it is bad, Git can run bisect automatically. This is the fastest way to hunt regressions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Automated Bisect Script",
+        "code": "#!/bin/bash\n# test.sh - exit 0 if good, 1 if bad\nnpm test -- --grep \"should parse nested arrays\"\n",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Running Automated Bisect",
+        "code": "git bisect start HEAD v2.3.0\n\ngit bisect run ./test.sh\n\n# Git runs test.sh at each step and decides good or bad automatically",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Script Exit Codes Matter",
+        "text": "Git interprets exit code 0 as good, 125 as skip, and anything else as bad. Make sure your test script follows this contract exactly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Skipping Commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some commits are untestable or irrelevant, such as massive formatting commits. Mark them with git bisect skip, and Git will ignore them in the binary search."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skipping a Commit",
+        "code": "git bisect skip abc1234",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bisect with Merge Commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "By default, Git bisect treats merge commits as untestable and skips them. Use the --first-parent option if you want to trace regressions along the main integration branch only."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting Along First Parent",
+        "code": "git bisect start --first-parent HEAD v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using git bisect visualize"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git bisect visualize opens a pager with the log of commits in the current bisect range. This helps you understand which commits remain under evaluation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Visualize Bisect Range",
+        "code": "git bisect visualize",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bisect Log and Replay"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can record a bisect session with git bisect log and replay it later or share it with teammates. This is useful for documenting how a regression was tracked down."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Logging and Replaying Bisect",
+        "code": "# Save the bisect session\ngit bisect log > bisect.log\n\n# Replay on another clone\ngit bisect replay bisect.log",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automated Regression Detection in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some teams run bisect automatically in CI when a regression is detected on main. The CI system finds the first bad commit and comments on the pull request with the culprit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CI Bisect Comment",
+        "code": "## Regression Detected\n\nAutomated bisect identified abc1234 as the first bad commit:\n\n\"fix(parser): optimize regex for edge cases\"\n\nPlease review this change for the regression.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Bisect Pitfalls"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of git bisect for regression investigation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Starting bisect from a dirty working tree",
+          "Using incorrect good or bad anchors",
+          "Forgetting to skip untestable commits",
+          "Running bisect on a shallow clone with insufficient history",
+          "Leaving the repository in a detached HEAD state after finishing"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Shallow Clones and Bisect",
+        "text": "If you cloned with --depth, bisect may fail because the needed commits are missing. Fetch full history before bisecting with git fetch --unshallow."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Flaky Tests"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Flaky tests break automated bisect because a test may pass on one commit and fail on the next for unrelated reasons. Stabilize tests first, or modify the script to run the test multiple times and require consistent results."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Flaky-Test-Aware Script",
+        "code": "#!/bin/bash\npass=0\nfail=0\nfor i in 1 2 3; do\n  if npm test -- --grep \"regression-test\"; then\n    pass=$((pass+1))\n  else\n    fail=$((fail+1))\n  fi\ndone\n[ $pass -gt $fail ] && exit 0 || exit 1",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bisect and Binary Search Complexity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bisect takes O(log N) steps where N is the number of commits in the range. For a history of 1,000 commits, that is about 10 steps. For 1,000,000 commits, it is about 20 steps. The efficiency gain over linear search is enormous."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Commits in Range",
+          "Approximate Bisect Steps"
+        ],
+        "rows": [
+          [
+            "100",
+            "7"
+          ],
+          [
+            "1,000",
+            "10"
+          ],
+          [
+            "10,000",
+            "14"
+          ],
+          [
+            "100,000",
+            "17"
+          ],
+          [
+            "1,000,000",
+            "20"
+          ]
         ]
       }
     },
@@ -38,21 +383,1423 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Alternatives to Bisect"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding git bisect for regression investigation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Sometimes a simple git log -S or git log -G search is enough. These commands find commits that added or removed a specific string or pattern, which can quickly surface a suspicious commit without bisect."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Commits That Changed a String",
+        "code": "git log -S \"parseArray\" --oneline\n\ngit log -G \"nested.*array\" --oneline",
+        "language": "bash"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with git bisect for regression investigation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Combine Tools",
+        "text": "Use git log -S first to narrow suspects, then run bisect on the smaller candidate range for faster results."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Documenting the Finding"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After bisect identifies the culprit, document the finding in your issue tracker. Include the commit hash, author, why it introduced the regression, and the fix."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Issue Comment Template",
+        "code": "Root cause: commit abc1234 by Jane Doe.\n\nChange: optimized regex for edge cases.\nRegression: nested arrays fail to parse when they contain comments.\nFix: revert regex or add comment-aware tokenizer.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect is one of the most powerful debugging tools in a senior engineer's arsenal. Combined with automated test scripts, it turns regressions into a repeatable, fast, and reliable investigation process."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git bisect start with good and bad anchors",
+          "Prefer automated bisect with a test script",
+          "Reset with git bisect reset when finished",
+          "Use git log -S to narrow suspects before bisecting"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect is a binary search tool for finding the commit that introduced a regression. It systematically narrows the search space by checking out middle commits and asking you to mark them as good or bad."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Prerequisites for Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before starting bisect, you need a reproducible regression, a known good commit, and a known bad commit. Without these, bisect cannot function."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A reliable way to test whether the bug is present",
+          "A commit hash where the bug does not exist",
+          "A commit hash where the bug does exist, usually HEAD",
+          "Sufficient history between the two commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Starting Bisect with Good and Bad Anchors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can specify good and bad in any order. Git automatically determines the search range and begins checking out commits between the two anchors."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Starting Bisect with Tag",
+        "code": "git bisect start\n\ngit bisect bad HEAD\n\ngit bisect good v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Dates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you know approximately when the regression was introduced, you can use git log --before and --after to find candidate commits, then use those as bisect anchors."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Commits by Date",
+        "code": "git log --oneline --before='2026-09-01' --after='2026-08-15'",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect View"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The git bisect view command shows the remaining range of commits under evaluation. This helps you understand how much of the search space is left."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing Bisect Range",
+        "code": "git bisect visualize --oneline",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Skip Reasons"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You may need to skip commits that are untestable, missing build artifacts, or part of a massive reformatting. Skipping too many commits reduces bisect accuracy."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit removed the test infrastructure",
+          "Commit is a formatting-only change",
+          "Build is broken and cannot be tested",
+          "Commit is a merge commit with untestable changes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Writing Robust Test Scripts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An automated bisect script should be deterministic, fast, and independent of environment state. Avoid network calls, time-dependent assertions, and external dependencies in test scripts."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use local mocks instead of external APIs",
+          "Avoid sleep or timeout-based assertions",
+          "Reset the database to a known state before each test",
+          "Log output for debugging failed bisect runs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Build Steps"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If your test requires a build step, include it in the bisect script. Git runs the script at every step, so the script must handle checking out, building, and testing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Script with Build",
+        "code": "#!/bin/bash\nnpm install\nnpm run build\nnpm test -- --grep \"regression-test\"",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisecting Across Multiple Branches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If the regression could have been introduced on any of several branches, bisect each branch separately. Use --first-parent to trace along the main integration branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting Along First Parent",
+        "code": "git bisect start --first-parent HEAD origin/main~50",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Git Worktrees"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git worktrees let you run multiple bisect sessions simultaneously without checking out different commits in the same working directory. This is useful when investigating multiple regressions at once."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a Worktree for Bisect",
+        "code": "git worktree add /tmp/bisect-worktree HEAD\ngit bisect -C /tmp/bisect-worktree start HEAD v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect and Merge Conflicts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a commit in the bisect range has a merge conflict, the automated script may fail. You can either skip the commit or write a script that resolves trivial conflicts automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skipping Merge Commits",
+        "code": "git bisect skip $(git rev-list --merges HEAD..v2.3.0)",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Log Analysis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After bisect finishes, review the bisect log to understand the search path. This can reveal whether the regression was introduced in a straightforward commit or required skipping many commits."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Analyzing Bisect Log",
+        "code": "git bisect log | wc -l\n\n# Shows how many steps bisect took",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect in Jupyter or Notebook Environments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For data science or notebook-based regressions, write a bisect script that runs a specific notebook cell or script and checks the output. This bisects regressions in analysis pipelines, not just application code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting a Notebook Regression",
+        "code": "#!/bin/bash\njupyter nbconvert --to notebook --execute analysis.ipynb --output out.ipynb\ngrep -q \"Expected Result\" out.ipynb",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preserving Bisect Results"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Document bisect results in your issue tracker. Include the commit hash, author, date, and a brief explanation of the regression. Future teams can use this information to improve testing and code review."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Documentation Template",
+        "code": "## Regression Investigation: #511\n\n### First Bad Commit\nabc1234 by Jane Doe on 2026-09-10\n\n### Root Cause\nThe commit optimized a regex for edge cases but broke nested array parsing.\n\n### Remediation\nRevert the regex change or add a comment-aware tokenizer.\n\n### Prevention\nAdd a regression test for nested arrays with comments.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Bisect Errors"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "fatal: not a git repository - run bisect inside a valid repo",
+          "bad/food anchor not a commit - verify the anchor is a valid SHA or ref",
+          "fatal: ambiguous argument - the ref does not exist; check spelling",
+          "Automatic merge failed - the script produced a conflict; skip or fix the script"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Performance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bisect performance depends on test script speed. If each test takes 30 seconds, 20 bisect steps take 10 minutes. Optimize tests to run in seconds, not minutes."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use unit tests instead of E2E tests when possible",
+          "Mock external dependencies",
+          "Run only the relevant test suite, not the entire suite",
+          "Use test parallelization if available"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "When Bisect Is Not the Right Tool"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bisect requires a reproducible regression. If the bug is intermittent, environment-dependent, or requires complex manual steps, bisect will produce unreliable results. Use other debugging techniques first."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Bug is flaky or non-deterministic",
+          "Bug requires manual UI interaction to reproduce",
+          "Bug depends on external system state",
+          "Bug was introduced gradually across many commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect turns regression hunting from a manual slog into a fast, repeatable process. With automated test scripts, it becomes one of the most powerful debugging tools available."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git bisect start with good and bad anchors",
+          "Prefer automated bisect with a test script",
+          "Reset with git bisect reset when finished",
+          "Use git log -S to narrow suspects before bisecting"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect is a binary search tool for finding the commit that introduced a regression. It systematically narrows the search space by checking out middle commits and asking you to mark them as good or bad."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Prerequisites for Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before starting bisect, you need a reproducible regression, a known good commit, and a known bad commit. Without these, bisect cannot function."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A reliable way to test whether the bug is present",
+          "A commit hash where the bug does not exist",
+          "A commit hash where the bug does exist, usually HEAD",
+          "Sufficient history between the two commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Starting Bisect with Good and Bad Anchors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can specify good and bad in any order. Git automatically determines the search range and begins checking out commits between the two anchors."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Starting Bisect with Tag",
+        "code": "git bisect start\n\ngit bisect bad HEAD\n\ngit bisect good v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Dates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you know approximately when the regression was introduced, you can use git log --before and --after to find candidate commits."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Commits by Date",
+        "code": "git log --oneline --before='2026-09-01' --after='2026-08-15'",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect View"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The git bisect visualize command shows the remaining range of commits under evaluation. This helps you understand how much of the search space is left."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing Bisect Range",
+        "code": "git bisect visualize --oneline",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Skip Reasons"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You may need to skip commits that are untestable, missing build artifacts, or part of a massive reformatting. Skipping too many commits reduces bisect accuracy."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit removed the test infrastructure",
+          "Commit is a formatting-only change",
+          "Build is broken and cannot be tested",
+          "Commit is a merge commit with untestable changes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Writing Robust Test Scripts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An automated bisect script should be deterministic, fast, and independent of environment state. Avoid network calls, time-dependent assertions, and external dependencies."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use local mocks instead of external APIs",
+          "Avoid sleep or timeout-based assertions",
+          "Reset the database to a known state before each test",
+          "Log output for debugging failed bisect runs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Build Steps"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If your test requires a build step, include it in the bisect script. Git runs the script at every step, so the script must handle checking out, building, and testing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Script with Build",
+        "code": "#!/bin/bash\nnpm install\nnpm run build\nnpm test -- --grep \"regression-test\"",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisecting Across Multiple Branches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If the regression could have been introduced on any of several branches, bisect each branch separately. Use --first-parent to trace along the main integration branch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting Along First Parent",
+        "code": "git bisect start --first-parent HEAD origin/main~50",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Git Worktrees"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git worktrees let you run multiple bisect sessions simultaneously without checking out different commits in the same working directory."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a Worktree for Bisect",
+        "code": "git worktree add /tmp/bisect-worktree HEAD\ngit bisect -C /tmp/bisect-worktree start HEAD v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect and Merge Conflicts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a commit in the bisect range has a merge conflict, the automated script may fail. You can either skip the commit or write a script that resolves trivial conflicts automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skipping Merge Commits",
+        "code": "git bisect skip $(git rev-list --merges HEAD..v2.3.0)",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Log Analysis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After bisect finishes, review the bisect log to understand the search path. This can reveal whether the regression was introduced in a straightforward commit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Analyzing Bisect Log",
+        "code": "git bisect log | wc -l\n\n# Shows how many steps bisect took",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect in Notebook Environments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For data science or notebook-based regressions, write a bisect script that runs a specific notebook cell or script and checks the output."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting a Notebook Regression",
+        "code": "#!/bin/bash\njupyter nbconvert --to notebook --execute analysis.ipynb --output out.ipynb\ngrep -q \"Expected Result\" out.ipynb",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preserving Bisect Results"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Document bisect results in your issue tracker. Include the commit hash, author, date, and a brief explanation of the regression."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Documentation Template",
+        "code": "## Regression Investigation: #511\n\n### First Bad Commit\nabc1234 by Jane Doe on 2026-09-10\n\n### Root Cause\nThe commit optimized a regex for edge cases but broke nested array parsing.\n\n### Remediation\nRevert the regex change or add a comment-aware tokenizer.\n\n### Prevention\nAdd a regression test for nested arrays with comments.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Bisect Errors"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "fatal: not a git repository - run bisect inside a valid repo",
+          "bad/food anchor not a commit - verify the anchor is a valid SHA or ref",
+          "fatal: ambiguous argument - the ref does not exist",
+          "Automatic merge failed - the script produced a conflict; skip or fix the script"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Performance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bisect performance depends on test script speed. If each test takes 30 seconds, 20 bisect steps take 10 minutes. Optimize tests to run in seconds."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use unit tests instead of E2E tests when possible",
+          "Mock external dependencies",
+          "Run only the relevant test suite",
+          "Use test parallelization if available"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "When Bisect Is Not the Right Tool"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bisect requires a reproducible regression. If the bug is intermittent, environment-dependent, or requires complex manual steps, bisect will produce unreliable results."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Bug is flaky or non-deterministic",
+          "Bug requires manual UI interaction to reproduce",
+          "Bug depends on external system state",
+          "Bug was introduced gradually across many commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect turns regression hunting from a manual slog into a fast, repeatable process. With automated test scripts, it becomes one of the most powerful debugging tools available."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git bisect start with good and bad anchors",
+          "Prefer automated bisect with a test script",
+          "Reset with git bisect reset when finished",
+          "Use git log -S to narrow suspects before bisecting"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect is a binary search tool for finding the commit that introduced a regression. It systematically narrows the search space by checking out middle commits and asking you to mark them as good or bad."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Prerequisites for Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before starting bisect, you need a reproducible regression, a known good commit, and a known bad commit."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A reliable way to test whether the bug is present",
+          "A commit hash where the bug does not exist",
+          "A commit hash where the bug does exist, usually HEAD",
+          "Sufficient history between the two commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Starting Bisect with Good and Bad Anchors"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Starting Bisect with Tag",
+        "code": "git bisect start\n\ngit bisect bad HEAD\n\ngit bisect good v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Dates"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Commits by Date",
+        "code": "git log --oneline --before='2026-09-01' --after='2026-08-15'",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect View"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing Bisect Range",
+        "code": "git bisect visualize --oneline",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Skip Reasons"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit removed the test infrastructure",
+          "Commit is a formatting-only change",
+          "Build is broken and cannot be tested",
+          "Commit is a merge commit with untestable changes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Writing Robust Test Scripts"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use local mocks instead of external APIs",
+          "Avoid sleep or timeout-based assertions",
+          "Reset the database to a known state before each test",
+          "Log output for debugging failed bisect runs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Build Steps"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Script with Build",
+        "code": "#!/bin/bash\nnpm install\nnpm run build\nnpm test -- --grep \"regression-test\"",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisecting Across Multiple Branches"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting Along First Parent",
+        "code": "git bisect start --first-parent HEAD origin/main~50",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Git Worktrees"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a Worktree for Bisect",
+        "code": "git worktree add /tmp/bisect-worktree HEAD\ngit bisect -C /tmp/bisect-worktree start HEAD v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect and Merge Conflicts"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skipping Merge Commits",
+        "code": "git bisect skip $(git rev-list --merges HEAD..v2.3.0)",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Log Analysis"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Analyzing Bisect Log",
+        "code": "git bisect log | wc -l\n\n# Shows how many steps bisect took",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect in Notebook Environments"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting a Notebook Regression",
+        "code": "#!/bin/bash\njupyter nbconvert --to notebook --execute analysis.ipynb --output out.ipynb\ngrep -q \"Expected Result\" out.ipynb",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preserving Bisect Results"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Documentation Template",
+        "code": "## Regression Investigation: #511\n\n### First Bad Commit\nabc1234 by Jane Doe on 2026-09-10\n\n### Root Cause\nThe commit optimized a regex for edge cases but broke nested array parsing.\n\n### Remediation\nRevert the regex change or add a comment-aware tokenizer.\n\n### Prevention\nAdd a regression test for nested arrays with comments.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Bisect Errors"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "fatal: not a git repository - run bisect inside a valid repo",
+          "bad/food anchor not a commit - verify the anchor is a valid SHA or ref",
+          "fatal: ambiguous argument - the ref does not exist",
+          "Automatic merge failed - the script produced a conflict; skip or fix the script"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Performance"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use unit tests instead of E2E tests when possible",
+          "Mock external dependencies",
+          "Run only the relevant test suite",
+          "Use test parallelization if available"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "When Bisect Is Not the Right Tool"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Bug is flaky or non-deterministic",
+          "Bug requires manual UI interaction to reproduce",
+          "Bug depends on external system state",
+          "Bug was introduced gradually across many commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect turns regression hunting from a manual slog into a fast, repeatable process."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git bisect start with good and bad anchors",
+          "Prefer automated bisect with a test script",
+          "Reset with git bisect reset when finished",
+          "Use git log -S to narrow suspects before bisecting"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect is a binary search tool for finding the commit that introduced a regression. It systematically narrows the search space by checking out middle commits and asking you to mark them as good or bad."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Prerequisites for Bisect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before starting bisect, you need a reproducible regression, a known good commit, and a known bad commit."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A reliable way to test whether the bug is present",
+          "A commit hash where the bug does not exist",
+          "A commit hash where the bug does exist, usually HEAD",
+          "Sufficient history between the two commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Starting Bisect with Good and Bad Anchors"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Starting Bisect with Tag",
+        "code": "git bisect start\n\ngit bisect bad HEAD\n\ngit bisect good v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Dates"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding Commits by Date",
+        "code": "git log --oneline --before='2026-09-01' --after='2026-08-15'",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect View"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing Bisect Range",
+        "code": "git bisect visualize --oneline",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Skip Reasons"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Commit removed the test infrastructure",
+          "Commit is a formatting-only change",
+          "Build is broken and cannot be tested",
+          "Commit is a merge commit with untestable changes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Writing Robust Test Scripts"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use local mocks instead of external APIs",
+          "Avoid sleep or timeout-based assertions",
+          "Reset the database to a known state before each test",
+          "Log output for debugging failed bisect runs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Build Steps"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Script with Build",
+        "code": "#!/bin/bash\nnpm install\nnpm run build\nnpm test -- --grep \"regression-test\"",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisecting Across Multiple Branches"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting Along First Parent",
+        "code": "git bisect start --first-parent HEAD origin/main~50",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect with Git Worktrees"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a Worktree for Bisect",
+        "code": "git worktree add /tmp/bisect-worktree HEAD\ngit bisect -C /tmp/bisect-worktree start HEAD v2.3.0",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect and Merge Conflicts"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skipping Merge Commits",
+        "code": "git bisect skip $(git rev-list --merges HEAD..v2.3.0)",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Log Analysis"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Analyzing Bisect Log",
+        "code": "git bisect log | wc -l\n\n# Shows how many steps bisect took",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect in Notebook Environments"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisecting a Notebook Regression",
+        "code": "#!/bin/bash\njupyter nbconvert --to notebook --execute analysis.ipynb --output out.ipynb\ngrep -q \"Expected Result\" out.ipynb",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Preserving Bisect Results"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect Documentation Template",
+        "code": "## Regression Investigation: #511\n\n### First Bad Commit\nabc1234 by Jane Doe on 2026-09-10\n\n### Root Cause\nThe commit optimized a regex for edge cases but broke nested array parsing.\n\n### Remediation\nRevert the regex change or add a comment-aware tokenizer.\n\n### Prevention\nAdd a regression test for nested arrays with comments.",
+        "language": "markdown"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Bisect Errors"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "fatal: not a git repository - run bisect inside a valid repo",
+          "bad/food anchor not a commit - verify the anchor is a valid SHA or ref",
+          "fatal: ambiguous argument - the ref does not exist",
+          "Automatic merge failed - the script produced a conflict; skip or fix the script"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Bisect Performance"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use unit tests instead of E2E tests when possible",
+          "Mock external dependencies",
+          "Run only the relevant test suite",
+          "Use test parallelization if available"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "When Bisect Is Not the Right Tool"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Bug is flaky or non-deterministic",
+          "Bug requires manual UI interaction to reproduce",
+          "Bug depends on external system state",
+          "Bug was introduced gradually across many commits"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git bisect turns regression hunting from a manual slog into a fast, repeatable process."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "text": [
+          "Use git bisect start with good and bad anchors",
+          "Prefer automated bisect with a test script",
+          "Reset with git bisect reset when finished",
+          "Use git log -S to narrow suspects before bisecting"
+        ]
       }
     }
   ],

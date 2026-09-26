@@ -6,7 +6,7 @@
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 
-export type CalloutVariant = 'info' | 'tip' | 'warning' | 'note' | 'important' | 'danger';
+export type CalloutVariant = 'info' | 'tip' | 'warning' | 'note' | 'important' | 'danger' | 'error';
 
 // ── Content block system ─────────────────────────────────────────────────────
 
