@@ -4,58 +4,139 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "Client evaluation and translation failures",
-  "description": "Learn about Client evaluation and translation failures. Master the concepts, patterns, and best practices.",
+  "description": "Understand how EF Core handles queries it cannot translate to SQL, and learn to avoid the performance pitfalls of unintended client-side evaluation.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "client evaluation", "SQL translation", "performance", "logging"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Client evaluation and translation failures** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with client evaluation and translation failures."
+        "text": "EF Core can only translate a subset of C# into SQL. When your LINQ query contains logic the translator does not understand, EF Core must decide whether to throw an exception or evaluate the untranslatable part on the client. Understanding this boundary — and how to keep your queries fully server-side — is critical for predictable performance."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "From client evaluation to exceptions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before EF Core 3.0, the ORM silently pulled data into memory and ran the untranslatable parts on the client. A query like `dbContext.Products.Where(p => p.Name.StartsWith(\"A\"))` might work fine, but `dbContext.Products.Where(p => p.CustomMethod(p.Price))` would silently load the entire Products table and filter in C#. EF Core 3.0 changed this behavior to throw exceptions by default, making the failure loud and visible."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Warnings are still logged",
+        "text": "Even when EF Core successfully translates a query, it may log warnings about client evaluation. Check your logs during development. A single query that looks efficient can hide a silent full-table load behind a translated portion."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common translation failures"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of client evaluation and translation failures",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Custom C# methods inside LINQ queries — EF Core does not know how to convert `MyHelper(value)` into SQL.",
+          "Unsupported .NET types — custom structs, dictionaries, or complex objects cannot be translated to database columns.",
+          "DateTime methods that are provider-specific — some SQL Server DateTime functions have no equivalent in PostgreSQL.",
+          "String operations beyond basic comparisons — case conversion, culture-sensitive comparisons, or regex may not be supported."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Translation failure example",
+        "code": "public bool IsExpensive(decimal price) => price > 1000m;\n\n// Throws at runtime: cannot translate 'IsExpensive'\nvar expensiveProducts = await dbContext.Products\n    .Where(p => IsExpensive(p.Price))\n    .ToListAsync();",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Fixing translation failures"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding client evaluation and translation failures is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The simplest fix is to inline the logic directly in the LINQ expression. EF Core can translate simple comparisons and arithmetic operators. If the logic is reused, consider using an expression-bodied property on the entity or a mapped computed column."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: inline the expression",
+        "code": "// Works — EF Core translates the comparison directly\nvar expensiveProducts = await dbContext.Products\n    .Where(p => p.Price > 1000m)\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: use EF.Functions for database-specific operations",
+        "code": "// EF.Functions.Like translates to SQL LIKE\nvar discounted = await dbContext.Products\n    .Where(p => EF.Functions.Like(p.Name, \"%sale%\"))\n    .ToListAsync();\n\n// Raw SQL for complex patterns\nvar recent = await dbContext.Products\n    .Where(p => EF.Functions.DateDiffDay(p.CreatedAt, DateTime.UtcNow) < 7)\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Explicit client evaluation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes client evaluation is exactly what you want — for example, when applying a final filter to a small in-memory set after a server-side query. EF Core supports this explicitly with `AsEnumerable()` or `ToListAsync()` followed by LINQ-to-Objects. The key is to do it intentionally and only on small result sets."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Intentional client evaluation after server-side filtering",
+        "code": "var candidates = await dbContext.Candidates\n    .Where(c => c.Status == CandidateStatus.Active)\n    .OrderBy(c => c.ApplicationDate)\n    .Take(50)\n    .AsEnumerable()\n    .Where(c => c.CalculateScore() > 80)\n    .ToListAsync();",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with client evaluation and translation failures, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Log and inspect queries in development",
+        "text": "Configure EF Core logging to show both warnings and the SQL being executed. In ASP.NET Core, set the log level to Information or Debug for the Microsoft.EntityFrameworkCore.Database category to see every query and any translation warnings."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "EF Core 3.0+ throws on untranslatable queries instead of silently evaluating on the client.",
+          "Use inline expressions, EF.Functions, or database functions instead of custom C# methods.",
+          "Explicitly switch to client evaluation only after filtering to a small result set.",
+          "Always check EF Core logs during development to catch hidden client evaluation."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["linq-expression-trees-and-sql-translation"],
+  "furtherReading": [
+    { "title": "EF Core client evaluation", "url": "https://learn.microsoft.com/en-us/ef/core/querying/client-eval", "type": "article" },
+    { "title": "EF Core logging and diagnostics", "url": "https://learn.microsoft.com/en-us/ef/core/logging-events-diagnostics", "type": "article" }
+  ]
 }

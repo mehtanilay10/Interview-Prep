@@ -3,34 +3,56 @@
   "slug": "rbac-and-namespaces",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "RBAC and namespaces",
-  "description": "Learn about RBAC and namespaces. Master the concepts, patterns, and best practices.",
+  "title": "RBAC and Namespaces",
+  "description": "Secure your Kubernetes cluster using Role-Based Access Control and organize workloads with namespaces for isolation, resource quotas, and access boundaries.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "rbac",
+    "namespaces",
+    "security",
+    "access-control"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**RBAC and namespaces** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rbac and namespaces."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Security Starts with Access Control"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of rbac and namespaces",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "In a multi-tenant Kubernetes cluster, not everyone should have full admin access. **Role-Based Access Control (RBAC)** is Kubernetes's built-in authorization system that controls who can do what — and on which resources. RBAC lets you define fine-grained permissions so developers get access only to their own namespaces, CI/CD bots can only deploy specific services, and auditors can read but not modify resources."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Role",
+            "definition": "A set of permissions scoped to a specific namespace."
+          },
+          {
+            "term": "ClusterRole",
+            "definition": "A set of permissions that apply across all namespaces or cluster-scoped resources."
+          },
+          {
+            "term": "RoleBinding",
+            "definition": "Grants the permissions in a Role to a user or service account within a namespace."
+          },
+          {
+            "term": "ClusterRoleBinding",
+            "definition": "Grants the permissions in a ClusterRole to a user or service account across the cluster."
+          },
+          {
+            "term": "ServiceAccount",
+            "definition": "An identity for Pods to authenticate to the Kubernetes API."
+          }
         ]
       }
     },
@@ -38,24 +60,173 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "RBAC Building Blocks"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rbac and namespaces is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "RBAC has four main components that work together: **Rules** (what actions are allowed on which resources), **Roles** (a collection of rules for a namespace), **RoleBindings** (who gets the role), and **ServiceAccounts** (the identity Pods use when calling the API). A rule specifies verbs (get, list, create, update, delete, watch) and resources (pods, deployments, secrets, etc.)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Role for read-only access to Pods",
+        "content": "Allow a team to view Pods in their namespace but not modify them.",
+        "code": "apiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pod-reader\n  namespace: team-alpha\nrules:\n- apiGroups: [\"\"]\n  resources: [\"pods\"]\n  verbs: [\"get\", \"list\", \"watch\"]",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RoleBinding granting the Role to a user",
+        "content": "Bind the pod-reader Role to user alice in the team-alpha namespace.",
+        "code": "apiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: alice-pod-reader\n  namespace: team-alpha\nsubjects:\n- kind: User\n  name: alice\n  apiGroup: rbac.authorization.k8s.io\nroleRef:\n  kind: Role\n  name: pod-reader\n  apiGroup: rbac.authorization.k8s.io",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rbac and namespaces, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "RBAC is additive and powerful by default",
+        "text": "RBAC denies everything by default — a subject needs an explicit allow to access a resource. But be careful: cluster-admin gives full control over every resource in every namespace. Always follow the principle of least privilege."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Namespaces — Logical Cluster Partitioning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **Namespace** is a logical partition inside a Kubernetes cluster. Namespaces let you divide cluster resources between multiple users, teams, or projects. Resources in one namespace are isolated from resources in another namespace, though they can communicate through Services. Common uses include separating development, staging, and production environments, or isolating different teams."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a namespace for a team",
+        "content": "Create and label a new namespace for team-alpha.",
+        "code": "kubectl create namespace team-alpha\nkubectl label namespace team-alpha team=alpha",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not all Kubernetes resources live in namespaces. Nodes, PersistentVolumes, and ClusterRoles are cluster-scoped — they exist outside any namespace. Most workloads (Pods, Services, Deployments, Secrets) are namespace-scoped, which means you must specify the namespace when working with them."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Combining RBAC and Namespaces"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The real power of Kubernetes security comes from combining RBAC with namespaces. You create a Role per namespace with the exact permissions that namespace's team needs, then bind that Role to the team's users and service accounts. This creates a strong security boundary: team-alpha developers cannot accidentally delete team-beta's resources, even though they share the same cluster."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Scenario",
+          "RBAC Object",
+          "Scope"
+        ],
+        "rows": [
+          [
+            "Developer can manage Deployments in their namespace",
+            "Role + RoleBinding",
+            "Single namespace"
+          ],
+          [
+            "CI/CD bot can deploy to any namespace",
+            "ClusterRole + ClusterRoleBinding",
+            "All namespaces"
+          ],
+          [
+            "External monitoring reads metrics across cluster",
+            "ClusterRole + ClusterRoleBinding",
+            "All namespaces (read-only)"
+          ],
+          [
+            "Pod needs to read Secrets in its own namespace",
+            "ServiceAccount + Role",
+            "Single namespace"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Set up RBAC for a new team namespace",
+        "description": "Create a namespace and restrict access with RBAC.",
+        "steps": [
+          "Create a namespace named \"team-beta\".",
+          "Create a Role that allows creating, updating, and deleting Deployments in team-beta.",
+          "Create a Role that allows reading Pods and Services in team-beta.",
+          "Create a ServiceAccount named \"deployer\" in team-beta.",
+          "Bind the ServiceAccount to both Roles.",
+          "Create a Pod using the deployer ServiceAccount and verify it can list Deployments but cannot delete them if you did not grant delete."
+        ],
+        "expectedOutcome": "The team-beta namespace has isolated permissions, and the deployer ServiceAccount has exactly the access needed for CI/CD."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RBAC controls who can do what on which resources using Roles, RoleBindings, and ServiceAccounts.",
+          "Namespaces partition a cluster into isolated logical environments.",
+          "Combine namespaces with RBAC to create strong multi-tenant security boundaries.",
+          "ClusterRoles apply across all namespaces; use them sparingly for cluster-wide needs.",
+          "Follow the principle of least privilege — grant only the minimum permissions required."
+        ],
+        "takeaway": "RBAC and namespaces together give you multi-tenant isolation without needing separate physical clusters."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "pods-and-workload-controllers",
+    "rolling-deployments-and-rollback",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes RBAC",
+      "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Namespaces",
+      "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Authorization",
+      "url": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
+      "type": "article"
+    }
+  ]
 }

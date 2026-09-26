@@ -3,59 +3,153 @@
   "slug": "ihttpclientfactory-and-handler-lifetimes",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "IHttpClientFactory and handler lifetimes",
-  "description": "Learn about IHttpClientFactory and handler lifetimes. Master the concepts, patterns, and best practices.",
+  "title": "IHttpClientFactory and Handler Lifetimes",
+  "description": "Learn how to use IHttpClientFactory to create resilient, pool-managed HTTP clients, avoid socket exhaustion, and configure handler lifetimes and policies.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "httpclient",
+    "http",
+    "socket-exhaustion",
+    "resilience"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**IHttpClientFactory and handler lifetimes** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with ihttpclientfactory and handler lifetimes."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of ihttpclientfactory and handler lifetimes",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "In the early days of .NET, creating an `HttpClient` for every request was a common pattern. It quickly became clear that this caused **socket exhaustion**: each `HttpClient` instance opens a TCP connection that can take minutes to release back to the OS. Under load, the application runs out of available sockets and fails to connect to downstream services."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding ihttpclientfactory and handler lifetimes is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`IHttpClientFactory` solves this problem by pooling `HttpMessageHandler` instances and reusing them across `HttpClient` objects. The factory creates lightweight `HttpClient` instances that share a long-lived handler, which manages connection pooling, DNS refresh, and TLS sessions correctly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How IHttpClientFactory Works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you request an `HttpClient` from the factory, it creates a new client instance backed by an existing or newly created `HttpMessageHandler`. The handler is the expensive object that owns TCP connections. By default, handlers are pooled and rotated after two minutes to pick up DNS changes without leaking connections."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering and using typed clients",
+        "content": "Typed clients are the recommended way to use IHttpClientFactory.",
+        "language": "csharp",
+        "code": "// Define a typed client\npublic class GitHubClient\n{\n    private readonly HttpClient _http;\n\n    public GitHubClient(HttpClient http)\n    {\n        _http = http;\n        _http.BaseAddress = new Uri(\"https://api.github.com/\");\n        _http.DefaultRequestHeaders.Add(\"User-Agent\", \"InterviewPrep-App\");\n    }\n\n    public async Task<string> GetUserAsync(string username, CancellationToken ct)\n    {\n        var response = await _http.GetAsync($\"users/{username}\", ct);\n        response.EnsureSuccessStatusCode();\n        return await response.Content.ReadAsStringAsync(ct);\n    }\n}\n\n// Registration\nbuilder.Services.AddHttpClient<GitHubClient>(client =>\n{\n    client.Timeout = TimeSpan.FromSeconds(10);\n});;\n\n// Usage in a controller or service\npublic class ProfilesController(GitHubClient github)\n{\n    public async Task<IActionResult> View(string username)\n    {\n        var json = await github.GetUserAsync(username, HttpContext.RequestAborted);\n        return Content(json, \"application/json\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handler Lifetimes and Pooling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The factory pools handlers by default. The pool size is controlled by `MaxConnectionsPerServer` on the handler, which defaults to `int.MaxValue`. In practice, you should set this to a reasonable number to prevent one misbehaving downstream service from consuming all outbound connections."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring handler lifetime and pool limits",
+        "content": "Tune the handler lifetime and connection limits for a named client.",
+        "language": "csharp",
+        "code": "builder.Services.AddHttpClient(\"PaymentGateway\", client =>\n{\n    client.BaseAddress = new Uri(\"https://payments.example.com/\");\n    client.Timeout = TimeSpan.FromSeconds(15);\n})\n.ConfigurePrimaryHttpMessageHandler(() =>\n{\n    return new HttpClientHandler\n    {\n        MaxConnectionsPerServer = 10,\n        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate\n    };\n})\n.SetHandlerLifetime(TimeSpan.FromMinutes(5));"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with ihttpclientfactory and handler lifetimes, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Handler Lifetime and DNS Caching",
+        "text": "TCP connections cache DNS resolutions. If your downstream service changes its IP address frequently, handlers must be rotated to pick up the new DNS entry. The default two-minute handler lifetime balances connection reuse and DNS freshness. Increase it only if your DNS is static and you need maximum connection reuse."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resilience with Polly"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`IHttpClientFactory` integrates with Polly to add resilience policies such as retries, circuit breakers, and timeout wrappers. These policies are applied at the handler level, so they are shared across all clients created by the factory. This is the recommended approach for building robust microservice communication."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Adding retry and circuit breaker policies",
+        "content": "Use the Microsoft.Extensions.Http.Polly package to add resilience.",
+        "language": "csharp",
+        "code": "builder.Services.AddHttpClient<InventoryClient>(client =>\n{\n    client.BaseAddress = new Uri(\"https://inventory.example.com/\");\n})\n.AddTransientHttpErrorPolicy(policy =>\n    policy.WaitAndRetryAsync(3, retry => TimeSpan.FromSeconds(Math.Pow(2, retry))))\n.AddCircuitBreakerPolicy(policy =>\n{\n    policy.KeepAlive = TimeSpan.FromSeconds(30);\n});"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What is the difference between AddHttpClient and AddTypedClient?",
+            "answer": "AddHttpClient registers a named client factory that returns raw HttpClient instances. AddHttpClient<TClient> registers a typed client where the framework automatically injects HttpClient into your class constructor. Typed clients are preferred because they keep HTTP logic isolated and testable."
+          },
+          {
+            "question": "Should I dispose HttpClient obtained from the factory?",
+            "answer": "No. The factory manages the underlying handler's lifetime. Disposing the client does not close the handler pool. Dispose the client only if you created it manually with new HttpClient()."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "IHttpClientFactory Summary",
+        "points": [
+          "IHttpClientFactory pools HttpMessageHandler instances to avoid socket exhaustion.",
+          "Typed clients are the recommended pattern: inject HttpClient directly into a dedicated class.",
+          "Handler lifetimes control how long pooled connections are reused before rotation.",
+          "MaxConnectionsPerServer limits outbound connections to a single downstream host.",
+          "Polly integration adds retry, circuit breaker, and timeout policies declaratively."
+        ],
+        "takeaway": "IHttpClientFactory is the correct way to create HTTP clients in ASP.NET Core. By pooling handlers, managing lifetimes, and integrating with resilience libraries, it prevents socket exhaustion and makes your outbound HTTP calls production-ready."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "dependency-injection-lifetimes-and-scope-validation",
+    "backgroundservice-and-hosted-workloads"
+  ],
+  "furtherReading": [
+    {
+      "title": "IHttpClientFactory in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/http-requests",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on typed clients, named clients, handler lifetimes, and Polly integration."
+    },
+    {
+      "title": "Avoid socket exhaustion with IHttpClientFactory",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/httpclient-guidelines",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Best practices for HttpClient usage and why IHttpClientFactory is required for high-throughput applications."
+    }
+  ]
 }

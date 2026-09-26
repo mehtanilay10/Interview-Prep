@@ -4,58 +4,131 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "LINQ expression trees and SQL translation",
-  "description": "Learn about LINQ expression trees and SQL translation. Master the concepts, patterns, and best practices.",
+  "description": "Understand how EF Core translates LINQ expression trees into SQL queries, and learn how to write LINQ that produces efficient database queries.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "LINQ", "SQL translation", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**LINQ expression trees and SQL translation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with linq expression trees and sql translation."
+        "text": "When you write a LINQ query in EF Core, the framework must convert your C# code into SQL that the database can execute. This translation happens through expression trees — data structures that represent your code as a tree of operations. Understanding how this translation works helps you write queries that produce efficient SQL and avoid surprises in production."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is an expression tree?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A regular C# lambda like `x => x.Price > 100` is compiled into executable code. But when you write the same lambda inside an `IQueryable<T>` expression (such as an EF Core `DbSet<T>`), EF Core captures it as an expression tree — a model of the code itself, not the result. EF Core then walks this tree to understand what data you want and translates each node into SQL."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "IEnumerable vs IQueryable",
+        "text": "`IEnumerable<T>` LINQ runs in memory using compiled delegates. `IQueryable<T>` LINQ builds an expression tree that a provider (EF Core) can translate. The moment you call `.ToList()` or switch to `IEnumerable`, the query executes locally — not in the database."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How EF Core translates queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core's query pipeline has several stages. First, it normalizes your LINQ expression tree. Then it applies query optimizations such as simplifying redundant conditions or pushing filters closer to their source. Finally, a SQL generator produces the SQL string, which the database executes. You can view the generated SQL by calling `ToQueryString()` on an `IQueryable`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Viewing generated SQL",
+        "code": "var query = dbContext.Products\n    .Where(p => p.Category.Name == \"Electronics\")\n    .OrderByDescending(p => p.Price)\n    .Take(10);\n\nstring sql = query.ToQueryString();\nConsole.WriteLine(sql);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common translation pitfalls"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of linq expression trees and sql translation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Calling a C# method inside a LINQ query — EF Core cannot translate most .NET methods to SQL and will throw at runtime.",
+          "Using client-side properties after `.AsEnumerable()` — this pulls more data from the database than you need.",
+          "Negated nullable comparisons — these sometimes generate unexpected `IS NULL` patterns.",
+          "Chaining multiple `Where` calls — EF Core usually combines them correctly, but complex conditions can confuse the translator."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Watch out for client evaluation",
+        "text": "Before EF Core 3.0, the ORM would silently evaluate parts of your query on the client. This often led to loading entire tables into memory. Modern EF Core throws exceptions instead, which is safer but means you must write fully translatable LINQ."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Writing translatable LINQ"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding linq expression trees and sql translation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The safest approach is to stick to simple, composable LINQ operators: `Where`, `Select`, `OrderBy`, `ThenBy`, `Take`, `Skip`, and `Include`. Avoid custom C# logic inside the query. If you need complex logic, compute it after the data is retrieved or use `EF.Functions` for database-specific operations."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with linq expression trees and sql translation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Good: translatable LINQ",
+        "code": "var activeElectronics = await dbContext.Products\n    .Where(p => p.Category.Name == \"Electronics\")\n    .Where(p => p.IsActive)\n    .OrderByDescending(p => p.Price)\n    .Select(p => new\n    {\n        p.Id,\n        p.Name,\n        CategoryName = p.Category.Name\n    })\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bad: non-translatable LINQ",
+        "code": "// Throws at runtime: Cannot translate 'FormatPrice()'\nvar bad = await dbContext.Products\n    .Where(p => FormatPrice(p.Price).StartsWith(\"$\"))\n    .ToListAsync();\n\nstring FormatPrice(decimal price) => $\"${price:F2}\";",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "LINQ on IQueryable builds an expression tree that EF Core translates to SQL.",
+          "Use ToQueryString() to inspect the exact SQL your query produces.",
+          "Avoid C# method calls inside LINQ queries — stick to translatable operators.",
+          "Modern EF Core throws on client evaluation, which protects you from accidental full-table loads."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["client-evaluation-and-translation-failures"],
+  "furtherReading": [
+    { "title": "EF Core Query Types documentation", "url": "https://learn.microsoft.com/en-us/ef/core/querying/", "type": "article" },
+    { "title": "Client vs server evaluation in EF Core", "url": "https://learn.microsoft.com/en-us/ef/core/querying/client-eval", "type": "article" }
+  ]
 }

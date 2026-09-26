@@ -4,33 +4,53 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Database migration safety",
-  "description": "Learn about Database migration safety. Master the concepts, patterns, and best practices.",
+  "description": "Apply safe migration patterns so database schema changes never block deployments or corrupt production data.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "CI/CD",
+    "database",
+    "migrations",
+    "schema",
+    "data-safety"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Database migration safety** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with database migration safety."
+        "text": "Database migrations are the deployment step most likely to cause outages. A column rename that takes ten seconds on a local database can lock a production table for minutes and break every running instance of the application. Safe database migration is not about avoiding schema changes; it is about changing schemas in a way that keeps the application running throughout the process."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers expand and contract patterns, online schema changes, zero-downtime migrations in CI/CD, and how to test database changes before they reach production."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The expand-and-contract pattern"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
+        "text": "Most dangerous schema changes follow the same safe pattern: expand the schema in a backward-compatible way, deploy application code that uses both old and new schema, then contract by removing the old schema. The key insight is that the application code and the database schema can be in different 'versions' temporarily, as long as both can read and write the data."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Renaming a column safely",
         "items": [
-          "Understand the fundamental principles of database migration safety",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Expand: add the new column. Keep the old column.",
+          "Deploy application code that writes to both columns and reads from the new column.",
+          "Backfill existing rows from old column to new column.",
+          "Deploy application code that no longer reads the old column.",
+          "Contract: remove the old column once all instances run the new code."
         ]
       }
     },
@@ -38,24 +58,122 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Migration in CI/CD"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding database migration safety is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Running migrations automatically during deployment is convenient but risky. If a migration fails halfway through, you may have a partially applied schema and an application that crashes. Many teams separate schema migrations from code deployments: apply migrations to staging first, verify with tests, then apply to production in a separate, monitored step."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Separate migration and deployment jobs",
+        "content": "Run migrations before deploying the new code, not inside the deploy step.",
+        "code": "jobs:\n  migrate-staging:\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - uses: actions/checkout@v4\n      - run: dotnet ef database update --project src/Data/Data.csproj\n\n  deploy-staging:\n    needs: migrate-staging\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: deploy/\n      - run: ./deploy.sh staging",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Online schema change tools"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For large tables, even simple migrations can cause downtime. Online schema change tools modify tables in small chunks, avoid long locks, and keep the application responsive. PostgreSQL supports tools such as pg-osc, and SQL Server supports tools such as Enterprise Edition online index operations. Evaluate these tools before a migration becomes an emergency."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with database migration safety, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Never drop a column in the same release that stops writing to it",
+        "text": "If your application stops writing to a column and you drop it immediately, any instance still running the old code will crash. Always wait at least one full release cycle before removing old columns."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Database migration safety checklist",
+        "items": [
+          {
+            "text": "All schema changes are backward compatible at every intermediate step.",
+            "hint": "Old code can read and write the new schema, and vice versa."
+          },
+          {
+            "text": "Migrations are run in CI against a copy of production data before release.",
+            "hint": "Use database snapshots or sanitized production copies."
+          },
+          {
+            "text": "Large table migrations use chunking or online schema change tools.",
+            "hint": "Avoid table-level locks that block writes."
+          },
+          {
+            "text": "Rollback scripts exist for every migration and are tested.",
+            "hint": "A migration without a tested rollback is a liability."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Use expand and contract to separate schema changes from code changes.",
+          "Never drop columns or constraints until every running instance has moved on.",
+          "Test migrations on realistic data volumes before running in production.",
+          "Treat rollback scripts as first-class artifacts and test them regularly."
+        ],
+        "takeaway": "A safe migration is one that keeps the application running, even if the schema is temporarily redundant."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I run migrations automatically in the deploy pipeline?",
+            "answer": "Automatic migrations are acceptable for small, low-risk changes in development. For production, run migrations in a separate monitored step with a tested rollback. Automation is fine; lack of observability is not."
+          },
+          {
+            "question": "How do I backfill data safely?",
+            "answer": "Backfill in small batches, monitor database load, and run during low-traffic windows if needed. Many teams backfill in the application after deploy, using background jobs that process rows gradually."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "backward-compatible-deployments",
+    "rollback-strategy"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure SQL Database: Online Index Operations",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/indexes/online-index-operation",
+      "type": "article",
+      "description": "How to rebuild indexes without taking tables offline."
+    },
+    {
+      "title": "PostgreSQL Online Schema Change",
+      "url": "https://github.com/zalando/pg-osc",
+      "type": "tool",
+      "description": "Open-source tool for online schema changes on PostgreSQL."
+    },
+    {
+      "title": "GitHub: gh-ost",
+      "url": "https://github.com/github/gh-ost",
+      "type": "tool",
+      "description": "GitHub's online schema migration tool for MySQL."
+    }
+  ]
 }

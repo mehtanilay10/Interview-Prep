@@ -4,33 +4,45 @@
   "moduleSlug": "testing-strategy-for-senior-frontend-engineers",
   "courseSlug": "react-testing",
   "title": "When not to mock",
-  "description": "Learn about When not to mock. Master the concepts, patterns, and best practices.",
+  "description": "Learn which React patterns and dependencies should never be mocked, how to trust your tests more by mocking less, and the heuristics senior engineers use to decide.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "testing",
+    "react",
+    "mocking",
+    "testing-library"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When not to mock** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when not to mock."
+        "text": "Mocking is a powerful tool, but over-mocking is the single biggest cause of test suites that pass in CI but break in production. A senior frontend engineer knows that the goal of a test is to catch real bugs, and the more you replace with mocks, the less real-world behavior your tests cover."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson focuses on the inverse question: when should you leave the real implementation in place? The answer depends on three factors — the cost of running the real code, the volatility of the code under test, and the risk if the integration silently breaks."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Things you should almost never mock"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of when not to mock",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Your UI framework: never mock React itself. If React breaks, you want your tests to fail, not silently pass.",
+          "Routing: React Router and similar libraries are stable, well-tested upstream, and cheap to render.",
+          "State management libraries you do not own: Redux, Zustand, and Jotai work fine in tests and catch selector bugs.",
+          "Utility functions: pure functions like date formatters, string helpers, or validation schemas should be tested directly, not via mocks.",
+          "Custom hooks that do not touch the network: hooks like useDebounce, useLocalStorage, or useMediaQuery are cheap and deterministic."
         ]
       }
     },
@@ -38,24 +50,109 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "A concrete example: do not mock useForm"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding when not to mock is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A common mistake is mocking a form hook and then asserting on the mock's internal state. Here is why that approach breaks down, followed by the better alternative:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Bad: mocking useForm hides real validation behavior",
+        "code": "// ❌ This test will pass even if the real useForm throws on invalid input\nvi.mock('./useForm', () => ({\n  useForm: vi.fn(() => ({\n    values: { email: 'test@example.com' },\n    errors: {},\n    handleChange: vi.fn(),\n  })),\n}))\n\nrender(<ContactForm />)\n// You are only asserting that ContactForm renders with a hand-crafted mock.\n// You learn nothing about real validation behavior."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Good: let the real hook run and interact with it through the DOM",
+        "code": "import { render, screen, fireEvent } from '@testing-library/react'\nimport ContactForm from './ContactForm'\n\ndescribe('ContactForm', () => {\n  it('shows an error when email is invalid', () => {\n    render(<ContactForm />)\n\n    fireEvent.change(screen.getByLabelText(/email/i), {\n      target: { value: 'not-an-email' },\n    })\n    fireEvent.click(screen.getByRole('button', { name: /submit/i }))\n\n    expect(screen.getByText(/valid email/i)).toBeDefined()\n  })\n})"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The second test uses the real hook and the real validation logic. It catches the same bug a user would hit in production."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Heuristics for the mock-or-not decision"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "If the real code is slower than 100 ms and deterministic, leave it real.",
+          "If the real code depends on network or filesystem, replace it with a fake or stub — never a full mock of the interface.",
+          "If you find yourself re-creating the real behavior in a mock body, you are mocking too much.",
+          "If a test fails only because the mock was not updated after a refactor, the mock is the problem, not the test."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when not to mock, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Mock-only-what-you-own principle",
+        "text": "As a rough rule, avoid mocking code you do not control. Third-party libraries have their own test suites. Your job is to verify that your code integrates with them correctly, not to recreate their behavior in mock return values."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When mocking does make sense"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Network calls: Replace with MSW interceptors or a stub, not a hand-written mock object.",
+          "Timers: Use fake timers (vi.useFakeTimers()) for debounce and throttle logic.",
+          "Browser APIs not available in jsdom: IntersectionObserver, matchMedia, ResizeObserver.",
+          "Expensive computation: A slow image processing function that takes seconds should be stubbed in unit tests, but also tested in a separate slow integration suite."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Mocking the real implementation is a trade-off, not a default.",
+          "Leave React, routing, state libraries, and pure utilities unmocked.",
+          "Replace only slow, non-deterministic, or external dependencies.",
+          "A test that mocks everything tests nothing."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "test-doubles-mocks-stubs-and-fakes",
+    "component-testing-vs-integration-testing",
+    "testcontainers-and-realistic-backend-integration"
+  ],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Stop mocking fetch (Kent C. Dodds)",
+      "url": "https://kentcdodds.com/blog/stop-mocking-fetch"
+    },
+    {
+      "type": "article",
+      "title": "Testing Library Guiding Principles",
+      "url": "https://testing-library.com/docs/guiding-principles"
+    }
+  ]
 }

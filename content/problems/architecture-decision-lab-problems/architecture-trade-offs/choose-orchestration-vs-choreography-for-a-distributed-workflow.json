@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose orchestration vs choreography for a distributed workflow",
-  "description": "Problem: Choose orchestration vs choreography for a distributed workflow. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Design an e-commerce order fulfillment workflow comparing a central orchestrator against an event-driven choreography pattern.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": ["orchestration", "choreography", "saga", "distributed-systems", "event-driven"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose orchestration vs choreography for a distributed workflow** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose orchestration vs choreography for a distributed workflow."
+        "text": "You need to build an order fulfillment workflow that coordinates payment, inventory reservation, shipping, notification, and analytics. The workflow must handle partial failures and allow each service to evolve independently. Should you build a central orchestrator or use pure event choreography?"
       }
     },
     {
@@ -24,13 +24,71 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose orchestration and choreography for a distributed workflow",
-          "Know when to choose choose orchestration over choreography for a distributed workflow",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "Orchestration", "definition": "A central controller directs the workflow, calling services in sequence and handling compensation." },
+          { "term": "Choreography", "definition": "Each service reacts to events and decides its own next action without a central controller." },
+          { "term": "Saga Pattern", "definition": "A sequence of local transactions with compensating actions to maintain data consistency across services." },
+          { "term": "Eventual Consistency", "definition": "A consistency model where updates propagate asynchronously and all replicas converge eventually." },
+          { "term": "Compensating Transaction", "definition": "An operation that semantically undoes a previous operation in a distributed transaction." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Choreography does not mean no orchestration",
+        "text": "Pure event choreography often evolves into an invisible orchestration layer embedded in event consumers. The difference is that choreography has no single place to see the full workflow, making debugging and auditing nearly impossible at scale."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Orchestration versus choreography",
+        "cards": [
+          {
+            "title": "Central Orchestrator",
+            "description": "A dedicated service (or state machine) controls the entire workflow.",
+            "pros": [
+              "Single source of truth for workflow state",
+              "Easy to visualize, debug, and audit the full flow",
+              "Compensation logic is centralized and explicit",
+              "New services can be added without changing existing consumers"
+            ],
+            "cons": [
+              "Orchestrator can become a bottleneck and single point of failure",
+              "Central service must know about every downstream service",
+              "Requires durable state storage for workflow progress",
+              "Tight coupling between orchestrator and service contracts"
+            ],
+            "tags": ["explicit", "centralized", "auditable"]
+          },
+          {
+            "title": "Event Choreography",
+            "description": "Services react to events and publish new events without a central controller.",
+            "pros": [
+              "Loose coupling: services only know about the events they consume",
+              "Easy to add new participants without changing existing code",
+              "Scales naturally with the number of services",
+              "No single failure point for workflow logic"
+            ],
+            "cons": [
+              "Workflow state is distributed; hard to see the big picture",
+              "Debugging requires correlating events across multiple logs",
+              "Cyclic dependencies can emerge between services",
+              "Testing the full happy path requires running the entire system"
+            ],
+            "tags": ["decentralized", "loosely-coupled", "hard-to-debug"]
+          }
         ]
       }
     },
@@ -38,24 +96,91 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Orchestrator implementation"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose orchestration vs choreography for a distributed workflow is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "C#: State machine orchestrator for order fulfillment",
+        "content": "Using a persistent workflow state machine.",
+        "code": "public class OrderFulfillmentOrchestrator\n{\n    public async Task ExecuteAsync(Order order)\n    {\n        await _stateMachine.TransitionAsync(order.Id, FulfillmentState.ReserveInventory);\n        try\n        {\n            await _inventoryService.ReserveAsync(order);\n            await _stateMachine.TransitionAsync(order.Id, FulfillmentState.ChargePayment);\n            await _paymentService.ChargeAsync(order);\n            await _stateMachine.TransitionAsync(order.Id, FulfillmentState.Ship);\n            await _shippingService.LabelAsync(order);\n            await _stateMachine.TransitionAsync(order.Id, FulfillmentState.Complete);\n        }\n        catch (InventoryUnavailableException)\n        {\n            await _paymentService.RefundAsync(order);\n            await _stateMachine.TransitionAsync(order.Id, FulfillmentState.Failed);\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Choreography event flow"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RabbitMQ: Event-driven fulfillment",
+        "content": "Each service reacts to the previous event and publishes the next.",
+        "code": "Event flow:\n1. order.created          -> Inventory Service\n2. inventory.reserved     -> Payment Service\n3. payment.charged        -> Shipping Service\n4. shipping.labeled       -> Notification Service\n5. notification.sent      -> Analytics Service\n\nIf payment fails, Payment Service publishes payment.failed.\nInventory Service must listen for payment.failed and release reservation.\nNo central owner of this logic.",
+        "language": "text"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "orchestration-vs-choreography",
+        "caption": "Central control versus decentralized reactions",
+        "definition": "graph TD\n    subgraph Orchestration\n        O[Orchestrator] -->|1. Reserve| I[Inventory]\n        O -->|2. Charge| P[Payment]\n        O -->|3. Ship| S[Shipping]\n        O -->|4. Notify| N[Notification]\n    end\n    subgraph Choreography\n        C1[order.created] -->|triggers| C2[Inventory]\n        C2 -->|publishes| C3[inventory.reserved]\n        C3 -->|triggers| C4[Payment]\n        C4 -->|publishes| C5[payment.charged]\n        C5 -->|triggers| C6[Shipping]\n    end"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation criteria",
+        "items": [
+          { "text": "How many steps are in the workflow? Long chains favor orchestration." },
+          { "text": "Do you need auditability of the full workflow state?" },
+          { "text": "Are services owned by the same or different teams?" },
+          { "text": "How often does the workflow change?" },
+          { "text": "Can you tolerate some services knowing about workflow progression?" }
+        ]
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Orchestration for complex workflows",
+        "content": "For order fulfillment with compensation logic, use an orchestrator. The workflow is complex enough that choreography would produce an invisible state machine spread across five services. Centralize the state transitions; keep the orchestrator stateless by storing state in a database or workflow engine.",
+        "code": "// Use Temporal or a lightweight state machine\n// Temporal gives you durable execution with retries and timeouts\n\n[WorkflowActivity]\npublic Task ReserveInventoryAsync(Order order);\n[WorkflowActivity]\npublic Task ChargePaymentAsync(Order order);\n[WorkflowActivity]\npublic Task ShipOrderAsync(Order order);\n\npublic class OrderWorkflow : Workflow\n{\n    [WorkflowRun]\n    public async Task RunAsync(Order order)\n    {\n        await ReserveInventoryAsync(order);\n        await ChargePaymentAsync(order);\n        await ShipOrderAsync(order);\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose orchestration vs choreography for a distributed workflow, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Hybrid reality",
+        "text": "Many production systems use orchestration for the main flow and events for side effects (analytics, notifications). The orchestrator owns the critical path; events keep other systems informed without coupling them to the flow."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Orchestration wins when workflow state and compensation logic must be visible and explicit.",
+          "Choreography wins for fan-out side effects where services are loosely coupled.",
+          "Most real systems use both: orchestration for the critical path, events for observability."
+        ],
+        "takeaway": "Choose orchestration when correctness matters more than decoupling."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-synchronous-processing-vs-a-message-queue",
+    "choose-between-modular-monolith-and-microservices-for-a-new-product"
+  ],
+  "furtherReading": [
+    { "title": "Saga Pattern", "url": "https://microservices.io/patterns/data/saga.html", "type": "article", "author": "Chris Richardson" },
+    { "title": "Temporal Documentation", "url": "https://docs.temporal.io/", "type": "article" }
+  ]
 }

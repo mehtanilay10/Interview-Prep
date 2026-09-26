@@ -3,34 +3,46 @@
   "slug": "synchronous-vs-asynchronous-workflows",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "Synchronous vs asynchronous workflows",
-  "description": "Learn about Synchronous vs asynchronous workflows. Master the concepts, patterns, and best practices.",
+  "title": "Synchronous vs Asynchronous Workflows",
+  "description": "Understand when to use synchronous versus asynchronous workflows in C#, how async affects scalability and error handling, and how to choose the right pattern for your use case.",
   "order": 16,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "async",
+    "performance",
+    "workflows",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Synchronous vs asynchronous workflows** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with synchronous vs asynchronous workflows."
+        "text": "Synchronous code is easy to understand: do step A, then step B, then step C. Asynchronous code is harder: start step A, yield the thread, resume when A completes, then start B. But asynchronous code scales better under load because it does not block threads while waiting for I/O. In a C# ASP.NET Core application, choosing the right workflow pattern directly affects how many concurrent requests the server can handle before threads are exhausted."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The senior engineer does not default to async everywhere. Async has costs: it complicates debugging, introduces synchronization context concerns, and can create deadlocks if misused. The choice should be based on the actual workload: CPU-bound work benefits from parallelism, I/O-bound work benefits from asynchrony, and mixed workloads need careful orchestration."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "When to Go Asynchronous"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Use async for",
         "items": [
-          "Understand the core differences between synchronous and asynchronous workflows",
-          "Know when to choose synchronous over asynchronous workflows",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "I/O-bound operations: database queries, HTTP calls, file system access, and message queue operations.",
+          "High-concurrency web APIs where thread starvation is a real risk.",
+          "Long-running operations that should not block the request thread.",
+          "Parallel I/O: fetching multiple independent resources concurrently using Task.WhenAll."
         ]
       }
     },
@@ -38,24 +50,163 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When to Stay Synchronous"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding synchronous vs asynchronous workflows is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Use sync for",
+        "items": [
+          "CPU-bound work: complex calculations, data transformations, image processing.",
+          "Simple CRUD operations with low expected concurrency where async adds complexity without benefit.",
+          "Console applications, background scripts, or migration tools where thread pool exhaustion is not a concern.",
+          "Code paths that are called from synchronous contexts and cannot propagate async all the way up."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with synchronous vs asynchronous workflows, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Async all the way up",
+        "text": "If you introduce async in a C# application, propagate it all the way to the entry point. Mixing sync and async creates blocking calls that negate the scalability benefit and can cause deadlocks in legacy synchronization contexts. In ASP.NET Core, always use async controller actions and async EF Core methods."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example: Synchronous Workflow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A synchronous workflow is straightforward and easy to debug. It is appropriate when the operations are CPU-bound or when the expected concurrency is low."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Synchronous order processing",
+        "content": "A simple synchronous workflow for processing an order with sequential steps.",
+        "language": "csharp",
+        "code": "public class OrderProcessor\n{\n    private readonly AppDbContext _context;\n    private readonly IPaymentGateway _paymentGateway;\n    private readonly IEmailService _emailService;\n\n    public OrderProcessor(AppDbContext context, IPaymentGateway paymentGateway, IEmailService emailService)\n    {\n        _context = context;\n        _paymentGateway = paymentGateway;\n        _emailService = emailService;\n    }\n\n    public void ProcessOrder(Order order)\n    {\n        // Step 1: Validate inventory\n        foreach (var item in order.Items)\n        {\n            var stock = _context.Inventory.First(i => i.ProductId == item.ProductId);\n            if (stock.Quantity < item.Quantity)\n                throw new InvalidOperationException(\"Insufficient stock\");\n        }\n\n        // Step 2: Charge payment\n        var paymentResult = _paymentGateway.Charge(order.CustomerId, order.Total);\n        if (!paymentResult.Succeeded)\n            throw new PaymentFailedException(paymentResult.Error);\n\n        // Step 3: Update inventory\n        foreach (var item in order.Items)\n        {\n            stock.Quantity -= item.Quantity;\n            _context.Inventory.Update(stock);\n        }\n\n        // Step 4: Save order and send confirmation\n        order.Status = OrderStatus.Confirmed;\n        _context.Orders.Add(order);\n        _context.SaveChanges();\n\n        _emailService.SendConfirmation(order.CustomerId, order.Id);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example: Asynchronous Workflow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An asynchronous workflow keeps threads free while waiting for I/O. In ASP.NET Core, this allows the server to handle more concurrent requests with the same thread pool. The key pattern is to await every I/O operation and use Task.WhenAll for parallel independent operations."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Asynchronous order processing with parallel I/O",
+        "content": "An async workflow that processes order steps concurrently where possible.",
+        "language": "csharp",
+        "code": "public class AsyncOrderProcessor\n{\n    private readonly AppDbContext _context;\n    private readonly IPaymentGateway _paymentGateway;\n    private readonly IEmailService _emailService;\n    private readonly IInventoryService _inventoryService;\n\n    public async Task<OrderResult> ProcessOrderAsync(CreateOrderRequest request, CancellationToken ct)\n    {\n        // Step 1: Validate inventory and customer in parallel\n        var inventoryTask = _inventoryService.CheckAvailabilityAsync(request.Items, ct);\n        var customerTask = _customerService.GetAsync(request.CustomerId, ct);\n        await Task.WhenAll(inventoryTask, customerTask);\n\n        if (!inventoryTask.Result.IsAvailable)\n            return OrderResult.Failure(\"Insufficient stock\");\n\n        // Step 2: Create and save order\n        var order = Order.Create(request);\n        await _context.Orders.AddAsync(order, ct);\n        await _context.SaveChangesAsync(ct);\n\n        // Step 3: Charge payment\n        var paymentTask = _paymentGateway.ChargeAsync(request.CustomerId, order.Total, ct);\n        await paymentTask;\n        if (!paymentTask.Result.Succeeded)\n            return OrderResult.Failure(paymentTask.Result.Error);\n\n        // Step 4: Reserve inventory and send email in parallel\n        var reserveTask = _inventoryService.ReserveAsync(order.Id, request.Items, ct);\n        var emailTask = _emailService.SendConfirmationAsync(request.CustomerId, order.Id, ct);\n        await Task.WhenAll(reserveTask, emailTask);\n\n        return OrderResult.Success(order);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Background Workflows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some workflows should not run in the request path at all. Order confirmation emails, report generation, and data synchronization are better handled as background workflows. In .NET, BackgroundService, Hangfire, or Azure Functions provide the infrastructure. The key insight is that the user does not need to wait for these operations to complete, so blocking the request thread is wasteful."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BackgroundService for order confirmation emails",
+        "content": "A background worker that processes order confirmation emails asynchronously without blocking requests.",
+        "language": "csharp",
+        "code": "public class OrderConfirmationWorker : BackgroundService\n{\n    private readonly Channel<OrderConfirmation> _channel;\n    private readonly IEmailService _emailService;\n    private readonly ILogger<OrderConfirmationWorker> _logger;\n    private const int MaxConcurrency = 4;\n\n    public OrderConfirmationWorker(Channel<OrderConfirmation> channel, IEmailService emailService, ILogger<OrderConfirmationWorker> logger)\n    {\n        _channel = channel;\n        _emailService = emailService;\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        await foreach (var confirmation in _channel.Reader.ReadAllAsync(stoppingToken))\n        {\n            try\n            {\n                await _emailService.SendOrderConfirmationAsync(confirmation.CustomerId, confirmation.OrderId, stoppingToken);\n                _logger.LogInformation(\"Sent confirmation email for order {OrderId}\", confirmation.OrderId);\n            }\n            catch (Exception ex)\n            {\n                _logger.LogError(ex, \"Failed to send confirmation email for order {OrderId}\", confirmation.OrderId);\n            }\n        }\n    }\n}\n\n// Controller publishes to the channel and returns immediately\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class OrdersController : ControllerBase\n{\n    private readonly OrderService _service;\n    private readonly ChannelWriter<OrderConfirmation> _channelWriter;\n\n    [HttpPost]\n    public async Task<ActionResult<OrderResult>> Create([FromBody] CreateOrderRequest request)\n    {\n        var result = await _service.CreateAsync(request);\n        if (result.IsSuccess)\n            await _channelWriter.WriteAsync(new OrderConfirmation(result.OrderId, result.CustomerId));\n        return result.IsSuccess ? CreatedAtRoute(...) : BadRequest(result.Error);\n    }\n}"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Does async always improve performance?",
+            "answer": "Async improves scalability under concurrent load, not raw speed. A single async call is slightly slower than a sync call because of state machine overhead. The benefit appears when many concurrent operations are in flight and threads would otherwise be blocked."
+          },
+          {
+            "question": "Should I make everything async?",
+            "answer": "No. CPU-bound work should use parallel tasks or background queues, not async/await. Async/await is for I/O-bound operations where the thread would otherwise wait idle. For pure computation, use Task.Run or Parallel LINQ."
+          },
+          {
+            "question": "What about async in unit tests?",
+            "answer": "xUnit and NUnit both support async test methods directly. Always return Task from test methods when testing async code; do not use .Wait() or .Result, as they can mask deadlocks and cause flaky tests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Convert a sync workflow to async",
+        "description": "Take an existing synchronous method and convert it to an asynchronous workflow.",
+        "steps": [
+          "Find a method in your project that makes multiple I/O calls sequentially.",
+          "Identify which calls are independent and can run in parallel with Task.WhenAll.",
+          "Convert the method to async/await, propagating async all the way to the entry point.",
+          "Move any non-critical side effects (logging, notifications) to a background channel or BackgroundService.",
+          "Measure the throughput difference under simulated load.",
+          "Compare error handling: ensure exceptions are captured correctly in the async flow."
+        ],
+        "expectedOutcome": "A converted async workflow with improved concurrency and a performance comparison."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Async/await improves scalability for I/O-bound workloads, not raw computation speed.",
+          "Propagate async all the way up the call stack; mixing sync and async creates deadlocks.",
+          "Use Task.WhenAll for parallel independent I/O operations.",
+          "Move non-critical side effects to background workflows to keep the request path fast."
+        ],
+        "takeaway": "Asynchronous workflows are not inherently better; they are better for specific workloads. Senior engineers choose the right workflow pattern based on the actual I/O and CPU characteristics of the operation."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "ef-core-vs-dapper-vs-raw-sql",
+    "rest-vs-grpc-decision-framework"
+  ],
+  "furtherReading": [
+    {
+      "title": "Async/Await in C#",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/async/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official Microsoft documentation on async and await in C#, including best practices and common pitfalls."
+    },
+    {
+      "title": "Parallel Programming with .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guidance on task parallelism, data parallelism, and asynchronous programming patterns in .NET."
+    }
+  ]
 }

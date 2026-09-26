@@ -4,33 +4,45 @@
   "moduleSlug": "backend-database-follow-ups",
   "courseSlug": "interview-qa",
   "title": "When should a synchronous API become asynchronous?",
-  "description": "Interview question: When should a synchronous API become asynchronous?. Learn the answer with detailed explanation and examples.",
+  "description": "Identify the workload and user-experience signals that justify moving from synchronous request-response to async processing.",
   "order": 7,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": [
+    "backend",
+    "architecture",
+    "async",
+    "api-design"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When should a synchronous API become asynchronous?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when should a synchronous api become asynchronous?."
+        "text": "Not every slow API should become asynchronous. Async processing introduces complexity: you need a queue, a worker, status tracking, and timeout handling. The question is whether the benefits outweigh that cost. Strong candidates explain the trade-off in terms of user experience, system coupling, and failure modes."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A synchronous API blocks the caller until the work is done. An asynchronous API accepts the request, acknowledges it immediately, and processes the work in the background. The client polls or receives a webhook when the result is ready."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Signs that sync is the wrong choice"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of when should a synchronous api become asynchronous?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "The operation consistently takes longer than the HTTP timeout budget (typically 30-60 seconds).",
+          "The work involves multiple slow external calls that can run in parallel rather than sequentially.",
+          "The user does not need the result immediately — a notification later is acceptable.",
+          "Traffic is spiky and the work is CPU or I/O intensive, blocking thread-pool threads needed for other requests.",
+          "Retrying on timeout creates duplicate side effects that idempotency cannot easily prevent."
         ]
       }
     },
@@ -38,25 +50,112 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Architectural patterns"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding when should a synchronous api become asynchronous? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Fire-and-forget with status polling: client POSTs a request, receives a job ID, and GETs /jobs/{id} for status.",
+          "Callback URL: client provides a webhook URL in the request and receives a POST when the work completes.",
+          "Message queue decoupling: the API enqueues a message; a worker processes it independently. This is the cleanest separation but requires queue infrastructure."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# example: queued background processing"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Minimal API with background job acceptance",
+        "language": "csharp",
+        "code": "public record GenerateReportRequest(Guid CustomerId, DateTime From, DateTime To);\n\napp.MapPost(\"/reports\", async (GenerateReportRequest req, IBackgroundJobQueue queue) => {\n    var jobId = Guid.NewGuid();\n    await queue.EnqueueAsync(new GenerateReportJob(jobId, req));\n    return Results.Accepted($\"/reports/{jobId}\", new { jobId, status = \"queued\" });\n})\n.WithName(\"GenerateReport\");\n\napp.MapGet(\"/reports/{jobId:guid}\", async (Guid jobId, AppDb db) => {\n    var job = await db.ReportJobs.FindAsync(jobId);\n    return job is null ? Results.NotFound() : Results.Json(job);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When NOT to go async"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "The user is staring at a loading screen waiting for the result — latency still matters.",
+          "The operation is fast and the added infrastructure cost is not justified.",
+          "The team lacks operational experience with queues, workers, and dead-letter handling.",
+          "The API contract requires immediate success-or-failure semantics (e.g., payment authorization)."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when should a synchronous api become asynchronous?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Async is not a performance shortcut",
+        "text": "Moving work to a background queue does not make it faster — it makes the API more responsive under load. The total processing time is the same or higher. Async trades latency for throughput and resilience."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Status lifecycle: define clear states (queued, running, completed, failed) and store them durably.",
+          "Timeout and expiry: set a maximum job age and clean up completed jobs after clients have had time to fetch results.",
+          "Error handling: failed jobs should move to a dead-letter queue with enough context for manual retry or investigation.",
+          "Security: authenticate the polling request and ensure job IDs are unguessable UUIDs, not sequential integers."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Go async when the operation exceeds the HTTP timeout budget or the user does not need the result immediately.",
+          "Choose between fire-and-forget polling, callbacks, or message queues based on reliability requirements.",
+          "Async improves API responsiveness under load, not raw operation speed.",
+          "Track job status durably and handle failures with dead-letter queues, not silent drops."
+        ],
+        "takeaway": "Async is a scalability and resilience pattern, not a magic performance boost."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "how-would-you-design-retry-behavior-without-creating-a-retry-storm",
+    "how-do-you-handle-a-database-transaction-that-succeeds-but-event-publishing-fails"
+  ],
+  "furtherReading": [
+    {
+      "title": "Background tasks with hosted services — ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article"
+    },
+    {
+      "title": "Azure Queue Storage with .NET",
+      "url": "https://learn.microsoft.com/en-us/azure/storage/queues/",
+      "type": "article"
+    },
+    {
+      "title": "Designing Data-Intensive Applications, Chapter 11",
+      "url": "https://dataintensive.net/",
+      "type": "course"
+    }
+  ],
+  "technology": "Backend & Database"
 }

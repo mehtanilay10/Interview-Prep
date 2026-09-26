@@ -4,58 +4,124 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Boxing and hidden allocations",
-  "description": "Learn about Boxing and hidden allocations. Master the concepts, patterns, and best practices.",
+  "description": "Learn how boxing allocates memory on the heap, identify common hidden allocation patterns, and eliminate unnecessary GC pressure.",
   "order": 11,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": ["boxing", "allocations", "generics", "GC-pressure", "value-types"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Boxing and hidden allocations** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with boxing and hidden allocations."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of boxing and hidden allocations",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Boxing is one of the most common sources of hidden allocations in C# code. It happens whenever a value type — a `struct`, an `int`, a `bool` — is cast to `object` or to an interface type the struct implements. At that moment, the runtime allocates a new object on the managed heap, copies the value inside it, and returns a reference to the heap object. This allocation is invisible in your source code, which makes it easy to introduce accidentally in performance-sensitive paths."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding boxing and hidden allocations is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The reverse operation — unboxing — extracts the value type from the heap object. Unboxing is cheap: it reads a pointer and returns the value. But unboxing to a value type and then re-boxing it creates two heap allocations where zero were needed. In tight loops or frequently called methods, these hidden allocations can dominate your GC pressure and slow down your application without any obvious smoking gun."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What boxing actually does"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you write `object o = 42;`, the runtime performs three steps: it allocates a new object on the heap with the size of the boxed type plus the object header, it copies the value `42` into the object's data field, and it returns an `object` reference pointing to the heap object. The boxed object carries a type pointer so the runtime knows what type is inside. You can unbox it with `(int)o`, which reads the value without further allocation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Boxing and its hidden cost",
+        "code": "// Boxed allocation — 40 bytes on a 64-bit process\n// (8-byte header + 4-byte int + padding)\nobject boxedInt = 42;\n\nint unboxed = (int)boxedInt; // no new allocation\n\n// Common boxing traps:\n\n// 1. Casting to object\nvoid Log(object value)\n{\n    Console.WriteLine(value);\n}\nLog(42); // boxes int here\n\n// 2. Non-generic collections\nArrayList list = new ArrayList();\nlist.Add(42); // boxes int here\nlist.Add(\"text\"); // reference type, no boxing\n\n// 3. Calling non-generic interface methods\nvar comparer = Comparer.Default;\nint result = comparer.Compare(1, 2); // boxes ints here",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common hidden allocation patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Boxing is the most well-known hidden allocation, but it is not the only one. String concatenation in loops allocates a new string on every iteration. `nameof()` does not allocate, but string interpolation with non-string values does. `Guid.NewGuid()` allocates a 16-byte struct on the heap when boxed. `DateTime.UtcNow` returns a value type, but putting it in a non-generic collection boxes it. The pattern is always the same: a value type crosses a boundary that requires a reference type, and the runtime allocates to bridge the gap."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Finding hidden allocations with a benchmark",
+        "code": "using BenchmarkDotNet.Attributes;\nusing BenchmarkDotNet.Running;\n\n[MemoryDiagnoser]\npublic class BoxingBenchmarks\n{\n    private int _value = 42;\n\n    [Benchmark]\n    public string StringConcat()\n    {\n        string s = \"\";\n        for (int i = 0; i < 1000; i++)\n            s += i; // allocates new string each iteration\n        return s;\n    }\n\n    [Benchmark]\n    public string StringBuilder()\n    {\n        var sb = new System.Text.StringBuilder();\n        for (int i = 0; i < 1000; i++)\n            sb.Append(i); // no per-iteration allocation\n        return sb.ToString();\n    }\n}\n\nBenchmarkRunner.Run<BoxingBenchmarks>();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Eliminating boxing with generics and ReadOnlySpan<char>"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `where T : struct` constraint on generic methods tells the compiler that `T` is a value type. When the compiler sees `T` used in a generic context, it generates code that keeps `T` as a value type — no boxing. Similarly, `ReadOnlySpan<char>` replaces `string` in many parsing and comparison scenarios without allocating. The `string.Create` API introduced in .NET 6 builds strings without intermediate allocations by formatting directly into the final buffer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Generic method avoiding boxing",
+        "code": "static T Max<T>(T a, T b) where T : IComparable<T>\n{\n    // IComparable<T> is generic — no boxing when T is a value type\n    return a.CompareTo(b) > 0 ? a : b;\n}\n\nint maxInt = Max(10, 20);      // no boxing\nDateTime maxDate = Max(d1, d2); // no boxing\n\n// Compare with non-generic IComparable:\nstatic T MaxLegacy<T>(T a, T b) where T : IComparable\n{\n    // IComparable.CompareTo takes object — boxes value types\n    return a.CompareTo((object)b) > 0 ? a : b;\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with boxing and hidden allocations, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use BenchmarkDotNet to find boxing hotspots",
+        "text": "Boxing allocations are often invisible until you profile them. Run your code through BenchmarkDotNet with the `MemoryDiagnoser` attribute. It will report the number of allocations per operation. Look for any benchmark with more than 0 bytes allocated in a method that should be allocation-free. If a hot path is boxing, refactoring it to use generics or spans can eliminate thousands of allocations per second."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Boxing wraps a value type in a heap-allocated object whenever it is cast to `object` or a non-generic interface.",
+          "String concatenation in loops, non-generic collections, and interface dispatch are common hidden allocation sources.",
+          "`where T : struct` keeps value types unboxed in generic methods; prefer `IComparable<T>` over `IComparable`.",
+          "`ReadOnlySpan<char>` and `string.Create` eliminate intermediate allocations in string-heavy parsing."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["managed-heap-and-allocation-lifecycle", "allocation-pressure-and-latency", "spant-memoryt-and-ref-structs"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Boxing and unboxing",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/types/boxing-and-unboxing"
+    },
+    {
+      "type": "article",
+      "title": "BenchmarkDotNet MemoryDiagnoser",
+      "url": "https://benchmarkdotnet.org/articles/features/memorydiagnoser.html"
+    },
+    {
+      "type": "article",
+      "title": "ReadOnlySpan<char> and string processing",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.readonlyspan-1"
+    }
+  ]
 }

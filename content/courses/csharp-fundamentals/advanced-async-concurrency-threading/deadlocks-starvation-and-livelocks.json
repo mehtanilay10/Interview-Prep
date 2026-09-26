@@ -4,58 +4,112 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "Deadlocks, starvation and livelocks",
-  "description": "Learn about Deadlocks, starvation and livelocks. Master the concepts, patterns, and best practices.",
+  "description": "Detect and prevent deadlocks, thread starvation, and livelocks in concurrent C# applications.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Deadlocks, starvation and livelocks** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with deadlocks, starvation and livelocks."
+        "text": "Concurrency problems are not always obvious from a code review. Deadlocks, starvation, and livelocks are failures of coordination that can freeze or degrade an application for minutes before anyone notices."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Deadlocks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A deadlock occurs when two or more threads each hold a lock that the other needs, and neither can proceed. The classic conditions are mutual exclusion, hold and wait, no preemption, and circular wait. If any one of these is broken, a deadlock cannot occur."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Classic deadlock with two locks",
+        "language": "csharp",
+        "code": "private readonly object _x = new object();\nprivate readonly object _y = new object();\n\npublic void ThreadA()\n{\n    lock (_x)\n    {\n        Thread.Sleep(100); // Ensure Thread B acquires _y first\n        lock (_y)\n        {\n            Console.WriteLine(\"Thread A\");\n        }\n    }\n}\n\npublic void ThreadB()\n{\n    lock (_y)\n    {\n        lock (_x)\n        {\n            Console.WriteLine(\"Thread B\");\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Livelocks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A livelock looks like a deadlock but the threads are not blocked — they are actively running yet making no progress. This often happens when threads repeatedly detect a conflict and retry, but their retries always collide."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Livelock with aggressive retry",
+        "language": "csharp",
+        "code": "private readonly object _resource = new object();\n\npublic void WorkerA()\n{\n    while (true)\n    {\n        Thread.Sleep(10);\n        try\n        {\n            Monitor.TryEnter(_resource, 10);\n            {\n                DoWork();\n                Monitor.Exit(_resource);\n                break;\n            }\n        }\n        catch\n        {\n            // Keep retrying immediately\n        }\n    }\n}\n\npublic void WorkerB()\n{\n    while (true)\n    {\n        Thread.Sleep(10);\n        try\n        {\n            Monitor.TryEnter(_resource, 10);\n            {\n                DoWork();\n                Monitor.Exit(_resource);\n                break;\n            }\n        }\n        catch\n        {\n            // Keep retrying immediately\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thread starvation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Thread starvation is a scheduling problem: low-priority threads never get enough CPU time because higher-priority threads monopolize the processor. In the ThreadPool, this can happen if long-running CPU-bound tasks continuously occupy threads."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of deadlocks, starvation and livelocks",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**Avoid nested locks** — Acquire locks in a globally consistent order.",
+          "**Use timeouts** — `Monitor.TryEnter` with a timeout or `SemaphoreSlim.WaitAsync` with a timeout prevents indefinite waits.",
+          "**Prefer async I/O** — Frees threads instead of blocking them.",
+          "**Detect livelocks** — Add randomized backoff or jitter to retry logic."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding deadlocks, starvation and livelocks is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with deadlocks, starvation and livelocks, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "ThreadPool starvation is silent",
+        "text": "Unlike a deadlock, starvation does not freeze the application. It slows it down gradually. Monitor ThreadPool queue length and thread count with ETW or EventCounters to detect it early."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Deadlocks need four conditions; break any one to prevent them.",
+          "Livelocks waste CPU because threads keep retrying without progress.",
+          "Starvation slows an application when threads are chronically oversubscribed.",
+          "Use timeouts, consistent lock ordering, and async I/O to reduce risk."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "lock-and-monitor",
+    "task-scheduling-and-continuations",
+    "semaphoreslim-and-bounded-concurrency"
+  ],
+  "furtherReading": [
+    { "title": "Avoiding deadlocks (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/managed-threading-best-practices" },
+    { "title": "Detecting thread pool starvation (devblogs.microsoft.com)", "url": "https://devblogs.microsoft.com/dotnet/threadpool-starvation-and-how-to-avoid-it/" }
+  ]
 }

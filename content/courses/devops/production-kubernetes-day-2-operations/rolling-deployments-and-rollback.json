@@ -3,34 +3,62 @@
   "slug": "rolling-deployments-and-rollback",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Rolling deployments and rollback",
-  "description": "Learn about Rolling deployments and rollback. Master the concepts, patterns, and best practices.",
+  "title": "Rolling Deployments and Rollback",
+  "description": "Deploy new application versions with zero downtime using rolling updates, and recover quickly from bad releases using Kubernetes rollback mechanisms.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "deployments",
+    "rolling-updates",
+    "rollback",
+    "zero-downtime"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Rolling deployments and rollback** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rolling deployments and rollback."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Deploying Without Downtime"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of rolling deployments and rollback",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "A **rolling update** is Kubernetes's default strategy for updating Pods in a Deployment. Instead of taking down all old Pods and then starting new ones (which causes downtime), Kubernetes gradually replaces old Pods with new ones. At every moment during the update, some Pods are still serving the old version while others run the new version. Users experience no interruption."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You control the pace of a rolling update with two settings: `maxSurge` (how many extra Pods can run temporarily) and `maxUnavailable` (how many old Pods can be down at once). Tuning these values lets you balance update speed against resource availability."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Rolling update",
+            "definition": "A Deployment strategy that gradually replaces old Pods with new ones."
+          },
+          {
+            "term": "maxSurge",
+            "definition": "The maximum number of Pods that can exceed the desired replica count during an update."
+          },
+          {
+            "term": "maxUnavailable",
+            "definition": "The maximum number of Pods that can be unavailable during an update."
+          },
+          {
+            "term": "Rollback",
+            "definition": "Reverting a Deployment to a previous revision if the new version is faulty."
+          },
+          {
+            "term": "ReplicaSet revision",
+            "definition": "Each rollout creates a new ReplicaSet; Kubernetes keeps the old ones for rollback."
+          }
         ]
       }
     },
@@ -38,24 +66,140 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "How Rolling Updates Work"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rolling deployments and rollback is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "When you update the Pod template in a Deployment (e.g., change the container image tag), Kubernetes detects the change and starts a new rollout. It creates a new ReplicaSet with the updated template and gradually scales it up while scaling down the old ReplicaSet. The speed and safety of this process depend on your `strategy` configuration."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deployment with rolling update strategy",
+        "content": "Control the pace of updates with maxSurge and maxUnavailable.",
+        "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app\nspec:\n  replicas: 4\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1\n      maxUnavailable: 1\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - name: web\n        image: myregistry.io/web:2.3.1\n        ports:\n        - containerPort: 80",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performing a Rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a new release introduces bugs or performance issues, you can roll back to the previous known-good version with a single command. Kubernetes keeps the history of ReplicaSet revisions, so rollbacks are instant and reliable. You can roll back to any previous revision, not just the immediately preceding one."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rolling back a Deployment",
+        "content": "Use kubectl rollout commands to inspect and undo a deployment.",
+        "code": "# Check rollout history\nkubectl rollout history deployment/web-app\n\n# Roll back to the previous revision\nkubectl rollout undo deployment/web-app\n\n# Roll back to a specific revision\nkubectl rollout undo deployment/web-app --to-revision=2\n\n# Watch the rollback progress\nkubectl rollout status deployment/web-app",
+        "language": "bash"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rolling deployments and rollback, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Rollbacks are fast because ReplicaSets already exist",
+        "text": "Kubernetes does not need to re-pull images during a rollback — it simply scales the old ReplicaSet back up. This makes rollbacks nearly instantaneous, which is why rolling updates + rollbacks are the default for production deployments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Zero-Downtime Deployment Checklist"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "True zero downtime requires more than just rolling updates. Your application must handle being shut down gracefully and must be ready to accept traffic immediately after starting. Here are the key requirements."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "items": [
+          "Container image tag is explicit (not :latest) so Kubernetes detects changes.",
+          "Readiness probe is configured so Kubernetes only routes traffic to ready Pods.",
+          "Application handles SIGTERM and stops accepting new connections gracefully.",
+          "Rolling update strategy has sensible maxSurge and maxUnavailable values.",
+          "Database schema changes are backward-compatible (blue-green compatible).",
+          "Health endpoints are exposed on a dedicated port or path."
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Perform a rolling update and rollback",
+        "description": "Update an application version and practice rolling back.",
+        "steps": [
+          "Deploy an application with image tag v1.0.0 and 4 replicas.",
+          "Update the Deployment to image tag v2.0.0.",
+          "Watch the rollout with kubectl rollout status.",
+          "While the rollout is in progress, describe a Pod to see the old container being terminated and the new one starting.",
+          "Verify all Pods are running v2.0.0 with kubectl get pods.",
+          "Simulate a bad release by deploying a non-existent image tag.",
+          "Roll back using kubectl rollout undo and verify the version reverted."
+        ],
+        "expectedOutcome": "You can perform rolling updates safely and recover quickly from bad deployments using rollbacks."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Rolling updates gradually replace old Pods with new ones, maintaining availability throughout.",
+          "maxSurge and maxUnavailable control the speed and safety of each rollout.",
+          "Readiness probes ensure traffic only routes to fully started Pods.",
+          "Rollbacks are instant because Kubernetes retains old ReplicaSets.",
+          "Zero-downtime deployments require readiness probes, graceful shutdown, and backward-compatible changes."
+        ],
+        "takeaway": "Rolling updates give you safe, incremental deployments, and rollbacks give you a safety net when things go wrong."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "pods-and-workload-controllers",
+    "liveness-readiness-and-startup-probes",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Rolling Update Strategy",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Rollback",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-revision",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Pod Lifecycle",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "type": "article"
+    }
+  ]
 }

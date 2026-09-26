@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a background worker with no cancellation support** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a background worker with no cancellation support."
+        "text": "A hosted background service starts a long-running loop when the application begins. It processes a queue of work items without ever checking for cancellation. When the application shuts down, the worker is stopped abruptly, leaving in-flight work incomplete and potentially corrupting shared state. In production, this pattern causes data loss, hung shutdowns, and difficult-to-reproduce race conditions during deployments or scaling events."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a background worker with no cancellation support",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand how IHostedService and BackgroundService manage lifecycle",
+          "Learn why CancellationToken is passed to ExecuteAsync and how to use it",
+          "Identify common pitfalls of blocking loops and missing timeout logic",
+          "Apply cooperative cancellation patterns in long-running services"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "CancellationToken",
+            "definition": "A struct passed through the .NET dependency injection container that signals when an operation should stop cooperatively."
+          },
+          {
+            "term": "IHostedService",
+            "definition": "A .NET interface for background tasks that run alongside a web host or worker service."
+          },
+          {
+            "term": "BackgroundService",
+            "definition": "A base class that simplifies IHostedService implementation by providing an ExecuteAsync method with a cancellation token."
+          },
+          {
+            "term": "Cooperative cancellation",
+            "definition": "A pattern where running code periodically checks a cancellation token and exits gracefully instead of being forcibly terminated."
+          }
         ]
       }
     },
@@ -44,15 +67,179 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a background worker with no cancellation support is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Uncancellable background workers block graceful shutdown, corrupt in-flight database transactions, and leave message queues in an inconsistent state. In containerized environments, SIGTERM gives the process only seconds to exit. A worker that ignores cancellation will be killed mid-operation, which can duplicate messages, drop events, or leave files half-written."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a background worker with no cancellation support, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Cancellation is not optional",
+        "text": "Any long-running loop in ASP.NET Core or a Worker Service must observe the CancellationToken. If you do not check it, the runtime cannot guarantee safe shutdown, and your customers will see data loss during deployments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic implementation typically looks like this: a while loop runs forever, processing items from a channel or queue. The developer assumes the process will be terminated gently, but in practice Docker, Kubernetes, or IIS may end the process at any time after the shutdown signal. Without explicit cancellation checks, the worker has no way to finish the current item or release locks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Problematic implementation",
+        "content": "A background worker that never observes cancellation:",
+        "code": "public class BadWorker : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (true)\n        {\n            var item = await _queue.ReadAsync(stoppingToken);\n            await ProcessAsync(item);\n            // What happens to 'item' if the host stops here?\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct pattern passes the cancellation token through every async boundary, checks it before expensive synchronous work, and uses a timeout or bounded wait to ensure the loop can respond within the shutdown window. If the token is cancelled during processing, the worker should finish the current item, commit or rollback the transaction, and then exit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cooperative cancellation with timeout",
+        "content": "Pass the token through every async call and wrap blocking work in Task.Run with the token:",
+        "code": "public class GoodWorker : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);\n            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));\n\n            try\n            {\n                var item = await _queue.ReadAsync(timeoutCts.Token);\n                await ProcessAsync(item, stoppingToken);\n            }\n            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)\n            {\n                // Expected during shutdown; exit gracefully\n                break;\n            }\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Approaches to background work",
+        "cards": [
+          {
+            "title": "Fire-and-forget Task.Run",
+            "description": "Start a background task from a request without tracking it.",
+            "pros": ["Simple to write", "No hosted service required"],
+            "cons": ["No cancellation support", "Lost on process recycle", "No retry or monitoring"]
+          },
+          {
+            "title": "IHostedService without cancellation",
+            "description": "Run a loop in a hosted service but never check the token.",
+            "pros": ["Runs continuously", "Centralized registration"],
+            "cons": ["Cannot shut down gracefully", "Killed mid-operation", "Risk of data corruption"]
+          },
+          {
+            "title": "BackgroundService with cooperative cancellation",
+            "description": "Observe the cancellation token at every async boundary.",
+            "pros": ["Graceful shutdown", "Safe transaction boundaries", "Production-ready"],
+            "cons": ["Requires discipline to pass the token everywhere"]
+          },
+          {
+            "title": "External queue with retry and DLQ",
+            "description": "Offload work to a durable queue with retry logic and a dead-letter queue.",
+            "pros": ["Resilient to process crashes", "Built-in retry", "Decoupled from web app"],
+            "cons": ["Operational overhead", "Latency from queue round-trip"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "worker-cancellation-flow",
+        "caption": "Lifecycle of a well-behaved background worker during shutdown",
+        "definition": "graph LR\n    A[Host receives SIGTERM] --> B[StopAsync called]\n    B --> C[CancellationToken signaled]\n    C --> D{Worker checks token?}\n    D -->|Yes| E[Finish current item]\n    E --> F[Commit or rollback]\n    F --> G[Exit ExecuteAsync]\n    D -->|No| H[Worker killed mid-flight]\n    H --> I[Data corruption or loss]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Shutdown timeout matters",
+        "text": "The default shutdown timeout in ASP.NET Core is five seconds. If your worker needs longer to drain the queue, configure HostOptions.ShutdownTimeout. But the real fix is to make the worker cancellable, not to give it more time to ignore the signal."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Pitfalls"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Watch out for these mistakes",
+        "items": [
+          "Calling blocking code like Thread.Sleep inside ExecuteAsync without a cancellable alternative",
+          "Creating a new CancellationTokenSource inside the loop instead of using the injected token",
+          "Ignoring OperationCanceledException and letting it crash the worker",
+          "Holding a database transaction open across multiple queue reads",
+          "Assuming the host will wait indefinitely for the worker to finish"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I use CancellationToken.ThrowIfCancellationRequested in a loop?",
+            "answer": "Only if the loop body is purely synchronous and you want a cheap check. For async loops, prefer passing the token into async methods and catching OperationCanceledException."
+          },
+          {
+            "question": "What if my processing logic is not cancellable?",
+            "answer": "Break the work into smaller chunks. If a third-party library blocks, wrap it in Task.Run with the token and consider running it in a separate process so the host can terminate it independently."
+          },
+          {
+            "question": "Does IHostedService.StopAsync wait for ExecuteAsync to complete?",
+            "answer": "Yes. When StopAsync is called, the runtime signals the cancellation token and then waits for ExecuteAsync to return. If you ignore the token, StopAsync will eventually time out and the process will exit anyway."
+          },
+          {
+            "question": "Can I use ChannelReader.ReadAsync without a cancellation token?",
+            "answer": "You can, but then the call waits forever if the channel is empty. During shutdown, the host cannot wake the reader to finish. Always pass the cancellation token."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add cancellation to an existing worker",
+        "description": "Take a background worker that loops forever processing items. Refactor it to observe cancellation, finish the current item on shutdown, and exit within five seconds.",
+        "steps": [
+          "Add the CancellationToken parameter to ProcessAsync and pass it through every async call",
+          "Replace infinite while with while (!stoppingToken.IsCancellationRequested)",
+          "Wrap queue reads in a linked token source with a short timeout so the worker can wake up",
+          "Handle OperationCanceledException and break the loop gracefully",
+          "Write a test that cancels the token mid-processing and asserts the worker exits cleanly"
+        ],
+        "expectedOutcome": "The worker finishes the current item, commits any pending transaction, and exits without throwing or leaving orphaned resources."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "BackgroundService.ExecuteAsync receives a CancellationToken for a reason: use it",
+          "Pass the token through every async and IO-bound boundary",
+          "Finish the current item, then exit; do not abandon work mid-flight",
+          "Test shutdown behavior explicitly; it is the moment most bugs appear"
+        ],
+        "takeaway": "A cancellable worker turns a scary deployment into a routine operation."
       }
     }
   ],

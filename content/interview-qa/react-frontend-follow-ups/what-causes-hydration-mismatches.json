@@ -4,33 +4,51 @@
   "moduleSlug": "react-frontend-follow-ups",
   "courseSlug": "interview-qa",
   "title": "What causes hydration mismatches?",
-  "description": "Interview question: What causes hydration mismatches?. Learn the answer with detailed explanation and examples.",
+  "description": "Understand SSR/CSR divergence, how React hydrates, and the specific patterns that cause hydration mismatch errors in Next.js and other SSR frameworks.",
   "order": 5,
   "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["React", "SSR", "Next.js", "Hydration", "Rendering"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**What causes hydration mismatches?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with what causes hydration mismatches?."
+        "text": "Hydration is the process where React attaches event listeners and reconciles the server-rendered HTML with the client-side component tree. A **hydration mismatch** occurs when the server-generated markup differs from what the client renders. React detects the mismatch, logs a warning, and attempts to reconcile—but the result is often a flicker, missing interactivity, or a full client re-render that defeats the purpose of SSR."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How hydration works"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of what causes hydration mismatches?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "On the server, React renders components to HTML strings. The browser receives this HTML, displays it immediately (fast FCP), and then loads the JavaScript bundle. When the JS arrives, React builds the same component tree in memory, walks the existing DOM, and 'hydrates' it by attaching event listeners and setting up internal state. If the in-memory tree produces different HTML than what's in the DOM, React logs a hydration mismatch."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Hydration",
+            "definition": "The process of making a server-rendered page interactive by attaching React's event system and state to the existing DOM."
+          },
+          {
+            "term": "Hydration mismatch",
+            "definition": "A divergence between server-rendered HTML and client-rendered output, detected during hydration."
+          },
+          {
+            "term": "SSR",
+            "definition": "Server-Side Rendering: React renders components to HTML on the server before sending them to the browser."
+          },
+          {
+            "term": "CSR",
+            "definition": "Client-Side Rendering: the browser downloads JavaScript and renders the entire UI in the browser."
+          }
         ]
       }
     },
@@ -38,25 +56,177 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Common causes"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding what causes hydration mismatches? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Patterns that break hydration",
+        "items": [
+          "`Date.now()` or `Math.random()` in render—different values on server vs client",
+          "Browser-only APIs (`window`, `document`, `localStorage`) used during render before a guard",
+          "Third-party scripts that modify the DOM before React hydrates",
+          "Invalid HTML structure (e.g., `<p>` inside `<p>`) that browsers auto-correct differently",
+          "Conditional rendering based on `typeof window !== 'undefined'` without suppressing hydration",
+          "CSS-in-JS or global styles that change layout during hydration"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: random value causing mismatch"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Non-deterministic render",
+        "content": "The server renders one color, the client renders another. React sees the mismatch and warns.",
+        "code": "function PromoBanner() {\n  // Server picks blue; client picks green\n  const color = ['#2563eb', '#16a34a', '#9333ea'][Math.floor(Math.random() * 3)];\n  return <div style={{ background: color }}>Sale!</div>;\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: suppress hydration for known mismatches",
+        "content": "Next.js provides `suppressHydrationWarning` for cases where you know the content differs and it's intentional.",
+        "code": "function Timestamp() {\n  // Server renders 2026-09-26, client re-renders with actual local time\n  return (\n    <time suppressHydrationWarning datetime={new Date().toISOString()}>\n      {new Date().toLocaleString()}\n    </time>\n  );\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with what causes hydration mismatches?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Don't overuse suppressHydrationWarning",
+        "text": "This attribute silences the warning for that node only—it does not fix the mismatch. Use it sparingly for content that is genuinely expected to differ (timestamps, user-specific data). If the entire subtree is mismatched, React may discard the server-rendered content and render from scratch, negating SSR benefits."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Debugging hydration errors"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Step-by-step",
+        "items": [
+          "Check browser console for the specific hydration warning—it includes the mismatched text",
+          "View the page source (server HTML) and compare to what the client renders in DevTools",
+          "Search your code for non-deterministic values: `Date`, `Math.random`, `crypto`, `performance.now`",
+          "Temporarily add `console.log` at the top of suspect components to compare server vs client output",
+          "Use `useEffect` to defer client-only rendering until after mount"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Defer client-only code to useEffect",
+        "content": "Code that reads `localStorage` must not run during render. Wrap it in `useEffect` so it only runs on the client, after hydration.",
+        "code": "function ThemeToggle() {\n  const [theme, setTheme] = useState('system');\n\n  useEffect(() => {\n    // This runs only on the client, after hydration completes\n    const saved = localStorage.getItem('theme') ?? 'system';\n    setTheme(saved);\n  }, []);\n\n  return <button onClick={() => toggleTheme(theme)}>Toggle theme</button>;\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hydration process"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hydration-flow",
+        "caption": "Server render, transport, and client hydration sequence",
+        "definition": "sequenceDiagram\n    participant S as Server\n    participant B as Browser\n    participant R as React (Client)\n    S->>S: Render components to HTML string\n    S->>B: Send HTML + script tags\n    B->>B: Paint HTML immediately (FCP)\n    B->>B: Download JS bundle\n    R->>R: Build component tree in memory\n    R->>B: Walk existing DOM nodes\n    alt DOM matches expected output\n        R->>B: Attach event listeners (hydrated)\n    else Mismatch detected\n        R->>R: Log warning\n        R->>B: Attempt reconciliation\n        Note over R,B: May cause visual flicker or full re-render\n    end"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FAQ"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-up questions",
+        "items": [
+          {
+            "question": "Does a hydration mismatch always cause a visible bug?",
+            "answer": "No. React attempts to recover by re-rendering the mismatched subtree on the client. The user may see a brief flash of wrong content, or the component may work correctly after recovery. But the warning means SSR's benefit (fast FCP without JS) is partially wasted."
+          },
+          {
+            "question": "What's the difference between a hydration mismatch and a render error?",
+            "answer": "A hydration mismatch means the server and client produced different markup. A render error means the component threw during render. Mismatches are usually recoverable; render errors crash the component tree and show an error boundary."
+          },
+          {
+            "question": "Why do I see 'Text content did not match' specifically?",
+            "answer": "This is the most common mismatch. It happens when a component renders different text on server vs client—often due to timestamps, localized dates, or user-specific content rendered before authentication state is available."
+          },
+          {
+            "question": "Can I disable SSR to avoid hydration issues entirely?",
+            "answer": "You can, but you lose FCP benefits and hurt SEO. A better approach is to ensure server and client render the same content by default and only diverge in `useEffect` for genuinely client-only logic."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Hydration requires server and client to produce identical HTML",
+          "Non-deterministic values (`Date.now`, `Math.random`) are the most common cause",
+          "Use `suppressHydrationWarning` for intentionally mismatched content",
+          "Defer browser-only code to `useEffect` so it runs after hydration"
+        ],
+        "takeaway": "Make server and client render the same thing by default. Defer differences to client-only effects."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Further reading"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Next.js: [Troubleshooting hydration errors](https://nextjs.org/docs/messages/react-hydration-mismatch)",
+          "React Docs: [Hydration](https://react.dev/reference/react-dom/client/hydrateRoot)",
+          "web.dev: [Render HTML on the server](https://web.dev/rendering-on-the-web/)"
+        ]
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "furtherReading": [
+    {
+      "title": "Next.js: Troubleshooting hydration errors",
+      "url": "https://nextjs.org/docs/messages/react-hydration-mismatch",
+      "type": "article"
+    },
+    {
+      "title": "React Docs: HydrateRoot",
+      "url": "https://react.dev/reference/react-dom/client/hydrateRoot",
+      "type": "article"
+    }
+  ],
+  "technology": "React"
 }

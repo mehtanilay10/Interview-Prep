@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Notification architecture** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with notification architecture."
+        "text": "Notification architecture extends real-time messaging to mobile push, email, and in-app banners. The challenge is not delivering a single notification; it is delivering the right notification to the right device, deduplicating across channels, and respecting user preferences without overwhelming them. Senior engineers treat notifications as a product feature with strict rate limits and measurable engagement metrics."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of notification architecture",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Separate notification creation from notification delivery to allow retry and fan-out",
+          "Use a notification worker that listens to a message bus and applies user preferences and rate limits",
+          "Support multiple channels: in-app, WebSocket push, mobile push (APNs, FCM), and email",
+          "Deduplicate notifications across channels so a user does not receive both an in-app banner and an email for the same event",
+          "Implement per-user and per-channel rate limits to prevent notification fatigue",
+          "Store notification preferences per channel per user: quiet hours, muted conversations, and importance thresholds",
+          "Design the data model to support both transactional notifications and aggregate digests"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Fan-out",
+            "definition": "Sending a single event to multiple delivery channels or recipients, often implemented as a publish-subscribe pattern."
+          },
+          {
+            "term": "Push notification provider",
+            "definition": "An external service such as Apple Push Notification service or Firebase Cloud Messaging that delivers notifications to mobile devices."
+          },
+          {
+            "term": "Quiet hours",
+            "definition": "A user-defined time window during which non-critical notifications are suppressed or batched."
+          },
+          {
+            "term": "Notification fatigue",
+            "definition": "The diminished response to notifications caused by excessive volume, leading users to disable or ignore all notifications."
+          },
+          {
+            "term": "Digest",
+            "definition": "A batched summary of multiple notifications delivered as a single message at a scheduled interval."
+          }
         ]
       }
     },
@@ -44,18 +74,147 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding notification architecture is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Notifications are the primary retention lever for communication platforms. If users disable notifications because they are noisy or irrelevant, engagement drops and the product loses its real-time advantage. A senior engineer designs the notification system with user preference, channel capability, and rate limiting as first-class concerns."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with notification architecture, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Respect user attention",
+        "text": "Always provide a way to mute or unsubscribe. Rate-limit notifications to a maximum of ten per user per hour for non-critical events. For critical alerts such as security or billing, bypass the rate limit but still allow users to opt out."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Notification delivery flow"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Event occurs: message received, mention, or system alert",
+          "Notification service creates a notification record with event type, recipients, and payload",
+          "Worker loads user preferences for each recipient: enabled channels, quiet hours, importance threshold",
+          "Worker filters recipients who should not receive this notification based on preferences",
+          "Worker applies rate limiting: if the user has exceeded the channel limit, defer to digest",
+          "Worker delivers via the highest-priority enabled channel: in-app if online, mobile push if app installed, email as fallback",
+          "Worker records delivery status and increments the user notification counter"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-notification-flow",
+        "caption": "Notification delivery and fan-out architecture",
+        "definition": "graph TD\n    A[Event: message sent] --> B[Notification Service]\n    B --> C[Create notification record]\n    C --> D[Worker loads preferences]\n    D --> E{User muted channel?}\n    E -->|Yes| F[Skip delivery]\n    E -->|No| G{Rate limit exceeded?}\n    G -->|Yes| H[Add to digest queue]\n    G -->|No| I{App in foreground?}\n    I -->|Yes| J[In-app banner]\n    I -->|No| K[Mobile push via FCM/APNs]\n    K --> L[Email fallback if no device]\n    J --> M[Record delivery status]\n    L --> M"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: in-app versus push versus email"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Notification channels",
+        "cards": [
+          {
+            "title": "In-app notification",
+            "description": "Delivered through the WebSocket connection while the app is open.",
+            "pros": ["Immediate delivery", "No external dependency", "Rich interactive UI"],
+            "cons": ["Missed when app is closed", "Requires active connection"]
+          },
+          {
+            "title": "Mobile push notification",
+            "description": "Delivered through FCM or APNs to the device notification center.",
+            "pros": ["Reaches user when app is closed", "High engagement", "Rich media support"],
+            "cons": ["External dependency", "Rate limited by provider", "Delivery not guaranteed"]
+          },
+          {
+            "title": "Email notification",
+            "description": "Delivered to the user email inbox asynchronously.",
+            "pros": ["Persistent", "Works for all users", "Good for digests"],
+            "cons": ["High latency", "Low engagement for real-time", "Spam risk"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design a notification worker",
+        "description": "Design a worker that receives events from a message bus and delivers notifications according to user preferences and rate limits. The worker should support in-app, mobile push, and email channels.",
+        "steps": [
+          "Define the notification schema: eventType, recipientId, channel, payload, priority, and createdAt",
+          "Implement a preference loader that returns enabled channels and quiet hours for a user",
+          "Implement a rate limiter using a Redis sorted set per user per channel",
+          "Implement channel delivery adapters: WebSocket for in-app, FCM/APNs for mobile, SMTP or SES for email",
+          "Implement a digest queue that batches non-critical notifications for hourly delivery",
+          "Write a delivery log that records success, failure, and reason for each attempt"
+        ],
+        "expectedOutcome": "You should have a worker that respects user preferences, avoids notification fatigue, and provides clear delivery observability."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How do I handle mobile push token rotation?",
+            "answer": "Store the latest token per user per device. On each delivery attempt, if the provider returns NotRegistered or InvalidRegistration, remove the token and prompt the user to re-enable notifications."
+          },
+          {
+            "question": "What if FCM is down?",
+            "answer": "FCM is highly available, but you should still implement a fallback: queue the notification for retry and deliver via email or in-app when the user opens the app. Do not block the worker waiting for FCM."
+          },
+          {
+            "question": "Should I persist every notification?",
+            "answer": "Yes. Persist notifications so users can view their notification history and so you can deduplicate across retries. Use the notification ID as the idempotency key."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Decouple notification creation from delivery with a worker and message bus",
+          "Respect user preferences and rate limits on every delivery",
+          "Use mobile push for critical real-time alerts and email for digests",
+          "Persist notifications for history, deduplication, and analytics"
+        ],
+        "takeaway": "Notifications are a product feature, not an infrastructure afterthought. The best notification systems are quiet by default and loud only when truly necessary."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "websocket-connection-lifecycle",
+    "presence-and-typing-indicators"
+  ],
+  "furtherReading": [
+    {
+      "title": "Web Push Protocol",
+      "url": "https://web.dev/learn/push/web-push-protocol/",
+      "type": "article",
+      "author": "web.dev",
+      "description": "How the Web Push protocol works with VAPID keys and service workers for browser notifications."
+    }
+  ]
 }

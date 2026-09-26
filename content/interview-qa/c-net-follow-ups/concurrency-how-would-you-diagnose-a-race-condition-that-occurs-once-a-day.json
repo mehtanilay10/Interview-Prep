@@ -4,33 +4,82 @@
   "moduleSlug": "c-net-follow-ups",
   "courseSlug": "interview-qa",
   "title": "Concurrency: how would you diagnose a race condition that occurs once a day?",
-  "description": "Interview question: Concurrency: how would you diagnose a race condition that occurs once a day?. Learn the answer with detailed explanation and examples.",
+  "description": "Learn a systematic approach to reproducing, capturing, and fixing intermittent race conditions in production C# applications.",
   "order": 5,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": [
+    "concurrency",
+    "race-condition",
+    "threading",
+    "debugging",
+    "reliability"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Concurrency: how would you diagnose a race condition that occurs once a day?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with concurrency: how would you diagnose a race condition that occurs once a day?."
+        "text": "A race condition that happens once a day is one of the hardest bugs to fix. The usual debugging techniques — breakpoints, single-stepping, and local reproduction — often fail because timing changes when you attach a debugger. A systematic investigation strategy is more valuable than any single tool."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start by defining the observable failure: corrupted state, a duplicate record, a thrown exception, or an incorrect calculation. The failure tells you which shared resource is contested and narrows the search space."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Reproduction under pressure"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
+        "text": "Because the bug is rare, you need to amplify the conditions that expose it. Run multiple instances in parallel, inject artificial delays, or lower the contention threshold so the window of vulnerability widens."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Amplifying a race with delays",
+        "content": "This simplified example shows two threads updating a shared counter without synchronization. Adding Thread.Sleep widens the race window for demonstration; in production you would use this pattern only in a controlled test.",
+        "code": "private int _balance;\n\npublic void Transfer(int amount)\n{\n    int current = _balance;\n    Thread.Sleep(10); // widen the window for demo\n    _balance = current - amount;\n}\n\n// Two concurrent transfers may both read the same balance.\nTask.WaitAll(\n    Task.Run(() => Transfer(100)),\n    Task.Run(() => Transfer(100))\n);\n\n// Expected: balance decreases by 200\n// Actual:   balance may decrease by only 100",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Do not use Thread.Sleep in production",
+        "text": "Sleep only in test harnesses. In production, capture production artifacts: ETW traces, EventSource events, and structured logs with correlation IDs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Production investigation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you cannot reproduce locally, collect evidence from production without stopping the service. The goal is to record the exact sequence of events that led to the corrupted state."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Production steps",
         "items": [
-          "Understand the step-by-step process of concurrency: would you diagnose a race condition that occurs once a day?",
-          "Identify the key components and their interactions",
-          "Recognize common failure points and how to avoid them",
-          "Apply best practices for reliable implementation"
+          "Instrument the suspicious code path with structured logs that include request IDs, thread IDs, and timestamps.",
+          "Enable `System.Diagnostics` EventSource listeners and capture ETW traces with `dotnet-trace`.",
+          "Look for overlapping timestamps on the same resource: two writes within microseconds are a strong signal.",
+          "If the bug involves a database, enable SQL Server audit or PostgreSQL log_statement to see interleaved transactions."
         ]
       }
     },
@@ -38,25 +87,71 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Fixes and patterns"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding concurrency: how would you diagnose a race condition that occurs once a day? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Once you know which resource is contested, choose the light-weight synchronization primitive that fits the access pattern. Do not default to `lock` for every scenario; reader/writer locks, `SemaphoreSlim`, and lock-free algorithms have specific trade-offs."
       }
     },
     {
-      "type": "callout",
+      "type": "bullet-list",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with concurrency: how would you diagnose a race condition that occurs once a day?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Common fixes",
+        "items": [
+          "Use `lock` (or `Monitor.Enter/Exit`) for simple mutual exclusion on reference types.",
+          "Use `ReaderWriterLockSlim` when reads dominate writes.",
+          "Use `Interlocked` for atomic updates to numeric or reference fields.",
+          "Prefer immutable data structures or message passing to avoid shared mutable state."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Thread-safe counter",
+        "content": "This version uses Interlocked to guarantee that the decrement is atomic.",
+        "code": "private int _balance;\n\npublic void Transfer(int amount)\n{\n    int initial, updated;\n    do\n    {\n        initial = _balance;\n        updated = initial - amount;\n    } while (Interlocked.CompareExchange(\n               ref _balance, updated, initial) != initial);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Race conditions require evidence: logs, traces, and dumps — not guesswork.",
+          "Amplify timing windows in test environments to make the bug reproducible.",
+          "Pick the lightest synchronization primitive that solves the problem.",
+          "Immutable data and message passing eliminate many races by design."
+        ],
+        "takeaway": "Diagnose with production telemetry first, then reproduce in a controlled test, then apply the simplest correct fix."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation",
+    "dependency-injection-what-happens-when-a-singleton-depends-on-a-scoped-service",
+    "taskrun-when-is-it-appropriate-in-an-aspnet-core-application"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft — Threading and synchronization",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/",
+      "type": "article"
+    },
+    {
+      "title": "Vance Morrison — Finding race conditions",
+      "url": "https://learn.microsoft.com/en-us/archive/blogs/vancem/finding-race-conditions-in-your-code",
+      "type": "article"
+    },
+    {
+      "title": "JetBrains — dotMemory race detection",
+      "url": "https://www.jetbrains.com/help/dotmemory/Analyzing_Race_Conditions.html",
+      "type": "tool"
+    }
+  ],
+  "technology": "C#"
 }

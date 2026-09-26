@@ -4,58 +4,212 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Artifact versioning",
-  "description": "Learn about Artifact versioning. Master the concepts, patterns, and best practices.",
+  "description": "Apply deterministic versioning schemes to CI/CD artifacts so teams can trace, compare, and roll back releases with confidence.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "CI/CD",
+    "versioning",
+    "artifacts",
+    "traceability"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Artifact versioning** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with artifact versioning."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of artifact versioning",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "An artifact without a version is a black box. When something goes wrong in production, the first question is always the same: which exact build caused this? Versioning answers that question. It also determines whether you can safely run multiple versions side by side, whether dependencies resolve correctly, and whether rollbacks are auditable."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding artifact versioning is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "This lesson covers semantic versioning for binaries, container images, and package registries. You will learn how to generate versions in CI, how to avoid collisions, and how to make version metadata useful for humans and machines."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Semantic versioning for artifacts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Semantic Versioning, or SemVer, uses three numbers: MAJOR.MINOR.PATCH. A major bump means breaking changes. A minor bump means new, backward-compatible features. A patch bump means backward-compatible fixes. Many teams extend this with a build metadata suffix, such as a commit SHA or build number, so each artifact is uniquely identifiable."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Docker image tags with SemVer and Git SHA",
+        "content": "Tag images so the registry reflects both user-facing version and exact source commit.",
+        "code": "# Build arguments\nARG COMMIT_SHA=unknown\nARG VERSION=1.2.3\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final\nWORKDIR /app\nCOPY --from=publish /app/publish .\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]\n\n# Tag this image as:\n# myregistry.azurecr.io/myapp:1.2.3\n# myregistry.azurecr.io/myapp:1.2.3-sha.a1b2c3d\n# myregistry.azurecr.io/myapp:latest",
+        "language": "dockerfile"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Generating versions in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CI systems can generate versions automatically from Git tags, commit counts, or build numbers. The safest approach is to derive the version from an existing Git tag and append build metadata from the pipeline. This keeps human-readable versions aligned with machine-generated identifiers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "GitVersion in GitHub Actions",
+        "content": "GitVersion calculates SemVer from branching strategy and Git history.",
+        "code": "jobs:\n  version:\n    runs-on: ubuntu-latest\n    outputs:\n      semver: ${{ steps.version.outputs.semver }}\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: gittools/gitversion/actions/run@v5\n        id: version\n        with:\n          useConfigFile: true\n      - run: echo \"semver=${{ steps.version.outputs.semver }}\" >> $GITHUB_OUTPUT",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Artifact type",
+          "Recommended version field",
+          "Uniqueness guarantee",
+          "Common registry"
+        ],
+        "rows": [
+          [
+            "NuGet package",
+            "PackageVersion (1.2.3-build.123)",
+            "Version + build number",
+            "NuGet.org / Azure Artifacts"
+          ],
+          [
+            "Docker image",
+            "Tag: 1.2.3-sha.a1b2c3d",
+            "Registry + tag",
+            "ACR / Docker Hub / ECR"
+          ],
+          [
+            "npm package",
+            "version in package.json",
+            "Version + tarball hash",
+            "npm / GitHub Packages"
+          ],
+          [
+            "Maven artifact",
+            "version + buildNumber",
+            "Version + timestamp",
+            "Maven Central / Azure Artifacts"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with artifact versioning, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid latest in production",
+        "text": "The 'latest' tag is mutable and ambiguous. Always deploy by digest or explicit version in production pipelines so you can reproduce any release."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Version metadata in practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Good versioning is not just a string. It is structured metadata attached to the artifact. Store the commit SHA, build URL, triggered branch, and who approved the release inside the artifact manifest or registry metadata. When an incident happens, these fields let you reconstruct the exact pipeline run that produced the bad artifact."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Artifact versioning checklist",
+        "items": [
+          {
+            "text": "Every published artifact has a unique, non-mutable version.",
+            "hint": "No overwriting tags; use append-only registries."
+          },
+          {
+            "text": "The version encodes the SemVer and build metadata.",
+            "hint": "Example: 2.1.0-sha.4f3a2b1"
+          },
+          {
+            "text": "Registries retain artifacts for at least the rollback window.",
+            "hint": "Match retention to your deployment SLA."
+          },
+          {
+            "text": "Deploy pipelines reference artifacts by version, not by branch.",
+            "hint": "This prevents accidental promotion of unverified builds."
+          },
+          {
+            "text": "Version metadata includes commit SHA and build URL.",
+            "hint": "Critical for incident response."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "SemVer gives humans a readable contract about change impact.",
+          "Append build metadata, such as a commit SHA, to make each artifact unique.",
+          "Never use mutable tags like 'latest' for production deployments.",
+          "Store traceable metadata alongside the artifact so incidents are debuggable."
+        ],
+        "takeaway": "If you cannot name the exact build running in production, you cannot safely operate it."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I version every commit or only releases?",
+            "answer": "Version every build that might be deployed. Even internal snapshots benefit from unique identifiers. For public releases, follow SemVer strictly."
+          },
+          {
+            "question": "What if my registry does not support SemVer?",
+            "answer": "Use the registry's native tag or version field, but still embed SemVer and build metadata in the tag string. Consistency matters more than the registry feature set."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "environment-promotion",
+    "supply-chain-security-in-cicd"
+  ],
+  "furtherReading": [
+    {
+      "title": "Semantic Versioning 2.0.0",
+      "url": "https://semver.org/",
+      "type": "article",
+      "description": "The official SemVer specification and FAQ."
+    },
+    {
+      "title": "GitVersion Documentation",
+      "url": "https://gitversion.net/docs/",
+      "type": "article",
+      "description": "Automated SemVer calculation from Git history."
+    },
+    {
+      "title": "Container Image Versioning Best Practices",
+      "url": "https://learn.microsoft.com/en-us/azure/container-apps/revision-management",
+      "type": "article",
+      "description": "How Azure Container Apps handles immutable revisions and tags."
+    }
+  ]
 }

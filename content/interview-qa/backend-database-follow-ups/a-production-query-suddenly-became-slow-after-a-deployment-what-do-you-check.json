@@ -4,33 +4,46 @@
   "moduleSlug": "backend-database-follow-ups",
   "courseSlug": "interview-qa",
   "title": "A production query suddenly became slow after a deployment: what do you check?",
-  "description": "Interview question: A production query suddenly became slow after a deployment: what do you check?. Learn the answer with detailed explanation and examples.",
+  "description": "Focus your investigation on deployment artifacts, query-plan changes, parameter sniffing, and index state after a code release.",
   "order": 2,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": [
+    "backend",
+    "database",
+    "sql-server",
+    "query-performance"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A production query suddenly became slow after a deployment: what do you check?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a production query suddenly became slow after a deployment: what do you check?."
+        "text": "This is a very specific and common scenario: a query that ran in milliseconds is now taking seconds, and the change correlates with a deployment. The deployment did not touch the database schema directly, yet the query regressed. The interviewer is testing whether you understand the connection between application changes and database behavior."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The first thing to verify is correlation, not causation. Confirm that the slow query window actually overlaps with the deployment time and that the same query text is being executed. Sometimes a new code path calls a different stored procedure or uses a different parameter shape that produces a different plan."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Step-by-step checklist"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of a production query suddenly became slow after a deployment: what do you check?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Pull the exact SQL text executed before and after the deployment from the query store or DMVs.",
+          "Compare execution plans. Look for index scans replacing index seeks, or new Key Lookup operators.",
+          "Check for parameter sniffing: a plan compiled for atypical parameter values may be reused for the general workload.",
+          "Review recent schema changes: even if the deployment is application code, migrations may have run.",
+          "Inspect statistics and index fragmentation on the affected tables.",
+          "Check for blocking or deadlocks introduced by new transaction scopes or isolation levels."
         ]
       }
     },
@@ -38,25 +51,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Parameter sniffing example"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding a production query suddenly became slow after a deployment: what do you check? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Parameter sniffing happens when SQL Server compiles a plan based on the first parameter value it sees. If that value is unusual — say, a rare status code — the optimizer may choose a nested-loops plan that is terrible for the common case. The deployment may have changed which value is passed first."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Server: Inspect plan differences with Query Store",
+        "language": "sql",
+        "code": "SELECT qsqt.query_sql_text,\n       qsp.plan_id,\n       qrs.avg_duration,\n       qrs.last_execution_time\nFROM sys.query_store_query_text AS qsqt\nJOIN sys.query_store_query AS qsq\n    ON qsqt.query_text_id = qsq.query_text_id\nJOIN sys.query_store_plan AS qsp\n    ON qsq.query_id = qsp.query_id\nJOIN sys.query_store_runtime_stats AS qrs\n    ON qsp.plan_id = qrs.plan_id\nWHERE qsqt.query_sql_text LIKE '%OrdersByStatus%'\n  AND qrs.last_execution_time >= DATEADD(HOUR, -2, GETUTCDATE())\nORDER BY qrs.avg_duration DESC;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Mitigation strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use OPTION (RECOMPILE) or OPTIMIZE FOR UNKNOWN for queries with highly variable parameters.",
+          "Implement plan guides or forced plans only as a last resort with full testing.",
+          "Update statistics with FULLSCAN after large data changes: UPDATE STATISTICS Orders WITH FULLSCAN.",
+          "Rebuild or reorganize fragmented indexes if seek degradation is visible in the plan.",
+          "Add query-level logging in the application to capture parameter values alongside duration."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a production query suddenly became slow after a deployment: what do you check?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use Query Store as your safety net",
+        "text": "Enable Query Store on every production database. It lets you compare plans before and after regressions and force a known-good plan while you fix the root cause."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Correlation is not causation: verify the deployment actually changed the query execution path.",
+          "Compare execution plans — look for scan-vs-seek changes and new operators.",
+          "Parameter sniffing is the most common silent cause of post-deployment query regressions.",
+          "Query Store is your best tool for diagnosing plan regressions in SQL Server."
+        ],
+        "takeaway": "Compare execution plans before and after the deployment to find the exact regression source."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "api-latency-increased-from-100ms-to-4-seconds-how-do-you-investigate",
+    "how-would-you-handle-a-database-deadlock-in-production"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL Server Query Store best practices",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/query-store-best-practices",
+      "type": "article"
+    },
+    {
+      "title": "Parameter sniffing in SQL Server",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/parameter-sensitive-plan-optimization",
+      "type": "article"
+    },
+    {
+      "title": "Brent Ozar's guide to query plan regression",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store",
+      "type": "article"
+    }
+  ],
+  "technology": "Backend & Database"
 }

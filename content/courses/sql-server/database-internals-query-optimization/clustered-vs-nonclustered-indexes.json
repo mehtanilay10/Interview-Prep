@@ -4,58 +4,158 @@
   "moduleSlug": "database-internals-query-optimization",
   "courseSlug": "sql-server",
   "title": "Clustered vs nonclustered indexes",
-  "description": "Learn about Clustered vs nonclustered indexes. Master the concepts, patterns, and best practices.",
+  "description": "Compare clustered and nonclustered indexes in SQL Server, including how data is stored, read, and maintained.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Clustered vs nonclustered indexes** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with clustered vs nonclustered indexes."
+        "text": "A clustered index determines the physical order of rows in a table. A nonclustered index is stored separately and contains a copy of the indexed columns plus a row locator. Choosing the right type for each table is one of the most important decisions you will make for query performance."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the core differences between clustered and nonclustered indexes",
-          "Know when to choose clustered over nonclustered indexes",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Clustered index basics"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding clustered vs nonclustered indexes is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Because the leaf level of a clustered index IS the data, range scans on the clustered key are very fast. SQL Server can read adjacent rows directly from the same page chain. However, every nonclustered index must include the clustered key as its row locator, so a wide clustered key makes every nonclustered index larger."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Wide clustered keys are expensive",
+        "text": "If you create a clustered index on a 16-byte uniqueidentifier or a composite of several varchar columns, every nonclustered index in that table stores that large key on every row. Prefer narrow, immutable values like int or bigint for clustered keys."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Nonclustered index basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A nonclustered index contains the indexed key columns at every level of the B-tree. At the leaf level, it also includes the clustered index key (or a RID for heaps). This means nonclustered indexes are smaller than the table itself, but retrieving all columns requires a lookup back to the base table or clustered index."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a clustered index on Orders",
+        "content": "This example creates a clustered index on the OrderDate column so recent orders are stored together.",
+        "code": "CREATE CLUSTERED INDEX IX_Orders_OrderDate\nON dbo.Orders (OrderDate);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a nonclustered index on Orders",
+        "content": "This example creates a nonclustered index on CustomerID. The leaf level stores CustomerID plus the clustered key (OrderID in this case).",
+        "code": "CREATE NONCLUSTERED INDEX IX_Orders_CustomerID\nON dbo.Orders (CustomerID)\nINCLUDE (OrderDate, TotalAmount);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison at a glance"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Clustered index",
+          "Nonclustered index"
+        ],
+        "rows": [
+          [
+            "Physical order",
+            "Yes",
+            "No"
+          ],
+          [
+            "Leaf level contains",
+            "Data rows",
+            "Key columns + row locator"
+          ],
+          [
+            "One per table",
+            "Yes",
+            "Up to 999"
+          ],
+          [
+            "Impact on other indexes",
+            "Every nonclustered index stores the clustered key",
+            "None"
+          ],
+          [
+            "Range query speed",
+            "Very fast",
+            "Depends on lookup cost"
+          ],
+          [
+            "Insert pattern",
+            "Can cause page splits at the end of the range",
+            "Can cause page splits anywhere"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with clustered vs nonclustered indexes, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Heaps vs clustered tables",
+        "text": "A table without a clustered index is called a heap. Heaps avoid page splits on inserts, but scans can be slower because rows are unordered. For most production tables, a well-chosen clustered index is better than a heap."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Takeaway",
+        "points": [
+          "A clustered index defines physical row order; there can be only one per table",
+          "Every nonclustered index stores the clustered key as its row locator",
+          "Narrow clustered keys keep nonclustered indexes smaller",
+          "Range queries benefit most from clustered indexes"
+        ],
+        "takeaway": "Choose a clustered index on a narrow, ever-increasing, frequently filtered column to keep all related indexes and range queries efficient."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "b-tree-indexes-and-page-structure",
+    "included-columns-and-covering-indexes",
+    "seek-vs-scan"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs - Clustered and Nonclustered Indexes",
+      "url": "https://learn.microsoft.com/sql/relational-databases/indexes/clustered-and-nonclustered-indexes-described",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Brent Ozar - How to Choose a Clustered Index",
+      "url": "https://learn.microsoft.com/sql/relational-databases/databases/database-identifiers",
+      "type": "article",
+      "author": "Brent Ozar"
+    }
+  ]
 }

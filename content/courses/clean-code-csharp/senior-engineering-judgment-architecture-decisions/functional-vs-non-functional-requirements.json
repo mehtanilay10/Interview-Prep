@@ -3,34 +3,47 @@
   "slug": "functional-vs-non-functional-requirements",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "Functional vs non-functional requirements",
-  "description": "Learn about Functional vs non-functional requirements. Master the concepts, patterns, and best practices.",
+  "title": "Functional vs Non-Functional Requirements",
+  "description": "Understand how to separate what a system must do from how well it must do it, and why both categories drive equally important architecture decisions.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "requirements",
+    "architecture",
+    "performance",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Functional vs non-functional requirements** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with functional vs non-functional requirements."
+        "text": "Every software system has two kinds of requirements. Functional requirements describe what the system does: a user can place an order, a report can be generated, an email can be sent. Non-functional requirements describe how the system does it: the order must complete in under two seconds, the report must be available 99.9 percent of the time, the email must be encrypted in transit. Both are mandatory. Both constrain architecture. And confusing them is one of the most common sources of late-project surprises."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a C# codebase, functional requirements usually map directly to methods, classes, and API endpoints. Non-functional requirements map to cross-cutting concerns: caching strategies, database indexing, async pipelines, logging infrastructure, and deployment topology. A senior engineer treats both categories with equal seriousness because non-functional requirements are often the ones that make or break a system in production."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Functional Requirements"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Characteristics of functional requirements",
         "items": [
-          "Understand the core differences between functional and non-functional requirements",
-          "Know when to choose functional over non-functional requirements",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Describe specific business behaviors and user interactions.",
+          "Can usually be tested as pass or fail with clear acceptance criteria.",
+          "Often expressed as user stories or use cases.",
+          "Map directly to features visible to users or external systems.",
+          "Examples: 'A user can reset their password,' 'The system sends a confirmation email.'"
         ]
       }
     },
@@ -38,24 +51,126 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Non-Functional Requirements"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding functional vs non-functional requirements is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Characteristics of non-functional requirements",
+        "items": [
+          "Describe quality attributes: performance, security, reliability, maintainability.",
+          "Often expressed as constraints, targets, or policies rather than features.",
+          "Harder to test directly; usually validated through load tests, audits, or benchmarks.",
+          "Apply to the system as a whole rather than a single feature.",
+          "Examples: 'The API must handle 1,000 requests per second,' 'Data must be encrypted at rest.'"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with functional vs non-functional requirements, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "The non-functional iceberg",
+        "text": "Functional requirements are visible in the product; non-functional requirements are often invisible until they fail. A system can have every functional requirement met and still be unusable if it is too slow, too insecure, or too unreliable. Always document non-functional requirements explicitly and treat them as first-class constraints, not afterthoughts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Each Type Shapes C# Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A functional requirement like 'generate an invoice PDF' leads you to choose a PDF library and design an Invoice service. A non-functional requirement like 'generate 500 invoices per minute' leads you to consider parallel processing, background queues, and memory management. In C#, the first is straightforward; the second requires understanding channels, background services, and resource pooling."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Functional requirement implementation",
+        "content": "A straightforward service method that satisfies a functional requirement.",
+        "language": "csharp",
+        "code": "public interface IInvoiceService\n{\n    Task<InvoiceResult> GenerateAsync(InvoiceRequest request);\n}\n\npublic class InvoiceService : IInvoiceService\n{\n    private readonly IPdfGenerator _pdfGenerator;\n    private readonly IInvoiceRepository _repository;\n\n    public InvoiceService(IPdfGenerator pdfGenerator, IInvoiceRepository repository)\n    {\n        _pdfGenerator = pdfGenerator;\n        _repository = repository;\n    }\n\n    public async Task<InvoiceResult> GenerateAsync(InvoiceRequest request)\n    {\n        var invoice = await _repository.GetByIdAsync(request.InvoiceId);\n        var pdfBytes = await _pdfGenerator.GeneratePdfAsync(invoice);\n        return new InvoiceResult { PdfBytes = pdfBytes, FileName = $\"Invoice-{invoice.Number}.pdf\" };\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Non-functional requirement implementation",
+        "content": "A background processing pipeline that satisfies a non-functional throughput requirement.",
+        "language": "csharp",
+        "code": "public class InvoiceProcessingWorker : BackgroundService\n{\n    private readonly Channel<InvoiceRequest> _channel;\n    private readonly IInvoiceService _invoiceService;\n    private readonly ILogger<InvoiceProcessingWorker> _logger;\n    private const int MaxConcurrency = 8;\n\n    public InvoiceProcessingWorker(Channel<InvoiceRequest> channel, IInvoiceService invoiceService, ILogger<InvoiceProcessingWorker> logger)\n    {\n        _channel = channel;\n        _invoiceService = invoiceService;\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        var semaphore = new SemaphoreSlim(MaxConcurrency);\n        await foreach (var request in _channel.Reader.ReadAllAsync(stoppingToken))\n        {\n            await semaphore.WaitAsync(stoppingToken);\n            _ = Task.Run(async () =>\n            {\n                try\n                {\n                    await _invoiceService.GenerateAsync(request);\n                }\n                finally\n                {\n                    semaphore.Release();\n                }\n            }, stoppingToken);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Confusion: Constraints vs Features"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A frequent mistake is treating non-functional requirements as features. 'We need a caching layer' is not a feature request; it is a proposed solution to a performance requirement. The real requirement might be 'product search results must load in under 200 milliseconds.' Once that is stated clearly, you can compare in-memory caching, Redis, database indexing, or even a dedicated search engine like Elasticsearch."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Can a single requirement be both functional and non-functional?",
+            "answer": "Rarely. If you can point to a specific button click or API call, it is functional. If it describes a quality attribute of the whole system, it is non-functional. Sometimes a requirement sounds like both ('the report must be exportable and complete in under 3 seconds'), in which case split it into two separate requirements."
+          },
+          {
+            "question": "Who is responsible for defining non-functional requirements?",
+            "answer": "Product owners and stakeholders often state functional requirements. Non-functional requirements typically emerge from operations, security, compliance, or past incidents. A senior engineer should actively elicit them because they are easy to overlook until a production event forces the conversation."
+          },
+          {
+            "question": "How specific should non-functional targets be?",
+            "answer": "Specific enough to measure and verify. 'Fast' is not specific. '95th percentile latency under 300ms during peak hours' is specific. Include the measurement window, the percentile, and the acceptable failure mode when the target is not met."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Functional requirements describe what the system does; non-functional requirements describe how well it does it.",
+          "Both categories drive architecture; non-functional requirements are often the harder constraint.",
+          "Treat non-functional requirements as measurable targets, not vague wishes.",
+          "Separate requirements from solutions; a 'caching layer' is a solution, not a requirement."
+        ],
+        "takeaway": "A system that meets every functional requirement but misses its non-functional targets is still a failed system. Senior engineers give both categories equal weight from the very first conversation."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "clarifying-ambiguous-requirements",
+    "making-technical-trade-offs-explicit"
+  ],
+  "furtherReading": [
+    {
+      "title": "ISO/IEC 25010 Quality Model",
+      "url": "https://iso25000.com/index.php/en/iso-25000-standards/iso-25010",
+      "type": "article",
+      "author": "ISO/IEC",
+      "description": "A standard taxonomy for software quality characteristics including performance, security, and reliability."
+    },
+    {
+      "title": "Building Evolutionary Architectures",
+      "url": "https://www.oreilly.com/library/view/building-evolutionary-architectures/9781491986356/",
+      "type": "book",
+      "author": "Neal Ford, Rebecca Parsons, Patrick Kua",
+      "description": "Covers how fitness functions can enforce non-functional requirements automatically in evolving systems."
+    }
+  ]
 }

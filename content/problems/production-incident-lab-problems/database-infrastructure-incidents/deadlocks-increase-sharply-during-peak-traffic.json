@@ -4,58 +4,215 @@
   "moduleSlug": "database-infrastructure-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Deadlocks increase sharply during peak traffic",
-  "description": "Problem: Deadlocks increase sharply during peak traffic. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose and eliminate deadlocks that appear only under concurrency, including lock ordering, snapshot isolation, and transaction-scoping fixes in SQL Server and EF Core.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["sql-server", "deadlock", "concurrency", "transactions", "incident-response", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Deadlocks increase sharply during peak traffic** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with deadlocks increase sharply during peak traffic."
+        "text": "Deadlocks are not random. They are deterministic consequences of concurrent transactions competing for the same resources in different orders. Under normal traffic, the timing never aligns. During peak traffic, the probability of circular wait rises sharply. SQL Server detects the cycle, chooses a victim, and aborts its transaction. If your application does not handle the 1205 error, the user sees a failure. If it does, the retry masks a deeper design problem."
       }
     },
     {
       "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
+      "data": { "level": 2, "text": "Key Concepts" }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core concepts",
         "items": [
-          "Understand the fundamental principles of deadlocks increase sharply during peak traffic",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Deadlock: two or more transactions hold locks that the other needs, causing indefinite wait",
+          "Lock escalation: the database converts fine-grained locks into coarse-grained ones under memory pressure",
+          "Isolation level: controls how transaction changes are visible to other transactions, affecting lock behavior",
+          "Snapshot isolation: reads versioned rows instead of locking, reducing read-write blocking",
+          "Access ordering: enforcing a deterministic resource acquisition order eliminates circular waits"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Deadlock",
+            "definition": "A condition where two or more transactions hold locks that the other transactions need, causing all to wait indefinitely."
+          },
+          {
+            "term": "Lock Escalation",
+            "definition": "When a database engine converts many fine-grained locks into fewer coarse-grained locks to reduce memory overhead, increasing contention."
+          },
+          {
+            "term": "Isolation Level",
+            "definition": "A database setting that controls how transaction changes are visible to other transactions, affecting locking behavior and deadlock probability."
+          },
+          {
+            "term": "Victim",
+            "definition": "The transaction SQL Server chooses to abort when a deadlock is detected, based on cost and deadlock priority."
+          }
         ]
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "Root Causes" }
+    },
+    {
+      "type": "bullet-list",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "items": [
+          "Transactions access tables in inconsistent orders (e.g., T1 locks A then B, T2 locks B then A)",
+          "Long-running transactions hold locks across user think time or external API calls",
+          "High concurrency on hot tables with frequent updates and selects",
+          "Lock escalation from row locks to page or table locks under memory pressure",
+          "Missing or inefficient indexes causing table scans and wider lock footprints",
+          "READ COMMITTED SNAPSHOT disabled, causing more blocking reads"
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "heading",
+      "data": { "level": 2, "text": "Comparison of Resolution Strategies" }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding deadlocks increase sharply during peak traffic is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Deadlock Resolution Strategies",
+        "cards": [
+          {
+            "title": "Access Ordering",
+            "description": "Ensure all transactions access resources in the same deterministic order (e.g., by primary key).",
+            "pros": ["Eliminates circular waits", "No database configuration needed", "Works for any RDBMS"],
+            "cons": ["Requires code changes across services", "Hard to enforce in existing large codebases", "Does not help with lock escalation"]
+          },
+          {
+            "title": "Snapshot Isolation",
+            "description": "Use READ COMMITTED SNAPSHOT or SNAPSHOT to reduce blocking by reading versioned rows instead of locking.",
+            "pros": ["Dramatically reduces read blocking", "Improves concurrency", "Transparent to most queries"],
+            "cons": ["Increases tempdb usage", "Update conflicts require retry logic", "Not suitable for all consistency requirements"]
+          },
+          {
+            "title": "Short Transactions",
+            "description": "Break large transactions into smaller units and commit early to reduce lock hold time.",
+            "pros": ["Reduces lock duration", "Lowers deadlock probability", "Improves throughput"],
+            "cons": ["Requires careful error handling", "May violate business logic atomicity", "More round trips to the database"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-deadlock-cycle",
+        "caption": "Classic deadlock cycle between two transactions",
+        "definition": "graph LR\n    T1[Transaction 1] -->|Holds| L1[Lock on Order]\n    T1 -->|Needs| L2[Lock on Customer]\n    T2[Transaction 2] -->|Holds| L2\n    T2 -->|Needs| L1\n    L1 -->|Blocked| T2\n    L2 -->|Blocked| T1"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Investigation Steps" }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Enable deadlock tracing in SQL Server Extended Events or the PostgreSQL log_lock_waits setting.",
+          "Analyze the deadlock graph to identify the objects, queries, and isolation levels involved.",
+          "Check whether both transactions modified the same tables in different orders.",
+          "Review recent schema or index changes that may have altered execution plans.",
+          "Test the fix in a load test that replicates peak concurrency before deploying."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with deadlocks increase sharply during peak traffic, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Retry is a band-aid",
+        "text": "Retrying deadlocked transactions reduces user-visible errors but does not fix the underlying race condition. Use retries as a safety net, not the primary solution."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Prevention Patterns" }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Standardize table access order across all application services",
+          "Enable READ COMMITTED SNAPSHOT to reduce read-write blocking",
+          "Keep transactions short: do not include user think time or external API calls inside a transaction",
+          "Use the lowest practical isolation level: READ COMMITTED before REPEATABLE READ or SERIALIZABLE",
+          "Add covering indexes to eliminate key lookups that widen lock footprints",
+          "Monitor deadlock graphs continuously and alert on spikes above baseline"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I set DEADLOCK_PRIORITY LOW globally?",
+            "answer": "Setting DEADLOCK_PRIORITY LOW makes the current session the victim when a deadlock occurs. It reduces user-facing errors but does not prevent the deadlock. Use it alongside structural fixes."
+          },
+          {
+            "question": "Does snapshot isolation eliminate all deadlocks?",
+            "answer": "No. Snapshot isolation reduces read blocking but update conflicts and write-write deadlocks can still occur. Use it to reduce frequency, not as a complete solution."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Analyze and fix a deadlock-prone query pattern",
+        "description": "Given two stored procedures that update Orders and Customers in opposite orders, rewrite them to eliminate the deadlock risk and explain why the fix works.",
+        "steps": [
+          "Read the deadlock graph from Extended Events",
+          "Identify the lock order conflict between the two procedures",
+          "Rewrite both procedures to access tables in the same order",
+          "Run a concurrency test with 100 parallel sessions to verify the deadlock no longer occurs",
+          "Document the change in a migration script"
+        ],
+        "expectedOutcome": "A deterministic lock order that prevents circular waits and a test proving deadlock frequency dropped to zero under peak concurrency."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Deadlocks are a concurrency problem, not a hardware problem",
+          "Access tables in a consistent order to eliminate circular waits",
+          "Snapshot isolation reduces blocking but does not remove all deadlocks",
+          "Keep transactions short and avoid user think time inside transactions",
+          "Monitor deadlock graphs and act on trends, not isolated incidents"
+        ],
+        "takeaway": "Deadlocks are predictable in concurrent systems. Design your data access patterns to remove the circular wait condition rather than relying on retries alone."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "sql-server-cpu-reaches-95-after-a-release",
+    "a-cache-outage-causes-the-database-to-become-overloaded"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL Server Deadlock Analysis",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/deadlock-analysis",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "MIT: Deadlock Prevention",
+      "url": "https://people.csail.mit.edu/birge/6.824/notes/deadlock.pdf",
+      "type": "article"
+    }
+  ]
 }

@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose an API evolution strategy for three client versions",
-  "description": "Problem: Choose an API evolution strategy for three client versions. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Design an API versioning and deprecation strategy that supports a v1 mobile app, v2 web app, and an upcoming v3 redesign without breaking existing clients.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["api-versioning", "deprecation", "evolution", "backward-compatibility", "contracts"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose an API evolution strategy for three client versions** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose an api evolution strategy for three client versions."
+        "text": "Your public API has 1,200 enterprise clients. You are shipping a v3 redesign that removes two deprecated fields and changes the response envelope. The v1 mobile app is still used by 30 percent of users. You need a migration strategy that lets all three versions coexist for 18 months without breaking contracts."
       }
     },
     {
@@ -24,13 +24,88 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the fundamental principles of choose an api evolution strategy for three client versions",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "terms": [
+          { "term": "API Versioning", "definition": "A strategy for managing breaking changes while keeping old clients functional." },
+          { "term": "Backward Compatibility", "definition": "A contract promise that newer versions do not break consumers of older versions." },
+          { "term": "Sunset Policy", "definition": "A published timeline and process for retiring an API version." },
+          { "term": "Content Negotiation", "definition": "Using headers (Accept, API-Version) rather than URLs to select the API version." },
+          { "term": "Feature Flag", "definition": "A toggle that enables or disables functionality at runtime without deployment." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The compatibility trap",
+        "text": "Every 'small breaking change' accumulates. Without a formal versioning policy and deprecation timeline, you end up maintaining N versions indefinitely because you never gave clients a hard deadline."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Three Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "URL versioning, header versioning, and GraphQL",
+        "cards": [
+          {
+            "title": "URL Versioning",
+            "description": "Version in the path: /v1/users, /v2/users.",
+            "pros": [
+              "Visually obvious which version a client is calling",
+              "Easy to route and document",
+              "Simple to deprecate: return 404 on old paths",
+              "CDN caching works naturally per path"
+            ],
+            "cons": [
+              "URL proliferation: N versions times N endpoints",
+              "Code duplication or adapter layers to share logic",
+              "Clients must change URLs when upgrading",
+              "Does not compose well with media-type versioning"
+            ],
+            "tags": ["simple", "explicit"]
+          },
+          {
+            "title": "Header Versioning",
+            "description": "Version via Accept or a custom API-Version header.",
+            "pros": [
+              "Single URL per resource; versions are negotiable",
+              "Cleaner URL space",
+              "Allows content-type negotiation alongside versioning",
+              "Easier to route at the gateway level"
+            ],
+            "cons": [
+              "Less visible in logs and browser history",
+              "Caching proxies require Vary header configuration",
+              "Harder for clients to test manually",
+              "Version deprecation is less explicit"
+            ],
+            "tags": ["clean", "requires-discipline"]
+          },
+          {
+            "title": "GraphQL Federation",
+            "description": "Schema evolution through field deprecation and type extensions.",
+            "pros": [
+              "Clients select exactly the fields they need",
+              "Deprecation warnings are visible in schema introspection",
+              "No endpoint proliferation",
+              "Additive changes are non-breaking by default"
+            ],
+            "cons": [
+              "Removing a field breaks any client that still requests it",
+              "Query complexity limits add operational overhead",
+              "Requires all clients to migrate to GraphQL",
+              "Not suitable for simple public REST APIs"
+            ],
+            "tags": ["flexible", "introspective"]
+          }
         ]
       }
     },
@@ -38,24 +113,91 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Sunset headers"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose an api evolution strategy for three client versions is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "HTTP: Sunset header for deprecation signaling",
+        "content": "Inform clients of version retirement without breaking them immediately.",
+        "code": "HTTP/1.1 200 OK\nAPI-Version: 1\nSunset: Sat, 31 Oct 2026 23:59:59 GMT\nDeprecation: true\nLink: </v2/users>; rel=\"successor-version\"\n\nBody (v1 format):\n{\n  \"id\": \"123\",\n  \"username\": \"alice\",\n  \"email\": \"a@b.com\"\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Backward-compatible v2 response"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "v2 adds new fields without removing v1 fields",
+        "content": "Old clients continue to work; new fields are ignored by v1 clients.",
+        "code": "// v1 clients expect:\n// { id, username, email }\n// v2 clients expect:\n// { id, username, email, displayName, avatarUrl }\n\npublic class UserResponseV2\n{\n    public Guid Id { get; set; }\n    public string Username { get; set; }\n    public string Email { get; set; }\n    public string? DisplayName { get; set; }  // New, nullable\n    public string? AvatarUrl { get; set; }    // New, nullable\n}\n\n// v1 serializer ignores unknown fields if using JsonIgnoreCondition.WhenWritingNull",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation criteria",
+        "items": [
+          { "text": "How many active client versions must be supported simultaneously?" },
+          { "text": "Do you control all clients, or are they third-party integrations?" },
+          { "text": "Can you enforce client upgrade timelines via support contracts?" },
+          { "text": "Is your API surface small and stable, or rapidly evolving?" },
+          { "text": "Do you have automated contract testing between API and clients?" }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "api-evolution",
+        "caption": "Version lifecycle: active, deprecated, sunset",
+        "definition": "stateDiagram-v2\n    [*] --> Active\n    Active --> Deprecated: Announce sunset date\n    Deprecated --> Sunset: Date arrives\n    Sunset --> [*]: Disabled\n    note right of Deprecated\n        Returns Sunset header\n        New clients guided to v2\n    end note"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: URL versioning with Sunset headers",
+        "content": "Use /v1, /v2, /v3 paths. Each version lives in its own controller or folder, sharing business logic through internal services. Publish a 12-month sunset timeline and enforce it through automated monitoring. v1 clients that have not migrated by the sunset date receive 301 redirects to a migration guide.",
+        "code": "// ASP.NET Core versioning via route constraints\n[ApiController]\n[Route(\"v{version:apiVersion}/users\")]\n[ApiVersion(\"1.0\")]\npublic class UsersV1Controller : ControllerBase { }\n\n[ApiController]\n[Route(\"v{version:apiVersion}/users\")]\n[ApiVersion(\"2.0\")]\npublic class UsersV2Controller : ControllerBase { }\n\n// Global deprecation filter\npublic class DeprecationFilter : IResultFilter\n{\n    public void OnResultExecuting(ResultExecutingContext context)\n    {\n        if (context.HttpContext.GetRequestedApiVersion() == new ApiVersion(1,0))\n        {\n            context.HttpContext.Response.Headers.Sunset = \"2026-10-31\";\n        }\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose an api evolution strategy for three client versions, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Testing backward compatibility",
+        "text": "Use Pact or similar consumer-driven contract testing. Every breaking change should fail a contract test before it reaches production. If you cannot test it, do not ship it."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Versioning is a social contract backed by headers and automated tests.",
+          "Deprecation without a hard sunset date is just nostalgia.",
+          "Share logic through internal services, not through versioned controllers."
+        ],
+        "takeaway": "Give clients a clear upgrade path, enforce it with automation, and remove old versions on schedule."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-rest-vs-graphql-for-a-multi-client-application",
+    "decide-whether-a-proposed-microservice-should-actually-exist"
+  ],
+  "furtherReading": [
+    { "title": "API Versioning Best Practices", "url": "https://swagger.io/resources/articles/best-practices-in-api-design/", "type": "article" },
+    { "title": "Pact Contract Testing", "url": "https://pact.io/", "type": "tool" }
+  ]
 }

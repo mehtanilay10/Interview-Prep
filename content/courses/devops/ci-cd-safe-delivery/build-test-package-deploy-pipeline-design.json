@@ -4,33 +4,51 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Build-test-package-deploy pipeline design",
-  "description": "Learn about Build-test-package-deploy pipeline design. Master the concepts, patterns, and best practices.",
+  "description": "Design reliable CI/CD pipelines that build, test, package, and deploy applications safely and repeatably.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "CI/CD",
+    "pipelines",
+    "DevOps",
+    "automation"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Build-test-package-deploy pipeline design** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with build-test-package-deploy pipeline design."
+        "text": "A CI/CD pipeline is the assembly line for software delivery. Every time a developer saves code, the pipeline automatically compiles it, runs checks, packages the result, and moves it toward production. When designed well, this process is invisible to developers and extremely reliable. When designed poorly, it becomes a source of outages, rollback chaos, and slow delivery."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In this lesson, you will learn how to structure a pipeline from source control all the way to deployable artifacts. We will cover stage boundaries, what belongs in each stage, how to fail fast, and why packaging is one of the most underrated steps in modern delivery."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The four core stages"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
+        "text": "Most delivery pipelines can be broken into four logical stages: build, test, package, and deploy. Each stage has a single, clear responsibility. When stages blur together, pipelines become brittle and hard to debug."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Pipeline stages",
         "items": [
-          "Understand the fundamental principles of build-test-package-deploy pipeline design",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Build: compile source code, restore dependencies, and produce a runnable binary or bundle.",
+          "Test: run unit, integration, and security checks to catch defects before packaging.",
+          "Package: wrap the validated build into an immutable artifact with a unique identifier.",
+          "Deploy: push the artifact to an environment and verify the release succeeded."
         ]
       }
     },
@@ -38,24 +56,139 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "A sample pipeline configuration"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding build-test-package-deploy pipeline design is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The following GitHub Actions workflow shows a clean separation of stages. Notice how each job depends on the previous one, and how the package job creates a versioned artifact that later stages consume."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "GitHub Actions pipeline",
+        "content": "Each stage runs only if the previous stage succeeds.",
+        "code": "name: CI/CD Pipeline\non:\n  push:\n    branches: [ main ]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: \"8.0.x\"\n      - run: dotnet build --no-restore\n\n  test:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: \"8.0.x\"\n      - run: dotnet test --no-build --verbosity normal\n\n  package:\n    needs: test\n    runs-on: ubuntu-latest\n    outputs:\n      artifact-id: ${{ steps.package.outputs.artifact-id }}\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: \"8.0.x\"\n      - run: dotnet publish -c Release -o out\n      - uses: actions/upload-artifact@v4\n        id: package\n        with:\n          name: app-${{ github.sha }}\n          path: out/\n          retention-days: 30\n\n  deploy-staging:\n    needs: package\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: deploy/\n      - run: ./deploy.sh staging",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why packaging matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Packaging transforms a directory of compiled files into an artifact with an immutable identity. This identity, usually a version or commit SHA, lets you trace every deployed instance back to exact source code. Without a package stage, deployments drift because environments can end up with different combinations of files, dependencies, and configuration."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with build-test-package-deploy pipeline design, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Treat artifacts as immutable",
+        "text": "Once an artifact is created, never rebuild it for a different environment. The same package should flow from staging to production. Rebuilding introduces hidden differences that make debugging impossible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fail fast, fail loudly"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Pipelines should fail as early and as loudly as possible. A syntax error should stop the pipeline in the build stage, not wait until deployment. Fast feedback loops keep developers productive and reduce mean time to recovery when something breaks."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Pipeline design checklist",
+        "items": [
+          {
+            "text": "Each stage has a single, clear purpose.",
+            "hint": "Build compiles, test validates, package archives, deploy releases."
+          },
+          {
+            "text": "Later stages consume artifacts from earlier stages, never rebuild from source.",
+            "hint": "Use artifact upload/download or a registry."
+          },
+          {
+            "text": "Tests run in parallel where possible, but never deploy before all required tests pass.",
+            "hint": "Use matrix builds and needs dependencies."
+          },
+          {
+            "text": "Pipeline failures notify the right team within minutes.",
+            "hint": "Slack, email, or PR status checks."
+          },
+          {
+            "text": "Artifacts are retained long enough to support rollback investigations.",
+            "hint": "At least 30 days for production releases."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "A well-structured pipeline has four stages: build, test, package, deploy.",
+          "Packaging creates an immutable artifact that prevents environment drift.",
+          "Fail fast by running cheap checks early and expensive tests later.",
+          "Never rebuild an artifact for a different environment."
+        ],
+        "takeaway": "Good pipeline design is invisible to developers and indispensable to operators."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I run integration tests in the package stage or the deploy stage?",
+            "answer": "Integration tests that validate the packaged artifact belong in the package stage. Environment-specific smoke tests belong after deploy."
+          },
+          {
+            "question": "How many stages is too many?",
+            "answer": "There is no magic number. If adding a stage makes the pipeline harder to understand or slower to debug, it is probably too many. If removing a stage makes failure modes unclear, it was probably necessary."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "artifact-versioning",
+    "environment-promotion",
+    "supply-chain-security-in-cicd"
+  ],
+  "furtherReading": [
+    {
+      "title": "GitHub Actions Documentation",
+      "url": "https://docs.github.com/en/actions",
+      "type": "article",
+      "description": "Official guide to workflows, jobs, steps, and artifacts."
+    },
+    {
+      "title": "Azure Pipelines Documentation",
+      "url": "https://learn.microsoft.com/en-us/azure/devops/pipelines/",
+      "type": "article",
+      "description": "Microsoft documentation for multi-stage CI/CD on Azure DevOps."
+    },
+    {
+      "title": "Continuous Delivery by Jez Humble",
+      "url": "https://continuousdelivery.com/",
+      "type": "article",
+      "description": "Foundational principles behind reliable release pipelines."
+    }
+  ]
 }

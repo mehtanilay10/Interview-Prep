@@ -4,58 +4,233 @@
   "moduleSlug": "database-infrastructure-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "A cache outage causes the database to become overloaded",
-  "description": "Problem: A cache outage causes the database to become overloaded. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose and remediate a cascading failure where Redis goes down, all traffic shifts to SQL Server, and connection-pool exhaustion turns a cache outage into a full database outage.",
   "order": 8,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["cache", "redis", "database", "circuit-breaker", "incident-response", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A cache outage causes the database to become overloaded** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a cache outage causes the database to become overloaded."
+        "text": "Redis was your shield. Without it, every read hits SQL Server directly—hundreds of requests per second that were cheap cache hits become expensive table scans and connection-pool acquisitions. Within minutes, the database is saturated, queries queue, and the entire application degrades. The cache was a performance optimization; now its absence is a reliability incident."
       }
     },
     {
       "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
+      "data": { "level": 2, "text": "Key Concepts" }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core concepts",
         "items": [
-          "Understand the fundamental principles of a cache outage causes the database to become overloaded",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Cache-aside pattern: the app is responsible for populating and invalidating the cache",
+          "Thundering herd: many concurrent requests for the same uncached key hit the database simultaneously",
+          "Connection-pool exhaustion: all database connections are in use and new requests wait or fail",
+          "Circuit breaker: stops sending requests to an overloaded dependency and returns a fallback",
+          "Request coalescing: multiple concurrent requests for the same key are collapsed into a single database query",
+          "Graceful degradation: the system continues to operate in a reduced-capability state"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Stampede",
+            "definition": "A sudden surge of traffic to the database when a popular cache entry expires or the cache layer fails entirely."
+          },
+          {
+            "term": "Thundering Herd",
+            "definition": "Many clients simultaneously requesting the same uncached data, overwhelming the database with duplicate queries."
+          },
+          {
+            "term": "Connection Pool Exhaustion",
+            "definition": "When all database connections are in use and new requests must wait or fail, often triggered by a sudden load spike."
+          },
+          {
+            "term": "Circuit Breaker",
+            "definition": "A pattern that stops sending requests to a failing service after a threshold, preventing cascading failure."
+          },
+          {
+            "term": "Graceful Degradation",
+            "definition": "Designing the system to continue operating in a reduced-capability state when a component fails."
+          }
         ]
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "Root Cause Analysis" }
+    },
+    {
+      "type": "bullet-list",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "title": "What happened",
+        "items": [
+          "Redis cluster ran out of memory and evicted keys aggressively or crashed entirely",
+          "Network partition between the application and Redis nodes caused universal cache misses",
+          "Application has no local fallback cache or request coalescing mechanism",
+          "Database connection pool was sized for cached traffic, not raw query volume",
+          "No circuit breaker on the read path to shed load before reaching the database",
+          "Monitoring alerted on database CPU but not on cache hit-rate drop"
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "heading",
+      "data": { "level": 2, "text": "Comparison of Mitigation Strategies" }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding a cache outage causes the database to become overloaded is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Mitigation Strategies for Cache Outage",
+        "cards": [
+          {
+            "title": "Local Caching",
+            "description": "Use an in-process cache (Caffeine, MemoryCache) as a second line of defense.",
+            "pros": ["Reduces immediate database load", "No network hop", "Fast TTL-based eviction"],
+            "cons": ["Stale data risk", "Memory pressure on app instances", "Not shared across instances"]
+          },
+          {
+            "title": "Request Coalescing",
+            "description": "Deduplicate concurrent requests for the same cache key so only one database query runs.",
+            "pros": ["Prevents thundering herd", "Reduces redundant queries", "Works during cold starts"],
+            "cons": ["Adds complexity", "Requires careful state management", "May delay some requests"]
+          },
+          {
+            "title": "Circuit Breaker",
+            "description": "Stop hammering the database when it is overloaded and return fallback responses.",
+            "pros": ["Protects database from total collapse", "Fast failure for non-critical paths", "Allows recovery time"],
+            "cons": ["Requires sensible fallback data", "Users see degraded experience", "Tuning thresholds is hard"]
+          },
+          {
+            "title": "Read Replica Auto-Scaling",
+            "description": "Spin up additional read replicas automatically when cache hit rate drops below a threshold.",
+            "pros": ["Absorbs redirected read traffic", "Transparent to application code", "Scales with demand"],
+            "cons": ["Replication lag under heavy writes", "Cost of idle replicas", "Not instant—minutes to provision"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-cache-outage-flow",
+        "caption": "Traffic flow during a cache outage showing database overload",
+        "definition": "graph TD\n    A[Client Request] --> B{Cache Available?}\n    B -->|Yes| C[Cache Hit]\n    B -->|No| D[Database Query]\n    D --> E{DB Overloaded?}\n    E -->|No| F[Return Result]\n    E -->|Yes| G[Circuit Breaker Opens]\n    G --> H[Fallback Response]\n    C --> F\n    H --> I[Partial Degradation]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Immediate Response Steps" }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Confirm the cache outage via metrics: hit rate, memory usage, node health, and error logs.",
+          "Enable request coalescing or activate local caches if not already active.",
+          "Activate a circuit breaker for non-critical read paths to shed load immediately.",
+          "Scale read replicas horizontally to absorb the redirected traffic.",
+          "Increase database connection pool size only if CPU and I/O are not saturated.",
+          "Communicate status to stakeholders with an ETA for cache restoration."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a cache outage causes the database to become overloaded, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid cascading failure",
+        "text": "Do not blindly retry database queries during overload. Retries multiply the load and can turn a degraded state into a full outage. Use exponential backoff, request coalescing, and circuit breakers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Long-Term Prevention" }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Implement multi-level caching: CDN, distributed cache, and local in-process cache.",
+          "Add automatic cache warmers for critical keys during maintenance windows.",
+          "Run chaos engineering experiments that kill cache nodes to validate resilience.",
+          "Set database connection pool alerts at 80% utilization.",
+          "Use read replicas and database-level query caching for hot data.",
+          "Alert on cache hit-rate drops before they cause database saturation.",
+          "Document a runbook for cache outage response and practice it in game days."
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should we increase the database max connections during a cache outage?",
+            "answer": "Only if the database CPU and I/O are not already saturated. More connections without capacity worsen contention. Prefer read replicas first."
+          },
+          {
+            "question": "Is it safe to serve stale cached data when the cache is recovering?",
+            "answer": "For non-critical reads, yes. For financial or inventory data, prefer a degraded but accurate response over stale data."
+          },
+          {
+            "question": "How do I prevent a cache stampede on key expiration?",
+            "answer": "Use probabilistic early expiration with jittered TTLs, or implement a lock-based single-writer pattern so only one request repopulates the key."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design a cache-outage response plan",
+        "description": "Given an e-commerce site that relies on Redis for product catalog data, write a runbook for a full Redis outage during a flash sale.",
+        "steps": [
+          "Identify the metrics that confirm a cache outage",
+          "List three immediate mitigations in priority order",
+          "Describe how you would communicate with the product team",
+          "Define the criteria for declaring recovery and disabling mitigations"
+        ],
+        "expectedOutcome": "A runbook that protects the database, maintains a degraded but usable experience, and restores full service safely."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Cache outages shift all load directly to the database",
+          "Use local caching and request coalescing as immediate shields",
+          "Circuit breakers prevent cascading database failure",
+          "Scale read replicas before increasing connection limits",
+          "Practice cache failure scenarios before they happen in production"
+        ],
+        "takeaway": "A resilient system treats cache as a performance optimization, not a reliability guarantee, and designs for graceful degradation when it fails."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "a-service-can-resolve-dns-but-cannot-connect-to-its-dependency",
+    "sql-server-cpu-reaches-95-after-a-release"
+  ],
+  "furtherReading": [
+    {
+      "title": "Cache Aside Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Circuit Breaker Pattern",
+      "url": "https://martinfowler.com/bliki/CircuitBreaker.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    }
+  ]
 }

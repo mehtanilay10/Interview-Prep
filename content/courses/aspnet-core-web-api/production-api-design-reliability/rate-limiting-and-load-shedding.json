@@ -4,33 +4,39 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Rate limiting and load shedding",
-  "description": "Learn about Rate limiting and load shedding. Master the concepts, patterns, and best practices.",
+  "description": "Protect your API from traffic spikes and abusive clients. Learn rate-limiting algorithms, ASP.NET Core rate limiter middleware, and load-shedding patterns for high-traffic services.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Rate limiting and load shedding** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rate limiting and load shedding."
+        "text": "Production APIs face sudden traffic spikes from flash sales, misbehaving clients, and bot traffic. Without guardrails, a spike can exhaust CPU, memory, or downstream database connections and take down every endpoint at once. Rate limiting and load shedding are complementary defenses: rate limiting prevents abuse over time, while load shedding makes hard cut decisions when the system is already under stress."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Rate-limiting algorithms"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choosing the right algorithm depends on your traffic pattern, memory budget, and fairness requirements. The four algorithms you will encounter in production are fixed window, sliding window, token bucket, and concurrency limiter."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of rate limiting and load shedding",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Fixed window: allow N requests per minute. Simple, memory-light, but allows burst at window boundaries.",
+          "Sliding window: smooths out boundary bursts by tracking requests over a rolling interval. Better user experience but slightly higher memory cost.",
+          "Token bucket: refills tokens at a steady rate and allows short bursts up to the bucket size. Ideal for APIs that want to tolerate occasional spikes.",
+          "Concurrency limiter: caps the number of in-flight requests rather than counting over time. Perfect for protecting downstream services with limited connection pools."
         ]
       }
     },
@@ -38,24 +44,108 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "ASP.NET Core rate limiter"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rate limiting and load shedding is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "ASP.NET Core 8+ includes built-in rate limiting middleware with token bucket, fixed window, and sliding window policies. It integrates with dependency injection and can partition limits by client ID, IP address, or any custom key."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token bucket rate limiter",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddRateLimiter(options =>\n{\n    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>\n    {\n        var clientId = context.User.FindFirst(\"sub\")?.Value\n            ?? context.Connection.RemoteIpAddress?.ToString()\n            ?? \"anonymous\";\n\n        return RateLimitPartition.GetTokenBucketLimiter(clientId, key =>\n            new TokenBucketRateLimiterOptions\n            {\n                TokenLimit = 100,\n                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,\n                QueueLimit = 10,\n                ReplenishmentPeriod = TimeSpan.FromMinutes(1),\n                TokensPerPeriod = 100,\n                AutoReplenishment = true\n            });\n    });\n\n    options.OnRejected = async (context, token) =>\n    {\n        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;\n        context.HttpContext.Response.Headers.RetryAfter = context.Lease.TryRetryAfter\n            ? context.Lease.RetryAfter.Value.TotalSeconds.ToString()\n            : string.Empty;\n\n        await context.HttpContext.Response.WriteAsJsonAsync(\n            new { error = \"Too many requests. Please retry later.\" },\n            token);\n    };\n});\n\nvar app = builder.Build();\napp.UseRateLimiter();\napp.MapControllers();\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This configuration limits every authenticated client to 100 requests per minute with a queue depth of 10. Unauthenticated requests fall back to the IP address. When the limit is exceeded, the client receives 429 with a `Retry-After` header."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Load shedding"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limiting shapes traffic over time. Load shedding makes immediate decisions when the server is already overloaded. When CPU, memory, thread pool saturation, or downstream latency crosses a threshold, the API rejects new requests with 503 Service Unavailable instead of accepting them and degrading every caller."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Health-based shedding: check CPU, memory, or a downstream dependency before processing each request.",
+          "Queue-depth shedding: if the background work queue exceeds a depth, reject immediately.",
+          "Priority shedding: assign priorities to endpoints or clients and shed the lowest priority first.",
+          "Adaptive shedding: use recent error rate or p99 latency as the signal and adjust the allowed load dynamically."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Health-based load shedding middleware",
+        "code": "public class LoadSheddingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly double _cpuThreshold = 0.80;\n    private readonly double _memoryThreshold = 0.85;\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        if (IsOverloaded())\n        {\n            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;\n            context.Response.Headers.RetryAfter = \"1\";\n            await context.Response.WriteAsJsonAsync(\n                new { error = \"Service overloaded. Retry shortly.\" });\n            return;\n        }\n\n        await _next(context);\n    }\n\n    private bool IsOverloaded()\n    {\n        var cpu = GetCpuUsage();\n        var memory = GetMemoryUsage();\n        return cpu > _cpuThreshold || memory > _memoryThreshold;\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rate limiting and load shedding, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Design caution",
+        "text": "Load shedding is a last line of defense. If you rely on it often, your capacity planning is wrong. Use it for spikes, not normal traffic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Rate limiting controls traffic over time using token bucket, sliding window, or fixed window algorithms.",
+          "Use ASP.NET Core built-in rate limiter middleware with partitioned policies per client.",
+          "Return 429 Too Many Requests with a Retry-After header so clients back off predictably.",
+          "Load shedding makes hard rejections when the system is already overloaded; treat it as a circuit breaker, not a replacement for capacity planning."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "timeouts-retries-and-cancellation",
+    "webhooks-and-reliable-callback-processing"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs: Rate limiting in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/performance/rate-limit",
+      "type": "article"
+    },
+    {
+      "title": "AWS Architecture Blog: Load Shedding",
+      "url": "https://aws.amazon.com/blogs/architecture/",
+      "type": "article"
+    },
+    {
+      "title": "RFC 6585: 429 Too Many Requests",
+      "url": "https://tools.ietf.org/html/rfc6585",
+      "type": "article"
+    }
+  ]
 }

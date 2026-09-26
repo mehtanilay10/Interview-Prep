@@ -4,33 +4,61 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Background jobs process the same message twice",
-  "description": "Problem: Background jobs process the same message twice. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Fix duplicate background job execution caused by at-least-once delivery using idempotency, message deduplication, and the outbox pattern.",
   "order": 8,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["background-jobs", "idempotency", "message-queue", "duplicate-processing", "at-least-once"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Background jobs process the same message twice** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with background jobs process the same message twice."
+        "text": "Your order confirmation emails are being sent twice. Your inventory is being decremented twice. The database shows two entries for the same background job ID. The message broker guarantees at-least-once delivery, which means duplicates are expected. You need to make your consumers idempotent and add safeguards to prevent duplicate processing from causing business harm."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why duplicates happen"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of background jobs process the same message twice",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "The consumer acknowledges the message after processing, but the network drops the ACK, so the broker redelivers",
+          "The consumer crashes after processing but before acknowledging, and the message is redelivered on restart",
+          "The message broker replicates the message across partitions and delivers it twice during a leader election",
+          "A manual replay of the queue was performed without filtering already-processed IDs",
+          "The job queue does not enforce uniqueness on the message ID, allowing enqueue-time duplicates"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "At-least-once delivery",
+            "definition": "A messaging guarantee that a message will be delivered one or more times, but never zero times."
+          },
+          {
+            "term": "Idempotency",
+            "definition": "The property that processing the same message multiple times produces the same result as processing it once."
+          },
+          {
+            "term": "Poison message",
+            "definition": "A message that consistently causes a consumer to fail, often requiring manual intervention or dead-letter routing."
+          },
+          {
+            "term": "Dead-letter queue",
+            "definition": "A holding queue for messages that cannot be processed successfully after all retry attempts."
+          },
+          {
+            "term": "Outbox pattern",
+            "definition": "Storing messages in the same database transaction as the business event, then publishing them reliably to a broker."
+          }
         ]
       }
     },
@@ -38,24 +66,115 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Idempotency strategies"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding background jobs process the same message twice is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Store a record of processed message IDs in a durable table with a unique constraint",
+          "Before processing, check whether the message ID already exists in the processed table",
+          "Use database transactions to ensure the idempotency check and business operation are atomic",
+          "Set a TTL on processed message records to prevent the table from growing indefinitely",
+          "Return a 200 OK for redelivered messages even if the business result is unchanged"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Duplicate processing prevention patterns",
+        "cards": [
+          {
+            "title": "Idempotency key table",
+            "description": "Insert a unique message ID before processing; skip if already present.",
+            "pros": ["Simple to implement", "Works with any message broker", "Enforced by database constraint"],
+            "cons": ["Requires a database round-trip", "Table growth over time"]
+          },
+          {
+            "title": "Outbox pattern",
+            "description": "Write messages to an outbox table in the same transaction as the business event.",
+            "pros": ["Guaranteed exactly-once publish", "No lost messages on crash", "Atomic with business state"],
+            "cons": ["Requires a relay process", "Adds storage overhead"]
+          },
+          {
+            "title": "Message deduplication in broker",
+            "description": "Use broker-native deduplication (e.g., AWS SQS FIFO, Azure Service Bus deduplication).",
+            "pros": ["No application changes required", "Managed by infrastructure"],
+            "cons": ["Not all brokers support it", "Limited deduplication window"]
+          },
+          {
+            "title": "Business-level idempotency",
+            "description": "Design the business operation itself to be safe to repeat (e.g., upserts, conditional updates).",
+            "pros": ["No extra infrastructure", "Handles duplicates naturally"],
+            "cons": ["Requires careful query design", "Not all operations are naturally idempotent"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent consumer with a processed-message table",
+        "content": "A background job processor that checks for duplicates before acting:",
+        "code": "public async Task ProcessAsync(Message message, CancellationToken ct)\n{\n    using var tx = await _db.BeginTransactionAsync(ct);\n    \n    // Check if already processed\n    var exists = await _db.ProcessedMessages\n        .AnyAsync(p => p.MessageId == message.Id, ct);\n    \n    if (exists)\n    {\n        await tx.CommitAsync(ct);\n        return; // Already done\n    }\n    \n    // Process the business logic\n    await _orderService.ConfirmOrderAsync(message.OrderId, ct);\n    \n    // Mark as processed\n    await _db.ProcessedMessages.AddAsync(new ProcessedMessage\n    {\n        MessageId = message.Id,\n        ProcessedAt = DateTime.UtcNow\n    }, ct);\n    \n    await tx.CommitAsync(ct);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-idempotent-consumer",
+        "caption": "Idempotent message processing flow with duplicate detection",
+        "definition": "graph TD\n    A[Message received] --> B[Check processed table]\n    B -->|Exists| C[Return 200 OK]\n    B -->|Not found| D[Begin transaction]\n    D --> E[Process business logic]\n    E --> F[Insert processed message]\n    F --> G{Transaction commits?}\n    G -->|Yes| H[ACK message]\n    G -->|No| I[Rollback, retry later]\n    C --> H\n    H --> J[Done]\n    I --> K[Broker redelivers]\n    K --> B"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with background jobs process the same message twice, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Do not rely on the broker for exactly-once semantics",
+        "text": "Most message brokers offer at-least-once delivery. Even brokers with deduplication have a limited window and do not protect against application crashes between processing and acknowledgment."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Make a background job idempotent",
+        "description": "Find a background job or message consumer in your codebase that does not currently handle duplicates. Add an idempotency check and a processed-message table.",
+        "steps": [
+          "Identify a job that could cause harm if run twice (e.g., sending money, sending email)",
+          "Create a ProcessedMessages table with a unique MessageId column",
+          "Modify the consumer to check this table before processing",
+          "Wrap the check and business logic in a database transaction",
+          "Write a test that simulates a redelivered message and verifies the job is skipped"
+        ],
+        "expectedOutcome": "You should have a consumer that safely ignores duplicate messages without causing duplicate side effects."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "At-least-once delivery is the norm; design for duplicates from day one",
+          "Use a unique constraint on processed message IDs to enforce idempotency at the database level",
+          "The outbox pattern couples message publishing to the business transaction for reliability",
+          "Test duplicate handling explicitly; do not assume it works"
+        ],
+        "takeaway": "Duplicate messages are not a bug in the broker; they are a property of distributed systems. Your job is to make them harmless."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Enterprise Integration Patterns",
+      "url": "https://www.enterpriseintegrationpatterns.com/",
+      "type": "book",
+      "author": "Gregor Hohpe",
+      "description": "The canonical reference for messaging patterns including idempotent consumers and the outbox pattern."
+    }
+  ]
 }

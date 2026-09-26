@@ -4,33 +4,46 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Idempotency keys and duplicate request handling",
-  "description": "Learn about Idempotency keys and duplicate request handling. Master the concepts, patterns, and best practices.",
+  "description": "Protect payment and mutation endpoints from accidental double-submits. Learn idempotency keys, storage strategies, and how to make unsafe HTTP methods safe to retry.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Idempotency keys and duplicate request handling** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with idempotency keys and duplicate request handling."
+        "text": "Network glitches, impatient users, and aggressive retry logic all create the same problem: the same mutation can arrive twice. Without protection, a customer may be charged twice, two identical records may be created, or inventory may be decremented twice. Idempotency keys are the production answer to this class of bug."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An idempotency key is a unique value the client sends on the first request. The server stores the result keyed by that value. If the same request arrives again, the server returns the stored result instead of re-executing the business logic."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How the Idempotency-Key header works"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
+      "data": {
+        "text": "The standard pattern is the `Idempotency-Key` header. The client generates a new UUID for every new action and reuses the same UUID if it retries. The server checks whether it has seen that UUID before."
+      }
+    },
+    {
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of idempotency keys and duplicate request handling",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Client sends `POST /payments` with `Idempotency-Key: abc-123` and the order payload.",
+          "Server checks the idempotency store for `abc-123`.",
+          "If not found, the server executes the payment, stores the result with `abc-123`, and returns 200.",
+          "If found, the server returns the stored 200 response without re-processing.",
+          "If a request is still in progress, the server returns 409 Conflict or 429 to prevent parallel duplicates."
         ]
       }
     },
@@ -38,24 +51,117 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Implementing the store"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding idempotency keys and duplicate request handling is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The store must be durable and atomic. A relational database table is usually sufficient. You need the request payload hash, the resulting status code, the response body, and an expiry timestamp. Use a unique constraint on the key so concurrent requests for the same key cannot create duplicates."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotency record model",
+        "code": "public class IdempotencyRecord\n{\n    public Guid Id { get; set; }\n    public string Key { get; set; } = string.Empty;\n    public string PayloadHash { get; set; } = string.Empty;\n    public int StatusCode { get; set; }\n    public string ResponseBody { get; set; } = string.Empty;\n    public DateTime ExpiresAtUtc { get; set; }\n    public DateTime CreatedAtUtc { get; set; }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Middleware to enforce idempotency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The cleanest implementation is a middleware that sits before your controllers. It reads the header, locks the key, checks the store, and either short-circuits with the cached response or allows the request to proceed and records the outcome."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotency middleware",
+        "code": "public class IdempotencyMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly TimeSpan _lockTimeout = TimeSpan.FromSeconds(10);\n\n    public IdempotencyMiddleware(RequestDelegate next) => _next = next;\n\n    public async Task InvokeAsync(HttpContext context, IIdempotencyStore store)\n    {\n        if (!HttpMethods.IsPost(context.Request.Method) ||\n            !context.Request.Headers.TryGetValue(\"Idempotency-Key\", out var keyValue))\n        {\n            await _next(context);\n            return;\n        }\n\n        var key = keyValue.ToString();\n        var existing = await store.GetAsync(key, context.RequestAborted);\n        if (existing != null)\n        {\n            context.Response.StatusCode = existing.StatusCode;\n            context.Response.ContentType = \"application/json\";\n            await context.Response.WriteAsync(existing.ResponseBody, context.RequestAborted);\n            return;\n        }\n\n        var originalBody = context.Response.Body;\n        await using var memoryStream = new MemoryStream();\n        context.Response.Body = memoryStream;\n\n        await _next(context);\n\n        memoryStream.Seek(0, SeekOrigin.Begin);\n        var responseBody = await new StreamReader(memoryStream).ReadToEndAsync();\n\n        await store.SaveAsync(key, context.Request, context.Response.StatusCode, responseBody);\n\n        memoryStream.Seek(0, SeekOrigin.Begin);\n        await memoryStream.CopyToAsync(originalBody, context.RequestAborted);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Locking and concurrency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Two retries can arrive at the server simultaneously for the same key. Without locking, both will see no record and both will execute. Use a distributed lock—Redis `SET key value NX EX 10` is a common choice—so the first request claims the key, others wait briefly, and then read the cached result."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with idempotency keys and duplicate request handling, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Critical detail",
+        "text": "The lock must expire. If a request crashes after acquiring the lock, a permanent lock deadlalls all future retries for that key. Always set a short TTL."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to require idempotency keys"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not every endpoint needs idempotency. Reserve it for financial transactions, order creation, and any state-changing action where duplicates are dangerous. Read-only endpoints are naturally idempotent. Safe methods like GET and DELETE do not need this header, though DELETE can benefit from a key if the delete itself is expensive or irreversible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Idempotency keys protect mutation endpoints from duplicate execution caused by retries.",
+          "Store the key, request hash, status, and response body durably with a unique constraint.",
+          "Use a distributed lock with a short TTL to prevent parallel duplicates.",
+          "Require the key only on endpoints where duplicates would be harmful."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "problem-details-and-consistent-error-contracts",
+    "timeouts-retries-and-cancellation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Stripe Docs: Idempotent Requests",
+      "url": "https://stripe.com/docs/api/idempotent_requests",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs: HTTP middleware in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/fundamentals/middleware",
+      "type": "article"
+    },
+    {
+      "title": "Redis SET command with NX and EX options",
+      "url": "https://redis.io/commands/set",
+      "type": "article"
+    }
+  ]
 }

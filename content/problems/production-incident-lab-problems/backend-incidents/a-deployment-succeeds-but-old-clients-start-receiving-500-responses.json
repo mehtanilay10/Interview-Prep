@@ -4,58 +4,223 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "A deployment succeeds but old clients start receiving 500 responses",
-  "description": "Problem: A deployment succeeds but old clients start receiving 500 responses. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose and fix a breaking API change that causes old clients to receive 500 errors after a successful deployment, using versioning, feature flags, and contract testing.",
   "order": 10,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["breaking-changes", "api-versioning", "backward-compatibility", "contract-testing", "deployment"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A deployment succeeds but old clients start receiving 500 responses** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a deployment succeeds but old clients start receiving 500 responses."
+        "text": "You deploy a new version of an API. The deployment succeeds and health checks pass, but support tickets start flooding in from legacy mobile clients that receive 500 errors on every request. The new clients work fine. You need to determine why the old clients broke and how to prevent this from recurring without blocking feature delivery."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common causes"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of a deployment succeeds but old clients start receiving 500 responses",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "A required field was removed or renamed in the response body, and old clients fail to deserialize it",
+          "The API now returns a different HTTP status code for validation errors, and old clients treat it as a server error",
+          "Enum values were changed or removed, causing serialization exceptions on the server",
+          "A new dependency was added that is incompatible with the runtime version used by old clients",
+          "The server started returning JSON properties with different casing conventions",
+          "A middleware change introduced stricter authentication requirements that old clients do not satisfy"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Backward compatibility",
+            "definition": "The property that newer versions of software continue to work with older clients or consumers."
+          },
+          {
+            "term": "Semantic versioning",
+            "definition": "A versioning scheme where breaking changes increment the major version number."
+          },
+          {
+            "term": "Consumer-driven contract testing",
+            "definition": "Tests where the consumer defines the expected API contract, and the provider verifies it."
+          },
+          {
+            "term": "Feature flags",
+            "definition": "Conditional logic that enables or disables functionality at runtime without redeploying."
+          },
+          {
+            "term": "Graceful degradation",
+            "definition": "Designing systems to provide limited functionality when some components fail."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The fastest way to confirm the cause is to compare the response schema between versions. Use a tool like tcpdump, Wireshark, or your API gateway logs to capture the raw response that old clients receive. Look for missing fields, type mismatches, or new required properties that were not present in the previous version."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Breaking response change",
+        "content": "Version 1 returned a flat user object. Version 2 nests it under data.user:",
+        "code": "// Version 1 response (old clients expect this)\n{\n  \"id\": 123,\n  \"name\": \"Alice\",\n  \"email\": \"alice@example.com\"\n}\n\n// Version 2 response (old clients break)\n{\n  \"data\": {\n    \"user\": {\n      \"id\": 123,\n      \"name\": \"Alice\",\n      \"email\": \"alice@example.com\"\n    }\n  }\n}",
+        "language": "json"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Remediation strategies"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding a deployment succeeds but old clients start receiving 500 responses is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Roll back the deployment if user impact is high and the fix is not immediately available.",
+          "Enable a feature flag that returns the old response shape to legacy user agents.",
+          "Add API versioning: route /v1/ to the old behavior and /v2/ to the new behavior.",
+          "Update the client version detection logic to serve the correct schema.",
+          "Add consumer-driven contract tests to your CI pipeline so this regression is caught before deployment."
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Breaking change handling strategies",
+        "cards": [
+          {
+            "title": "Rollback",
+            "description": "Revert the deployment to the previous working version.",
+            "pros": ["Fastest way to restore service", "Zero risk of new bugs"],
+            "cons": ["Delays the feature", "Does not fix the underlying contract mismatch"]
+          },
+          {
+            "title": "Feature flag",
+            "description": "Toggle behavior at runtime based on client version or user segment.",
+            "pros": ["Instant rollback without redeploy", "Can target specific client versions"],
+            "cons": ["Adds branching complexity", "Flag debt if not cleaned up"]
+          },
+          {
+            "title": "API versioning",
+            "description": "Expose multiple API versions simultaneously and route requests accordingly.",
+            "pros": ["Clean separation of contracts", "Allows gradual client migration"],
+            "cons": ["Maintenance burden of multiple versions", "Increased testing surface"]
+          },
+          {
+            "title": "Contract testing",
+            "description": "Automated tests that verify the provider meets consumer expectations.",
+            "pros": ["Catches breaking changes in CI", "Improves team communication"],
+            "cons": ["Requires consumer and provider collaboration", "Setup overhead"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-breaking-change-debug",
+        "caption": "Diagnosis flow for breaking API changes after deployment",
+        "definition": "graph TD\n    A[Old clients get 500s] --> B[Capture raw response]\n    B --> C{Response shape changed?}\n    C -->|Yes| D[Compare schemas v1 vs v2]\n    C -->|No| E{Status code changed?}\n    E -->|Yes| F[Check error handling logic]\n    E -->|No| G{Server exception logs?}\n    G -->|Yes| H[Check enum or type changes]\n    G -->|No| I[Check middleware or auth]\n    D --> J[Add versioning or feature flag]\n    F --> J\n    H --> J\n    I --> J\n    J --> K[Add contract test to CI]"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a deployment succeeds but old clients start receiving 500 responses, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Do not rely on health checks alone",
+        "text": "Health checks typically hit the newest client path or a synthetic endpoint that does not exercise legacy contracts. Always test with real client versions in a staging environment that mirrors production traffic before deploying breaking changes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prevention patterns"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Additive-only changes during minor releases: new fields are optional, removed fields go through a deprecation cycle",
+          "Use OpenAPI or GraphQL schema validation to enforce compatibility in CI",
+          "Run integration tests with actual legacy client builds against every release candidate",
+          "Deprecate fields with a sunset header before removing them",
+          "Automate schema diffing as part of the pull request pipeline"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How long should a deprecation period last?",
+            "answer": "It depends on your client update cycle. Mobile apps may take weeks to propagate through app stores, so a 90-day deprecation window is common. For server-to-server APIs, 30 days is usually sufficient."
+          },
+          {
+            "question": "Should I version with URL paths or headers?",
+            "answer": "URL path versioning (/v1/, /v2/) is the most explicit and easiest to route. Header-based versioning is cleaner but harder to debug from logs."
+          },
+          {
+            "question": "What if I cannot add contract tests immediately?",
+            "answer": "Start with a single canary deployment that routes a percentage of legacy traffic to the new version and alerts on error rate. That buys you time to build proper contract tests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Audit a service for breaking changes",
+        "description": "Pick a service in your codebase. Review its last three releases and identify any changes that could break older clients. Document the risk and propose a mitigation for each.",
+        "steps": [
+          "List the consumers of the service and their versions",
+          "Review pull requests merged since the last release for schema changes",
+          "Classify each change as additive, non-breaking, or breaking",
+          "For breaking changes, propose a deprecation or versioning strategy",
+          "Add one contract test that would have caught the most dangerous breaking change"
+        ],
+        "expectedOutcome": "You should produce a compatibility audit that identifies hidden breaking changes and adds at least one automated safeguard."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Compare response schemas between versions to identify the breaking change",
+          "Use feature flags or API versioning to restore service quickly",
+          "Add consumer-driven contract tests to prevent recurrence",
+          "Treat deprecation as a first-class concern, not an afterthought"
+        ],
+        "takeaway": "A deployment is not successful if it breaks your oldest clients. Measure success by user impact, not just health-check status."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "API Versioning Best Practices",
+      "url": "https://restfulapi.net/versioning/",
+      "type": "article",
+      "author": "RESTfulAPI.net",
+      "description": "Strategies for evolving APIs without breaking existing clients."
+    }
+  ]
 }

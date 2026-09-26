@@ -3,34 +3,61 @@
   "slug": "services-and-service-discovery",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Services and service discovery",
-  "description": "Learn about Services and service discovery. Master the concepts, patterns, and best practices.",
+  "title": "Services and Service Discovery",
+  "description": "Learn how Kubernetes Services provide stable networking for dynamic Pods and enable reliable communication inside and outside the cluster.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "services",
+    "service-discovery",
+    "networking"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Services and service discovery** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with services and service discovery."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Problem Services Solve"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of services and service discovery",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Kubernetes Pods are ephemeral. They get new IP addresses every time they restart, and they can scale up or down at any time. Hardcoding Pod IPs is impossible in production. A **Service** solves this by providing a stable network endpoint — a single DNS name and virtual IP — that never changes, even as the Pods behind it come and go."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Services work by continuously watching the Kubernetes API for Pods with matching labels. When a Pod starts or stops, the Service's internal load balancer updates automatically. Other services in the cluster talk to the Service, not directly to Pods."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Service",
+            "definition": "An abstraction that defines a logical set of Pods and a policy to access them."
+          },
+          {
+            "term": "ClusterIP",
+            "definition": "The default Service type; exposes the Service on an internal IP reachable only from within the cluster."
+          },
+          {
+            "term": "NodePort",
+            "definition": "Exposes the Service on each Node's IP at a static port."
+          },
+          {
+            "term": "LoadBalancer",
+            "definition": "Provisions an external load balancer (in supported cloud environments) to route traffic to the Service."
+          },
+          {
+            "term": "EndpointSlice",
+            "definition": "A scalable way to track the IP addresses of Pods backing a Service."
+          }
         ]
       }
     },
@@ -38,24 +65,163 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Service Types"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding services and service discovery is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Kubernetes supports four primary Service types. Choosing the right one depends on where your traffic originates and whether you need external access."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Type",
+          "Scope",
+          "Use Case"
+        ],
+        "rows": [
+          [
+            "ClusterIP",
+            "Internal only",
+            "Default; inter-service communication within the cluster"
+          ],
+          [
+            "NodePort",
+            "External via node IP:port",
+            "Direct external access without a load balancer"
+          ],
+          [
+            "LoadBalancer",
+            "External via cloud LB",
+            "Production external traffic in cloud environments"
+          ],
+          [
+            "ExternalName",
+            "Maps to DNS name",
+            "Mapping a Service to an external DNS name"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Service"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common way to create a Service is by applying a YAML manifest. The Service uses a label selector to find Pods that belong to it. Any Pod with matching labels becomes part of the Service's endpoint pool."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ClusterIP Service for internal API access",
+        "content": "Expose a set of API Pods internally with a stable DNS name.",
+        "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: api-service\n  labels:\n    app: api\nspec:\n  type: ClusterIP\n  selector:\n    app: api\n  ports:\n  - name: http\n    port: 80\n    targetPort: 8080\n    protocol: TCP",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Once this Service is running, any Pod in the same namespace can reach your API at the DNS name `api-service` on port 80. If you need to reach it from another namespace, use the fully qualified domain name: `api-service.<namespace>.svc.cluster.local`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Headless Services"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **headless Service** (ClusterIP set to `None`) does not allocate a virtual IP. Instead, DNS returns the individual Pod IPs directly. This is useful for StatefulSets where clients need to connect to specific replicas, such as peer-to-peer database clusters or distributed caches."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Headless Service for StatefulSet peer discovery",
+        "content": "Enable direct Pod DNS resolution for a StatefulSet.",
+        "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: cassandra\nspec:\n  clusterIP: None\n  selector:\n    app: cassandra\n  ports:\n  - port: 9042\n    name: cql",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with services and service discovery, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Services do not load-balance like cloud LBs",
+        "text": "ClusterIP Services use kube-proxy rules (iptables or IPVS) for round-robin or random selection at the TCP level. They do not offer health-check-aware load balancing. For advanced traffic management, combine with an Ingress controller."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Expose applications with Services",
+        "description": "Create and verify Service connectivity for internal and external access.",
+        "steps": [
+          "Deploy two Pods with labels app=frontend and app=backend.",
+          "Create a ClusterIP Service for the backend Pods.",
+          "From a debug Pod, curl the backend Service by its DNS name.",
+          "Create a NodePort Service for the frontend and access it via node IP.",
+          "Describe the Service endpoints to see which Pod IPs are included."
+        ],
+        "expectedOutcome": "You can reach applications through stable Service endpoints regardless of Pod IP changes."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Services provide stable network endpoints for dynamic Pods using label selectors.",
+          "ClusterIP is for internal traffic; NodePort and LoadBalancer expose services externally.",
+          "DNS names like <service>.<namespace>.svc.cluster.local let Pods discover each other.",
+          "Headless Services (clusterIP: None) return individual Pod IPs for StatefulSet use cases.",
+          "EndpointSlices track the Pod IPs backing a Service as Pods scale and move."
+        ],
+        "takeaway": "Services are the backbone of Kubernetes networking — they make ephemeral Pods addressable and discoverable."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "pods-and-workload-controllers",
+    "ingress-and-traffic-routing",
+    "rbac-and-namespaces"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Services",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes DNS for Services and Pods",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "type": "article"
+    },
+    {
+      "title": "EndpointSlices",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+      "type": "article"
+    }
+  ]
 }

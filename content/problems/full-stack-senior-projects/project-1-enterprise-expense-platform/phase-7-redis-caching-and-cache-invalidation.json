@@ -4,58 +4,197 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 7: Redis caching and cache invalidation",
-  "description": "Project: Phase 7: Redis caching and cache invalidation. Build and understand this project with step-by-step guidance.",
+  "description": "Implement multi-level Redis caching for policy rules, user dashboard summaries, and organization settings. Apply cache-aside pattern, key versioning, and event-driven invalidation when data changes.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "redis",
+    "caching",
+    "cache-invalidation",
+    "stackexchange.redis",
+    "performance",
+    "asp.net-core"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 7: Redis caching and cache invalidation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 7: redis caching and cache invalidation."
+        "text": "Caching is the cheapest way to improve throughput — until stale data corrupts user decisions. In an expense platform, a stale policy limit or an outdated approval count could cause compliance violations or duplicate approvals. This phase teaches you what to cache, how long to keep it, and how to evict it safely."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What to cache"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Candidate cache keys",
         "items": [
-          "Understand the fundamental principles of phase 7: redis caching and cache invalidation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Policy rules: rarely change, expensive to join across categories.",
+          "Organization settings: currency, approval chain, per-user feature flags.",
+          "User dashboard summary: pending approvals count, recent reports — aggregated from multiple queries.",
+          "Department cost center mapping: static for months, referenced in many list queries."
         ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-cache-architecture",
+        "caption": "Cache layers: application-level Redis + HTTP cache headers for the frontend",
+        "definition": "graph LR\n    C[Client] -->|GET /api/reports/summary| API\n    API -->|Check Redis| Redis[(Redis Cache)]\n    Redis -->|Hit| API\n    API -->|Miss| DB[(SQL Server)]\n    DB -->|Hydrate| API\n    API -->|SET| Redis\n    API -->|200 OK + Cache-Control| C\n    subgraph Events\n        E1[ExpenseReportSubmitted]\n        E2[PolicyRuleUpdated]\n        E3[ApprovalGranted]\n    end\n    E2 -->|Invalidate| Redis"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Cache-aside with versioned keys"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 7: redis caching and cache invalidation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Never cache forever. Use a version prefix (e.g., `ExpensePlatform:policy:v2`) so you can invalidate all related keys by bumping the version. This is simpler and safer than tracking every individual key."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: ICacheService abstraction with StackExchange.Redis",
+        "content": "The abstraction lets you swap Redis for a no-op implementation in tests.",
+        "language": "csharp",
+        "code": "public interface ICacheService\n{\n    Task<T?> GetAsync<T>(string key, CancellationToken ct = default);\n    Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default);\n    Task RemoveAsync(string key, CancellationToken ct = default);\n    Task RemoveByPatternAsync(string pattern, CancellationToken ct = default);\n}\n\npublic sealed class RedisCacheService(IConnectionMultiplexer multiplexer) : ICacheService, IDisposable\n{\n    private readonly IDatabase _db = multiplexer.GetDatabase();\n    private readonly IServer _server = multiplexer.GetServer(multiplexer.GetEndPoints()[0]);\n\n    public async Task<T?> GetAsync<T>(string key, CancellationToken ct = default)\n    {\n        var value = await _db.StringGetAsync(key);\n        if (!value.HasValue) return default;\n        return JsonSerializer.Deserialize<T>(value);\n    }\n\n    public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)\n    {\n        var json = JsonSerializer.Serialize(value);\n        await _db.StringSetAsync(key, json, ttl ?? TimeSpan.FromMinutes(10));\n    }\n\n    public async Task RemoveAsync(string key, CancellationToken ct = default)\n        => await _db.KeyDeleteAsync(key);\n\n    public async Task RemoveByPatternAsync(string pattern, CancellationToken ct = default)\n    {\n        var keys = _server.Keys(pattern: pattern).ToArray();\n        if (keys.Length > 0)\n            await _db.KeyDeleteAsync(keys);\n    }\n\n    public void Dispose() => multiplexer.Dispose();\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Cached policy rule query with versioned key",
+        "content": "Bump the version prefix when all policy rules change (e.g., on Organization update).",
+        "language": "csharp",
+        "code": "public class CachedPolicyQuery(IPolicyRepository repo, ICacheService cache, IOptions<CacheOptions> opts)\n    : IPolicyQuery\n{\n    private readonly string _version = opts.Value.PolicyVersion; // \"v3\"\n    private readonly TimeSpan _ttl = TimeSpan.FromMinutes(30);\n\n    public async Task<IReadOnlyList<PolicyRule>> GetActiveRulesAsync(Guid orgId, CancellationToken ct)\n    {\n        var key = $\"ExpensePlatform:policy:{_version}:{orgId}\";\n        var cached = await cache.GetAsync<IReadOnlyList<PolicyRule>>(key, ct);\n        if (cached is not null) return cached;\n\n        var rules = await repo.GetActiveByOrganizationAsync(orgId, ct);\n        await cache.SetAsync(key, rules, _ttl, ct);\n        return rules;\n    }\n\n    public async Task InvalidateAsync(Guid orgId, CancellationToken ct)\n    {\n        var pattern = $\"ExpensePlatform:policy:*:{orgId}\";\n        await cache.RemoveByPatternAsync(pattern, ct);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Event-driven cache invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a PolicyRule is updated, the stale cache entry must die immediately, not on TTL expiry. Publish a PolicyRulesChanged event and let a handler call InvalidateAsync."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Domain event triggers cache invalidation",
+        "content": "MediatR INotificationHandler responds to domain events.",
+        "language": "csharp",
+        "code": "public record PolicyRulesChanged(Guid OrganizationId) : INotification;\n\npublic class InvalidatePolicyCacheHandler(ICacheService cache, ILogger<InvalidatePolicyCacheHandler> log)\n    : INotificationHandler<PolicyRulesChanged>\n{\n    public async Task Handle(PolicyRulesChanged notification, CancellationToken ct)\n    {\n        log.LogInformation(\"Invalidating policy cache for org {OrgId}\", notification.OrganizationId);\n        await new CachedPolicyQuery(null!, cache, null!).InvalidateAsync(notification.OrganizationId, ct);\n    }\n}\n\n// When a policy is updated via MediatR command:\npublic async Task<Result<Unit>> Handle(UpdatePolicyRuleCommand request, CancellationToken ct)\n{\n    var rule = await _policyRepo.GetByIdAsync(request.Id, ct);\n    rule.Update(request.MaxAmount, request.RequiresReceipt);\n    await _policyRepo.UpdateAsync(rule, ct);\n    await _uow.SaveChangesAsync(ct);\n    await _mediator.Publish(new PolicyRulesChanged(request.OrganizationId), ct);\n    return Result<Unit>.Success(Unit.Value);\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 7: redis caching and cache invalidation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Stale cache is worse than no cache",
+        "text": "If a manager approves an expense and the pending-approvals count in Redis doesn't update for 5 minutes, the manager may approve duplicates. Always invalidate on write; use TTL only as a safety net."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frontend caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Query (TanStack Query v5) provides client-side caching with stale-while-revalidate semantics. Set cacheTime and gcTime to match the volatility of the data."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TypeScript: React Query with stale-while-revalidate",
+        "content": "Policy rules rarely change, so a long staleTime is acceptable. Dashboard summaries are short-lived.",
+        "language": "typescript",
+        "code": "// src/features/policy/hooks.ts\nexport function usePolicyRules(organizationId: string) {\n  return useQuery({\n    queryKey: ['policy-rules', organizationId],\n    queryKeyHash: ['policy-rules', organizationId].join('-'),\n    queryFn: () => fetchPolicyRules(organizationId),\n    staleTime: 5 * 60 * 1000, // 5 minutes — policies rarely change\n    gcTime: 30 * 60 * 1000,   // 30 minutes in memory after unused\n  });\n}\n\n// src/features/dashboard/hooks.ts\nexport function useDashboardSummary(organizationId: string) {\n  const queryClient = useQueryClient();\n  const mutation = useMutation({\n    mutationFn: submitExpenseReport,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['dashboard-summary', organizationId] });\n    },\n  });\n  return useQuery({\n    queryKey: ['dashboard-summary', organizationId],\n    queryFn: () => fetchDashboardSummary(organizationId),\n    staleTime: 30 * 1000, // 30 seconds — sensitive counts\n    gcTime: 5 * 60 * 1000,\n  });\n}"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 7 deliverables",
+        "items": [
+          {
+            "text": "ICacheService abstraction with StackExchange.Redis implementation."
+          },
+          {
+            "text": "Policy rules cached with versioned key and 30-minute TTL."
+          },
+          {
+            "text": "PolicyRulesChanged domain event handler invalidates cache on write."
+          },
+          {
+            "text": "Dashboard summary query uses shorter TTL than policy rules."
+          },
+          {
+            "text": "Cache hit/miss metrics instrumented with ILogger or OpenTelemetry counters."
+          },
+          {
+            "text": "Integration test proves stale data is not served after invalidation."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 7 summary",
+        "points": [
+          "Cache-aside: read-through on miss, explicit write-through on update.",
+          "Versioned key prefixes make bulk invalidation a single call.",
+          "Domain events are the safest invalidation trigger — they fire after the transaction commits.",
+          "Frontend caching complements backend caching; they invalidate independently."
+        ],
+        "takeaway": "Caching decisions are about data volatility. Policies are slow-changing; dashboards are fast-changing. Match your TTL and invalidation strategy to the business cost of stale data."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Redis Documentation",
+      "url": "https://redis.io/docs/",
+      "type": "article"
+    },
+    {
+      "title": "StackExchange.Redis",
+      "url": "https://stackexchange.github.io/StackExchange.Redis/",
+      "type": "tool"
+    },
+    {
+      "title": "Microsoft: Cache aside pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "TanStack Query v5 Documentation",
+      "url": "https://tanstack.com/query/latest",
+      "type": "article"
+    }
+  ]
 }

@@ -3,34 +3,96 @@
   "slug": "snapshot-isolation-and-row-versioning",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Snapshot isolation and row versioning",
-  "description": "Learn about Snapshot isolation and row versioning. Master the concepts, patterns, and best practices.",
+  "title": "Snapshot Isolation and Row Versioning",
+  "description": "Understand how SNAPSHOT isolation and row versioning eliminate reader-writer blocking, and learn when to enable them in production.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "snapshot",
+    "row-versioning",
+    "tempdb",
+    "isolation",
+    "sql-server"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Snapshot isolation and row versioning** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with snapshot isolation and row versioning."
+        "text": "Under the default READ COMMITTED isolation level, a SELECT statement acquires shared (S) locks on the rows or pages it reads. If another session is modifying those same rows with an exclusive (X) lock, the SELECT must wait. This is called reader-writer blocking, and it is one of the most common sources of production concurrency problems."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Snapshot isolation** and **read committed snapshot isolation (RCSI)** solve this problem by giving readers a version of the data that existed at the start of their transaction or statement, without acquiring shared locks. Instead of waiting for writers, readers read from a version store in tempdb."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How Row Versioning Works"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of snapshot isolation and row versioning",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "When a row is modified under snapshot isolation or RCSI, SQL Server copies the **before** image of the row into tempdb in a structure called the version store. Each version is tagged with a sequence number. When a reader needs a row that is currently locked by a writer, SQL Server follows the version chain back to the most recent version that was committed before the reader's transaction or statement began."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "row-versioning-flow",
+        "caption": "How SNAPSHOT isolation uses tempdb to serve a reader without waiting for a writer.",
+        "definition": "flowchart TB\n    W[Writer updates Row X] -->|stores before image| V[Version Store in tempdb]\n    R[Reader queries Row X] -->|sees X locked| V\n    V -->|returns committed version| R\n    W -->|commits| DB[Database]\n    R -->|continues without waiting| DB"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Snapshot Isolation vs. Read Committed Snapshot"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There are two distinct row-versioning features in SQL Server, and they are often confused. They use the same version store, but they behave differently and are enabled independently."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "cards": [
+          {
+            "title": "READ COMMITTED SNAPSHOT (RCSI)",
+            "description": "Changes the default READ COMMITTED behavior to use row versioning. Readers see the last committed version of each row at the start of each statement, not the start of the transaction. It is the lowest-impact way to eliminate most reader-writer blocking.",
+            "pros": [
+              "Transparent to applications — no code changes required",
+              "Eliminates shared locks for reads",
+              "Minimal tempdb overhead compared to full SNAPSHOT"
+            ],
+            "cons": [
+              "Update conflicts still possible at commit time",
+              "Does not prevent non-repeatable reads within a transaction"
+            ]
+          },
+          {
+            "title": "SNAPSHOT Isolation",
+            "description": "A full transaction-level isolation level. Readers see a consistent view of the database as of the start of the transaction, regardless of changes made by other sessions during the transaction.",
+            "pros": [
+              "Full statement-level and transaction-level consistency",
+              "Eliminates non-repeatable reads and phantoms",
+              "No shared locks acquired for reads"
+            ],
+            "cons": [
+              "Requires explicit SET TRANSACTION ISOLATION LEVEL SNAPSHOT",
+              "Can fail at commit time if write conflicts are detected",
+              "Higher tempdb version store usage than RCSI"
+            ]
+          }
         ]
       }
     },
@@ -38,24 +100,135 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Enabling Row Versioning"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding snapshot isolation and row versioning is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Both features are disabled by default and must be enabled at the database level. Enabling them requires an exclusive database lock for a very short time while the database state is updated. Plan the enablement during a maintenance window or low-traffic period."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enable RCSI and Snapshot Isolation",
+        "content": "Enable row versioning features at the database level.",
+        "language": "sql",
+        "code": "-- Enable READ COMMITTED SNAPSHOT (RCSI)\n-- This is the most commonly enabled option\nALTER DATABASE [AdventureWorks]\nSET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;\n\n-- Enable full SNAPSHOT isolation\nALTER DATABASE [AdventureWorks]\nSET ALLOW_SNAPSHOT_ISOLATION ON;\n\n-- Verify the settings\nSELECT \n    name AS database_name,\n    is_read_committed_snapshot_on,\n    is_snapshot_isolation_on\nFROM sys.databases\nWHERE name = 'AdventureWorks';"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "ROLLBACK IMMEDIATE",
+        "text": "The ROLLBACK IMMEDIATE option terminates all existing connections to the database so the ALTER DATABASE command can proceed. In production, this will disconnect active users. Use it during a maintenance window or coordinate with your application team."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Monitoring the Version Store"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The version store lives in tempdb. If tempdb is too small or its data files are not configured for autogrowth, the version store can fill up and cause transactions to fail. You should monitor version store usage as part of your regular tempdb health checks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monitor Version Store Size",
+        "content": "Query tempdb to see how much space the version store is using.",
+        "language": "sql",
+        "code": "SELECT \n    database_id,\n    file_id,\n    name AS logical_name,\n    physical_name,\n    size / 128.0 AS size_mb,\n    FILEPROPERTY(name, 'SpaceUsed') / 128.0 AS used_mb,\n    (size - FILEPROPERTY(name, 'SpaceUsed')) / 128.0 AS free_mb\nFROM sys.database_files\nWHERE database_id = 2;  -- tempdb is always database_id 2\n\n-- Version store cleanup task status\nSELECT \n    name,\n    is_auto_create_stats_incremental_on,\n    is_auto_update_stats_on\nFROM sys.databases\nWHERE database_id = 2;"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with snapshot isolation and row versioning, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Tempdb Sizing Best Practice",
+        "text": "For snapshot isolation, size tempdb with multiple data files (typically one per CPU core up to 8) and set autogrowth to a fixed MB value rather than percentage. This prevents allocation contention and ensures the version store has room to grow."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Write Conflicts Under Snapshot"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Snapshot isolation detects write conflicts at commit time. If two transactions modify the same row and both try to commit, the second transaction receives error 3960: 'Snapshot isolation transaction aborted due to update conflict.' The application must catch this error and retry. This is by design — snapshot isolation guarantees that committed data reflects a serializable order of transactions."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Should I enable RCSI on every database?",
+            "answer": "In most OLTP environments, yes. RCSI eliminates the majority of reader-writer blocking with very low risk. Test it in a staging environment first, but it is widely recommended as a best practice for SQL Server 2016 and later."
+          },
+          {
+            "question": "Does RCSI completely eliminate blocking?",
+            "answer": "No. RCSI eliminates shared-lock blocking for reads, but writers still acquire exclusive locks and can still block each other. Schema changes, lock escalation, and long-running transactions can still cause blocking."
+          },
+          {
+            "question": "Can I use RCSI and SNAPSHOT together?",
+            "answer": "Yes. RCSI changes the default READ COMMITTED behavior, while SNAPSHOT is an explicit isolation level you opt into per transaction. They share the same version store in tempdb, so enabling both increases version store usage."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Row versioning stores before-images in tempdb so readers do not need to wait for writers",
+          "RCSI changes READ COMMITTED to use row versioning transparently — no application code changes required",
+          "SNAPSHOT isolation provides full transaction-level consistency but requires explicit opt-in and write-conflict retries",
+          "Tempdb must be sized appropriately for version store growth — undersized tempdb causes transaction failures",
+          "Write conflicts under SNAPSHOT are normal and must be handled with retries in application code"
+        ],
+        "takeaway": "Row versioning transforms the locking behavior of SQL Server from a pessimistic, wait-based model to an optimistic, version-store model — but only if tempdb can keep up."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "transaction-isolation-levels",
+    "long-running-transactions"
+  ],
+  "furtherReading": [
+    {
+      "title": "Row Versioning-Based Isolation Levels (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Tempdb Monitoring and Troubleshooting (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/databases/tempdb-database",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Snapshot Isolation in SQL Server (Paul Randal)",
+      "url": "https://www.sqlskills.com/blogs/paul/category/snapshot-isolation/",
+      "type": "article",
+      "author": "Paul Randal"
+    }
+  ]
 }

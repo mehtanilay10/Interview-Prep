@@ -8,54 +8,203 @@
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["database", "performance", "query-optimization", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce database performance regression** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce database performance regression."
+        "text": "Database performance regressions often arrive quietly: a query that used to take 20ms now takes 800ms, and the first signal is a user complaint rather than an alert. This lesson introduces common regression patterns in relational databases, how to recognize them from query plans, and what architectural defenses prevent them from reaching production."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common regression patterns"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce database performance regression",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "N+1 queries hidden inside loops or lazy-loaded navigation properties",
+          "Missing indexes on columns used in WHERE, JOIN, or ORDER BY clauses",
+          "Implicit conversions that prevent index seeks and force table scans",
+          "Lock escalation or deadlocks caused by long-running transactions",
+          "Parameter sniffing where a cached plan optimized for one parameter value is poor for others",
+          "Connection pool exhaustion under load, causing queuing rather than query slowness"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Query plan",
+            "definition": "The execution strategy a database optimizer chooses for a statement, including index seeks, scans, joins, and sorts."
+          },
+          {
+            "term": "Index seek",
+            "definition": "A lookup that navigates directly to matching rows using a B-tree; much faster than scanning every row."
+          },
+          {
+            "term": "N+1 query",
+            "definition": "A pattern where one query fetches a parent collection, then N additional queries fetch each child individually."
+          },
+          {
+            "term": "Parameter sniffing",
+            "definition": "When SQL Server caches a plan based on the first parameter value, which may be atypical for subsequent executions."
+          },
+          {
+            "term": "Connection pool",
+            "definition": "A cache of open database connections reused by an application to avoid the overhead of creating new connections."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The fastest query is the one you do not run. Before optimizing a slow query, ask whether it needs to run at all. Can the result be cached? Can the request be precomputed? Can the user request fewer rows? Eliminating work is more durable than making work faster."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "N+1 query pattern in EF Core",
+        "content": "Lazy loading inside a loop causes N+1 queries. Use Include or a projection instead:",
+        "code": "// N+1: one query for orders, then N queries for items\nvar orders = await _ctx.Orders.ToListAsync();\nforeach (var order in orders)\n{\n    var items = await _ctx.Items\n        .Where(i => i.OrderId == order.Id)\n        .ToListAsync();\n}\n\n// Optimized: single query with projection\nvar orders = await _ctx.Orders\n    .Select(o => new\n    {\n        o.Id,\n        Items = o.Items.Select(i => i.Name).ToList()\n    })\n    .ToListAsync();",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Investigation workflow"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding introduce database performance regression is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Capture the slow query with an execution plan or extended events session",
+          "Look for scans, key lookups, and spills to tempdb as primary red flags",
+          "Compare the actual plan to the estimated plan to identify parameter sniffing",
+          "Check index usage statistics to confirm the index exists and is being used",
+          "Run the query under production-like data volume to confirm the fix holds"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Query optimization approaches",
+        "cards": [
+          {
+            "title": "Add an index",
+            "description": "Create a B-tree index on filtered or sorted columns.",
+            "pros": ["Fast to implement", "Immediate impact for targeted queries", "Minimal code changes"],
+            "cons": ["Slows writes", "Can become unused and need maintenance", "Does not fix N+1"]
+          },
+          {
+            "title": "Rewrite the query",
+            "description": "Restructure joins, projections, or pagination to reduce work.",
+            "pros": ["Fixes root cause", "Benefits multiple queries", "Reduces database load"],
+            "cons": ["Requires code change and testing", "May need application refactoring"]
+          },
+          {
+            "title": "Introduce caching",
+            "description": "Cache hot query results in Redis or memory.",
+            "pros": ["Eliminates repeated database hits", "Works for read-heavy workloads", "Fastest latency after warmup"],
+            "cons": ["Cache invalidation complexity", "Stale data risk", "Added infrastructure"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-db-regression-investigation",
+        "caption": "Database performance regression investigation flow",
+        "definition": "graph TD\n    A[Alert: latency spike] --> B[Capture query plan]\n    B --> C{Plan shows scan?}\n    C -->|Yes| D[Check missing index]\n    C -->|No| E{Plan shows key lookup?}\n    E -->|Yes| F[Review covering index]\n    E -->|No| G{Lock or deadlock?}\n    G -->|Yes| H[Check transaction scope]\n    G -->|No| I{Connection pool full?}\n    I -->|Yes| J[Increase pool or fix leak]\n    I -->|No| K[Check parameter sniffing]\n    D --> L[Apply index]\n    F --> M[Add INCLUDE columns]\n    H --> N[Shorten transaction]\n    J --> O[Fix connection leak]\n    K --> P[Use OPTION RECOMPILE]\n    L --> Q[Verify in production]\n    M --> Q\n    N --> Q\n    O --> Q\n    P --> Q"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce database performance regression, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Indexes are not free",
+        "text": "Every index speeds up reads and slows down writes. Adding an index to a table with high INSERT volume can increase write latency noticeably. Monitor write latency after adding any index, and drop indexes that are not used."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Preventive measures"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Run query plan analysis in CI for any migration that changes schema or adds queries",
+          "Set up automated index usage monitoring to catch unused indexes before they bloat storage",
+          "Use read replicas for reporting queries to isolate analytical load from transactional workloads",
+          "Cap long-running queries with a statement timeout to prevent cascading saturation"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Diagnose a slow query",
+        "description": "You are given a query that runs in 800ms on production but 20ms on development. The execution plan shows a clustered index scan. Identify the likely causes and propose a fix.",
+        "steps": [
+          "Compare the data volume between dev and production environments",
+          "Check whether statistics are up to date on production",
+          "Look for implicit column conversions in the WHERE clause",
+          "Propose an index or query rewrite and justify the choice"
+        ],
+        "expectedOutcome": "You should be able to explain why the plan differs between environments and propose a fix that works at production scale."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Start with the execution plan, not the query text",
+          "Eliminate N+1 before tuning individual queries",
+          "Indexes help reads but hurt writes; balance both",
+          "Validate fixes under production-like data volume",
+          "Prevent regressions with CI-based query plan analysis"
+        ],
+        "takeaway": "A senior engineer treats database performance as a continuous responsibility, not a one-time optimization task. Instrumentation, review, and periodic audits keep regressions from reaching users."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-downstream-timeout",
+    "investigate-using-logs-metrics-and-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL Server Execution Plans",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/execution-plans",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on reading and interpreting SQL Server execution plans."
+    },
+    {
+      "title": "EF Core Performance Best Practices",
+      "url": "https://learn.microsoft.com/en-us/ef/core/performance/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guidance on avoiding common performance pitfalls in Entity Framework Core."
+    }
+  ]
 }

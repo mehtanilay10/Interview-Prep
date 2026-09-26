@@ -4,58 +4,124 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Reflection and its trade-offs",
-  "description": "Learn about Reflection and its trade-offs. Master the concepts, patterns, and best practices.",
+  "description": "Understand how .NET reflection works, when it is useful, and what performance and security costs it carries.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["reflection", "emit", "performance", "source-generators", "metadata"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Reflection and its trade-offs** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with reflection and its trade-offs."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of reflection and its trade-offs",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Reflection is the ability of a program to inspect, modify, and invoke types and members at runtime. It is one of the most powerful features in .NET — and one of the most expensive. Frameworks like ASP.NET Core, Entity Framework Core, and JSON serializers all rely on reflection to discover types, map properties, and build pipelines. But in performance-sensitive code paths, reflection can silently dominate CPU time and generate significant garbage-collection pressure."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding reflection and its trade-offs is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The key to using reflection well is knowing when it is the right tool and when a source generator, a compiled expression, or a manually written dispatcher would be faster. Reflection is not inherently bad — it is the absence of an alternative. Modern .NET provides alternatives that give you the flexibility of reflection without the runtime cost."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How reflection reads metadata"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you call `typeof(MyClass)`, the runtime returns a `Type` object backed by the assembly's metadata tables. The metadata is already loaded — the CLR parsed it when the assembly was loaded. Reflection reads those tables rather than performing expensive disk I/O. The expense comes from string-based lookups, boxing of value types, and the creation of temporary delegate objects. A single reflection-heavy loop can allocate thousands of small objects per millisecond."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading type metadata with reflection",
+        "code": "using System.Reflection;\n\nType personType = typeof(Person);\n\n// Read class-level metadata\nConsole.WriteLine($\"Full name: {personType.FullName}\");\nConsole.WriteLine($\"Is class: {personType.IsClass}\");\n\n// Enumerate public properties\nforeach (PropertyInfo prop in personType.GetProperties())\n{\n    Console.WriteLine($\"{prop.PropertyType.Name} {prop.Name}\");\n}\n\n// Read a method and invoke it\nMethodInfo getName = personType.GetMethod(\"GetDisplayName\");\nPerson p = new Person { FirstName = \"Ada\", LastName = \"Lovelace\" };\nstring result = (string)getName.Invoke(p, null);\nConsole.WriteLine(result);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reflection.Emit and dynamic method generation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`System.Reflection.Emit` lets you generate new types, methods, and assemblies at runtime. It is used by serializers, ORMs, and proxy generators to build fast, type-specific code paths without writing the code by hand. A common pattern is to generate a dynamic method that reads or writes properties directly, avoiding the string-based overhead of `PropertyInfo.GetValue` on every call."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a dynamic getter with Reflection.Emit",
+        "code": "using System.Reflection;\nusing System.Reflection.Emit;\n\npublic static Func<T, object> CreateGetter<T>(string propertyName)\n{\n    PropertyInfo prop = typeof(T).GetProperty(propertyName);\n    DynamicMethod getter = new DynamicMethod(\n        \"get_\", typeof(object), new[] { typeof(T) }, typeof(T));\n\n    ILGenerator il = getter.GetILGenerator();\n    il.Emit(OpCodes.Ldarg_0);       // load the instance\n    il.Emit(OpCodes.Callvirt, prop.GetGetMethod());\n\nn    // Box value types to object\n    if (prop.PropertyType.IsValueType)\n        il.Emit(OpCodes.Box, prop.PropertyType);\n\n    il.Emit(OpCodes.Ret);\n\n    return (Func<T, object>)getter.CreateDelegate(typeof(Func<T, object>));\n}\n\n// Usage — compiled delegate is as fast as hand-written code\nvar getter = CreateGetter<Person>(\"FirstName\");\nstring name = (string)getter(personInstance);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Source generators: compile-time reflection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Source generators shift reflection work from runtime to compile time. A source generator runs during compilation, inspects your code using the Roslyn compiler API, and produces additional C# source files that are compiled alongside your project. Because the generated code is compiled ahead of time, there is no runtime reflection cost — and no trimming risk, since the compiler sees the generated code as regular source."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Source generator producing a mapper",
+        "code": "// [Generator] runs at compile time\npublic class MapperGenerator : ISourceGenerator\n{\n    public void Initialize(GeneratorInitializationContext ctx)\n    {\n        // Register a syntax receiver to find [MapTo] attributed classes\n    }\n\n    public void Execute(GeneratorExecutionContext ctx)\n    {\n        // Find all types with [MapTo] attribute\n        // Generate a static MapTo method for each pair\n        // Emit the generated C# source file\n        ctx.AddSource(\"Mapper.g.cs\", generatedSource);\n    }\n}\n\n// Generated code (at compile time):\n// public static class Mapper\n// {\n//     public static CustomerDto MapTo(this Order o)\n//         => new CustomerDto { Name = o.CustomerName };\n// }",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with reflection and its trade-offs, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Reflection and Native AOT do not mix well",
+        "text": "Native AOT and trimming analyze your code statically. If they cannot see a type being referenced directly, they assume it is unused and remove it. Reflection bypasses the compiler, so the linker cannot see the types you reference by name string. You must annotate your code with `DynamicDependency` or `RequiresUnreferencedCode`, or provide `rd.xml` files to preserve types. Always test Native AOT builds with full integration tests that exercise every reflection path."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Reflection reads embedded assembly metadata; its cost comes from string lookups, boxing, and delegate allocations.",
+          "Reflection.Emit generates IL at runtime to produce fast, type-specific delegates on demand.",
+          "Source generators move reflection work to compile time, eliminating runtime cost and trimming risk.",
+          "Native AOT requires explicit preservation of reflection-accessed types or the linker will remove them."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["assembly-loading-and-metadata", "readytorun-and-native-aot", "spant-memoryt-and-ref-structs"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Reflection in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/reflection"
+    },
+    {
+      "type": "article",
+      "title": "Source generators overview",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/source-generators-overview"
+    },
+    {
+      "type": "article",
+      "title": "ILLinker trimming annotations",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/deploying/trimming/annotations"
+    }
+  ]
 }

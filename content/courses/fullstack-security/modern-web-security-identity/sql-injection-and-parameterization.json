@@ -3,59 +3,203 @@
   "slug": "sql-injection-and-parameterization",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "SQL injection and parameterization",
-  "description": "Learn about SQL injection and parameterization. Master the concepts, patterns, and best practices.",
+  "title": "SQL Injection and Parameterization",
+  "description": "Understand how SQL injection lets attackers manipulate database queries. Learn parameterized queries, ORM usage, and .NET patterns that keep your data layer safe from injection attacks.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "sql-injection",
+    "parameterization",
+    "orm",
+    "dapper",
+    "entity-framework",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**SQL injection and parameterization** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with sql injection and parameterization."
+        "text": "SQL injection is one of the most damaging and well-understood vulnerabilities in web development. It occurs when untrusted user input is concatenated directly into a SQL query string. The database interprets the injected input as part of the query itself, allowing attackers to read, modify, or delete data — or even execute operating-system commands on the database server."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of sql injection and parameterization",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How SQL Injection Works"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding sql injection and parameterization is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Imagine a login query that concatenates the username directly into the SQL string. If the user types `admin' --`, the resulting query comments out the password check and logs the attacker in as the admin. More advanced attacks use stacked queries to extract entire tables, write files to disk, or call database-specific functions."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SQL injection (SQLi)",
+            "definition": "An attack where untrusted input alters the structure or logic of a SQL query."
+          },
+          {
+            "term": "Parameterized query",
+            "definition": "A query where placeholders represent values, and the database treats input as data, never as SQL code."
+          },
+          {
+            "term": "ORM",
+            "definition": "Object-Relational Mapping: a library that generates safe parameterized SQL from code, preventing injection."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable raw SQL query",
+        "content": "String concatenation with user input creates a SQL injection vulnerability.",
+        "code": "app.MapGet(\"/api/users\", async (string search, AppDbContext db) =>\n{\n    // DANGEROUS: user input is concatenated into SQL\n    var sql = $\"SELECT * FROM Users WHERE Name = '{search}' AND IsActive = 1\";\n    var users = await db.Users.FromSqlRaw(sql).ToListAsync();\n    return Results.Ok(users);\n});",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with sql injection and parameterization, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "FromSqlRaw is not parameterized by default",
+        "text": "Entity Framework Core's FromSqlRaw method does not automatically parameterize interpolated strings. You must use FromSqlInterpolated or pass DbParameter objects explicitly to get safe parameterization."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Parameterized Queries with Dapper"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Dapper is a lightweight data-access library that works well with raw SQL while keeping queries safe. When you pass an anonymous object as the parameter source, Dapper automatically creates parameterized queries. The database receives the SQL and the values separately, so injected characters are treated as literal text."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe parameterized query with Dapper",
+        "content": "Dapper parameterizes the query automatically. Even if search contains SQL syntax, it is treated as a string value.",
+        "code": "app.MapGet(\"/api/users\", async (string search, IDbConnection db) =>\n{\n    const string sql = @\"\n        SELECT * FROM Users\n        WHERE Name = @Search AND IsActive = 1\n    \";\n\n    var users = await db.QueryAsync<User>(sql, new { Search = search });\n    return Results.Ok(users);\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Entity Framework Core"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Entity Framework Core (EF Core) generates parameterized SQL automatically when you use LINQ. The LINQ expression is translated into SQL with parameters, so user input never becomes part of the query string. The safest pattern is to write queries with LINQ and avoid raw SQL entirely. If you must use raw SQL, use FromSqlInterpolated — it converts interpolated strings into parameters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe LINQ query with EF Core",
+        "content": "LINQ queries are automatically parameterized by EF Core.",
+        "code": "app.MapGet(\"/api/users\", async (string search, AppDbContext db) =>\n{\n    var users = await db.Users\n        .Where(u => u.Name.Contains(search) && u.IsActive)\n        .ToListAsync();\n\n    return Results.Ok(users);\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Additional Defenses"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Parameterized queries eliminate SQL injection, but additional controls reduce the blast radius of any future mistake. Use least-privilege database accounts so that even if injection occurs, the attacker cannot drop tables or access other databases. Enable query logging and monitor for unusual patterns. Use stored procedures with parameters if your team prefers that pattern, but avoid dynamic SQL inside stored procedures."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Stored procedure with parameters",
+        "content": "Stored procedures are safe when you use parameters, not string concatenation inside the procedure.",
+        "code": "CREATE PROCEDURE GetActiveUsers\n    @Search NVARCHAR(100)\nAS\nBEGIN\n    SELECT * FROM Users\n    WHERE Name LIKE '%' + @Search + '%'\n      AND IsActive = 1;\nEND\n\n// Calling from C#:\nvar users = await db.QueryAsync<User>(\n    \"GetActiveUsers\",\n    new { Search = search },\n    commandType: CommandType.StoredProcedure);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "SQL injection prevention checklist",
+        "items": [
+          {
+            "text": "Use parameterized queries or an ORM for every database query.",
+            "hint": "If you are concatenating user input into SQL, stop and refactor."
+          },
+          {
+            "text": "Prefer LINQ with EF Core over raw SQL.",
+            "hint": "LINQ queries are parameterized automatically and are easier to maintain."
+          },
+          {
+            "text": "Use least-privilege database accounts.",
+            "hint": "The app's database user should not have DROP or ALTER permissions."
+          },
+          {
+            "text": "Run automated SQL injection scanners in CI/CD.",
+            "hint": "Tools like sqlmap and DAST scanners catch injection before production."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "SQL injection happens when user input is mixed with SQL code instead of being treated as data.",
+          "Parameterized queries, Dapper, and EF Core LINQ all prevent injection by design.",
+          "FromSqlRaw is dangerous; use FromSqlInterpolated or LINQ instead.",
+          "Defense-in-depth includes least-privilege accounts, logging, and regular scanning."
+        ],
+        "takeaway": "Never build SQL strings with user input. Always parameterize."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "path-traversal-and-file-upload-security",
+    "open-redirects-and-url-validation",
+    "broken-access-control-and-idorbola"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP SQL Injection",
+      "url": "https://owasp.org/www-community/attacks/SQL_Injection",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — FromSqlInterpolated vs FromSqlRaw",
+      "url": "https://learn.microsoft.com/en-us/ef/core/querying/raw-sql",
+      "type": "article"
+    },
+    {
+      "title": "Dapper — Safe parameterization",
+      "url": "https://github.com/DapperLib/Dapper",
+      "type": "tool"
+    }
+  ]
 }

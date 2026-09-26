@@ -4,33 +4,57 @@
   "moduleSlug": "react-frontend-follow-ups",
   "courseSlug": "interview-qa",
   "title": "When should state live in React Query rather than Redux?",
-  "description": "Interview question: When should state live in React Query rather than Redux?. Learn the answer with detailed explanation and examples.",
+  "description": "Learn to distinguish server state from client state, decide where to store data, and avoid over-engineering with the wrong state manager.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["React", "React Query", "Redux", "State Management", "TanStack Query"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When should state live in React Query rather than Redux?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when should state live in react query rather than redux?."
+        "text": "The single most common state-management mistake in modern React apps is putting **server-fetched data** into Redux (or any global client store) instead of a dedicated server-state library. React Query, SWR, and RTK Query exist to solve a problem Redux was never designed for: caching, deduplication, background refetching, and stale-while-revalidate semantics for async data."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Server state vs client state"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "The fundamental split",
         "items": [
-          "Understand the fundamental principles of when should state live in react query rather than redux?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**Server state**: data that lives on the server and is fetched asynchronously—users, products, orders, notifications",
+          "**Client state**: data that originates in the UI and would not exist without it—form drafts, modal open/closed, selected tab, sidebar collapsed",
+          "**URL state**: data that belongs in the query string—filters, pagination, search terms",
+          "**Cache state**: derived data you compute once and reuse—memoized selectors, denormalized views"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Server state",
+            "definition": "Data that persists on the server. It can become stale the moment it arrives. The client's job is to fetch, cache, and keep it reasonably fresh."
+          },
+          {
+            "term": "Client state",
+            "definition": "Data that is owned by the UI itself—form inputs, UI toggles, modal visibility. It is not fetched from an API."
+          },
+          {
+            "term": "Stale-while-revalidate",
+            "definition": "A caching strategy that returns cached data immediately while silently fetching fresh data in the background."
+          },
+          {
+            "term": "Normalization",
+            "definition": "Storing entities by ID in a flat structure so updates to one entity automatically update all references. Redux requires manual normalization; React Query handles it via query keys."
+          }
         ]
       }
     },
@@ -38,25 +62,196 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When to use React Query"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding when should state live in react query rather than redux? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Use React Query (or SWR) for anything that involves `fetch`, `axios`, or GraphQL queries. It gives you caching, deduplication, background refetching on window focus, retry logic, and optimistic updates out of the box. You write a fetch function and a query key; the library handles the rest."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fetching a user with React Query",
+        "content": "React Query caches by query key. Calling `useQuery` with the same key returns cached data and triggers a background refetch.",
+        "code": "import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';\n\nconst queryClient = new QueryClient();\n\nfunction UserProfile({ userId }: { userId: string }) {\n  const { data, isLoading, error } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetch(`/api/users/${userId}`).then(r => r.json()),\n    staleTime: 5 * 60_000, // consider fresh for 5 minutes\n  });\n\n  if (isLoading) return <Skeleton />;\n  if (error) return <ErrorMessage error={error} />;\n  return <ProfileCard user={data} />;\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use Redux"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redux (with Redux Toolkit) still has a place, but it's narrower than most teams assume. Use Redux when you need **complex synchronous state transitions** that involve many unrelated components—like a drag-and-drop canvas, a collaborative editor with operational transforms, or a multi-step wizard where state is mutated by many different actions."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "React Query vs Redux: where each belongs",
+        "cards": [
+          {
+            "title": "React Query / TanStack Query",
+            "description": "Purpose-built for server state: async data that lives on a backend.",
+            "pros": [
+              "Caching, deduplication, and background refetching are free",
+              "Devtools show cache status and query timing",
+              "Optimistic updates via `onMutate`/`onError`/`onSettled`",
+              "Less boilerplate than Redux for data-fetching scenarios"
+            ],
+            "cons": [
+              "Not designed for complex synchronous state machines",
+              "Cache eviction requires tuning `gcTime` and `staleTime`",
+              "Team unfamiliarity with query-key conventions can cause cache misses"
+            ],
+            "tags": ["server state", "async", "caching"]
+          },
+          {
+            "title": "Redux Toolkit",
+            "description": "General-purpose synchronous state container with time-travel debugging.",
+            "pros": [
+              "Predictable, serialized state mutations via reducers",
+              "Excellent DevTools with action replay",
+              "Works offline—no API dependency",
+              "RTK Query provides server-state support too"
+            ],
+            "cons": [
+              "Significant boilerplate even with RTK",
+              "Developers often put fetched data here by habit",
+              "Cache invalidation is manual—no built-in stale-while-revalidate"
+            ],
+            "tags": ["client state", "offline", "complex UI"]
+          },
+          {
+            "title": "Zustand / Jotai",
+            "description": "Lightweight alternatives for simple global client state.",
+            "pros": [
+              "Minimal boilerplate, no providers or slices",
+              "Great for form state, UI toggles, theme",
+              "Atomic models (Jotai) avoid unnecessary re-renders"
+            ],
+            "cons": [
+              "No built-in devtools as rich as Redux DevTools",
+              "Less opinionated structure can lead to inconsistency"
+            ],
+            "tags": ["lightweight", "client state", "simple"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when should state live in react query rather than redux?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "The hybrid reality",
+        "text": "In practice, most production apps use **both**: React Query for server data and a small slice of Redux (or Zustand) for global client UI state. The mistake is using Redux for both. RTK Query bridges this gap, but many teams still keep RTK Query data and Redux client state in separate slices."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "A decision framework"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Where should this piece of state live?",
+        "items": [
+          "Does it come from an API? → React Query (or RTK Query)",
+          "Does it only exist in the UI and never gets persisted? → Component state (`useState`) or URL",
+          "Is it shared across many unrelated components and mutated by many actions? → Redux / Zustand",
+          "Does it represent navigation or filtering? → URL search params",
+          "Is it a derived value from other state? → Selectors / `useMemo`, not a separate store"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FAQ"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-up questions",
+        "items": [
+          {
+            "question": "Can I use React Query for client state too?",
+            "answer": "Technically yes—you can store anything in the query cache—but it's an anti-pattern. React Query's invalidation and refetching logic assumes data can become stale from an external source. Client state doesn't become stale that way."
+          },
+          {
+            "question": "What if the team is already using Redux for everything?",
+            "answer": "Introduce React Query gradually for new features. Over time you can migrate existing API calls out of Redux thunks. Don't force a big-bang rewrite—data-fetching is where React Query gives the biggest win with the smallest risk."
+          },
+          {
+            "question": "How do React Query and Redux Toolkit Query compare?",
+            "answer": "RTK Query is part of Redux Toolkit and shares the Redux store. It provides similar caching to React Query but with Redux DevTools integration. React Query has a larger ecosystem, more tuning knobs, and is framework-agnostic. Choose based on team familiarity and existing Redux investment."
+          },
+          {
+            "question": "What about Zustand? When does it replace Redux?",
+            "answer": "Zustand is excellent for small-to-medium global client state. If your Redux store has many slices mostly holding UI toggles and form state, Zustand is a cleaner fit. If you have complex state machines with many interdependent reducers, Redux's structure still helps."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Server state = React Query. Client state = component state, URL, or a lightweight global store",
+          "Putting fetched data in Redux adds caching and invalidation work you don't need to write yourself",
+          "Use comparison cards to decide: if it's async and from an API, React Query wins",
+          "Redux is still valid for complex synchronous UI state that many components mutate"
+        ],
+        "takeaway": "Choose the store based on where the data comes from and how it changes, not on familiarity."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Further reading"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "TanStack Query: [Core Concepts](https://tanstack.com/query/latest/docs/framework/react/overview)",
+          "Redux Toolkit: [RTK Query Overview](https://redux-toolkit.js.org/rtk-query/overview)",
+          "Mark Erikson: [The Case for Redux in 2025](https://blog.isquaredsoftware.com/)"
+        ]
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "furtherReading": [
+    {
+      "title": "TanStack Query: Core Concepts",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/overview",
+      "type": "article"
+    },
+    {
+      "title": "Redux Toolkit: RTK Query Overview",
+      "url": "https://redux-toolkit.js.org/rtk-query/overview",
+      "type": "article"
+    }
+  ],
+  "technology": "React"
 }

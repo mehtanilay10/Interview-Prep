@@ -3,34 +3,162 @@
   "slug": "jwt-pitfalls-and-token-storage",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "JWT pitfalls and token storage",
-  "description": "Learn about JWT pitfalls and token storage. Master the concepts, patterns, and best practices.",
+  "title": "JWT Pitfalls and Token Storage",
+  "description": "Learn how JSON Web Tokens work, where they fail, and how to store them safely in browsers. Cover algorithm confusion attacks, token revocation, and the trade-offs between localStorage and httpOnly cookies.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "jwt",
+    "token-storage",
+    "localStorage",
+    "httpOnly-cookies",
+    "algorithm-confusion",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**JWT pitfalls and token storage** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with jwt pitfalls and token storage."
+        "text": "JSON Web Tokens, or JWTs, are compact, URL-safe tokens that carry claims about a user. They are widely used in modern authentication because they are stateless: the server does not need to store session data, it simply verifies the token's signature and reads the claims. However, JWTs come with significant pitfalls that developers frequently overlook — poor storage, no built-in revocation, and algorithm confusion attacks are just the beginning."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "JWT Structure"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of jwt pitfalls and token storage",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "A JWT has three parts separated by dots: the header, the payload, and the signature. The header declares the token type and signing algorithm. The payload contains claims — statements about the user like their ID, roles, and expiration time. The signature ensures the token was not tampered with. If an attacker can change the algorithm or remove the signature, they can forge tokens."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "JWT (JSON Web Token)",
+            "definition": "A compact, signed token consisting of header, payload, and signature parts."
+          },
+          {
+            "term": "Claims",
+            "definition": "Statements about a subject (user) encoded in the JWT payload, such as sub, email, and roles."
+          },
+          {
+            "term": "Algorithm confusion",
+            "definition": "An attack where the token's algorithm is changed from asymmetric (RS256) to symmetric (HS256), allowing forgery with the public key."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JWT header and payload",
+        "content": "A decoded JWT shows the algorithm in the header and claims in the payload.",
+        "code": "// Header (base64-decoded)\n{\n  \"alg\": \"RS256\",\n  \"typ\": \"JWT\"\n}\n\n// Payload (base64-decoded)\n{\n  \"sub\": \"12345\",\n  \"email\": \"user@example.com\",\n  \"roles\": [\"Editor\"],\n  \"exp\": 1735689600\n}\n\n// Signature: RSA-SHA256(header + '.' + payload, privateKey)",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Algorithm confusion is real",
+        "text": "If your server accepts both RS256 and HS256, and an attacker knows your public RSA key, they can re-sign the token with HMAC-SHA256 using that public key as the secret. Always lock the algorithm to the expected value and never trust the token's alg header blindly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validating JWTs in .NET"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Microsoft.IdentityModel.Tokens and System.IdentityModel.Tokens.Jwt provide robust JWT validation in .NET. Always specify the exact signing algorithm, validate the issuer and audience, and enforce an expiration. Never accept tokens with `alg: none` — some older libraries would skip signature validation entirely if the header said none."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JWT validation with Microsoft.IdentityModel",
+        "content": "Configure token validation parameters to lock the algorithm, issuer, and audience.",
+        "code": "services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuer = true,\n            ValidIssuer = builder.Configuration[\"Jwt:Issuer\"],\n            ValidateAudience = true,\n            ValidAudience = builder.Configuration[\"Jwt:Audience\"],\n            ValidateLifetime = true,\n            ValidateIssuerSigningKey = true,\n            IssuerSigningKey = new RsaSecurityKey(rsaPublicKey),\n            ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 }\n        };\n    });",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Storage Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Where you store the token in the browser matters enormously. **localStorage** is easy to access from JavaScript but is vulnerable to XSS — any injected script can read every token. **httpOnly cookies** cannot be read by JavaScript, which blocks XSS token theft, but are vulnerable to CSRF unless protected with SameSite and anti-forgery tokens. For most web applications, httpOnly cookies with SameSite=Lax and short-lived access tokens are the safest default."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Token storage options",
+        "cards": [
+          {
+            "title": "localStorage",
+            "description": "Tokens stored in the browser's localStorage API. Accessible by any JavaScript on the page.",
+            "pros": [
+              "Simple to implement",
+              "No CSRF risk (not sent automatically)"
+            ],
+            "cons": [
+              "Completely exposed to XSS",
+              "No automatic expiration",
+              "Accessible by any third-party script"
+            ],
+            "tags": [
+              "avoid"
+            ]
+          },
+          {
+            "title": "httpOnly cookie",
+            "description": "Token stored in a cookie with the httpOnly flag, inaccessible to JavaScript.",
+            "pros": [
+              "Blocked from JavaScript (XSS-safe)",
+              "Automatic expiration support",
+              "Sent with SameSite=Lax by default"
+            ],
+            "cons": [
+              "Vulnerable to CSRF without SameSite/anti-forgery",
+              "Requires HTTPS"
+            ],
+            "tags": [
+              "recommended"
+            ]
+          },
+          {
+            "title": "In-memory variable",
+            "description": "Token stored only in JavaScript memory and lost on page refresh.",
+            "pros": [
+              "Never persisted to disk",
+              "Survives XSS only while page is loaded"
+            ],
+            "cons": [
+              "Lost on refresh (requires re-login or refresh token)",
+              "Still vulnerable to XSS while page is open"
+            ],
+            "tags": [
+              "supplemental"
+            ]
+          }
         ]
       }
     },
@@ -38,24 +166,77 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "JWT Revocation and Rotation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding jwt pitfalls and token storage is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Because JWTs are stateless, the server cannot revoke them without maintaining a blocklist — which defeats the stateless advantage. The practical solution is to keep access tokens very short-lived (5-15 minutes) and use refresh tokens with rotation. When a refresh token is used, the server issues a new refresh token and invalidates the old one. If a token is leaked, the window of exposure is limited."
       }
     },
     {
-      "type": "callout",
+      "type": "checklist",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with jwt pitfalls and token storage, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "JWT safety checklist",
+        "items": [
+          {
+            "text": "Lock the signing algorithm to RS256 or another explicit value.",
+            "hint": "Reject tokens that specify a different algorithm or none at all."
+          },
+          {
+            "text": "Prefer httpOnly, Secure, SameSite cookies over localStorage for web apps.",
+            "hint": "Cookies protect against XSS token theft, especially when combined with CSP."
+          },
+          {
+            "text": "Keep access tokens short-lived (under 15 minutes).",
+            "hint": "Short lifetimes limit the window for token replay or theft."
+          },
+          {
+            "text": "Use refresh token rotation with a server-side blocklist for reuse detection.",
+            "hint": "If a refresh token is presented twice, revoke the entire token family."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "JWTs carry signed claims but have no built-in revocation mechanism.",
+          "Algorithm confusion lets attackers forge tokens if the server accepts multiple algorithms.",
+          "httpOnly cookies are safer than localStorage for browser token storage.",
+          "Short-lived access tokens plus refresh token rotation limit the impact of token theft."
+        ],
+        "takeaway": "Treat JWTs like passwords: store them safely, validate everything, and limit their lifetime."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "refresh-token-rotation",
+    "oauth-20-roles-and-flows",
+    "broken-access-control-and-idorbola"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP JWT Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html",
+      "type": "article"
+    },
+    {
+      "title": "Auth0 — JWT Handbook",
+      "url": "https://auth0.com/resources/ebooks/jwt-handbook",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — Authentication in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authentication/",
+      "type": "article"
+    }
+  ]
 }

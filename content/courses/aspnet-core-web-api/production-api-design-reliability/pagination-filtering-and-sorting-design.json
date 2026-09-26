@@ -4,33 +4,101 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Pagination, filtering and sorting design",
-  "description": "Learn about Pagination, filtering and sorting design. Master the concepts, patterns, and best practices.",
+  "description": "Design list endpoints that scale. Learn cursor-based pagination, server-side filtering, dynamic sorting, and how to keep collection responses fast and predictable.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Pagination, filtering and sorting design** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with pagination, filtering and sorting design."
+        "text": "List endpoints are the most common API surface and the easiest to get wrong under load. Returning every row from a million-row table crashes memory, and naive offset pagination slows down as users page deeper. Filtering and sorting add even more complexity when done without indexes or consistent conventions."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson teaches production-ready patterns for pagination, filtering, and sorting in ASP.NET Core, including when to use cursor-based versus offset-based pagination and how to design a response shape that clients can rely on."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The trouble with offset pagination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Offset pagination uses `?page=2&pageSize=20` and tells the database to skip the first 20 rows and return the next 20. It is simple and works fine for small tables. But once you have millions of rows, skipping becomes expensive because the database still walks the skipped rows. Worse, if rows are inserted or deleted between requests, items can appear twice or vanish entirely."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Classic pitfall",
+        "text": "Offset pagination breaks down at scale and becomes unstable with concurrent writes. For high-volume feeds, real-time data, or large datasets, prefer cursor-based pagination."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cursor-based pagination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cursor-based pagination uses a stable, opaque cursor—typically a Base64-encoded ID or timestamp—from the last item on the previous page. The query asks for items after that cursor, which can use an index efficiently and is immune to insertions between requests."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cursor-based response shape",
+        "code": "public class PagedResponse<T>\n{\n    public List<T> Items { get; set; } = new();\n    public string? NextCursor { get; set; }\n    public bool HasMore { get; set; }\n    public int PageSize { get; set; }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The client sends the cursor back as `?cursor=eyJpZCI6MTIzfQ&pageSize=20`. The server decodes the cursor, queries with `WHERE Id > @cursor ORDER BY Id ASC`, and returns the next page plus a fresh cursor if more data exists."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cursor-based query",
+        "code": "public async Task<PagedResponse<OrderDto>> GetOrdersAsync(\n    string? cursor, int pageSize, CancellationToken ct)\n{\n    var lastId = DecodeCursor(cursor);\n    var query = _db.Orders.AsQueryable();\n\n    if (lastId.HasValue)\n        query = query.Where(o => o.Id > lastId.Value);\n\n    var items = await query\n        .OrderBy(o => o.Id)\n        .Take(pageSize + 1)\n        .ToListAsync(ct);\n\n    var hasMore = items.Count > pageSize;\n    if (hasMore) items = items.Take(pageSize).ToList();\n\n    return new PagedResponse<OrderDto>\n    {\n        Items = items.Adapt<List<OrderDto>>(),\n        NextCursor = hasMore ? EncodeCursor(items.Last().Id) : null,\n        HasMore = hasMore,\n        PageSize = pageSize\n    };\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server-side filtering"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Filtering should be server-side, explicit, and allow-listed. Never pass raw SQL fragments from clients. Instead, map query parameters to predicate builders that generate safe LINQ expressions. This keeps the query plan cacheable and prevents SQL injection."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of pagination, filtering and sorting design",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Define allowed filter fields and operators in one place.",
+          "Parse the query string into a filter model, then apply predicates dynamically.",
+          "Combine filters with AND logic by default; support OR only when explicitly requested.",
+          "Validate ranges (dates, numbers) before hitting the database."
         ]
       }
     },
@@ -38,24 +106,83 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Sorting design"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding pagination, filtering and sorting design is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Accept sorting through a `sortBy` parameter and a `sortOrder` parameter. Default to a stable sort like `CreatedUtc desc`. Validate the requested column against an allow-list so clients cannot sort on computed or sensitive columns. Always append a tie-breaker like `Id` to guarantee deterministic results."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dynamic sorting with validation",
+        "code": "public IQueryable<Order> ApplySorting(\n    IQueryable<Order> query,\n    string? sortBy,\n    string? sortOrder)\n{\n    var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)\n    {\n        nameof(Order.CreatedUtc), nameof(Order.Total), nameof(Order.Id)\n    };\n\n    var descending = sortOrder?.ToLower() == \"desc\";\n    var column = allowed.Contains(sortBy ?? string.Empty)\n        ? sortBy!\n        : nameof(Order.CreatedUtc);\n\n    query = descending\n        ? query.OrderByDescending(e => EF.Property<object>(e, column))\n        : query.OrderBy(e => EF.Property<object>(e, column));\n\n    return query.ThenBy(e => e.Id);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Response shape clients expect"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Wrap collection responses with metadata so clients do not have to guess. Include `items`, `totalCount` only when it is cheap, `nextCursor`, and `hasMore`. For UI use cases, also return `pageSize` so the client can render pagination controls without guessing."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with pagination, filtering and sorting design, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Consistency across endpoints",
+        "text": "Every list endpoint should return the same envelope shape. If `/orders` returns `{ items, nextCursor }` but `/products` returns `{ data, pagination }`, every client needs special-case code."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Use cursor-based pagination for large or rapidly changing datasets; offset pagination is fine for small, static lists.",
+          "Validate and allow-list all filter and sort fields on the server.",
+          "Return a consistent envelope on every list endpoint.",
+          "Add a tie-breaker sort column to guarantee deterministic pagination."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "problem-details-and-consistent-error-contracts",
+    "etags-and-conditional-requests"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs: Enabling pagination",
+      "url": "https://learn.microsoft.com/aspnet/core/data/ef-mp/pagination",
+      "type": "article"
+    },
+    {
+      "title": "GraphQL Cursor Connections Specification",
+      "url": "https://relay.dev/graphql/connections.htm",
+      "type": "article"
+    },
+    {
+      "title": "OData Filtering and Sorting",
+      "url": "https://learn.microsoft.com/odata/overview",
+      "type": "article"
+    }
+  ]
 }

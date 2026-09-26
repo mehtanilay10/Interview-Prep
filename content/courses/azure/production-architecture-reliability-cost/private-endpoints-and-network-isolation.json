@@ -4,33 +4,51 @@
   "moduleSlug": "production-architecture-reliability-cost",
   "courseSlug": "microsoft-azure-for-developers",
   "title": "Private endpoints and network isolation",
-  "description": "Learn about Private endpoints and network isolation. Master the concepts, patterns, and best practices.",
+  "description": "Secure Azure PaaS services with private endpoints and virtual network integration. Understand private link, service endpoints, DNS zones, and how to build a zero-trust network boundary around your workloads.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Private endpoints and network isolation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with private endpoints and network isolation."
+        "text": "By default, many Azure PaaS services expose public endpoints. Key Vault, Storage, and SQL Database all have public IP addresses that can be reached from anywhere on the internet—provided the caller has valid credentials. Private endpoints remove that public surface by mapping the service to a private IP address inside your virtual network."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Private Link and private endpoints"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of private endpoints and network isolation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Azure Private Link provides a private endpoint—a network interface inside your VNet—paired with a private link service on the provider side. Traffic stays within the Microsoft backbone network and never traverses the public internet. To the application, the service looks like any other resource in the same subnet."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Private endpoint",
+            "definition": "A network interface in your VNet that maps to an Azure PaaS service over Private Link."
+          },
+          {
+            "term": "Private Link service",
+            "definition": "The provider-side abstraction that exposes a service through a private endpoint."
+          },
+          {
+            "term": "Service endpoint",
+            "definition": "A VNet-level rule that extends the service's identity to your subnet, but traffic still routes over the Microsoft backbone, not a private IP."
+          },
+          {
+            "term": "Private DNS zone",
+            "definition": "A DNS zone that resolves the service's public name to the private endpoint IP."
+          }
         ]
       }
     },
@@ -38,24 +56,101 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Private endpoint vs service endpoint"
       }
     },
     {
-      "type": "paragraph",
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding private endpoints and network isolation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Isolation options",
+        "cards": [
+          {
+            "title": "Service endpoint",
+            "description": "Adds your VNet subnet to the service's firewall allow list. Traffic still uses the service's public endpoint but is restricted to your subnet. Lower cost, slightly less isolation."
+          },
+          {
+            "title": "Private endpoint",
+            "description": "Assigns a private IP from your VNet to the service. Traffic never touches the public endpoint. Stronger isolation, additional NIC and DNS costs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bicep example: private endpoint for Key Vault"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deploy a private endpoint with Bicep",
+        "content": "This template creates a private endpoint for an existing Key Vault and links a private DNS zone.",
+        "language": "json",
+        "code": "param keyVaultName string\nparam location string = resourceGroup().location\nparam subnetId string\n\nresource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {\n  name: keyVaultName\n}\n\nresource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = {\n  name: '${keyVaultName}-pe'\n  location: location\n  properties: {\n    subnet: {\n      id: subnetId\n    }\n    privateLinkServiceConnections: [\n      {\n        name: 'keyvault-connection'\n        properties: {\n          privateLinkServiceId: keyVault.id\n          groupIds: [\n            'vault'\n          ]\n        }\n      }\n    ]\n  }\n}\n\nresource privateDnsZone 'Microsoft.Network/privateDnsZones@2023-09-01' existing = {\n  name: 'privatelink.vaultcore.azure.net'\n}\n\nresource dnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-09-01' = {\n  name: '${privateEndpoint.name}/default'\n  properties: {\n    privateDnsZoneConfigs: [\n      {\n        name: 'vault-dns'\n        properties: {\n          privateDnsZoneId: privateDnsZone.id\n          recordSets: {\n            '${keyVaultName}': {\n              fqdn: keyVault.properties.vaultUri\n              ipAddresses: [\n                privateEndpoint.properties.networkInterfaces[0].id\n              ]\n            }\n          }\n        }\n      }\n    ]\n  }\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with private endpoints and network isolation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "DNS is the hidden dependency",
+        "text": "A private endpoint works only if the client resolves the service name to the private IP. If your VNet does not use the private DNS zone, or if your custom DNS servers do not forward to Azure DNS, traffic may still attempt to reach the public endpoint."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Network isolation checklist"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Zero-trust network controls",
+        "items": [
+          "Enable private endpoints for all PaaS services that support them.",
+          "Disable public network access on the service when private access is sufficient.",
+          "Use service endpoints only for services that do not yet support private endpoints.",
+          "Link private DNS zones automatically via the Azure portal or Bicep.",
+          "Validate connectivity with Azure Network Watcher IP flow verify."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Private endpoints remove public exposure by mapping services to private IPs.",
+          "Private Link is the underlying technology; private endpoint is the consumer resource.",
+          "DNS resolution must route to the private IP for the endpoint to be effective.",
+          "Combine private endpoints with RBAC for a defense-in-depth network strategy."
+        ],
+        "takeaway": "Network isolation in Azure is not just firewalls—it is identity-aware connectivity from endpoint to DNS."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "managed-identity-architecture",
+    "high-availability-and-zone-aware-architecture"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Private Link documentation",
+      "url": "https://learn.microsoft.com/en-us/azure/private-link/private-link-overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Concepts, architecture, and limitations of Azure Private Link and private endpoints."
+    },
+    {
+      "title": "Integrate Azure services with virtual networks",
+      "url": "https://learn.microsoft.com/en-us/azure/virtual-network/private-endpoint-overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Detailed guidance on private endpoints, service endpoints, and private DNS integration."
+    }
+  ]
 }

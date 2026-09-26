@@ -3,34 +3,89 @@
   "slug": "build-vs-buy-decisions",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "Build vs buy decisions",
-  "description": "Learn about Build vs buy decisions. Master the concepts, patterns, and best practices.",
+  "title": "Build vs Buy Decisions",
+  "description": "Develop a repeatable framework for deciding when to build a solution in-house versus when to adopt an existing product or open-source library.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "build-vs-buy",
+    "architecture",
+    "strategy",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Build vs buy decisions** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with build vs buy decisions."
+        "text": "The build-versus-buy question is one of the most frequent architecture decisions, yet it is often made emotionally rather than analytically. Engineers love to build; it is fun, it demonstrates skill, and it creates something uniquely theirs. But building is expensive, and every line of code you write is a line you must maintain, debug, secure, and eventually decommission. A disciplined build-versus-buy framework prevents the default 'we will build it' instinct from becoming technical debt."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In the .NET ecosystem, the build-versus-buy decision appears constantly: authentication, logging, PDF generation, file storage, email delivery, background processing, search, and monitoring all have mature open-source or SaaS alternatives. The senior engineer evaluates each against the same criteria: strategic value, implementation cost, operational burden, and exit cost."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Build-Buy Spectrum"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the core differences between build and buy decisions",
-          "Know when to choose build over buy decisions",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "text": "Build-versus-buy is not binary. It is a spectrum from fully custom to fully off-the-shelf, with hybrids in between. A common hybrid in C# projects is adopting an open-source library and wrapping it in an internal interface. That gives you the option to swap the implementation later without changing the rest of your codebase. It also forces you to define exactly what you need, which often reveals that an off-the-shelf product already covers 90 percent of your requirements."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Build vs Buy comparison",
+        "cards": [
+          {
+            "title": "Build",
+            "description": "Develop the capability entirely in-house.",
+            "pros": [
+              "Exact fit for unique requirements",
+              "Full control over roadmap and internals",
+              "Deep institutional knowledge"
+            ],
+            "cons": [
+              "High implementation and maintenance cost",
+              "Slower time to market",
+              "Security and edge cases are your responsibility"
+            ]
+          },
+          {
+            "title": "Buy",
+            "description": "Adopt an existing product or library.",
+            "pros": [
+              "Fastest path to production",
+              "Mature error handling and edge cases",
+              "Community or vendor support"
+            ],
+            "cons": [
+              "May include unused features or miss critical ones",
+              "Upgrade and breaking-change risk",
+              "Vendor lock-in or licensing constraints"
+            ]
+          },
+          {
+            "title": "Hybrid",
+            "description": "Use an off-the-shelf core wrapped in an internal abstraction.",
+            "pros": [
+              "Leverages existing work while preserving optionality",
+              "Limits blast radius of library changes",
+              "Easier to test and mock"
+            ],
+            "cons": [
+              "Adds an abstraction layer to maintain",
+              "Abstraction leaks can still tie you to the library"
+            ]
+          }
         ]
       }
     },
@@ -38,24 +93,132 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Decision Criteria"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Questions to ask before building",
+        "items": [
+          "Is this capability core to our competitive advantage? If yes, build. If no, buy.",
+          "Do we have the expertise to build it correctly the first time, including security, testing, and operations?",
+          "What is the total cost of ownership over three years, including maintenance and incident response?",
+          "Can we adopt an open-source library and wrap it behind an interface to preserve optionality?",
+          "What is the exit cost if we later discover the off-the-shelf product does not meet a critical requirement?"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example: Wrapping an External Library"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding build vs buy decisions is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The hybrid approach is especially common in C# because the NuGet ecosystem is rich. Instead of calling a third-party library directly from every service, define an internal interface and implement it using the library. If you later replace the library, you change one file instead of dozens."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hybrid approach with an internal interface",
+        "content": "Wrapping a third-party PDF library behind an internal interface to preserve optionality.",
+        "language": "csharp",
+        "code": "// The internal contract we control\npublic interface IPdfGenerator\n{\n    Task<byte[]> GenerateAsync(Invoice invoice, CancellationToken ct = default);\n}\n\n// Implementation using a third-party library\n// If we switch libraries later, only this class changes.\npublic class IronPdfGenerator : IPdfGenerator\n{\n    public async Task<byte[]> GenerateAsync(Invoice invoice, CancellationToken ct = default)\n    {\n        // Third-party library implementation\n        var renderer = new ChromePdfRenderer();\n        var html = RenderInvoiceToHtml(invoice);\n        var doc = await renderer.RenderHtmlAsPdfAsync(html, ct);\n        return doc.Stream.ToArray();\n    }\n\n    private string RenderInvoiceToHtml(Invoice invoice)\n    {\n        // Could be Razor, Scriban, or any templating engine\n        return TemplateEngine.Render(\"InvoiceTemplate\", invoice);\n    }\n}\n\n// Consumption code never depends on the library\npublic class InvoiceService\n{\n    private readonly IPdfGenerator _pdfGenerator;\n\n    public InvoiceService(IPdfGenerator pdfGenerator)\n    {\n        _pdfGenerator = pdfGenerator;\n    }\n\n    public async Task<byte[]> GetInvoicePdfAsync(Guid invoiceId)\n    {\n        var invoice = await _invoiceRepository.GetByIdAsync(invoiceId);\n        return await _pdfGenerator.GenerateAsync(invoice);\n    }\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with build vs buy decisions, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Abstraction does not eliminate lock-in",
+        "text": "Wrapping a library behind an interface reduces coupling, but it does not eliminate it. If the library has bugs, unusual memory behavior, or requires specific runtime configuration, you still carry that cost. The abstraction protects your consuming code; it does not protect your operations or debugging workflow."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Three-Year Rule"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When evaluating build-versus-buy, estimate the total cost of ownership over three years. A custom solution that takes two engineers three months to build might seem cheaper than a $5,000-per-year SaaS subscription. But over three years, that subscription costs $180,000, while the custom solution costs the salaries of two engineers plus incident response, security patches, and feature requests. Unless the capability is strategic, the math usually favors buying."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Total Cost of Ownership",
+            "definition": "The full lifetime cost of a technical decision, including implementation, maintenance, operations, and eventual replacement."
+          },
+          {
+            "term": "Exit cost",
+            "definition": "The cost of migrating away from a chosen solution, including data migration, code changes, and operational retraining."
+          },
+          {
+            "term": "Strategic value",
+            "definition": "The degree to which a capability differentiates your product from competitors or creates unique customer value."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Evaluate a build-versus-buy decision",
+        "description": "Pick a capability in your current project and analyze whether it should be built, bought, or hybridized.",
+        "steps": [
+          "Identify a capability that was built in-house: authentication, logging, reporting, file storage, etc.",
+          "Research one mature off-the-shelf alternative in the .NET ecosystem (library or SaaS).",
+          "Estimate the total cost of ownership over three years for both options.",
+          "List the strategic value of the capability: does it differentiate your product?",
+          "Write a one-paragraph recommendation with your trade-off statement.",
+          "Identify the exit cost for each option: how hard would it be to switch later?"
+        ],
+        "expectedOutcome": "A written build-versus-buy analysis with a clear recommendation and documented trade-offs."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Build-versus-buy is a spectrum, not a binary choice; the hybrid approach often wins.",
+          "Total cost of ownership over three years usually favors buying non-strategic capabilities.",
+          "Wrap third-party libraries behind internal interfaces to preserve optionality.",
+          "Document the trade-off: what you gain, what you give up, and why the choice was acceptable."
+        ],
+        "takeaway": "The best engineers are not those who build everything; they are those who know exactly what to build and what to buy."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "cost-as-an-architecture-constraint",
+    "making-technical-trade-offs-explicit"
+  ],
+  "furtherReading": [
+    {
+      "title": "The Build vs. Buy Decision",
+      "url": "https://www.cio.com/article/272388/build-vs-buy-how-to-make-the-right-decision.html",
+      "type": "article",
+      "author": " CIO Magazine",
+      "description": "A practical framework for evaluating build-versus-buy decisions with financial and strategic lenses."
+    },
+    {
+      "title": "NuGet Package Reference",
+      "url": "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files",
+      "type": "tool",
+      "author": "Microsoft",
+      "description": "The official NuGet documentation for managing package dependencies in .NET projects."
+    }
+  ]
 }

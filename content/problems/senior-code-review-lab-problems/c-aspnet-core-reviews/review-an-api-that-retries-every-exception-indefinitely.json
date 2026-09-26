@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an API that retries every exception indefinitely** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an api that retries every exception indefinitely."
+        "text": "An API endpoint wraps all outgoing calls in an unconditional retry loop. When a downstream service returns a 400 Bad Request or a 401 Unauthorized, the client retries immediately and forever. The downstream service is hammered with redundant requests, its error logs fill with stack traces, and the client thread is blocked indefinitely. Under partial failure, this pattern turns a small outage into a cascading failure that brings down both services."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an api that retries every exception indefinitely",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand the difference between retryable and non-retryable HTTP status codes",
+          "Learn exponential backoff and jitter as defenses against thundering herds",
+          "Identify circuit breaker patterns that stop retries when a downstream is clearly failing",
+          "Apply Polly or System.Threading.RateLimiting to implement bounded, policy-driven retries"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Retry",
+            "definition": "Repeating a failed operation in the hope that it will succeed on a subsequent attempt."
+          },
+          {
+            "term": "Exponential backoff",
+            "definition": "Increasing the wait time between retries exponentially to reduce load on a struggling downstream."
+          },
+          {
+            "term": "Jitter",
+            "definition": "Adding randomness to retry delays to prevent synchronized retries from many clients at once."
+          },
+          {
+            "term": "Circuit breaker",
+            "definition": "A pattern that stops retries after a threshold of failures, allowing the downstream to recover."
+          }
         ]
       }
     },
@@ -44,15 +67,183 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an api that retries every exception indefinitely is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Indefinite retries are the most common cause of cascading failures in distributed systems. A client that retries every exception without limit or delay turns a 500 error into a denial of service against the downstream. The downstream, already struggling, receives even more traffic, returns more errors, and triggers more retries. The loop continues until either the client runs out of threads or the downstream recovers on its own, which it cannot do under sustained load."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Not all errors are retryable",
+        "text": "A 400 Bad Request means the client sent invalid data. Retrying it will never succeed. A 401 means the token is expired or missing. Retrying without refreshing the token is pointless. Retry only transient errors such as 502, 503, and network timeouts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic API wraps every HttpClient call in a try-catch that retries on any exception. There is no limit on retry count, no backoff delay, and no distinction between error types. The loop runs until the request succeeds or the thread is aborted, which can be minutes or hours."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Infinite retry on all exceptions",
+        "content": "A method that retries forever without backoff or error filtering:",
+        "code": "public async Task<string> GetDataAsync(string url)\n{\n    while (true)\n    {\n        try\n        {\n            return await _httpClient.GetStringAsync(url);\n        }\n        catch\n        {\n            // Retries every exception, forever\n            await Task.Delay(100);\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct implementation uses a retry policy with explicit rules: which exceptions to retry, a maximum retry count, exponential backoff with jitter, and a circuit breaker that opens after too many failures. Polly is the standard library for this in .NET, and it integrates cleanly with HttpClient and ASP.NET Core."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Polly retry with backoff and circuit breaker",
+        "content": "A resilient HttpClient configured with retry and circuit breaker policies:",
+        "code": "var retryPolicy = Policy\n    .Handle<HttpRequestException>()\n    .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)\n    .WaitAndRetryAsync(\n        retryCount: 3,\n        sleepDurationProvider: attempt =>\n            TimeSpan.FromSeconds(Math.Pow(2, attempt)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000)),\n        onRetry: (outcome, timespan, attempt, context) =>\n        {\n            _logger.LogWarning(\"Retry {Attempt} for {Url} due to {Reason}\",\n                attempt, context[\"url\"], outcome.Exception?.Message ?? outcome.Result.StatusCode.ToString());\n            return Task.CompletedTask;\n        });\n\nvar circuitBreaker = Policy\n    .Handle<HttpRequestException>()\n    .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)\n    .CircuitBreakerAsync(\n        handledEventsAllowedBeforeBreaking: 5,\n        durationOfBreak: TimeSpan.FromSeconds(30));\n\nvar combined = Policy.WrapAsync(retryPolicy, circuitBreaker);\n\nvar response = await combined.ExecuteAsync(\n    async ctx => await _httpClient.GetAsync(url, ctx),\n    new Context { [\"url\"] = url });",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Retry strategy comparison",
+        "cards": [
+          {
+            "title": "Infinite retry",
+            "description": "Retry forever on every exception with a fixed delay.",
+            "pros": ["None"],
+            "cons": ["Cascading failures", "Downstream overload", "Thread exhaustion"]
+          },
+          {
+            "title": "Fixed count with fixed delay",
+            "description": "Retry a few times with the same delay between attempts.",
+            "pros": ["Simple", "Prevents infinite loops"],
+            "cons": ["Thundering herd if all clients retry at the same time"]
+          },
+          {
+            "title": "Exponential backoff with jitter",
+            "description": "Increase delay exponentially and add randomness.",
+            "pros": ["Reduces load on downstream", "Prevents synchronized retries"],
+            "cons": ["Longer total time before giving up"]
+          },
+          {
+            "title": "Circuit breaker with fallback",
+            "description": "Stop retrying after repeated failures and return a cached or default response.",
+            "pros": ["Protects downstream", "Fast failure", "Allows recovery"],
+            "cons": ["Requires fallback logic", "More complex configuration"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "retry-circuit-breaker",
+        "caption": "How retries interact with circuit breaker state",
+        "definition": "stateDiagram-v2\n    [*] --> Closed\n    Closed --> Open: Failure count exceeds threshold\n    Open --> HalfOpen: Wait duration expires\n    HalfOpen --> Closed: Next request succeeds\n    HalfOpen --> Open: Next request fails\n    Closed --> Closed: Request succeeds\n    note right of Closed\n        Requests flow normally\n        Failures are counted\n    end note\n    note right of Open\n        All requests fail fast\n        No downstream load\n    end note"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry Decision Matrix"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Which errors should be retried",
+        "items": [
+          "5xx Server Error: retry with backoff; the server may recover",
+          "408 Request Timeout: retry once; the network may have been momentarily slow",
+          "429 Too Many Requests: retry after the Retry-After header",
+          "Network timeout or connection reset: retry with backoff",
+          "400 Bad Request: do not retry; the request is malformed",
+          "401 Unauthorized: do not retry; refresh the token or return the error",
+          "403 Forbidden: do not retry; the user lacks permission",
+          "404 Not Found: do not retry; the resource does not exist"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an api that retries every exception indefinitely, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use a library",
+        "text": "Writing retry logic by hand is error-prone. Use Polly for .NET or the built-in resilience handlers in .NET 8+. They handle edge cases such as cancellation tokens, context propagation, and logging that hand-rolled loops miss."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I retry POST requests?",
+            "answer": "Only if the API is idempotent or provides an idempotency key. Retrying a non-idempotent POST can create duplicate resources. Use idempotency keys for payment and order creation endpoints."
+          },
+          {
+            "question": "What is a safe maximum retry count?",
+            "answer": "Three to five retries with exponential backoff is standard. More retries increase latency for the user and load on the downstream without significantly improving success rates."
+          },
+          {
+            "question": "How does HttpClientFactory help?",
+            "answer": "HttpClientFactory manages socket exhaustion and integrates with Polly through AddTransientHttpErrorPolicy. Use it instead of creating HttpClient instances manually."
+          },
+          {
+            "question": "What if the circuit breaker opens during a critical operation?",
+            "answer": "Return a fallback response: a cached value, a degraded mode, or a user-friendly error message. The circuit breaker protects the downstream at the cost of reduced functionality temporarily."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement bounded retries",
+        "description": "Refactor an API client that retries every exception indefinitely into one with a bounded retry policy and circuit breaker.",
+        "steps": [
+          "Identify all catch blocks that retry without conditions",
+          "Add Polly policies: retry only transient errors with a max of three attempts",
+          "Add exponential backoff with jitter between retries",
+          "Add a circuit breaker that opens after five consecutive failures",
+          "Log each retry attempt with the attempt number and reason",
+          "Write a test that mocks a 500 error and asserts the client retries three times then fails"
+        ],
+        "expectedOutcome": "The client retries transient errors with backoff, stops after three attempts, and opens the circuit breaker after five consecutive failures. Non-retryable errors fail immediately."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Retry only transient errors; never retry 4xx client errors",
+          "Use exponential backoff with jitter to avoid thundering herds",
+          "Bound retries with a maximum count and a circuit breaker",
+          "Use Polly or built-in resilience handlers instead of hand-rolled loops"
+        ],
+        "takeaway": "An unbounded retry is not resilience; it is an attack on your own infrastructure."
       }
     }
   ],

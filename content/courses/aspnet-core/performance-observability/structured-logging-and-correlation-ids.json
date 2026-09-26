@@ -3,59 +3,136 @@
   "slug": "structured-logging-and-correlation-ids",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Structured logging and correlation IDs",
-  "description": "Learn about Structured logging and correlation IDs. Master the concepts, patterns, and best practices.",
+  "title": "Structured Logging and Correlation IDs",
+  "description": "Implement structured logging and correlation IDs in ASP.NET Core to trace requests across services and make production debugging faster and more reliable.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Structured logging and correlation IDs** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with structured logging and correlation ids."
+        "text": "Structured logging turns free-text messages into queryable data by emitting key-value pairs instead of plain strings. Combined with **correlation IDs**, every log line from a single request shares an identifier, so you can filter, search, and reconstruct what happened across controllers, middleware, and downstream services."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of structured logging and correlation ids",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Structured Logging with ILogger"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding structured logging and correlation ids is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "ASP.NET Core's built-in `ILogger` supports structured messages through format strings. When you write `\"Order {OrderId} created\"`, the logging provider emits both the message template and the `OrderId` as a separate field. Serilog, Seq, and Elasticsearch can index and query these fields."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Structured Log with Scopes",
+        "content": "Use logging scopes to attach request-level data to every log line emitted inside the scope.",
+        "code": "public class OrdersController : ControllerBase\n{\n    private readonly ILogger<OrdersController> _logger;\n\n    public OrdersController(ILogger<OrdersController> logger)\n    {\n        _logger = logger;\n    }\n\n    [HttpPost]\n    public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)\n    {\n        using var scope = _logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"RequestId\"] = HttpContext.TraceIdentifier,\n            [\"CustomerId\"] = request.CustomerId,\n            [\"CorrelationId\"] = Activity.Current?.TraceId.ToString() ?? \"-\"\n        });\n\n        _logger.LogInformation(\n            \"Creating order with {ItemCount} items\",\n            request.Items.Count);\n\n        var order = await _service.CreateAsync(request);\n\n        _logger.LogInformation(\n            \"Order {OrderId} created successfully\",\n            order.Id);\n        return CreatedAtAction(nameof(Get), new { id = order.Id }, order);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correlation IDs and Activity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The .NET `Activity` class automatically creates a trace ID for each incoming request. You can expose this as a correlation ID in log scopes, HTTP response headers, and outbound messages. Some APIs also accept an incoming `X-Correlation-ID` header and continue the same trace rather than starting a new one."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Correlation ID Middleware",
+        "content": "Add or propagate a correlation ID header on every request and include it in all logs.",
+        "code": "public class CorrelationIdMiddleware\n{\n    private readonly RequestDelegate _next;\n    private const string CorrelationIdHeader = \"X-Correlation-ID\";\n\n    public CorrelationIdMiddleware(RequestDelegate next) => _next = next;\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var correlationId = context.Request.Headers[CorrelationIdHeader].FirstOrDefault()\n            ?? Guid.NewGuid().ToString();\n\n        context.Response.OnStarting(() =>\n        {\n            context.Response.Headers[CorrelationIdHeader] = correlationId;\n            return Task.CompletedTask;\n        });\n\n        using var activity = new Activity(\"CorrelationIdMiddleware\");\n        activity?.SetParentId(correlationId);\n        activity?.Start();\n\n        await _next(context);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Correlation ID",
+            "definition": "A unique identifier shared across logs, traces, and messages for a single request or workflow."
+          },
+          {
+            "term": "Activity",
+            "definition": "The .NET type representing an operation with a start time, duration, tags, and trace identifiers."
+          },
+          {
+            "term": "Log Scope",
+            "definition": "A logical grouping of log messages so shared properties appear on every line emitted inside the scope."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with structured logging and correlation ids, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "note",
+        "title": "Avoid Logging Secrets",
+        "text": "Never log passwords, tokens, or credit card numbers. Structured logging makes it easy to accidentally log the entire request body. Use filters or enrichers to scrub sensitive fields before they reach your sink."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Logging Best Practices",
+        "items": [
+          "Log at the right level: Trace for diagnostics, Debug for development, Information for business events, Warning for recoverable issues, Error for failures.",
+          "Include trace ID, user ID, and request path in every structured log scope.",
+          "Use a consistent timestamp format and machine-readable log output.",
+          "Centralize logs with Seq, Elasticsearch, or Application Insights so you can search by correlation ID."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Structured logging makes logs searchable and filterable instead of noisy text blobs.",
+          "Correlation IDs tie together logs, traces, and messages for a single request.",
+          "Use Activity and logging scopes to attach trace identifiers automatically.",
+          "Scrub sensitive data before it reaches your log sink."
+        ],
+        "takeaway": "Good logging is not about more text. It is about the right fields in the right format, so you can answer questions in seconds instead of hours."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "distributed-tracing-across-services",
+    "application-metrics-vs-logs-vs-traces",
+    "request-latency-decomposition"
+  ],
+  "furtherReading": [
+    {
+      "title": "Logging in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/extensions/logging",
+      "type": "article"
+    },
+    {
+      "title": "Serilog for ASP.NET Core",
+      "url": "https://serilog.net/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Distributed Application Patterns - Correlation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/",
+      "type": "article"
+    }
+  ]
 }

@@ -4,33 +4,47 @@
   "moduleSlug": "production-architecture-reliability-cost",
   "courseSlug": "microsoft-azure-for-developers",
   "title": "Managed identity architecture",
-  "description": "Learn about Managed identity architecture. Master the concepts, patterns, and best practices.",
+  "description": "Eliminate secrets from your Azure applications using managed identities. Compare system-assigned and user-assigned identities, understand the authentication flow, and implement secure access to Azure SQL, Key Vault, and storage.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Managed identity architecture** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with managed identity architecture."
+        "text": "Every time an application connects to a database, a key vault, or a storage account, it must prove its identity. The traditional approach is to store a client secret, certificate, or connection string. Managed identities remove that burden entirely: Azure issues and rotates the credential automatically, and your code never sees a secret."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How managed identity works"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of managed identity architecture",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "When you enable a managed identity on an Azure resource, Azure creates a service principal in Microsoft Entra ID. The resource can then request an access token from the Entra ID metadata endpoint, using no application code. The token is cached by the Azure SDK and renewed automatically before expiration."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "System-assigned identity",
+            "definition": "Tied to a single Azure resource. Deleting the resource deletes the identity."
+          },
+          {
+            "term": "User-assigned identity",
+            "definition": "A standalone Entra ID identity that can be assigned to multiple resources."
+          },
+          {
+            "term": "DefaultAzureCredential",
+            "definition": "An Azure SDK credential that chains multiple identity sources, falling back from managed identity to environment variables to developer credentials."
+          }
         ]
       }
     },
@@ -38,24 +52,119 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "System-assigned vs user-assigned"
       }
     },
     {
-      "type": "paragraph",
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding managed identity architecture is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Identity types",
+        "cards": [
+          {
+            "title": "System-assigned",
+            "description": "Best for one-to-one resource relationships, such as an App Service that needs access to one Key Vault. Simple to set up, lifecycle-bound to the resource."
+          },
+          {
+            "title": "User-assigned",
+            "description": "Best for shared workloads, such as multiple App Service instances needing the same database identity. Lifecycle is independent of any single resource."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Code example: C# with DefaultAzureCredential"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Accessing Key Vault without secrets",
+        "content": "Use the Azure SDK to fetch a secret using the managed identity of the host.",
+        "language": "csharp",
+        "code": "using Azure.Identity;\nusing Azure.Security.KeyVault.Secrets;\n\nvar vaultUri = new Uri(\"https://my-vault.vault.azure.net/\");\nvar client = new SecretClient(vaultUri, new DefaultAzureCredential());\n\nKeyVaultSecret secret = await client.GetSecretAsync(\"DatabaseConnectionString\");\nstring connectionString = secret.Value;\n\n// In production on Azure, DefaultAzureCredential picks up\n// the managed identity automatically. Locally, it falls\n// back to Visual Studio, Azure CLI, or environment variables."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with managed identity architecture, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Never mix secrets with managed identity",
+        "text": "If your application can use managed identity, do not also store the same credential as a secret. Hybrid approaches create confusion, increase blast radius, and make audits harder."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Granting access to Azure resources"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Managed identity is only half the equation. The target resource must also allow access. For Azure SQL, you create a contained database user from an external provider. For Key Vault, you assign an access policy. For storage, you use RBAC roles such as 'Storage Blob Data Reader.'"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Access pattern steps",
+        "items": [
+          "Enable managed identity on the client resource.",
+          "Note the principal ID or identity name.",
+          "On the target resource, grant the identity the least-privilege role or access policy.",
+          "Update application code to use DefaultAzureCredential.",
+          "Remove old connection strings and secrets from Key Vault and app settings."
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common pitfalls",
+        "items": [
+          "Forgetting to grant the identity access to the target resource.",
+          "Using the identity across subscriptions without proper RBAC.",
+          "Caching tokens longer than the Azure SDK cache duration.",
+          "Assigning Owner or Contributor when a data-only role is sufficient."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Managed identities remove secrets from code and configuration.",
+          "System-assigned identities are simple and resource-scoped; user-assigned identities are flexible and shareable.",
+          "DefaultAzureCredential provides seamless local-to-cloud identity resolution.",
+          "Least-privilege access on the target resource is as important as the identity itself."
+        ],
+        "takeaway": "If your application can authenticate with a managed identity, it should."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "private-endpoints-and-network-isolation",
+    "azure-monitoring-strategy-logs-metrics-and-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "Managed identities for Azure resources",
+      "url": "https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on system-assigned and user-assigned managed identities."
+    },
+    {
+      "title": "Azure.Identity DefaultAzureCredential",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential",
+      "type": "article",
+      "author": "Microsoft",
+      "description": ".NET SDK reference for DefaultAzureCredential and its credential chain."
+    }
+  ]
 }

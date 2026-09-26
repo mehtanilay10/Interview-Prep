@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**WebSocket connection lifecycle** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with websocket connection lifecycle."
+        "text": "A WebSocket connection is not a single event; it is a lifecycle with opening, open, message, close, and error phases. Senior engineers treat each phase as an opportunity to observe, recover, and optimize. Understanding the lifecycle helps you debug dropped connections, handle scaling correctly, and provide a reliable user experience across flaky mobile networks."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of websocket connection lifecycle",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "HTTP upgrade handshake: client sends Upgrade: websocket, server responds with 101 Switching Protocols",
+          "Opening phase: authentication, rate limiting, and subscription setup happen before the connection is usable",
+          "Active phase: heartbeats keep the connection alive; message handlers process inbound frames",
+          "Close phase: application-initiated close versus network-driven close; normal closure versus abnormal drop",
+          "Error phase: onerror fires when the transport breaks; reconnect logic must avoid stampedes",
+          "Reconnection strategies: exponential backoff with jitter, max delay caps, and circuit breakers",
+          "Scaling consideration: stateless connection managers require a shared message bus to fan out messages"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Upgrade handshake",
+            "definition": "The HTTP exchange that transitions a normal HTTP connection into a WebSocket connection using the Upgrade and Connection headers."
+          },
+          {
+            "term": "101 Switching Protocols",
+            "definition": "The HTTP status code indicating the server has accepted the protocol upgrade."
+          },
+          {
+            "term": "Circuit breaker",
+            "definition": "A pattern that stops retry attempts after repeated failures, allowing the system to recover and preventing resource exhaustion."
+          },
+          {
+            "term": "Stampede",
+            "definition": "When many clients reconnect simultaneously after an outage, overwhelming the server with a spike of connection requests."
+          },
+          {
+            "term": "Jitter",
+            "definition": "Randomized delay added to backoff intervals to prevent synchronized retries across many clients."
+          }
         ]
       }
     },
@@ -44,18 +74,157 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding websocket connection lifecycle is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "WebSocket bugs are some of the hardest to reproduce because they depend on network conditions, load balancer timeouts, and mobile carrier NAT behavior. A senior engineer who understands the lifecycle can design reconnection logic that recovers gracefully and adds observability at every phase so issues are caught before users notice."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with websocket connection lifecycle, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Implement heartbeats early",
+        "text": "Send a ping every thirty seconds and expect a pong within five seconds. If no pong arrives, close the socket and trigger the reconnection flow. Heartbeats detect half-open connections caused by firewalls or mobile NATs that silently drop TCP state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reconnection strategies"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Immediate retry: only for the first attempt; avoids unnecessary delay on transient drops",
+          "Exponential backoff: double the delay after each failure up to a maximum",
+          "Jitter: add a random fraction of the backoff delay to spread reconnections over time",
+          "Circuit breaker: after five failures in ten seconds, pause reconnections for thirty seconds",
+          "Back-off reset: once a connection succeeds, reset all failure counters and backoff state"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-websocket-lifecycle",
+        "caption": "WebSocket connection lifecycle with reconnection flow",
+        "definition": "graph TD\n    A[Client] --> B[HTTP Upgrade]\n    B -->|101| C[OPEN]\n    B -->|Error| D[Reconnect]\n    C --> E{Message received?}\n    E -->|Yes| F[Process message]\n    E -->|No| G{Heartbeat timeout?}\n    G -->|Yes| D\n    G -->|No| E\n    F --> H{Server close?}\n    H -->|Yes| I[ONCLOSE]\n    H -->|No| E\n    I --> D\n    D --> J{Backoff maxed?}\n    J -->|No| K[Wait + jitter]\n    K --> B\n    J -->|Yes| L[Show offline UI]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server-side connection management"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Authenticate during the upgrade request using a JWT or session cookie before accepting the WebSocket",
+          "Assign each connection a unique ID and store it in a connection registry mapped to user ID and room IDs",
+          "Track connection metadata: IP address, user agent, connected at timestamp, last heartbeat timestamp",
+          "Use a pub/sub system like Redis to broadcast messages across multiple server instances without tight coupling",
+          "Gracefully close idle connections after a server-side timeout and emit a close event with code 1001 Going Away"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Close codes and their meaning",
+        "cards": [
+          {
+            "title": "1000 Normal Closure",
+            "description": "The connection closed successfully after the endpoint completed its work.",
+            "pros": ["Expected path", "Clean shutdown"],
+            "cons": ["Does not indicate failure"]
+          },
+          {
+            "title": "1001 Going Away",
+            "description": "The endpoint is going away, such as a server restart or browser navigation away.",
+            "pros": ["Allows client to queue state"],
+            "cons": ["Client must reconnect"]
+          },
+          {
+            "title": "1006 Abnormal Closure",
+            "description": "The connection closed without a close frame, usually due to network loss.",
+            "pros": ["Signals unexpected drop"],
+            "cons": ["Client cannot distinguish server restart from network glitch"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement a WebSocket client wrapper",
+        "description": "Write a TypeScript WebSocket client class that manages the full lifecycle: connection, heartbeats, message queuing while offline, exponential backoff reconnection with jitter, and a circuit breaker after repeated failures.",
+        "steps": [
+          "Create a class that wraps the native WebSocket API",
+          "Implement a heartbeat sender that pings every thirty seconds",
+          "Implement a reconnection method with exponential backoff and jitter",
+          "Queue messages sent while the socket is disconnected and flush them on reconnect",
+          "Add event listeners for open, message, error, and close",
+          "Expose a ready state observable so UI components can show connection status"
+        ],
+        "expectedOutcome": "You should have a reusable client that survives network drops without losing messages or hammering the server with retries."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I reconnect immediately after a close event?",
+            "answer": "No. Use exponential backoff with jitter. Immediate retries cause a thundering herd when the server recovers, which can extend the outage."
+          },
+          {
+            "question": "How do I know if the server is down versus a network issue?",
+            "answer": "You cannot distinguish them reliably from the client. Use a circuit breaker: if reconnection fails repeatedly, assume the server is unavailable and show an offline UI rather than retrying indefinitely."
+          },
+          {
+            "question": "Do I need sticky sessions with WebSocket?",
+            "answer": "Not if you use a pub/sub message bus like Redis. Each server instance manages its own connections and publishes messages to the bus, which delivers them to the correct instance. Sticky sessions are a fallback for simple setups."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Treat WebSocket as a lifecycle, not a single connection",
+          "Add heartbeats and reconnection logic from the start",
+          "Use backoff with jitter to prevent stampedes",
+          "Observe every phase with metrics so debugging is possible in production"
+        ],
+        "takeaway": "A senior engineer designs the connection lifecycle for failure, because failure is the most common state in distributed systems."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "requirements-and-real-time-communication-architecture",
+    "scaling-real-time-connections"
+  ],
+  "furtherReading": [
+    {
+      "title": "WebSocket Protocol RFC 6455",
+      "url": "https://datatracker.ietf.org/doc/html/rfc6455",
+      "type": "article",
+      "author": "IETF",
+      "description": "The official specification for the WebSocket protocol, including the handshake, framing, and close codes."
+    }
+  ]
 }

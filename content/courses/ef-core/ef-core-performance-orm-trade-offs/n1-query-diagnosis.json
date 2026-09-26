@@ -4,33 +4,62 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "N+1 query diagnosis",
-  "description": "Learn about N+1 query diagnosis. Master the concepts, patterns, and best practices.",
+  "description": "Learn to identify and fix N+1 query problems in EF Core, one of the most common and damaging performance anti-patterns in data-access code.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["EF Core", "N+1", "performance", "lazy loading", "diagnostics"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**N+1 query diagnosis** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with n+1 query diagnosis."
+        "text": "The N+1 query problem is one of the most common performance issues in ORM-based applications. It happens when you load a collection of entities and then make a separate database query for each related entity. What should be two queries becomes N+1 — one to load the parent rows and one per parent to load its children."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What does N+1 look like?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Imagine loading 100 blog posts and then accessing the `Author` navigation property on each one. If that navigation property is lazy-loaded, EF Core fires 100 individual SELECT statements — one for each post's author. The database connection round-trips and query planning overhead dominate the response time, even though the data is small."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "N+1 problem with lazy loading",
+        "code": "// First query: SELECT * FROM Posts WHERE Published = 1\nvar posts = await dbContext.Posts\n    .Where(p => p.IsPublished)\n    .ToListAsync();\n\n// N additional queries — one per post\nforeach (var post in posts)\n{\n    // SELECT * FROM Authors WHERE Id = @p0\n    Console.WriteLine(post.Author.FullName);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "How to detect N+1",
+        "text": "Enable EF Core's built-in logging with `LogTo(Console.WriteLine)` or use a tool like MiniProfiler. If you see repeated queries inside a loop — especially queries on related tables — you are likely looking at N+1. Application Performance Monitoring (APM) tools also surface repeated identical queries."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common causes of N+1"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of n+1 query diagnosis",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Lazy-loading proxies enabled on navigation properties that are accessed inside a loop.",
+          "Serializing tracked entities with navigation properties — the serializer touches each property, triggering lazy loads.",
+          "Mixing `Include` with projection: `Include` loads full entities, then a `Select` accesses a navigation property that was not included.",
+          "Iterating over a parent list and accessing a reference navigation property without eager-loading it."
         ]
       }
     },
@@ -38,24 +67,73 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Fixing N+1 with Include"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding n+1 query diagnosis is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The most direct fix is to eager-load the related data using `Include` before you iterate. This consolidates all data retrieval into a single query. For reference navigations (many-to-one), this is usually the cleanest solution."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with n+1 query diagnosis, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Fixing N+1 with eager loading",
+        "code": "var posts = await dbContext.Posts\n    .Include(p => p.Author)\n    .Where(p => p.IsPublished)\n    .ToListAsync();\n\n// No additional queries — Author is already loaded\nforeach (var post in posts)\n{\n    Console.WriteLine(post.Author.FullName);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixing N+1 with projection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For read-only scenarios, projection is often better than Include. By selecting exactly the fields you need into a DTO, EF Core generates a single, efficient SQL query with no tracking overhead and no risk of lazy-loading side effects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fixing N+1 with projection",
+        "code": "var postSummaries = await dbContext.Posts\n    .Where(p => p.IsPublished)\n    .Select(p => new PostSummaryDto\n    {\n        Title = p.Title,\n        AuthorName = p.Author.FullName,\n        PublishedAt = p.PublishedAt\n    })\n    .ToListAsync();\n\nforeach (var summary in postSummaries)\n{\n    Console.WriteLine($\"{summary.Title} by {summary.AuthorName}\");\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Preventing N+1 in serialization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Returning tracked entities directly from API endpoints is risky. JSON serializers like System.Text.Json traverse every property by default, including navigation properties. If lazy-loading is enabled, serialization silently triggers N+1 queries. Use DTOs with projection to control exactly what gets serialized and fetched."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "N+1 occurs when a collection query is followed by individual queries per item.",
+          "Lazy loading and serialization of tracked entities are common causes.",
+          "Use Include or projection to load related data in a single round-trip.",
+          "Enable EF Core logging to spot repeated queries during development."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["projection-vs-include", "tracking-vs-asnotracking"],
+  "furtherReading": [
+    { "title": "EF Core loading related data", "url": "https://learn.microsoft.com/en-us/ef/core/querying/related-data", "type": "article" },
+    { "title": "EF Core logging and diagnostics", "url": "https://learn.microsoft.com/en-us/ef/core/logging-events-diagnostics", "type": "article" }
+  ]
 }

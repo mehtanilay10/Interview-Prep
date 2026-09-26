@@ -3,59 +3,153 @@
   "slug": "request-latency-decomposition",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Request latency decomposition",
-  "description": "Learn about Request latency decomposition. Master the concepts, patterns, and best practices.",
+  "title": "Request Latency Decomposition",
+  "description": "Break down where an HTTP request spends its time in ASP.NET Core, from Kestrel and middleware to routing, controllers, database calls, and JSON serialization.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Request latency decomposition** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with request latency decomposition."
+        "text": "Every API request passes through many layers before returning a response. When a request takes 500 milliseconds, you need to know whether that time is spent in network calls, database queries, serialization, or middleware. **Request latency decomposition** is the practice of measuring each layer so you can target the real bottleneck instead of guessing."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of request latency decomposition",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "The Layers of an ASP.NET Core Request"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding request latency decomposition is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A typical request flows through Kestrel, middleware, routing, the controller action, authorization filters, database access, model binding, and JSON serialization. Each layer adds some overhead. In high-throughput APIs, serialization alone can consume 20–30% of request time."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Kestrel",
+            "definition": "The cross-platform web server that hosts ASP.NET Core applications and processes raw HTTP requests."
+          },
+          {
+            "term": "Middleware",
+            "definition": "Software components that form a pipeline to handle requests and responses, such as authentication, caching, and CORS."
+          },
+          {
+            "term": "Model Binding",
+            "definition": "The process that converts HTTP request data into .NET objects that controller actions can use."
+          },
+          {
+            "term": "Serialization",
+            "definition": "Converting .NET objects into JSON or another format for the HTTP response body."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Timing Middleware",
+        "content": "Add a simple timing middleware to log how long each request takes end-to-end.",
+        "code": "public class RequestTimingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger<RequestTimingMiddleware> _logger;\n\n    public RequestTimingMiddleware(\n        RequestDelegate next,\n        ILogger<RequestTimingMiddleware> logger)\n    {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var start = Stopwatch.GetTimestamp();\n        await _next(context);\n        var elapsedMs = GetElapsedMilliseconds(start);\n\n        _logger.LogInformation(\n            \"Request {Method} {Path} completed in {Elapsed}ms\",\n            context.Request.Method,\n            context.Request.Path,\n            elapsedMs);\n    }\n\n    private static double GetElapsedMilliseconds(long start)\n    {\n        var end = Stopwatch.GetTimestamp();\n        var frequency = Stopwatch.Frequency;\n        return (end - start) * 1000.0 / frequency;\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using Activity and Diagnostic Listeners"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core already creates an `Activity` for each request. You can listen to `Activity.Start`, `Activity.Stop`, and custom diagnostic events to measure specific phases. The framework emits events for routing, model binding, and action execution that you can correlate with performance counters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Diagnostic Listener for Action Execution",
+        "content": "Create a listener that tracks how long controller actions take independently of the full request pipeline.",
+        "code": "public class ActionExecutionListener : IObserver<KeyValuePair<string, object?>>\n{\n    private readonly ILogger<ActionExecutionListener> _logger;\n    private Stopwatch? _sw;\n\n    public ActionExecutionListener(\n        ILogger<ActionExecutionListener> logger)\n    {\n        _logger = logger;\n    }\n\n    public void OnNext(KeyValuePair<string, object?> value)\n    {\n        if (value.Key == \"Microsoft.AspNetCore.Mvc.BeforeActionExecution\")\n        {\n            _sw = Stopwatch.StartNew();\n        }\n        else if (value.Key == \"Microsoft.AspNetCore.Mvc.AfterActionExecution\" && _sw is not null)\n        {\n            _sw.Stop();\n            var evt = (value.Value as IDictionary<string, object?>)!;\n            var action = evt[\"ActionDescriptor\"]?.ToString() ?? \"unknown\";\n            _logger.LogInformation(\n                \"Action {Action} took {Ms}ms\",\n                action,\n                _sw.ElapsedMilliseconds);\n        }\n    }\n\n    public void OnCompleted() { }\n    public void OnError(Exception error) { }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with request latency decomposition, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid Adding Too Many Timers",
+        "text": "Every Stopwatch and log statement adds overhead. In production, use sampling or conditional logging so your observability tools do not become the performance problem they are meant to solve."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Measuring Database and External Calls"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The biggest wins usually come from database and external HTTP calls. Entity Framework Core exposes `DiagnosticListener` events for query execution time. For HTTP calls, use `IHttpClientFactory` with delegating handlers to capture request and response durations without scattering timing code throughout your application."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Quick Wins",
+        "items": [
+          "Enable EF Core interceptors to log query execution time and parameter values.",
+          "Use `IHttpClientFactory` so you can add a single delegating handler for timing all outbound calls.",
+          "Check JSON serializer settings: camelCase and reference handling can add milliseconds per request.",
+          "Measure response compression savings on large payloads with `ResponseCompression` middleware."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Latency decomposition isolates each layer: server, middleware, routing, controller, and I/O.",
+          "Use middleware, Activity listeners, or EF Core interceptors to measure specific phases.",
+          "Focus on database and external calls first—they usually dominate total request time.",
+          "Keep measurement overhead low with sampling and conditional logging."
+        ],
+        "takeaway": "Measure first, optimize second. Without data, you are just guessing where the time goes."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "slow-api-investigation-workflow",
+    "profiling-cpu-and-allocations",
+    "application-metrics-vs-logs-vs-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "ASP.NET Core performance best practices",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/",
+      "type": "article"
+    },
+    {
+      "title": "Kestrel server overview",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/",
+      "type": "article"
+    },
+    {
+      "title": "DiagnosticSource and Activity in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/",
+      "type": "article"
+    }
+  ]
 }

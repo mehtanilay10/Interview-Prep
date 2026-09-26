@@ -4,33 +4,38 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "GC generations and collection behavior",
-  "description": "Learn about GC generations and collection behavior. Master the concepts, patterns, and best practices.",
+  "description": "Understand the generational garbage collection model, how objects move between generations, and what triggers collections at each level.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["GC", "generations", "ephemeral-segment", "collection", "promotion"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**GC generations and collection behavior** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with gc generations and collection behavior."
+        "text": "The .NET garbage collector organizes the managed heap into three generations. This is not an arbitrary design choice — it is based on a well-tested observation called the generational hypothesis: most objects die young. The vast majority of objects allocated in a .NET program become unreachable within microseconds of being created. By focusing collection effort on generation 0 — the youngest generation — the GC can reclaim large amounts of memory with minimal pause time."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Generation 0 contains the newest objects. Generation 1 is a buffer between the young and old generations. Generation 2 contains long-lived objects — singleton services, cached data, string literals, static references. Objects that survive a collection are promoted to the next older generation. This means a collection of generation 2 is expensive: it scans the entire managed heap, including generations 0, 1, and 2. The GC prefers to avoid full collections whenever possible."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The three generations"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of gc generations and collection behavior",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**Generation 0** — approximately 256 KB to a few MB. Contains brand-new objects. Collected most frequently. A gen 0 collection typically pauses the application for under 1 millisecond.",
+          "**Generation 1** — a buffer of objects that survived one gen 0 collection. About the same size as gen 0. Collected when gen 0 collections fail to free enough space.",
+          "**Generation 2** — long-lived objects, including everything promoted from gen 1 and large objects. Can grow to hundreds of MB or more. Full (gen 2) collections are rare but can pause the application for tens of milliseconds."
         ]
       }
     },
@@ -38,24 +43,81 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "What triggers each generation collection"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding gc generations and collection behavior is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The runtime triggers a gen 0 collection when the allocation since the last gen 0 collection exceeds a threshold — typically around 256 KB. If gen 0 collection does not free enough contiguous space for the next allocation, the runtime promotes surviving objects to gen 1 and triggers a gen 1 collection. Gen 1 collection is also triggered when gen 1 reaches a threshold size. Gen 2 collections happen when both gen 0 and gen 1 collections fail to free enough space, or when the system is under memory pressure and the runtime receives a low-memory notification from the OS."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Observing GC events in real time",
+        "code": "using System;\nusing System.Threading;\n\nGC.AllocateArray(1024, pinned: true); // pre-pause\n\nfor (int gen = 0; gen <= 2; gen++)\n{\n    long before = GC.GetGeneration(obj);\n}\n\nGC.Collect(); // force full collection\n\nlong gen0Before = GC.GetGeneration(obj);\nConsole.WriteLine($\"Object is in generation {gen0Before}\");\n\n// Subscribe to GC notifications\nGCNotification.Register(\n    onGCStart: () => Console.WriteLine(\"GC starting...\"),\n    onGCComplete: () => Console.WriteLine(\"GC complete.\"));",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The ephemeral segment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Generations 0 and 1 live together in a region of memory called the ephemeral segment. This segment is typically a few megabytes in size. When the GC collects generation 0, it only needs to scan the ephemeral segment — not the entire managed heap. This is why gen 0 collections are fast. Generation 2 objects live in separate segments called the large object heap and the generation 2 segment. A gen 2 collection must scan all segments, which is why it is slower."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "gc-generations",
+        "code": "flowchart TB\n    A[\"New Allocation\"] --> B[\"Generation 0\n(Ephemeral Segment)\"]\n    B --> C{\"Gen 0 GC\n(threshold reached)\"}\n    C -->|Survives| D[\"Generation 1\n(Ephemeral Segment)\"]\n    C -->|Dies| E[\"Memory reclaimed\n(free)\"]\n    D --> F{\"Gen 1 GC\n(promotion threshold)\"}\n    F -->|Survives| G[\"Generation 2\n(LOH + Gen2 Segment)\"]\n    F -->|Dies| E\n    G --> H{\"Gen 2 GC\n(full heap collection)\"}\n    H -->|Survives| G\n    H -->|Dies| E\n\n    style B fill:#f59e0b,color:#fff\n    style D fill:#f97316,color:#fff\n    style G fill:#ef4444,color:#fff\n    style E fill:#16a34a,color:#fff",
+        "caption": "Object promotion through the GC generations. Objects that survive collection are promoted; the ephemeral segment contains only generations 0 and 1."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with gc generations and collection behavior, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Large object heap objects skip generations",
+        "text": "Objects larger than 85,000 bytes are allocated directly on the Large Object Heap (LOH) and are treated as generation 2 objects from the moment of allocation. They are never placed in the ephemeral segment and are never collected in a gen 0 or gen 1 collection. Allocating large objects frequently causes full heap collections, which are expensive. Use pooling or slicing to reduce large-object allocations."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "The generational hypothesis holds that most objects die young; the GC exploits this to minimize pause time.",
+          "Objects that survive a generation collection are promoted to the next older generation.",
+          "The ephemeral segment holds only generations 0 and 1, making gen 0 and gen 1 collections fast.",
+          "Objects over 85 KB go directly to the LOH as generation 2, triggering expensive full collections."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["managed-heap-and-allocation-lifecycle", "large-object-heap-and-pinned-objects", "server-gc-vs-workstation-gc"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "GC fundamentals and generations",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals"
+    },
+    {
+      "type": "article",
+      "title": "Background GC and ephemeral segment",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/background-gc"
+    },
+    {
+      "type": "article",
+      "title": "GC.GetGeneration documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.gc.getgeneration"
+    }
+  ]
 }

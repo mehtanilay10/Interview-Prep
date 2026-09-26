@@ -4,33 +4,45 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Canary releases",
-  "description": "Learn about Canary releases. Master the concepts, patterns, and best practices.",
+  "description": "Gradually shift traffic to a new release and automatically roll back if health checks detect problems.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "CI/CD",
+    "canary",
+    "gradual-release",
+    "observability"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Canary releases** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with canary releases."
+        "text": "A canary release is named after the old mining practice of bringing a canary into a coal mine. If the air was toxic, the canary died before the miners did. In software, a small subset of real users or traffic tests the new version before everyone else sees it. If the canary fails, the system rolls back automatically and the majority of users are unaffected."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Canary releases require observability. You must measure latency, error rates, and business metrics in real time, compare them to a baseline, and make automatic or manual promotion decisions. Without good monitoring, a canary is just a partial rollout with no safety net."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The canary progression"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
+        "title": "Typical canary stages",
         "items": [
-          "Understand the fundamental principles of canary releases",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "1% of traffic to the new version for 5 minutes.",
+          "Increase to 5% and watch for error-rate spikes.",
+          "Promote to 25% if health metrics remain stable.",
+          "Promote to 100% or hold for further observation."
         ]
       }
     },
@@ -38,24 +50,142 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Automated canary with Azure Deployment Manager"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding canary releases is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Azure Deployment Manager and similar orchestration tools can automate canary steps. The following conceptual YAML shows a rollout strategy that increases traffic in phases and aborts if a health check fails."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Conceptual rollout strategy",
+        "content": "Each step promotes a percentage of traffic only if the previous step is healthy.",
+        "code": "rollout:\n  steps:\n    - name: canary-1pct\n      weight: 1\n      duration: 5m\n      healthPolicy:\n        healthyErrorRate: 0.01\n        unhealthyErrorRate: 0.05\n      trafficPolicy:\n        endpoints:\n          - target: app-green/1\n            weight: 1\n          - target: app-blue/1\n            weight: 99\n\n    - name: canary-5pct\n      weight: 5\n      duration: 10m\n      healthPolicy:\n        healthyErrorRate: 0.01\n        unhealthyErrorRate: 0.05\n      trafficPolicy:\n        endpoints:\n          - target: app-green/1\n            weight: 5\n          - target: app-blue/1\n            weight: 95\n\n    - name: promote-full\n      weight: 100\n      duration: 15m\n      trafficPolicy:\n        endpoints:\n          - target: app-green/1\n            weight: 100",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What to measure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not all metrics are equal during a canary. Latency averages can hide tail-latency regressions that affect only a small percentage of users. Error rates are important, but business metrics such as checkout completion, login success, or search result relevance often detect problems earlier than infrastructure metrics."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Control group",
+            "definition": "The traffic still running the old version. Serves as the baseline for comparison."
+          },
+          {
+            "term": "Treatment group",
+            "definition": "The traffic running the new version. Also called the canary cohort."
+          },
+          {
+            "term": "Statistical significance",
+            "definition": "Confidence that observed differences are real and not random noise. Critical when sample sizes are small."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with canary releases, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Automate rollback, do not rely on humans",
+        "text": "If a metric crosses a threshold, the system should roll back without waiting for a human to notice. Humans are slower than automated health checks and are often asleep when night-time canaries fail."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Canary release checklist",
+        "items": [
+          {
+            "text": "Health checks cover latency, error rate, and at least one business metric.",
+            "hint": "Example: HTTP 5xx rate, p99 latency, checkout success."
+          },
+          {
+            "text": "Traffic splitting is handled by the platform, not by application code.",
+            "hint": "Use load balancer weights, service mesh routing, or feature flags."
+          },
+          {
+            "text": "Rollback triggers are automated and tested in staging.",
+            "hint": "Simulate failures to verify the system reacts correctly."
+          },
+          {
+            "text": "Each canary step has a defined duration and maximum traffic percentage.",
+            "hint": "Avoid unbounded canaries that never fully promote."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Canary releases shift traffic gradually and roll back automatically on failure.",
+          "Measure infrastructure and business metrics, not just one or the other.",
+          "Automation is essential; human reaction time is too slow for canary safety.",
+          "Use canaries for high-traffic services where a bad release would affect many users."
+        ],
+        "takeaway": "Canary releases turn risky big-bang deployments into controlled, observable experiments."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Can I run canaries without a service mesh?",
+            "answer": "Yes. Load balancers, deployment slots, and even feature flags can split traffic. A service mesh makes it easier but is not a strict requirement."
+          },
+          {
+            "question": "How long should a canary step last?",
+            "answer": "Start with 5 to 10 minutes for infrastructure metrics and 15 to 30 minutes for business metrics. The right duration depends on your traffic patterns and alert sensitivity."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "blue-green-deployments",
+    "feature-flags",
+    "rollback-strategy"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Load Balancer and Traffic Manager",
+      "url": "https://learn.microsoft.com/en-us/azure/traffic-manager/",
+      "type": "article",
+      "description": "How Azure routes and weights traffic for gradual rollouts."
+    },
+    {
+      "title": "Google SRE Book: Release Engineering",
+      "url": "https://sre.google/sre-book/release-engineering/",
+      "type": "article",
+      "description": "How Google approaches canary analysis and progressive delivery."
+    },
+    {
+      "title": "Progressive Delivery with Argo Rollouts",
+      "url": "https://argoproj.github.io/rollouts/",
+      "type": "tool",
+      "description": "Kubernetes controller for canary, blue-green, and experimentation."
+    }
+  ]
 }

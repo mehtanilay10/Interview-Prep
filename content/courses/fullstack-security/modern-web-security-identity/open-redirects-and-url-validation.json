@@ -3,59 +3,180 @@
   "slug": "open-redirects-and-url-validation",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "Open redirects and URL validation",
-  "description": "Learn about Open redirects and URL validation. Master the concepts, patterns, and best practices.",
+  "title": "Open Redirects and URL Validation",
+  "description": "Learn how open redirect vulnerabilities let attackers use trusted domains to send users to malicious sites. Implement robust URL validation, domain allowlists, and safe redirect patterns in .NET and JavaScript.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": [
+    "open-redirect",
+    "url-validation",
+    "redirect",
+    "phishing",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Open redirects and URL validation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with open redirects and url validation."
+        "text": "An open redirect occurs when an application accepts a URL as input and redirects the user to it without validation. The vulnerability is dangerous because the link starts on your trusted domain, making it harder for users and security tools to detect the phishing attempt. Open redirects are often chained with other attacks — for example, an attacker sends a link like `https://yourapp.com/redirect?to=https://evil.com`, and the user sees the familiar domain before being sent to the attacker's site."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of open redirects and url validation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How Open Redirects Are Abused"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding open redirects and url validation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Attackers use open redirects to make phishing links more convincing. A user receiving an email with `https://bank.com/login?redirect=https://evil.com` is more likely to trust it than a link to `evil.com` alone. After the user logs in, the application redirects them to the attacker's site, which may look identical to the real bank and steal credentials. Open redirects also undermine OAuth and SAML flows if the redirect parameter is not strictly validated."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Open redirect",
+            "definition": "A vulnerability where an application redirects to an attacker-controlled URL without validation."
+          },
+          {
+            "term": "Redirect chain",
+            "definition": "A sequence of redirects from one URL to another, often used by attackers to hide the final destination."
+          },
+          {
+            "term": "Domain allowlist",
+            "definition": "A list of approved domains to which the application is permitted to redirect."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable redirect endpoint",
+        "content": "This C# endpoint blindly redirects to whatever URL the client provides.",
+        "code": "app.MapGet(\"/redirect\", (string to) =>\n{\n    // Attacker sends: /redirect?to=https://evil.com/phishing\n    return Results.Redirect(to);\n});",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with open redirects and url validation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Relative paths are usually safe",
+        "text": "Redirecting to a relative path like /dashboard is generally safe because the browser resolves it on the same domain. The danger comes from absolute URLs (https://evil.com) or protocol-relative URLs (//evil.com). Always distinguish between the two."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Safe Redirect Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest redirect pattern is to use a key or relative path instead of a full URL. Store the target destination on the server — for example, as a route value like `/redirect/dashboard` — and look it up in a table. If you must accept a full URL, validate that the hostname is in an explicit allowlist and that the scheme is HTTPS. Reject anything else with a 400 response."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe redirect with domain allowlist",
+        "content": "This endpoint only redirects to explicitly approved domains, or to relative paths.",
+        "code": "static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)\n{\n    \"app.example.com\",\n    \"help.example.com\"\n};\n\napp.MapGet(\"/redirect\", (string to) =>\n{\n    if (string.IsNullOrWhiteSpace(to))\n        return Results.Redirect(\"/dashboard\");\n\n    if (Uri.TryCreate(to, UriKind.Relative, out var relativeUri))\n        return Results.Redirect(relativeUri.ToString());\n\n    if (Uri.TryCreate(to, UriKind.Absolute, out var absoluteUri))\n    {\n        if (absoluteUri.Scheme != \"https\")\n            return Results.BadRequest(\"Only HTTPS is allowed\");\n\n        if (!AllowedHosts.Contains(absoluteUri.Host))\n            return Results.BadRequest(\"Redirect domain not allowed\");\n\n        return Results.Redirect(absoluteUri.ToString());\n    }\n\n    return Results.BadRequest(\"Invalid URL\");\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "OAuth and SAML Redirect Validation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "OAuth 2.0 and OpenID Connect rely heavily on redirect URLs. The authorization server must validate the `redirect_uri` parameter against a pre-registered list of exact URIs — partial matches, wildcards, or substring checks are not safe. The same rule applies to SAML's `AssertionConsumerServiceURL` and any other identity protocol that uses redirects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OAuth redirect_uri validation",
+        "content": "Validate the redirect URI against an exact allowlist, not a prefix or substring.",
+        "code": "static readonly HashSet<string> AllowedRedirectUris = new(StringComparer.Ordinal)\n{\n    \"https://app.example.com/auth/callback\",\n    \"https://admin.example.com/auth/callback\"\n};\n\napp.MapGet(\"/authorize\", (string redirect_uri) =>\n{\n    if (!AllowedRedirectUris.Contains(redirect_uri))\n        return Results.BadRequest(\"Invalid redirect_uri\");\n\n    // Proceed with authorization\n    var code = GenerateAuthorizationCode();\n    return Results.Redirect($\"{redirect_uri}?code={code}\");\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Open redirect prevention checklist",
+        "items": [
+          {
+            "text": "Prefer relative paths or server-side keys for redirects.",
+            "hint": "Eliminate the URL parameter entirely when possible."
+          },
+          {
+            "text": "Use an explicit domain allowlist for any absolute URL redirects.",
+            "hint": "Exact match only; never use substring or prefix checks."
+          },
+          {
+            "text": "Reject protocol-relative URLs (starting with //) and non-HTTPS schemes.",
+            "hint": "Protocol-relative URLs can redirect to any domain using HTTP or HTTPS."
+          },
+          {
+            "text": "Validate redirect_uri in OAuth and SAML against exact registered URIs.",
+            "hint": "A single mismatch can allow token theft in the authorization code flow."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Open redirects make phishing links more convincing by starting on a trusted domain.",
+          "Use relative paths or server-side keys instead of accepting full URLs from clients.",
+          "When absolute URLs are necessary, validate the host against an exact allowlist.",
+          "OAuth and SAML redirect_uri parameters require strict exact-match validation."
+        ],
+        "takeaway": "Redirect with keys, not URLs. If you must accept URLs, whitelist them strictly."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "ssrf-and-server-side-request-validation",
+    "oauth-20-roles-and-flows",
+    "authorization-code-flow-with-pkce"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP Unvalidated Redirects and Forwards",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html",
+      "type": "article"
+    },
+    {
+      "title": "RFC 6819 — OAuth 2.0 Threat Model and Security Considerations (redirect_uri)",
+      "url": "https://datatracker.ietf.org/doc/html/rfc6819#section-4.1.5",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — URL validation in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/localization",
+      "type": "article"
+    }
+  ]
 }

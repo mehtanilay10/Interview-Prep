@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Decide whether a proposed microservice should actually exist",
-  "description": "Problem: Decide whether a proposed microservice should actually exist. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Apply structured criteria to decide whether a proposed Notifications service should be extracted from the monolith, kept as a module, or eliminated entirely.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["microservices", "bounded-context", "team-autonomy", "extraction", "monolith"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Decide whether a proposed microservice should actually exist** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with decide whether a proposed microservice should actually exist."
+        "text": "A team proposes extracting Notifications from the monolith into a standalone microservice. The pitch: 'It scales independently and other teams can use it.' You need to evaluate whether this service should exist, what its boundaries should be, and what the migration cost would be."
       }
     },
     {
@@ -24,13 +24,88 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the fundamental principles of decide whether a proposed microservice should actually exist",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "terms": [
+          { "term": "Bounded Context", "definition": "A DDD boundary where a domain model is consistent and evolves independently." },
+          { "term": "Shared Kernel", "definition": "A small, shared code or model area between bounded contexts that cannot diverge." },
+          { "term": "Strangler Fig Pattern", "definition": "Incrementally replacing parts of a monolith by intercepting requests and routing them to new services." },
+          { "term": "Team Autonomy", "definition": "The ability of a team to change, deploy, and operate a service without coordinating with other teams." },
+          { "term": "Operational Cost", "definition": "The ongoing expense of monitoring, deploying, and debugging a service in production." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Every microservice is a tax",
+        "text": "A microservice adds latency, operational complexity, and deployment coordination. If the service does not reduce team coordination or solve a scaling problem, it is pure overhead dressed up as architecture."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Three Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Extract, modularize, or eliminate",
+        "cards": [
+          {
+            "title": "Extract to Microservice",
+            "description": "Notifications becomes a standalone service with its own database and deployment.",
+            "pros": [
+              "Independent scaling for high-volume notification bursts",
+              "Team can own the full lifecycle without blocking others",
+              "Technology choice can differ from the monolith",
+              "Failure isolation: notification issues do not crash the monolith"
+            ],
+            "cons": [
+              "Distributed data management: user preferences split across services",
+              "Network calls add latency to user-facing flows",
+              "Local development requires running the full mesh",
+              "Schema changes require contract versioning"
+            ],
+            "tags": ["independent", "operationally-expensive"]
+          },
+          {
+            "title": "Keep as Modular Monolith",
+            "description": "Notifications remains an internal module with strict boundaries and a public interface.",
+            "pros": [
+              "No network overhead; in-process calls are fast and reliable",
+              "Single deployment and monitoring surface",
+              "Refactoring across modules is trivial",
+              "No data synchronization problems"
+            ],
+            "cons": [
+              "Cannot scale the notification sender independently of the web app",
+              "Module boundaries degrade without language-enforced isolation",
+              "One team's deploy affects all teams using the monolith",
+              "Technology choice is global"
+            ],
+            "tags": ["simple", "shared-deployment"]
+          },
+          {
+            "title": "Eliminate or Use a Managed Service",
+            "description": "Remove custom notification code and use a SaaS provider (SendGrid, Firebase, OneSignal).",
+            "pros": [
+              "Zero operational burden for delivery infrastructure",
+              "Built-in analytics, templates, and compliance features",
+              "Scales automatically to millions of notifications",
+              "Your team focuses on business logic, not MTA maintenance"
+            ],
+            "cons": [
+              "Vendor lock-in and per-message cost at scale",
+              "Limited customization for complex routing rules",
+              "Data leaves your control for compliance review",
+              "Abstraction leaks: provider-specific errors surface in your app"
+            ],
+            "tags": ["outsourced", "low-maintenance"]
+          }
         ]
       }
     },
@@ -38,24 +113,86 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Decision criteria"
       }
     },
     {
-      "type": "paragraph",
+      "type": "checklist",
       "data": {
-        "text": "Understanding decide whether a proposed microservice should actually exist is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Evaluate the proposed microservice",
+        "items": [
+          { "text": "Does it own its own data with minimal coupling to other services?" },
+          { "text": "Does it have independent scaling requirements (spiky traffic, long-running jobs)?" },
+          { "text": "Is there a dedicated team that would own its lifecycle end-to-end?" },
+          { "text": "Are deployment and monitoring budgets available for another service?" },
+          { "text": "Would a managed SaaS solution eliminate 90 percent of the work?" },
+          { "text": "Does the current monolith module have clear, stable boundaries?" },
+          { "text": "What is the estimated extraction cost in engineering weeks?" }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Modular monolith: Enforced boundaries with C#",
+        "content": "Using internal access and dependency rules to prevent boundary erosion.",
+        "code": "// Notifications module\nnamespace App.Notifications\n{\n    public interface INotificationSender\n    {\n        Task SendAsync(Notification message);\n    }\n\n    internal class SmsSender : INotificationSender { }\n    internal class EmailSender : INotificationSender { }\n}\n\n// Other modules can depend on INotificationSender only.\n// They cannot reference SmsSender or EmailSender directly.",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Microservice extraction: Contract via gRPC",
+        "content": "If extracted, the monolith becomes a client of the notification service.",
+        "code": "syntax = \"proto3\";\npackage notifications;\n\nservice NotificationService {\n  rpc Send(SendRequest) returns (SendResponse);\n}\n\nmessage SendRequest {\n  string userId = 1;\n  string channel = 2;  // email, sms, push\n  string template = 3;\n  map<string, string> variables = 4;\n}\n\nmessage SendResponse {\n  string messageId = 1;\n  SendStatus status = 2;\n}\n\nenum SendStatus { QUEUED = 0; SENT = 1; FAILED = 2; }",
+        "language": "protobuf"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "service-existence",
+        "caption": "Decision tree: should this service exist?",
+        "definition": "graph TD\n    A[Proposed Service] --> B{Independent scaling needed?}\n    B -->|No| C[Keep as module]\n    B -->|Yes| D{Dedicated team?}\n    D -->|No| C\n    D -->|Yes| E{Managed SaaS exists?}\n    E -->|Yes| F[Adopt SaaS]\n    E -->|No| G[Extract microservice]\n    C --> H[Enforce boundaries]\n    F --> I[Low ops cost]\n    G --> J[High ops cost]"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Use a managed service; keep the monolith module",
+        "content": "Notifications do not need independent scaling because they are already async and bounded by third-party provider throughput. A dedicated team does not own them. The correct choice is to keep the Notifications module in the monolith and replace the custom email/SMS implementation with a managed provider. This removes operational burden without creating a new service boundary.",
+        "code": "// Inside the monolith, use a clean provider abstraction\npublic interface INotificationProvider\n{\n    Task SendAsync(NotificationMessage message);\n}\n\npublic class SendGridEmailProvider : INotificationProvider { }\npublic class TwilioSmsProvider : INotificationProvider { }\n\n// The rest of the app depends on INotificationProvider.\n// Swapping providers requires zero boundary changes.",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with decide whether a proposed microservice should actually exist, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "When extraction is justified",
+        "text": "Extract Notifications to a microservice only if a dedicated platform team needs to own delivery infrastructure, you must support custom delivery SLAs per tenant, or you are building a notification-as-a-service product line."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Do not extract a service to solve a team-communication problem.",
+          "Modular monoliths are the default; microservices are an earned complexity.",
+          "Managed services beat custom services when the problem is not your core differentiator."
+        ],
+        "takeaway": "Ask whether the service needs to exist before asking how to build it."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-between-modular-monolith-and-microservices-for-a-new-product",
+    "choose-kubernetes-vs-managed-application-hosting"
+  ],
+  "furtherReading": [
+    { "title": "Microservices: A Definition", "url": "https://martinfowler.com/articles/microservices.html", "type": "article", "author": "Martin Fowler" },
+    { "title": "Don't Build a Microservice", "url": "https://blog.devgenius.io/dont-build-a-microservice-5f86208c6966", "type": "article" }
+  ]
 }

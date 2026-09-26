@@ -4,58 +4,203 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 6: Automated unit and integration tests",
-  "description": "Project: Phase 6: Automated unit and integration tests. Build and understand this project with step-by-step guidance.",
+  "description": "Build a layered test suite using xUnit and Moq for domain and handler unit tests, Respawn + WebApplicationFactory for integration tests, and React Testing Library for frontend component tests. Target 80%+ line coverage on domain and application layers.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "xunit",
+    "testing",
+    "integration-tests",
+    "react-testing-library",
+    "respawn",
+    "testcontainers"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 6: Automated unit and integration tests** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 6: automated unit and integration tests."
+        "text": "Tests are the only safety net you have when refactoring legacy code or upgrading dependencies. In a senior-level project, tests are not an afterthought — they define the observable behavior of the system. This phase establishes the test pyramid: fast unit tests at the base, slower integration tests in the middle, and a handful of critical-path E2E tests at the top."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Test pyramid"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "mermaid",
       "data": {
-        "items": [
-          "Understand the fundamental principles of phase 6: automated unit and integration tests",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
+        "id": "mermaid-test-pyramid",
+        "caption": "Test pyramid: many unit tests, fewer integration tests, fewest E2E tests",
+        "definition": "graph BT\n    E2E[E2E Tests<br/>Playwright, slow, flaky] --> INT[Integration Tests<br/>WebApplicationFactory, moderate]\n    INT --> UNIT[Unit Tests<br/>xUnit + Moq, fast, reliable]\n    style E2E fill:#f9f,stroke:#333\n    style INT fill:#bbf,stroke:#333\n    style UNIT fill:#9f9,stroke:#333"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Domain unit tests"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 6: automated unit and integration tests is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Domain tests have zero infrastructure dependencies. They prove that aggregate invariants hold under all legal and illegal state transitions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: ExpenseReport aggregate unit tests",
+        "content": "Use xUnit theory tests for combinatorial inputs and FluentAssertions for readable assertions.",
+        "language": "csharp",
+        "code": "public class ExpenseReportTests\n{\n    private static ExpenseReport CreateReport(Guid orgId, Guid empId)\n    {\n        return new ExpenseReport(employeeId: empId, organizationId: orgId);\n    }\n\n    [Fact]\n    public void AddLineItem_WhenDraft_ShouldAddItem()\n    {\n        var report = CreateReport(Guid.NewGuid(), Guid.NewGuid());\n        var item = new LineItem(Category: LineItemCategory.Meals, Amount: new Money(25m, \"USD\"), Date: DateOnly.FromDateTime(DateTime.UtcNow));\n\n        report.AddLineItem(item);\n\n        report.LineItems.Should().ContainSingle().Which.Category.Should().Be(LineItemCategory.Meals);\n    }\n\n    [Theory]\n    [InlineData(ReportStatus.Approved)]\n    [InlineData(ReportStatus.Submitted)]\n    [InlineData(ReportStatus.Rejected)]\n    public void AddLineItem_WhenNotDraft_ShouldThrow(ReportStatus status)\n    {\n        var report = CreateReport(Guid.NewGuid(), Guid.NewGuid());\n        report.Submit(new StubPolicyEngine()); // transitions to Submitted\n        if (status == ReportStatus.Approved) report.Approve(Guid.NewGuid());\n        if (status == ReportStatus.Rejected) report.Reject(Guid.NewGuid(), \"reason\");\n\n        var item = new LineItem(LineItemCategory.Meals, new Money(10m, \"USD\"), DateOnly.FromDateTime(DateTime.UtcNow));\n        report.Invoking(r => r.AddLineItem(item))\n            .Should().Throw<DomainException>()\n            .WithMessage(\"*modify a submitted report*\");\n    }\n\n    [Fact]\n    public void Submit_WithNoLineItems_ShouldThrow()\n    {\n        var report = CreateReport(Guid.NewGuid(), Guid.NewGuid());\n        report.Invoking(r => r.Submit(new StubPolicyEngine()))\n            .Should().Throw<DomainException>()\n            .WithMessage(\"*at least one line item*\");\n    }\n\n    [Fact]\n    public void Approve_WhenSubmitted_ShouldEmitDomainEvent()\n    {\n        var report = CreateReport(Guid.NewGuid(), Guid.NewGuid());\n        report.AddLineItem(new LineItem(LineItemCategory.Travel, new Money(100m, \"USD\"), DateOnly.FromDateTime(DateTime.UtcNow)));\n        report.Submit(new StubPolicyEngine());\n        var approver = Guid.NewGuid();\n\n        report.Approve(approver);\n\n        report.Status.Should().Be(ReportStatus.Approved);\n        report.GetUncommittedEvents().Should().ContainSingle().\n            Which.Should().BeOfType<ExpenseReportApproved>();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handler unit tests with Moq"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Mock repository and policy engine interfaces. Verify that handlers call the right domain methods and persist changes via the unit of work."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: SubmitExpenseReportHandler unit test",
+        "content": "Moq creates a fake repository without touching a database.",
+        "language": "csharp",
+        "code": "public class SubmitExpenseReportHandlerTests\n{\n    [Fact]\n    public async Task Handle_WithValidRequest_ShouldReturnReportId()\n    {\n        // Arrange\n        var reports = new Mock<IExpenseReportRepository>();\n        var policy = new Mock<IPolicyEngine>();\n        var uow = new Mock<IUnitOfWork>();\n        var orgId = Guid.NewGuid();\n        var empId = Guid.NewGuid();\n        var savedReport = new ExpenseReport(empId, orgId);\n        reports.Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))\n            .Callback<ExpenseReport, CancellationToken>((r, _) => savedReport = r)\n            .Returns(Task.CompletedTask);\n\n        var handler = new SubmitExpenseReportHandler(reports.Object, policy.Object, uow.Object, NullLogger<SubmitExpenseReportHandler>.Instance);\n        var command = new SubmitExpenseReportCommand(\n            OrganizationId: orgId,\n            EmployeeId: empId,\n            LineItems: [\n                new CreateLineItemDto(LineItemCategory.Meals, new Money(25m, \"USD\"), DateOnly.FromDateTime(DateTime.UtcNow), null, null)\n            ]);\n\n        // Act\n        var result = await handler.Handle(command, CancellationToken.None);\n\n        // Assert\n        result.IsSuccess.Should().BeTrue();\n        result.Value.Should().NotBeEmpty();\n        reports.Verify(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()), Times.Once);\n        uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Integration tests with Respawn"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "WebApplicationFactory spins up the real API in-memory. Respawn resets the database to a clean checkpoint between tests, keeping tests isolated without dropping and recreating the schema each time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Integration test fixture with Respawn checkpoint",
+        "content": "Fixture creates the API host and provides a clean database for each test.",
+        "language": "csharp",
+        "code": "public class IntegrationTestFixture : IAsyncLifetime\n{\n    private readonly WebApplicationFactory<Program> _factory;\n    private readonly Respawner _checkpoint;\n    private readonly string _connectionString;\n\n    public HttpClient Client { get; private set; } = null!;\n\n    public IntegrationTestFixture()\n    {\n        _connectionString = Environment.GetEnvironmentVariable(\"TEST_CONNECTION_STRING\")\n            ?? throw new InvalidOperationException(\"TEST_CONNECTION_STRING is required.\");\n        _factory = new WebApplicationFactory<Program>()\n            .WithWebHostBuilder(b =>\n            {\n                b.ConfigureServices(services =>\n                {\n                    services.RemoveAll<DbContextOptions<ExpenseDbContext>>();\n                    services.AddDbContext<ExpenseDbContext>(opt =>\n                        opt.UseSqlServer(_connectionString));\n                });\n            });\n    }\n\n    public async Task InitializeAsync()\n    {\n        Client = _factory.CreateClient();\n        _checkpoint = await Respawner.CreateAsync(_connectionString, new RespawnerOptions\n        {\n            TablesToIgnore = [\"__EFMigrationsHistory\"],\n            DbAdapter = DbAdapter.SqlServer\n        });\n        await ResetDatabaseAsync();\n    }\n\n    public async Task ResetDatabaseAsync()\n    {\n        await using var conn = new SqlConnection(_connectionString);\n        await conn.OpenAsync();\n        await _checkpoint.ResetAsync(conn);\n    }\n\n    public async Task DisposeAsync() => await _factory.DisposeAsync();\n}\n\n[Collection(\"Integration\")]\npublic class SubmitExpenseReportIntegrationTests : IClassFixture<IntegrationTestFixture>\n{\n    private readonly IntegrationTestFixture _fixture;\n\n    public SubmitExpenseReportIntegrationTests(IntegrationTestFixture fixture)\n    {\n        _fixture = fixture;\n    }\n\n    [Fact]\n    public async Task Submit_WithValidPayload_Returns201WithReportId()\n    {\n        // Arrange: seed org and user, get JWT\n        var org = await _fixture.SeedOrganizationAsync(\"acme\");\n        var token = await _fixture.GetJwtForUserAsync(org.Id, role: \"Employee\");\n        _fixture.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(\"Bearer\", token);\n\n        var payload = new\n        {\n            organizationId = org.Id.ToString(),\n            lineItems = new[]\n            {\n                new { category = \"Meals\", amount = new { amount = 25.00m, currency = \"USD\" }, date = DateOnly.FromDateTime(DateTime.UtcNow).ToString() }\n            }\n        };\n\n        // Act\n        var response = await _fixture.Client.PostAsJsonAsync(\"/api/expense-reports\", payload);\n\n        // Assert\n        response.StatusCode.Should().Be(HttpStatusCode.Created);\n        var body = await response.Content.ReadFromJsonAsync<SubmitResponse>();\n        body.Should().NotBeNull();\n        body!.Id.Should().NotBeEmpty();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frontend component tests"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Testing Library tests assert behavior from the user's perspective: does the button fire a submit call? Does the error banner appear on failure?"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TypeScript: NewExpenseReportForm test",
+        "content": "Mock the API mutation and assert UI state transitions.",
+        "language": "typescript",
+        "code": "// src/features/expense-reports/components/__tests__/NewExpenseReportForm.test.tsx\nimport { render, screen, waitFor } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { QueryClientProvider, QueryClient } from '@tanstack/react-query';\nimport { NewExpenseReportForm } from '../NewExpenseReportForm';\n\nconst createTestQueryClient = () => new QueryClient({\n  defaultOptions: { queries: { retry: false }, mutations: { retry: false } },\n});\n\nconst wrapper = ({ children }: { children: React.ReactNode }) => (\n  <QueryClientProvider client={createTestQueryClient()}>\n    {children}\n  </QueryClientProvider>\n);\n\nglobalThis.alert = vi.fn(); // suppress browser alert in test\n\ndescribe('NewExpenseReportForm', () => {\n  it('submits a report with one line item', async () => {\n    const user = userEvent.setup();\n    render(<NewExpenseReportForm organizationId=\"org-123\" />, { wrapper });\n\n    await user.type(screen.getByPlaceholderText(/amount/i), '42.50');\n    await user.selectOptions(screen.getByRole('combobox', { name: /category/i }), 'Meals');\n    await user.click(screen.getByRole('button', { name: /submit report/i }));\n\n    await waitFor(() => expect(globalThis.alert).toHaveBeenCalledWith('Report submitted successfully!'));\n  });\n\n  it('displays an error when the API fails', async () => {\n    // TODO: mock useSubmitExpenseReport to reject and assert error banner appears.\n  });\n});"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 6: automated unit and integration tests, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use collection fixtures for shared infrastructure",
+        "text": "xUnit Collection fixtures ensure WebApplicationFactory is created once per test class, not once per test method. This keeps integration tests fast enough to run in CI."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 6 deliverables",
+        "items": [
+          {
+            "text": "Domain unit tests cover all aggregate invariants (submit, approve, reject, add line item, duplicate detection)."
+          },
+          {
+            "text": "Handler unit tests use Moq to verify repository and policy interactions."
+          },
+          {
+            "text": "Integration tests prove POST /api/expense-reports returns 201 with the correct shape."
+          },
+          {
+            "text": "Respawn checkpoint resets the database between tests without dropping schema."
+          },
+          {
+            "text": "React Testing Library tests cover form submission, error display, and loading states."
+          },
+          {
+            "text": "CI pipeline runs dotnet test and npm test on every PR."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 6 summary",
+        "points": [
+          "Domain tests are fast and require no infrastructure — cover them first.",
+          "Integration tests prove the full stack works together (EF Core → SQL Server → HTTP → JSON).",
+          "React Testing Library tests assert user-visible behavior, not implementation details.",
+          "CI gate: no PR merges without passing tests."
+        ],
+        "takeaway": "Tests are living documentation. If a new developer can understand the domain by reading the test names, you've written them well."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "xUnit Documentation",
+      "url": "https://xunit.net/",
+      "type": "article"
+    },
+    {
+      "title": "Moq: Mocking Framework",
+      "url": "https://github.com/moq/moq4",
+      "type": "tool"
+    },
+    {
+      "title": "Respawn: Database reset for tests",
+      "url": "https://github.com/jbogard/Respawn",
+      "type": "tool"
+    },
+    {
+      "title": "React Testing Library",
+      "url": "https://testing-library.com/docs/react-testing-library/intro/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft: Integration testing in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

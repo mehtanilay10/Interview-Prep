@@ -3,59 +3,156 @@
   "slug": "thread-pool-starvation",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Thread pool starvation",
-  "description": "Learn about Thread pool starvation. Master the concepts, patterns, and best practices.",
+  "title": "Thread Pool Starvation",
+  "description": "Understand how blocking code and synchronous operations exhaust the .NET thread pool in ASP.NET Core, and learn patterns to prevent thread pool starvation.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Thread pool starvation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with thread pool starvation."
+        "text": "ASP.NET Core runs on a limited number of threads. When too many threads block on I/O—waiting for a database, a file, or `Thread.Sleep`—the thread pool cannot serve new requests. This is **thread pool starvation**, and it causes latency spikes and 503 errors even though the CPU is mostly idle."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of thread pool starvation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How the Thread Pool Works"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding thread pool starvation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The .NET thread pool maintains a minimum number of worker threads and I/O completion port (IOCP) threads. When a thread blocks, the pool eventually adds more threads, but that injection is throttled and takes time. Under sustained load, blocked threads accumulate faster than the pool can replace them, and requests queue."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Worker Thread",
+            "definition": "A thread that executes CPU-bound code in the thread pool."
+          },
+          {
+            "term": "IOCP Thread",
+            "definition": "A thread that processes asynchronous I/O completion callbacks."
+          },
+          {
+            "term": "Thread Pool Starvation",
+            "definition": "A condition where all available threads are blocked or busy, causing new work to wait indefinitely."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Blocking Code That Causes Starvation",
+        "content": "Using `Task.Wait()` or `.Result` inside an ASP.NET Core request blocks a thread for the entire duration of an async operation.",
+        "code": "// BAD: Blocks a thread pool thread for the entire DB call\npublic string GetDataSync()\n{\n    return _dbContext.Orders\n        .Where(o => o.Status == \"Pending\")\n        .ToListAsync()\n        .Result; // Blocks!\n}\n\n// GOOD: Async all the way down\npublic async Task<List<Order>> GetDataAsync()\n{\n    return await _dbContext.Orders\n        .Where(o => o.Status == \"Pending\")\n        .ToListAsync();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configuring Minimum Threads"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If your application must call legacy synchronous libraries, you can raise the thread pool minimum with `ThreadPool.SetMinThreads`. This is a mitigation, not a cure—more threads mean more context switching and memory pressure. The better approach is to remove the blocking calls or run them on a background queue."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Setting Minimum Threads",
+        "content": "Increase the worker and IOCP thread minimums during application startup.",
+        "code": "// Set minimum threads in Program.cs\nThreadPool.SetMinThreads(\n    workerThreads: 100,\n    completionPortThreads: 100);\n\n// Restore default behavior when the app shuts down\nvar originalMin = ThreadPool.GetMinThreads(out var originalMinIOCP);\n// ... later on shutdown ...\nThreadPool.SetMinThreads(originalMin, originalMinIOCP);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Pattern",
+          "Impact on Thread Pool",
+          "Recommended"
+        ],
+        "rows": [
+          [
+            "`Task.Wait()` or `.Result`",
+            "Blocks thread for full I/O duration",
+            "Avoid"
+          ],
+          [
+            "`ConfigureAwait(false)` in libraries",
+            "Prevents deadlock in sync-over-async",
+            "Use in libraries"
+          ],
+          [
+            "`Channel<T>` background queue",
+            "Moves work off request threads",
+            "Recommended for CPU work"
+          ],
+          [
+            "`ThreadPool.SetMinThreads`",
+            "Adds threads proactively",
+            "Use as last resort"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with thread pool starvation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "error",
+        "title": "Deadlocks from sync-over-async",
+        "text": "Calling `.Wait()` on an async method that captures the synchronization context can deadlock the entire app. In ASP.NET Core, use `ConfigureAwait(false)` in libraries, and never block on async code in request handlers."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Thread pool starvation happens when blocking calls hold threads longer than the pool can replace them.",
+          "Prefer async/await all the way down; avoid `.Result`, `.Wait()`, and `GetAwaiter().GetResult()` in request paths.",
+          "Use `ConfigureAwait(false)` in class libraries to prevent synchronization context capture.",
+          "Background queues and `ThreadPool.SetMinThreads` are mitigations, not replacements for correct async code."
+        ],
+        "takeaway": "A blocked thread is a wasted thread. In ASP.NET Core, blocking one thread costs you the entire request latency."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "connection-pool-exhaustion",
+    "slow-api-investigation-workflow",
+    "profiling-cpu-and-allocations"
+  ],
+  "furtherReading": [
+    {
+      "title": "Threading in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/",
+      "type": "article"
+    },
+    {
+      "title": "ASP.NET Core async guidance",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/performance-best-practices#avoid-blocking-calls",
+      "type": "article"
+    },
+    {
+      "title": "Stephen Cleary on async/await",
+      "url": "https://blog.stephencleary.com/2012/07/dont-block-on-async-code.html",
+      "type": "article"
+    }
+  ]
 }

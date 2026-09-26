@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Requirements and real-time communication architecture** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with requirements and real-time communication architecture."
+        "text": "A collaborative communication platform must support real-time messaging, presence, and notification delivery across web and mobile clients. The architecture you design determines whether the product feels responsive or laggy, and whether it remains stable under burst traffic. In this lesson, you will explore the requirements that drive architectural decisions and how real-time transport choices affect latency, throughput, and operational complexity."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of requirements and real-time communication architecture",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Gather functional and non-functional requirements before choosing any transport or database",
+          "Distinguish between real-time guarantees: delivery, ordering, exactly-once, and at-least-once",
+          "Evaluate WebSocket, Server-Sent Events, and long-polling against your actual client base and network conditions",
+          "Model expected scale: concurrent connections, messages per second, and peak burst factors",
+          "Identify failure modes early: network drops, server restarts, message broker outages",
+          "Plan for horizontal scaling from the start; stateless application servers with a shared message bus",
+          "Define SLAs and SLOs for latency, delivery, and uptime before writing any infrastructure code"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Real-time transport",
+            "definition": "A communication channel that delivers messages with low, predictable latency, typically WebSocket, SSE, or gRPC bidirectional streaming."
+          },
+          {
+            "term": "Exactly-once delivery",
+            "definition": "A messaging guarantee where the recipient receives a message exactly one time, even if the sender or network retries."
+          },
+          {
+            "term": "At-least-once delivery",
+            "definition": "A guarantee that the message will be delivered one or more times; the consumer must deduplicate."
+          },
+          {
+            "term": "Connection concurrency",
+            "definition": "The number of simultaneous open connections the server must support, which directly affects memory, CPU, and load balancer configuration."
+          },
+          {
+            "term": "Heartbeat",
+            "definition": "A periodic ping or pong message used to detect dead connections and keep NAT bindings alive."
+          }
         ]
       }
     },
@@ -44,18 +74,121 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding requirements and real-time communication architecture is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Choosing the wrong transport or scaling model early can force a rewrite when traffic grows. A team that skips requirements gathering may build a chat app with WebSocket and discover later that mobile carriers drop idle connections after sixty seconds, breaking presence. Taking the time to understand scale, reliability, and client diversity prevents expensive pivots."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with requirements and real-time communication architecture, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Measure scale before designing",
+        "text": "Do not assume that your architecture must support millions of concurrent users on day one. Start with a realistic estimate: one hundred concurrent users, one message per second per user, and a peak burst factor of three during broadcast events. Design for that target, then document the scaling path when you hit eighty percent of capacity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transport comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Real-time transport options",
+        "cards": [
+          {
+            "title": "WebSocket",
+            "description": "Full-duplex TCP connection over HTTP upgrade.",
+            "pros": ["True bidirectional messaging", "Low per-message overhead", "Broad client support"],
+            "cons": ["Requires explicit reconnection logic", "NAT timeouts on mobile networks", "Load balancer sticky sessions or pub/sub needed"]
+          },
+          {
+            "title": "Server-Sent Events",
+            "description": "Unidirectional server-to-client stream over HTTP.",
+            "pros": ["Works with standard HTTP infrastructure", "Automatic reconnection in browsers", "Simple firewall traversal"],
+            "cons": ["Server-to-client only", "One connection per stream", "No binary framing"]
+          },
+          {
+            "title": "Long-polling",
+            "description": "Client issues request; server holds it open until data is available.",
+            "pros": ["Works in every browser", "No special server requirements", "Simple retry semantics"],
+            "cons": ["High request overhead", "Not truly real-time", "Server threads blocked waiting"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Message delivery semantics"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "At-most-once: fire and forget. Use for non-critical telemetry or ephemeral typing indicators.",
+          "At-least-once: persist before acknowledge. Use for chat messages where loss is unacceptable; the consumer must deduplicate.",
+          "Exactly-once: combine persistence, idempotency keys, and deduplication windows. Use for financial notifications or compliance-critical alerts."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-req-architecture",
+        "caption": "High-level real-time messaging architecture",
+        "definition": "graph TD\n    A[Client WebSocket] --> B[API Gateway / Load Balancer]\n    B --> C[Connection Manager 1]\n    B --> D[Connection Manager 2]\n    C --> E[Message Bus - Redis Pub/Sub]\n    D --> E\n    E --> F[Persistence Service]\n    F --> G[(PostgreSQL / Cassandra)]\n    E --> H[Notification Worker]\n    H --> I[Push Notification Service]\n    J[Admin / Metrics] --> K[Observability Stack]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Write a requirements document",
+        "description": "Draft a one-page requirements document for a collaborative communication platform. Include functional requirements, non-functional requirements, and explicit scale targets.",
+        "steps": [
+          "List five functional requirements: send message, receive message, typing indicator, online presence, notification delivery.",
+          "List five non-functional requirements: p99 latency under two hundred milliseconds, ninety-nine point nine percent uptime, support for ten thousand concurrent WebSocket connections, message retention for thirty days, end-to-end encryption optionality.",
+          "Write scale estimates: daily active users, messages per second, peak burst multiplier, and storage growth per month.",
+          "Identify three failure modes and describe the user-visible impact of each."
+        ],
+        "expectedOutcome": "You should have a document that makes transport and database choices obvious because the requirements leave little ambiguity."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Requirements drive architecture; do not skip this step",
+          "Choose transport based on client diversity, not trend",
+          "Plan for exactly-once or at-least-once semantics explicitly",
+          "Document scale targets and failure modes before coding"
+        ],
+        "takeaway": "A solid requirements phase prevents architectural rewrites later and makes every downstream decision easier to justify."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "websocket-connection-lifecycle",
+    "scaling-real-time-connections"
+  ],
+  "furtherReading": [
+    {
+      "title": "WebSocket vs SSE vs Long-Polling",
+      "url": "https://ably.com/blog/websockets-vs-sse-vs-long-polling",
+      "type": "article",
+      "author": "Ably",
+      "description": "A practical comparison of real-time transport protocols with latency and throughput considerations."
+    }
+  ]
 }

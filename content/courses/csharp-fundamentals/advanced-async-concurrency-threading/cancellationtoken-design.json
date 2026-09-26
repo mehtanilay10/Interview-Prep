@@ -4,58 +4,99 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "CancellationToken design",
-  "description": "Learn about CancellationToken design. Master the concepts, patterns, and best practices.",
+  "description": "Design cooperative cancellation patterns with CancellationToken, linked tokens, and timeout strategies.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**CancellationToken design** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with cancellationtoken design."
+        "text": "Cancellation in .NET is cooperative: the caller signals that work should stop, and the callee checks the signal and exits gracefully. The `CancellationToken` struct is the standard way to pass this signal through your application."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How CancellationToken works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A `CancellationToken` is created from a `CancellationTokenSource`. The source controls when cancellation is requested. The token is passed to methods that should respond to cancellation. Multiple tokens can be linked so that cancellation of any one source cancels the combined token."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic cancellation pattern",
+        "language": "csharp",
+        "code": "public async Task ProcessItemsAsync(IEnumerable<string> items, CancellationToken ct)\n{\n    foreach (var item in items)\n    {\n        ct.ThrowIfCancellationRequested();\n\n        await ProcessItemAsync(item, ct);\n    }\n}\n\n// Usage\nusing var cts = new CancellationTokenSource();\ncts.CancelAfter(TimeSpan.FromSeconds(5));\n\ntry\n{\n    await ProcessItemsAsync(data, cts.Token);\n}\ncatch (OperationCanceledException)\n{\n    Console.WriteLine(\"Processing was cancelled.\");\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Linked tokens and timeouts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You often combine cancellation from multiple sources. A timeout and a user-initiated cancel should both stop the same operation. `CancellationTokenSource.CreateLinkedTokenSource` merges two tokens into one."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Linked tokens: timeout + user cancel",
+        "language": "csharp",
+        "code": "public async Task FetchWithTimeoutAsync(string url, TimeSpan timeout, CancellationToken userCancel)\n{\n    using var timeoutCts = new CancellationTokenSource(timeout);\n    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, userCancel);\n\n    try\n    {\n        using var response = await _httpClient.GetAsync(url, linkedCts.Token);\n        response.EnsureSuccessStatusCode();\n        return await response.Content.ReadAsStringAsync(linkedCts.Token);\n    }\n    catch (OperationCanceledException)\n    {\n        if (timeoutCts.IsCancellationRequested)\n            throw new TimeoutException(\"Request timed out.\");\n\n        throw; // Re-throw user-initiated cancellation\n    }\n}"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of cancellationtoken design",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Always pass `CancellationToken` as the last parameter.",
+          "Check `ThrowIfCancellationRequested()` in loops and before expensive steps.",
+          "Pass the token to I/O APIs (`HttpClient`, `Stream.ReadAsync`, EF Core queries).",
+          "Use linked tokens to combine timeout, user action, and parent cancellation.",
+          "Do not cancel a `CancellationTokenSource` while its token is still in use without disposing it."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding cancellationtoken design is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with cancellationtoken design, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Register callback carefully",
+        "text": "`CancellationToken.Register` runs a callback when cancellation is requested. Avoid capturing variables that could be disposed or mutated unexpectedly. Use `CancellationToken` with `ConfigureAwait(false)` in library code to prevent context capture issues."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Cancellation is cooperative — the callee must check the token.",
+          "Link tokens when combining multiple cancellation sources.",
+          "Distinguish timeout cancellations from user cancellations."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "async-io-vs-cpu-bound-work",
+    "race-conditions-and-thread-safety",
+    "deadlocks-starvation-and-livelocks"
+  ],
+  "furtherReading": [
+    { "title": "Cancellation in managed threads (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/cancellation-in-managed-threads" },
+    { "title": "CancellationTokenSource.CreateLinkedTokenSource (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtokensource.createlinkedtokensource" }
+  ]
 }

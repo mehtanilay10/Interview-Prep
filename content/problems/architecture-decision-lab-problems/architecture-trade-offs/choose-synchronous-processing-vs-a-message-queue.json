@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose synchronous processing vs a message queue",
-  "description": "Problem: Choose synchronous processing vs a message queue. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Decide between immediate synchronous processing and asynchronous message-queue patterns for order fulfillment, considering latency, reliability, and user experience.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["message-queue", "async", "synchronous", "rabbitmq", "resilience", "saga"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose synchronous processing vs a message queue** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose synchronous processing vs a message queue."
+        "text": "Your checkout flow currently processes payment, inventory reservation, and shipping label generation synchronously in a single API call. Under Black Friday traffic, a shipping API timeout causes the entire checkout to fail. Customers abandon their carts. You need to decide whether to add retries and circuit breakers to the sync path, or move fulfillment to a message queue."
       }
     },
     {
@@ -24,13 +24,71 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose synchronous processing and a message queue",
-          "Know when to choose choose synchronous processing over a message queue",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "Message Queue", "definition": "An intermediary that buffers messages between producers and consumers for asynchronous processing." },
+          { "term": "Dead-Letter Queue", "definition": "A queue for messages that could not be processed after multiple retries." },
+          { "term": "Eventual Consistency", "definition": "A consistency model where updates propagate asynchronously; all replicas converge eventually." },
+          { "term": "Circuit Breaker", "definition": "A pattern that stops sending requests to a failing service after a threshold, preventing cascading failure." },
+          { "term": "Saga Pattern", "definition": "A sequence of local transactions with compensating actions to maintain consistency without distributed transactions." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The timeout trap",
+        "text": "Extending timeouts on synchronous calls does not fix the underlying problem. It only makes failures slower to detect and increases the chance of thread pool exhaustion and cascading retries."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Synchronous versus asynchronous processing",
+        "cards": [
+          {
+            "title": "Synchronous with Resilience",
+            "description": "Keep the current flow but add timeouts, retries, and circuit breakers.",
+            "pros": [
+              "User gets immediate confirmation that checkout succeeded",
+              "Simpler code path; no eventual consistency concerns",
+              "Easier to debug with standard request tracing",
+              "No infrastructure addition required"
+            ],
+            "cons": [
+              "Slowest dependency blocks the entire flow",
+              "Retries amplify load on already-struggling services",
+              "User experience degrades under any downstream issue",
+              "Thread and connection pools fill during spikes"
+            ],
+            "tags": ["simple", "latency-sensitive"]
+          },
+          {
+            "title": "Message Queue (Async)",
+            "description": "Decouple checkout from fulfillment using a broker like RabbitMQ or SQS.",
+            "pros": [
+              "Checkout returns immediately; user sees success page",
+              "Broker absorbs traffic spikes with durable buffering",
+              "Failed jobs land in dead-letter queues for manual inspection",
+              "Shipping service can be scaled independently"
+            ],
+            "cons": [
+              "Users must poll or receive webhooks for order status",
+              "Requires idempotency to handle duplicate deliveries",
+              "Operational complexity: brokers, consumers, and DLQs",
+              "End-to-end tracing spans synchronous and async boundaries"
+            ],
+            "tags": ["resilient", "buffered", "eventual"]
+          }
         ]
       }
     },
@@ -38,24 +96,91 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Synchronous approach with Polly"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose synchronous processing vs a message queue is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "C#: Resilient synchronous call with Polly",
+        "content": "Circuit breaker and timeout protect the checkout API from shipping failures.",
+        "code": "var shippingPolicy = Policy\n    .Handle<HttpRequestException>()\n    .OrResult<ShippingLabel>(r => !r.Success)\n    .CircuitBreakerAsync(\n        handledEventsAllowedBeforeBreaking: 5,\n        durationOfBreak: TimeSpan.FromSeconds(30));\n\nvar shippingResult = await shippingPolicy.ExecuteAsync(\n    async () => await _shippingClient.CreateLabelAsync(order));\n\nif (!shippingResult.Success)\n{\n    // Fallback: queue for manual review or async retry\n    await _adminQueue.SendAsync(new ManualFulfillment(order));\n    return Accepted(order.Id);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Asynchronous message flow"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RabbitMQ: Order events published after payment",
+        "content": "Payment succeeds synchronously; fulfillment is asynchronous.",
+        "code": "# Exchange: orders\n# Routing keys: order.created, order.paid, order.shipped\n\nProducer (Checkout API):\n1. Process payment synchronously\n2. Publish OrderPaid event to RabbitMQ\n3. Return 200 to client immediately\n\nConsumer (Fulfillment Worker):\n1. Consume OrderPaid\n2. Reserve inventory\n3. Generate shipping label\n4. Publish OrderShipped event\n5. If step 2 fails -> DLQ after 3 retries",
+        "language": "text"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sync-vs-async",
+        "caption": "Synchronous chain failure versus asynchronous buffering",
+        "definition": "graph TD\n    A[User Checkout] --> B[Payment]\n    B --> C[Inventory]\n    C --> D[Shipping]\n    D --> E{Success?}\n    E -->|No| F[User sees error]\n\n    G[User Checkout] --> H[Payment]\n    H --> I[Return 200]\n    I --> J[Message Queue]\n    J --> K[Inventory Worker]\n    K --> L[Shipping Worker]\n    L --> M{Success?}\n    M -->|No| N[Dead-Letter Queue]"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation criteria",
+        "items": [
+          { "text": "Can users tolerate eventual confirmation of order success?" },
+          { "text": "Are downstream services experiencing cascading timeouts?" },
+          { "text": "Do you have idempotency guarantees on all consumer operations?" },
+          { "text": "Is your team comfortable operating a message broker?" },
+          { "text": "What is the business cost of a failed checkout versus a delayed shipment?" }
+        ]
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Async for fulfillment, sync for payment",
+        "content": "Payment must remain synchronous: the user needs immediate confirmation of charge. Everything after payment—inventory, notifications, shipping—should be asynchronous. This limits the synchronous failure domain to the most critical operation and gives fulfillment workers a durable buffer.",
+        "code": "// Checkout API: synchronous payment, async fulfillment\n[HttpPost]\npublic async Task<IActionResult> Checkout([FromBody] Order order)\n{\n    var payment = await _paymentService.ChargeAsync(order);\n    if (!payment.Succeeded)\n        return BadRequest(new { payment.Status });\n\n    await _eventBus.PublishAsync(new OrderPaidEvent\n    {\n        OrderId = order.Id,\n        Amount = payment.Amount\n    });\n\n    return Accepted(new { order.Id, Status = \"processing\" });\n}\n\n// Client polls /orders/{id} for status updates.",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose synchronous processing vs a message queue, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Idempotency is non-negotiable",
+        "text": "Message brokers guarantee at-least-once delivery. Every consumer must be idempotent: processing the same message twice must produce the same result as processing it once."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Synchronous paths should be as short as possible.",
+          "Use async queues to buffer non-critical downstream work.",
+          "Dead-letter queues are your safety net; monitor them."
+        ],
+        "takeaway": "Accept the payment synchronously. Fulfill everything else asynchronously."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-sql-vs-nosql-for-a-high-write-workload",
+    "choose-orchestration-vs-choreography-for-a-distributed-workflow"
+  ],
+  "furtherReading": [
+    { "title": "Enterprise Integration Patterns", "url": "https://www.enterpriseintegrationpatterns.com/", "type": "book", "author": "Gregor Hohpe" },
+    { "title": "RabbitMQ Tutorials", "url": "https://www.rabbitmq.com/getstarted.html", "type": "article" }
+  ]
 }

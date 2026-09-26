@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an EF Core query that causes N+1 database calls** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an ef core query that causes n+1 database calls."
+        "text": "An EF Core query loads a list of parent entities and then, inside a foreach loop, lazily accesses a navigation property for each one. Each navigation access triggers a separate SQL query. For a list of one hundred orders, the application executes one hundred additional queries—one per order. This is the N+1 query problem. The page loads slowly, the database CPU spikes, and the issue is invisible in local development with small data sets."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an ef core query that causes n+1 database calls",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand lazy loading versus eager loading in Entity Framework Core",
+          "Learn how the N+1 problem emerges from accessing navigation properties inside a loop",
+          "Identify performance symptoms: high database CPU, slow page loads, and query log explosions",
+          "Apply Include, ThenInclude, projection, and split queries to eliminate redundant round trips"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "N+1 query problem",
+            "definition": "A performance issue where one query fetches N parent records, and then N additional queries fetch each child record individually."
+          },
+          {
+            "term": "Lazy loading",
+            "definition": "A pattern where navigation properties are loaded from the database only when accessed, triggering a separate query each time."
+          },
+          {
+            "term": "Eager loading",
+            "definition": "A pattern where related data is loaded in advance using Include, resulting in a single query or a controlled number of queries."
+          },
+          {
+            "term": "Split query",
+            "definition": "An EF Core feature that generates multiple SQL queries for Includes but returns a single result set, avoiding Cartesian explosion."
+          }
         ]
       }
     },
@@ -44,15 +67,188 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an ef core query that causes n+1 database calls is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "N+1 queries are the most common ORM performance bug. They pass unit tests because test data is small. They pass code review because the code looks correct. They only surface in production when the data volume grows. A page that loads fifty orders becomes fifty-one queries. A report that loads ten thousand rows becomes ten thousand and one queries. The database connection pool saturates, and the application times out."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "N+1 scales linearly and badly",
+        "text": "One hundred orders is one hundred extra queries. Ten thousand orders is ten thousand extra queries. The cost is not visible until the data volume crosses a threshold, at which point the application degrades suddenly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic code loads a collection of entities without including their navigation properties. Inside a foreach loop, it accesses each entity's navigation property, which triggers lazy loading. Because lazy loading is enabled, each access fires a separate SQL query. The developer does not see the extra queries because they happen implicitly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "N+1 with lazy loading",
+        "content": "Loading orders and then accessing each customer triggers N+1 queries:",
+        "code": "public async Task<List<OrderDto>> GetRecentOrdersAsync()\n{\n    // Query 1: SELECT * FROM Orders\n    var orders = await _context.Orders\n        .Where(o => o.CreatedAt > DateTime.UtcNow.AddDays(-30))\n        .ToListAsync();\n\n    // Query 2..N+1: SELECT * FROM Customers WHERE Id = @p0\n    var result = new List<OrderDto>();\n    foreach (var order in orders)\n    {\n        result.Add(new OrderDto\n        {\n            Id = order.Id,\n            CustomerName = order.Customer.Name // Lazy load triggers query\n        });\n    }\n\n    return result;\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct approach loads the related data upfront using Include, or projects the result directly into a DTO using Select. If the Include causes a Cartesian explosion because of multiple collections, use AsSplitQuery to generate separate SQL queries that EF Core combines into a single result set."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: eager loading with Include",
+        "content": "Load customers in the same query using Include:",
+        "code": "public async Task<List<OrderDto>> GetRecentOrdersAsync()\n{\n    var orders = await _context.Orders\n        .Include(o => o.Customer)\n        .Where(o => o.CreatedAt > DateTime.UtcNow.AddDays(-30))\n        .ToListAsync();\n\n    // No additional queries: Customer is already loaded\n    return orders.Select(o => new OrderDto\n    {\n        Id = o.Id,\n        CustomerName = o.Customer.Name\n    }).ToList();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: projection with Select",
+        "content": "Project directly into the DTO to load only the data you need:",
+        "code": "public async Task<List<OrderDto>> GetRecentOrdersAsync()\n{\n    return await _context.Orders\n        .Where(o => o.CreatedAt > DateTime.UtcNow.AddDays(-30))\n        .Select(o => new OrderDto\n        {\n            Id = o.Id,\n            CustomerName = o.Customer.Name\n        })\n        .ToListAsync();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Query loading strategies",
+        "cards": [
+          {
+            "title": "Lazy loading",
+            "description": "Access navigation properties and load them on demand.",
+            "pros": ["Simple code", "Loads only what you use"],
+            "cons": ["N+1 queries", "Hard to see in code review", "Surprise performance cost"]
+          },
+          {
+            "title": "Eager loading with Include",
+            "description": "Load related data in the same query.",
+            "pros": ["Single query", "Predictable performance"],
+            "cons": ["Cartesian explosion with multiple collections"]
+          },
+          {
+            "title": "Split query",
+            "description": "Load related data in multiple queries but return a single result set.",
+            "pros": ["Avoids Cartesian explosion", "Still predictable"],
+            "cons": ["Multiple round trips to the database"]
+          },
+          {
+            "title": "Explicit loading",
+            "description": "Call Entry.Reference or Entry.Collection explicitly when needed.",
+            "pros": ["Full control over when data loads", "Good for conditional loading"],
+            "cons": ["Easy to forget", "Still can cause N+1 if used in a loop"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "n1-query-flow",
+        "caption": "N+1 query problem versus eager loading",
+        "definition": "graph LR\n    A[Load Orders] --> B{Access navigation property?}\n    B -->|Lazy load| C[Query 2: Customer for Order 1]\n    B -->|Eager load| D[Single query with JOIN]\n    C --> E[Query 3: Customer for Order 2]\n    E --> F[...]\n    F --> G[Query N+1: Customer for Order N]\n    D --> H[All data in memory]\n    G --> I[N total queries]\n    H --> J[1 total query]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Code Review Checklist"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "What to look for in EF Core queries",
+        "items": [
+          "foreach loops that access navigation properties after loading a list",
+          "ToListAsync or ToArrayAsync followed by property access inside a loop",
+          "Missing Include for navigation properties used in the result",
+          "Multiple collection Includes that may cause Cartesian explosion",
+          "Lazy loading enabled globally without awareness of the N+1 risk"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an ef core query that causes n+1 database calls, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use compiled queries for hot paths",
+        "text": "For queries that run frequently, use EF.CompileQuery to pre-compile the LINQ expression tree. This reduces CPU overhead and is especially valuable for queries inside loops or called on every request."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Is lazy loading always bad?",
+            "answer": "No. Lazy loading is useful for rarely accessed navigation properties or in desktop applications where round-trip cost is low. In server applications processing lists, prefer eager loading or projection."
+          },
+          {
+            "question": "What is Cartesian explosion?",
+            "answer": "When Include loads multiple collection navigations, the SQL joins multiply rows. If an order has 3 items and 2 shipments, the join produces 6 rows per order. Use AsSplitQuery to avoid this."
+          },
+          {
+            "question": "Should I always use projection?",
+            "answer": "Projection is the most efficient because it loads only the columns you need. Use it for read-heavy APIs and DTOs. Use Include when you need full entity tracking for updates."
+          },
+          {
+            "question": "How do I detect N+1 in production?",
+            "answer": "Enable EF Core logging and look for repeated similar queries in a single request. Use MiniProfiler or database query logging to visualize query counts per request."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Eliminate N+1 queries",
+        "description": "Given an API endpoint that loads a list of blog posts and then accesses each author inside a loop, refactor it to use a single query.",
+        "steps": [
+          "Run the existing endpoint and count the queries with logging enabled",
+          "Identify the navigation property access inside the loop",
+          "Refactor to use Include or a projection with Select",
+          "Run the endpoint again and verify the query count drops to one or two",
+          "Add an integration test that asserts the query count stays below a threshold"
+        ],
+        "expectedOutcome": "The endpoint executes one or two queries regardless of the number of posts. The integration test prevents regression."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "N+1 queries are invisible in small data sets and catastrophic in production",
+          "Use Include or Select to load navigation data upfront",
+          "Use AsSplitQuery when multiple collections cause Cartesian explosion",
+          "Count queries per request in integration tests to catch regressions"
+        ],
+        "takeaway": "If you see a query inside a loop, you have an N+1 problem. Fix it before the data grows."
       }
     }
   ],

@@ -4,58 +4,216 @@
   "moduleSlug": "database-infrastructure-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "A service can resolve DNS but cannot connect to its dependency",
-  "description": "Problem: A service can resolve DNS but cannot connect to its dependency. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose a layered connectivity failure where DNS succeeds but TCP fails, tracing through cloud firewalls, VNet routing, and application configuration.",
   "order": 6,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["dns", "networking", "azure", "connectivity", "incident-response", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A service can resolve DNS but cannot connect to its dependency** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a service can resolve dns but cannot connect to its dependency."
+        "text": "The DNS lookup returns an IP address, so name resolution is working. But the TCP handshake never completes. The failure sits somewhere between the resolver and the application port: a firewall rule, a security group, a VNet peering misconfiguration, or a process listening on the wrong interface. DNS success is the first clue that the problem is not in your hosts file—it is in the network path or the target configuration."
       }
     },
     {
       "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
+      "data": { "level": 2, "text": "Key Concepts" }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core concepts",
         "items": [
-          "Understand the fundamental principles of a service can resolve dns but cannot connect to its dependency",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "DNS resolution only proves name-to-IP mapping, not path availability",
+          "TCP three-way handshake (SYN, SYN-ACK, ACK) must complete before application data flows",
+          "Security groups and network ACLs filter traffic at the cloud fabric level, invisible to the application",
+          "Azure Private Endpoints and VNet integration add DNS and routing layers that can misdirect traffic",
+          "A process bound to 127.0.0.1 accepts only local connections, not remote ones"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "TCP Handshake",
+            "definition": "A three-step process (SYN, SYN-ACK, ACK) that establishes a connection before application data is exchanged."
+          },
+          {
+            "term": "Security Group",
+            "definition": "A virtual firewall that controls inbound and outbound traffic for cloud resources such as VMs and databases."
+          },
+          {
+            "term": "Network ACL",
+            "definition": "A stateless firewall at the subnet level that filters traffic based on rules for IP addresses and ports."
+          },
+          {
+            "term": "Private Endpoint",
+            "definition": "An Azure resource that exposes a service via a private IP address within a VNet, bypassing public network exposure."
+          }
         ]
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "Common Causes" }
+    },
+    {
+      "type": "bullet-list",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "items": [
+          "Security group on the dependency does not allow inbound traffic from the service IP range",
+          "Network ACL blocks the ephemeral port range used by the client",
+          "The dependency is listening on a different port than the client expects",
+          "Azure Private Endpoint DNS is resolving to the public IP instead of the private IP",
+          "VNet peering is not configured or is blocking forwarded traffic",
+          "SSL/TLS certificate validation fails after TCP connects"
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "heading",
+      "data": { "level": 2, "text": "Troubleshooting Steps" }
+    },
+    {
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding a service can resolve dns but cannot connect to its dependency is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "From the service host, run Test-NetConnection or nc -zv <dependency-host> <port> to test TCP reachability.",
+          "Run traceroute or mtr to identify where packets are being dropped.",
+          "Check cloud firewall and security group rules on both sides of the connection.",
+          "Verify the dependency process is listening on the expected interface and port (0.0.0.0, not 127.0.0.1).",
+          "Review Azure VNet peering, Private Endpoint DNS, and service endpoint configurations.",
+          "Capture a packet trace with tcpdump or Wireshark to see SYN retransmissions or RST responses."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a service can resolve dns but cannot connect to its dependency, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "DNS is not connectivity",
+        "text": "A successful DNS query only confirms name resolution. It does not validate routing, firewall rules, or application availability. Always test the actual TCP or HTTP path after DNS."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Comparison of Diagnosis Approaches" }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Connection Failure Diagnosis",
+        "cards": [
+          {
+            "title": "Immediate Network Test",
+            "description": "Use telnet, nc, or Test-NetConnection to verify TCP path.",
+            "pros": ["Fast confirmation of layer 4 reachability", "No application changes needed"],
+            "cons": ["Does not test application protocol", "May be blocked by host firewall"]
+          },
+          {
+            "title": "Packet Capture",
+            "description": "Record traffic at the client or network boundary to see SYN, RST, or timeout behavior.",
+            "pros": ["Shows exact failure point", "Useful for firewall or routing issues"],
+            "cons": ["Requires permissions and tooling", "Can be noisy on busy hosts"]
+          },
+          {
+            "title": "Cloud-native Observability",
+            "description": "Use Azure Network Watcher or equivalent to test connectivity from the cloud fabric perspective.",
+            "pros": ["No host access required", "Validates actual cloud path", "Includes NSG and route analysis"],
+            "cons": ["Lag between change and result", "May miss local host firewall issues"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-dns-connect-flow",
+        "caption": "Network path from service to dependency showing failure points",
+        "definition": "graph LR\n    A[Service Pod] --> B[DNS Resolver]\n    B -->|Resolved IP| C[VNet Router]\n    C --> D{NSG Allows?}\n    D -->|No| E[Connection Refused]\n    D -->|Yes| F[Security Group]\n    F -->|Block| G[Timeout]\n    F -->|Allow| H[Dependency Port]\n    H -->|Listening| I[TCP Established]\n    H -->|Closed| J[Connection Refused]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Azure-Specific Checks" }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Verify App Service outbound IPs are included in the SQL server firewall rules.",
+          "Check if Private Endpoint DNS is resolving to the private IP rather than the public IP.",
+          "Confirm VNet integration is on the same VNet or a peered VNet as the database.",
+          "Review Azure Firewall or Azure Policy rules that may block egress.",
+          "Test connectivity using the Kudu console or a sidecar container in the same App Service Plan."
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Could this be a DNS TTL or caching issue?",
+            "answer": "If the IP changed recently, the service may have cached an old address. Flush the DNS cache and retry. However, DNS caching usually does not cause complete connectivity failure."
+          },
+          {
+            "question": "How do I distinguish a firewall block from a service not listening?",
+            "answer": "A firewall block typically returns a timeout. A closed port returns connection refused immediately. Use telnet or nc to observe the exact behavior."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Debug a DNS-resolved but unreachable dependency",
+        "description": "A .NET API running in Azure App Service can resolve sql.azurereview.internal to 10.0.4.12 but cannot open a SqlConnection. Investigate and document the likely cause.",
+        "steps": [
+          "Run a TCP connectivity test from the App Service Kudu console",
+          "Check the SQL server firewall rules for the App Service outbound IPs",
+          "Verify the connection string uses the correct port and authentication mode",
+          "Check VNet peering and Private Endpoint DNS configuration",
+          "Document the root cause and the fix"
+        ],
+        "expectedOutcome": "You should identify whether the failure is a firewall rule, VNet routing, or application configuration issue."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "DNS success does not guarantee TCP or application connectivity",
+          "Test the actual network path with TCP-level tools",
+          "Check cloud firewalls, security groups, and VNet configuration",
+          "Use packet captures or cloud network watchers for hard-to-find issues",
+          "Document the exact failure mode to speed up future incidents"
+        ],
+        "takeaway": "Connectivity debugging requires layered investigation: DNS, routing, firewall, and application. Skipping layers leads to wrong conclusions."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "container-image-deployment-works-locally-but-fails-in-production",
+    "sql-server-cpu-reaches-95-after-a-release"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Network Watcher",
+      "url": "https://learn.microsoft.com/en-us/azure/network-watcher/",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "TCP/IP Troubleshooting",
+      "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/tcpip-troubleshooting",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

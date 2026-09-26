@@ -4,58 +4,200 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Resource limits",
-  "description": "Learn about Resource limits. Master the concepts, patterns, and best practices.",
+  "description": "Set CPU, memory, and PID limits for containers, understand the cgroup model behind Docker resource controls, and prevent noisy-neighbor failures in production.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["docker", "resource-limits", "cgroups", "reliability"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Resource limits** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with resource limits."
+        "text": "Unconstrained containers can consume all available CPU, memory, or process IDs on a host, starving other containers and bringing down shared infrastructure. Resource limits prevent noisy-neighbor failures, protect critical services, and make capacity planning predictable."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of resource limits",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How Docker enforces limits"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding resource limits is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Docker uses Linux control groups, or cgroups, to allocate and limit resources among processes. The two cgroup versions in use today are cgroup v1 and cgroup v2. Docker supports both, but cgroup v2 provides a unified hierarchy and better memory pressure reporting. Most modern distributions run cgroup v2 by default."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with resource limits, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "cgroup version",
+        "text": "Check your cgroup version with `stat -fc %T /sys/fs/cgroup/`. If it returns `cgroup2fs`, you are on cgroup v2. If it returns `tmpfs`, you are on cgroup v1."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Memory limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Memory limits prevent a container from exhausting host RAM. When a container hits its memory limit, the Linux out-of-memory killer terminates processes inside that container. Without a limit, a memory leak can consume all host RAM and crash every container on the node."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Memory limits with docker run",
+        "content": "Set a hard memory limit and a reservation for the container.",
+        "language": "bash",
+        "code": "docker run -d \\\n  --memory=512m \\\n  --memory-reservation=256m \\\n  --name myapp \\\n  myapp:latest"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`--memory` sets the hard limit. `--memory-reservation` sets a soft limit that the kernel attempts to honor under memory pressure. Setting a reservation lower than the hard limit allows the container to burst above the reservation when host memory is available, while protecting the host under pressure."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CPU limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CPU limits are expressed as CPU shares or quotas. CPU shares are relative weights: a container with 1024 shares gets twice as much CPU time as a container with 512 shares when both are contending. CPU quotas set an absolute ceiling on CPU time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CPU limits with docker run",
+        "content": "Limit a container to at most one full CPU core and give it a relative weight of 512.",
+        "language": "bash",
+        "code": "docker run -d \\\n  --cpus=1 \\\n  --cpu-shares=512 \\\n  --name myapp \\\n  myapp:latest"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`--cpus=1` limits the container to one full CPU core. `--cpu-shares` is relative and has no effect unless the host is under CPU pressure. Use `--cpus` for predictable ceilings and `--cpu-shares` to express relative priority when multiple containers share a host."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "PID limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every process consumes a process ID. A fork bomb or a runaway thread pool can exhaust the PID table on the host, making it impossible to start new processes even as root. The `--pids-limit` flag caps the number of processes and threads a container can create."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Setting a PID limit",
+        "content": "Limit a container to 100 processes and threads total.",
+        "language": "bash",
+        "code": "docker run -d \\\n  --pids-limit=100 \\\n  --name myapp \\\n  myapp:latest"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "PID limits can crash misconfigured apps",
+        "text": "Setting `--pids-limit` too low causes application failures when thread pools or worker processes exceed the cap. Start with a generous value and lower it after monitoring the application's actual process count under load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resource limits in Compose"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In Docker Compose, resource limits belong in the `deploy.resources` section. Note that the `deploy` key is ignored by plain `docker-compose` and only respected by `docker compose` (the V2 plugin) and Docker Swarm."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resource limits in Compose",
+        "content": "This Compose snippet sets memory and CPU limits for a web API.",
+        "language": "yaml",
+        "code": "services:\n  api:\n    image: myapp:latest\n    deploy:\n      resources:\n        limits:\n          cpus: '0.5'\n          memory: 256M\n        reservations:\n          cpus: '0.25'\n          memory: 128M"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "OOM kills and detection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a container is killed by the OOM killer, Docker records an OOMKilled status. You can see this with `docker inspect` or `docker ps`. Frequent OOM kills indicate that the memory limit is too low for the workload or that there is a memory leak."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Responding to OOM kills",
+        "items": [
+          "Check container logs for the OOM event and identify the process that was killed",
+          "Increase the memory limit if the workload legitimately needs more RAM",
+          "Investigate memory leaks if the usage is growing over time without a corresponding traffic increase",
+          "Set up alerts on OOMKilled status in your monitoring platform"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Use memory limits to protect the host from container memory exhaustion",
+          "Use CPU limits and shares to prevent CPU contention and ensure fair scheduling",
+          "Use PID limits to prevent fork bombs and runaway process creation",
+          "Configure limits in Compose deploy.resources for Docker Compose V2 and Swarm",
+          "Monitor OOMKilled events and treat them as signals to tune limits or fix leaks"
+        ],
+        "takeaway": "Resource limits are a safety net, not a performance optimization. Set them high enough for normal operation and low enough to protect the host."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["container-health-checks", "container-networking", "image-layers-and-build-cache"],
+  "furtherReading": [
+    {
+      "title": "Docker documentation: Runtime options",
+      "url": "https://docs.docker.com/engine/reference/run/",
+      "type": "article",
+      "author": "Docker"
+    },
+    {
+      "title": "cgroup v2 documentation",
+      "url": "https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html",
+      "type": "article",
+      "author": "Linux Kernel"
+    }
+  ]
 }

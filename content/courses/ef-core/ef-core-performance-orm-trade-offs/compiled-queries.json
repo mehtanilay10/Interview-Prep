@@ -4,58 +4,141 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "Compiled queries",
-  "description": "Learn about Compiled queries. Master the concepts, patterns, and best practices.",
+  "description": "Learn how EF Core compiled queries cache LINQ-to-SQL translation plans to reduce overhead on frequently executed queries.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "compiled queries", "performance", "caching"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Compiled queries** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with compiled queries."
+        "text": "Every time EF Core encounters a new LINQ query shape, it must translate the expression tree into SQL, cache the translation plan, and build a query pipeline. For queries that run thousands of times per second — such as lookups by ID — this translation overhead adds up. Compiled queries let you pre-compile and cache the translation so EF Core skips the planning phase."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is a compiled query?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A compiled query is an `EF.CompileQuery` delegate that wraps a LINQ expression. The first time the delegate runs, EF Core translates the expression into SQL and caches the plan. Subsequent executions with different parameter values reuse the cached plan, saving the translation cost. The speedup is most noticeable on hot paths that execute the same query pattern repeatedly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Defining and using a compiled query",
+        "code": "using var dbContext = new AppDbContext();\n\n// Compile the query once at startup\nstatic readonly Func<AppDbContext, int, Task<Product?>> GetProductById =\n    EF.CompileQuery((AppDbContext ctx, int id) =>\n        ctx.Products.FirstOrDefault(p => p.Id == id));\n\n// Reuse it throughout the application lifetime\nProduct? product = await GetProductById(dbContext, productId);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Compiled queries with async"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core 7+ supports async compiled queries with `EF.CompileAsyncQuery`. These return `Task<T>` results and work with async database providers. Use async compiled queries when your data access is already asynchronous to avoid blocking threads on the execution path."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Async compiled query",
+        "code": "static readonly Func<AppDbContext, int, Task<Product?>> GetProductByIdAsync =\n    EF.CompileAsyncQuery((AppDbContext ctx, int id) =>\n        ctx.Products.FirstOrDefault(p => p.Id == id));\n\nProduct? product = await GetProductByIdAsync(dbContext, productId);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What can be compiled?"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of compiled queries",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Queries that return a single entity or scalar value using FirstOrDefault, SingleOrDefault, or Count.",
+          "Queries that return lists with ToList or ToArray.",
+          "Queries with multiple parameters, as long as the expression shape stays the same.",
+          "Queries that include related data via Include."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Query shape must be static",
+        "text": "Compiled queries cache the expression tree structure. You cannot conditionally add or remove Include, Where, or OrderBy clauses inside a compiled query. If the shape changes, EF Core falls back to normal query execution and logs a warning."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When compiled queries help most"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding compiled queries is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Compiled queries shine in high-throughput scenarios: API endpoints that run the same lookup repeatedly, background services processing messages in a loop, or real-time applications with tight latency budgets. For infrequent or one-off queries, the overhead of compiling is not worth the saved translation time."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with compiled queries, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Compiled query in a background service",
+        "code": "public class OrderProcessor\n{\n    private static readonly Func<AppDbContext, int, Task<Order?>> GetOrderById =\n        EF.CompileAsyncQuery((AppDbContext ctx, int id) =>\n            ctx.Orders\n                .Include(o => o.OrderItems)\n                .FirstOrDefault(o => o.Id == id));\n\n    public async Task ProcessAsync(int orderId)\n    {\n        await using var dbContext = new AppDbContext();\n        Order? order = await GetOrderById(dbContext, orderId);\n\n        if (order == null)\n        {\n            _logger.LogWarning(\"Order {OrderId} not found\", orderId);\n            return;\n        }\n\n        // Process order...\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Limitations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Compiled queries must be defined as static delegates — they cannot capture local variables.",
+          "They are not compatible with all query patterns, such as ExecuteUpdate or ExecuteDelete in EF Core 7+.",
+          "The performance benefit is proportional to how often the same query shape is reused.",
+          "Overusing compiled queries for every query in a large codebase adds maintenance complexity without proportional gains."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Compiled queries cache the LINQ-to-SQL translation plan for repeated reuse.",
+          "Use EF.CompileQuery for synchronous and EF.CompileAsyncQuery for async execution.",
+          "Best suited for hot paths: frequent lookups, background processing, real-time APIs.",
+          "Keep the query shape static — dynamic Include or Where logic breaks compilation."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["linq-expression-trees-and-sql-translation"],
+  "furtherReading": [
+    { "title": "EF Core compiled queries", "url": "https://learn.microsoft.com/en-us/ef/core/performance/compiled-queries", "type": "article" },
+    { "title": "EF Core async compiled queries", "url": "https://learn.microsoft.com/en-us/ef/core/performance/compiled-queries#async-queries", "type": "article" }
+  ]
 }

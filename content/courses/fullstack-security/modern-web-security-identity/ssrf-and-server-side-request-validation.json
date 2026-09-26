@@ -3,59 +3,180 @@
   "slug": "ssrf-and-server-side-request-validation",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "SSRF and server-side request validation",
-  "description": "Learn about SSRF and server-side request validation. Master the concepts, patterns, and best practices.",
+  "title": "SSRF and Server-Side Request Validation",
+  "description": "Learn how Server-Side Request Forgery (SSRF) tricks backend servers into making requests to internal services. Implement URL allowlists in .NET and understand the risks of user-controlled URLs.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "ssrf",
+    "server-side-request",
+    "url-validation",
+    "internal-services",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**SSRF and server-side request validation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with ssrf and server-side request validation."
+        "text": "Server-Side Request Forgery, or SSRF, is a vulnerability where an attacker tricks a server into making a request to an unintended destination. Because the request comes from the server itself, it bypasses firewalls, IP-based restrictions, and authentication that would normally block the attacker. SSRF is especially dangerous in cloud environments where a single server can reach metadata endpoints, internal databases, and other sensitive services."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of ssrf and server-side request validation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How SSRF Happens"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding ssrf and server-side request validation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "SSRF commonly appears in features that fetch URLs provided by users: webhook registrations, PDF generators, link previews, and import tools. If the application passes the user's URL directly to an HTTP client without validation, the attacker can point it at internal addresses like http://169.254.169.254 — the AWS metadata endpoint — or at internal APIs running on private IP ranges."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SSRF",
+            "definition": "An attack where the server is tricked into sending an HTTP request to an attacker-controlled or internal destination."
+          },
+          {
+            "term": "Cloud metadata endpoint",
+            "definition": "A special IP address (169.254.169.254) that provides cloud instance credentials and configuration to running servers."
+          },
+          {
+            "term": "URL allowlist",
+            "definition": "A list of approved domains or patterns that a server is permitted to request, blocking everything else."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable webhook registration",
+        "content": "This C# API accepts a user-provided callback URL and makes a server-side request to validate it, without checking where the request goes.",
+        "code": "app.MapPost(\"/api/webhooks\", async (string callbackUrl, HttpClient http) =>\n{\n    // Validating by making a request — but to where?\n    var response = await http.GetAsync(callbackUrl);\n    if (response.IsSuccessStatusCode)\n        return Results.Ok(new { status = \"verified\" });\n\n    return Results.BadRequest(\"Could not reach URL\");\n});",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with ssrf and server-side request validation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Cloud metadata is the crown jewel",
+        "text": "In AWS, GCP, and Azure, the metadata endpoint at 169.254.169.254 returns IAM credentials, database passwords, and encryption keys. An SSRF that reaches this endpoint can give an attacker full cloud account access in seconds."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Defending Against SSRF"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest approach is to avoid server-side requests to user-supplied URLs entirely. If you must fetch external URLs, use an explicit allowlist of approved domains. If your application runs in the cloud, ensure the IMDS (Instance Metadata Service) is disabled or restricted at the infrastructure level. Also validate that the resolved IP address is not a private or link-local address before sending the request."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "URL validation with domain allowlist",
+        "content": "This C# example parses the user-provided URL and checks that the hostname is in an explicit allowlist before making any request.",
+        "code": "static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)\n{\n    \"hooks.example.com\",\n    \"webhooks.trusted-partner.com\"\n};\n\napp.MapPost(\"/api/webhooks\", async (string callbackUrl, HttpClient http) =>\n{\n    if (!Uri.TryCreate(callbackUrl, UriKind.Absolute, out var uri))\n        return Results.BadRequest(\"Invalid URL\");\n\n    if (uri.Scheme != \"https\")\n        return Results.BadRequest(\"Only HTTPS URLs are allowed\");\n\n    if (!AllowedHosts.Contains(uri.Host))\n        return Results.BadRequest(\"Domain not allowed\");\n\n    var response = await http.GetAsync(uri);\n    return response.IsSuccessStatusCode\n        ? Results.Ok(new { status = \"verified\" })\n        : Results.BadRequest(\"Could not reach URL\");\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JavaScript and SSRF"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Client-side JavaScript cannot reach internal IP addresses directly because the browser's Same Origin Policy blocks it. However, if your frontend sends the user-provided URL to your backend API (which then fetches it), the SSRF risk moves to the backend. Always validate and restrict URLs on the server, never trust the frontend to filter them."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Frontend submission with server-side validation",
+        "content": "The React form sends the URL to the backend. The backend is responsible for all validation.",
+        "code": "async function registerWebhook(url) {\n  const response = await fetch('/api/webhooks', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ callbackUrl: url })\n  });\n\n  const result = await response.json();\n  if (!response.ok) {\n    alert(result); // \"Domain not allowed\"\n  }\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "SSRF prevention checklist",
+        "items": [
+          {
+            "text": "Avoid server-side requests to user-supplied URLs whenever possible.",
+            "hint": "If you need link previews, use a dedicated, isolated service with strict egress controls."
+          },
+          {
+            "text": "Use an explicit domain allowlist for any required URL fetching.",
+            "hint": "Never rely on blocklists — attackers can use IP addresses, DNS rebinding, or URL encoding tricks."
+          },
+          {
+            "text": "Resolve DNS and check the IP address before making the request.",
+            "hint": "Block private, link-local, and metadata IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x)."
+          },
+          {
+            "text": "Disable cloud IMDS access at the infrastructure level.",
+            "hint": "AWS IMDSv2, GCP metadata server restrictions, and Azure IMDS policies provide defense-in-depth."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "SSRF tricks backend servers into requesting internal or attacker-controlled destinations.",
+          "Cloud metadata endpoints contain credentials that give attackers full account access.",
+          "Always validate user-provided URLs with an explicit domain allowlist on the server.",
+          "Block private and metadata IP ranges, and use infrastructure-level protections as an extra layer."
+        ],
+        "takeaway": "Never let user input decide where your server sends an HTTP request."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "open-redirects-and-url-validation",
+    "path-traversal-and-file-upload-security",
+    "csp-and-browser-security-headers"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP Server-Side Request Forgery",
+      "url": "https://owasp.org/www-community/attacks/Server_Side_Request_Forgery",
+      "type": "article"
+    },
+    {
+      "title": "PortSwigger — SSRF",
+      "url": "https://portswigger.net/web-security/ssrf",
+      "type": "article"
+    },
+    {
+      "title": "AWS — IMDSv2 best practices",
+      "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html",
+      "type": "article"
+    }
+  ]
 }

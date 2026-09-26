@@ -4,33 +4,41 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Managed heap and allocation lifecycle",
-  "description": "Learn about Managed heap and allocation lifecycle. Master the concepts, patterns, and best practices.",
+  "description": "Understand how .NET allocates objects on the managed heap, how generations organize memory, and what happens during garbage collection.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["heap", "GC", "allocation", "generations", "managed-heap"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Managed heap and allocation lifecycle** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with managed heap and allocation lifecycle."
+        "text": "In unmanaged languages like C and C++, you allocate memory with `malloc` or `new` and free it with `free` or `delete`. If you forget to free memory, it leaks. In C#, the garbage collector handles memory reclamation automatically. You create objects with `new`, and the runtime decides when and how to reclaim them. This does not mean .NET programs never run out of memory — it means you do not manage individual object lifetimes manually. Understanding the managed heap helps you write code that keeps the GC efficient and your application responsive."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The managed heap is a contiguous region of virtual memory reserved for .NET objects. When you allocate an object, the runtime bumps a pointer called the `nextObjPtr` to reserve space. If there is enough free space, the allocation completes in a few CPU cycles — no searching, no splitting, no locking. This is why .NET allocations are extremely fast when the heap is healthy. Problems arise when the heap becomes fragmented or when the GC has to stop the world to clean up."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How allocation works on the managed heap"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of managed heap and allocation lifecycle",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Your code calls `new SomeClass()`.",
+          "The runtime calculates the object's size: its fields plus an object header (sync block index + type pointer).",
+          "If the current generation 0 segment has enough room, the runtime bumps `nextObjPtr` and returns the address.",
+          "If generation 0 is full, the runtime triggers a garbage collection to free space.",
+          "After collection, if space is still insufficient, the heap grows by reserving a new segment from the OS.",
+          "The new object is allocated and a reference is returned to your code."
         ]
       }
     },
@@ -38,24 +46,89 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The object header and type pointer"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding managed heap and allocation lifecycle is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Every object on the managed heap carries a two-word header, regardless of its declared fields. The first word is the sync block index, used by the runtime for locking, hash codes, and COM interop. The second word is the method table pointer — a reference to the type's metadata that describes its methods, fields, and base types. This header is invisible to your code, but it means a reference type instance with no fields still consumes 16 bytes on a 64-bit process: 8 bytes for the header and 8 bytes for the reference itself."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting object size with the runtime",
+        "code": "using System;\nusing System.Runtime.InteropServices;\n\nConsole.WriteLine($\"IntPtr size: {IntPtr.Size * 8} bits\");\n\n// Approximate object overhead:\n// 8 bytes object header (sync block + method table)\n// + field sizes\n// + alignment padding\n\n// A class with no fields still has overhead\nEmptyClass obj = new EmptyClass();\nConsole.WriteLine(\n    $\"Allocated {GC.GetAllocatedBytesForCurrentThread()} bytes\");\n\nclass EmptyClass { }",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Value types vs reference types on the heap"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Value types — `struct`, `int`, `bool`, `enum` — live where they are declared. A local variable of a value type lives on the stack. A value type field inside a class lives inside that class's heap allocation. When you pass a value type to a method expecting `object`, the runtime boxes it: it allocates a new object on the heap, copies the value inside, and stores a type pointer. Boxing allocates; unboxing does not. Avoiding unnecessary boxing is one of the simplest ways to reduce GC pressure in performance-sensitive code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Boxing in a generic-constrained method",
+        "code": "static void PrintValue(object value)\n{\n    // 'value' is boxed if a value type is passed.\n    // The GC will need to collect this allocation later.\n    Console.WriteLine(value);\n}\n\n// This allocates:\nPrintValue(42);          // boxes int → heap allocation\n\n// This does not:\nstatic void PrintValue<T>(T value)\n{\n    // No boxing — T remains a value type at runtime\n    Console.WriteLine(value);\n}\nPrintValue(42);          // no allocation",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with managed heap and allocation lifecycle, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Allocations are cheap when the GC is healthy",
+        "text": "Short-lived objects in generation 0 are reclaimed in microseconds during background GC. Do not avoid allocations reflexively. The real cost is not the allocation — it is promoting objects to generation 1 or 2, which makes them survive longer and increases GC pause times. Profile with `dotnet-counters` or PerfView before optimizing allocation patterns."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "managed-heap-segments",
+        "code": "flowchart LR\n    A[\"new Object()\"] --> B{\"Gen 0 has room?\"}\n    B -->|Yes| C[\"Allocate at nextObjPtr\n(Gen 0 segment)\"]\n    B -->|No| D[\"Trigger Gen 0 GC\"]\n    D --> E{\"Space freed?\"}\n    E -->|Yes| C\n    E -->|No| F[\"Grow heap\n(new segment from OS)\"]\n    F --> C\n\n    style A fill:#2563eb,color:#fff\n    style C fill:#16a34a,color:#fff\n    style D fill:#f59e0b,color:#fff",
+        "caption": "The allocation path: if generation 0 has room, allocation is near-instant. If not, the GC reclaims space or the heap grows."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Every .NET object has an 8-byte header (sync block index + method table pointer) plus field data.",
+          "Allocations on the managed heap are extremely fast when generation 0 has free space.",
+          "Value types avoid heap allocation until they are boxed by casting to `object` or an interface.",
+          "Gen 0 GC pauses are measured in microseconds; the real cost is promoting objects to older generations."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["gc-generations-and-collection-behavior", "large-object-heap-and-pinned-objects", "boxing-and-hidden-allocations"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Garbage collection fundamentals",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals"
+    },
+    {
+      "type": "article",
+      "title": "GC.GetAllocatedBytesForCurrentThread",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.gc.getallocatedbytesforcurrentthread"
+    },
+    {
+      "type": "article",
+      "title": "CLR via C# — Memory management",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/clr"
+    }
+  ]
 }

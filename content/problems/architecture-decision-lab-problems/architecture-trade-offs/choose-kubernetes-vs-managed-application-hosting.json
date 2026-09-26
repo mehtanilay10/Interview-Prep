@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose Kubernetes vs managed application hosting",
-  "description": "Problem: Choose Kubernetes vs managed application hosting. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Evaluate whether to adopt Kubernetes or use a managed platform like AWS ECS, Azure App Service, or Google Cloud Run for a greenfield SaaS product.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["kubernetes", "managed-services", "devops", "cloud", "ecs", "app-service"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose Kubernetes vs managed application hosting** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose kubernetes vs managed application hosting."
+        "text": "Your team is deploying a new SaaS platform. The CTO wants you to choose between a managed container platform (AWS ECS, Azure App Service) and self-managed Kubernetes. The team has one DevOps engineer and five backend developers. The product needs blue/green deployments, autoscaling, and multi-region failover within the next year."
       }
     },
     {
@@ -24,13 +24,70 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose kubernetes and managed application hosting",
-          "Know when to choose choose kubernetes over managed application hosting",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "Kubernetes", "definition": "An open-source container orchestration platform for automating deployment, scaling, and management of containerized applications." },
+          { "term": "Managed Service", "definition": "A cloud provider platform that abstracts infrastructure operations (ECS, App Service, Cloud Run)." },
+          { "term": "Control Plane", "definition": "The Kubernetes component that manages the cluster state, scheduling, and API server." },
+          { "term": "Blue/Green Deployment", "definition": "A release strategy that keeps the old version running while the new version is validated, then switches traffic." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Kubernetes is not free",
+        "text": "Kubernetes reduces infrastructure flexibility in exchange for operational control. You must manage etcd backups, certificate rotation, node pool upgrades, and network policies. A managed service absorbs these costs for a premium."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Kubernetes versus managed application hosting",
+        "cards": [
+          {
+            "title": "Managed Platform (ECS / App Service)",
+            "description": "Cloud provider manages the control plane; you define tasks or applications.",
+            "pros": [
+              "No control plane to patch, backup, or upgrade",
+              "Built-in load balancing and rolling deployments",
+              "Lower operational overhead for small teams",
+              "Tighter integration with provider IAM, monitoring, and secrets"
+            ],
+            "cons": [
+              "Vendor lock-in to proprietary APIs and configuration formats",
+              "Less flexibility in networking, ingress, and custom operators",
+              "Scaling costs can be unpredictable with managed components",
+              "Debugging platform issues requires support tickets"
+            ],
+            "tags": ["low-ops", "vendor-managed"]
+          },
+          {
+            "title": "Self-Managed Kubernetes",
+            "description": "Full control over cluster configuration, networking, and scheduling.",
+            "pros": [
+              "Portable across clouds and on-premises",
+              "Rich ecosystem of operators, ingress controllers, and service meshes",
+              "Fine-grained control over scheduling, affinity, and resource limits",
+              "Standardized interface for diverse workloads"
+            ],
+            "cons": [
+              "High operational burden: etcd, API server, node management",
+              "Steep learning curve for developers without platform experience",
+              "Security surface area is large; misconfiguration is common",
+              "Upgrades are manual and potentially disruptive"
+            ],
+            "tags": ["flexible", "high-ops"]
+          }
         ]
       }
     },
@@ -38,24 +95,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Deployment manifest"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose kubernetes vs managed application hosting is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Kubernetes: Rolling update with resource limits",
+        "content": "A deployment manifest expressing desired state.",
+        "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: checkout-api\nspec:\n  replicas: 3\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxUnavailable: 1\n      maxSurge: 1\n  selector:\n    matchLabels:\n      app: checkout-api\n  template:\n    metadata:\n      labels:\n        app: checkout-api\n    spec:\n      containers:\n        - name: checkout-api\n          image: checkout-api:v2.3.1\n          ports:\n            - containerPort: 8080\n          resources:\n            requests: { cpu: \"250m\", memory: \"256Mi\" }\n            limits:   { cpu: \"500m\", memory: \"512Mi\" }\n          livenessProbe:\n            httpGet: { path: /health, port: 8080 }\n          readinessProbe:\n            httpGet: { path: /ready, port: 8080 }",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ECS: Task definition for the same workload",
+        "content": "Equivalent in ECS using Fargate for managed compute.",
+        "code": "{\n  \"family\": \"checkout-api\",\n  \"networkMode\": \"awsvpc\",\n  \"requiresCompatibilities\": [\"FARGATE\"],\n  \"cpu\": \"512\",\n  \"memory\": \"1024\",\n  \"containerDefinitions\": [\n    {\n      \"name\": \"checkout-api\",\n      \"image\": \"checkout-api:v2.3.1\",\n      \"portMappings\": [{ \"containerPort\": 8080 }],\n      \"healthCheck\": {\n        \"command\": [\"CMD-SHELL\", \"curl -f http://localhost:8080/health\"],\n        \"interval\": 30,\n        \"timeout\": 5,\n        \"retries\": 3\n      }\n    }\n  ]\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Decision checklist",
+        "items": [
+          { "text": "Does your team have someone with Kubernetes Day 2 operations experience?" },
+          { "text": "Are your workloads stateful, requiring persistent volumes and operators?" },
+          { "text": "Do you need to run on multiple clouds or on-premises?" },
+          { "text": "Is cost predictability more important than infrastructure flexibility?" },
+          { "text": "Will your team size grow enough to justify a dedicated platform team?" }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "k8s-vs-managed",
+        "caption": "Operational effort increases with platform responsibility",
+        "definition": "graph LR\n    A[Managed Service] -->|Low control| B[Low ops burden]\n    C[Self-Managed K8s] -->|High control| D[High ops burden]\n    B --> E[Small team: 1-5 engineers]\n    D --> F[Platform team: 10+ engineers]\n    E --> G[Faster time to market]\n    F --> H[Long-term flexibility]"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Managed platform now, Kubernetes later",
+        "content": "Start with a managed platform. Your team needs to ship product, not manage etcd clusters. Design your application with the Twelve-Factor App methodology so the migration to Kubernetes later is a configuration change, not an architecture rewrite.",
+        "code": "// Twelve-Factor App: stateless, config from env, logs to stdout\n// Works identically on ECS, App Service, or Kubernetes\n\npublic class Program\n{\n    public static void Main(string[] args)\n    {\n        var builder = WebApplication.CreateBuilder(args);\n        builder.Services.AddHealthChecks();\n        builder.Services.AddControllers();\n        var app = builder.Build();\n        app.MapHealthChecks(\"/health\");\n        app.MapControllers();\n        app.Run();\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose kubernetes vs managed application hosting, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Migration path",
+        "text": "Containerize everything from day one. Use Docker Compose locally. When you outgrow the managed platform, your Docker images and environment-based configuration make the Kubernetes migration straightforward."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Managed platforms are optimal until team size or compliance requirements force self-management.",
+          "Container-first design keeps migration options open.",
+          "Kubernetes complexity is a team problem, not just an infrastructure problem."
+        ],
+        "takeaway": "Start managed, stay portable, graduate to Kubernetes when you have the team to operate it."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-synchronous-processing-vs-a-message-queue",
+    "decide-whether-a-proposed-microservice-should-actually-exist"
+  ],
+  "furtherReading": [
+    { "title": "Kubernetes vs ECS", "url": "https://aws.amazon.com/compare/the-distance-between-kubernetes-and-ecs/", "type": "article" },
+    { "title": "Twelve-Factor App", "url": "https://12factor.net/", "type": "article" }
+  ]
 }

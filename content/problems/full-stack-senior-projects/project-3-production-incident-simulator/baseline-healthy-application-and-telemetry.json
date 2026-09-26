@@ -8,29 +8,58 @@
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["observability", "telemetry", "health-checks", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Baseline healthy application and telemetry** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with baseline healthy application and telemetry."
+        "text": "Before you can detect incidents, you need to know what healthy looks like. This lesson establishes a baseline for the application: golden-signal metrics, structured logging, distributed tracing, and synthetic health checks. A well-instrumented baseline makes every later incident investigation faster because you can answer 'is this new?' in seconds instead of hours."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What a healthy baseline includes"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of baseline healthy application and telemetry",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Golden signals collected per service: request rate, error rate, request duration, and saturation",
+          "Structured JSON logs with severity, service name, trace ID, and user context on every request",
+          "Distributed traces that cross API, database, and cache boundaries with consistent sampling",
+          "Synthetic health-check endpoints verified every ten seconds from outside the cluster",
+          "Alerting thresholds derived from SLOs, not arbitrary numbers, with runbook links attached",
+          "Dashboard panels that a new team member can read without asking for definitions"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Golden signals",
+            "definition": "The four key metrics Google recommends for monitoring any service: traffic, errors, latency, and saturation."
+          },
+          {
+            "term": "SLO",
+            "definition": "Service Level Objective: a target reliability threshold, such as 99.9% successful requests over a rolling 30-day window."
+          },
+          {
+            "term": "Error budget",
+            "definition": "The allowable number of failures before an SLO is breached; consumed by real incidents and refreshed on a fixed window."
+          },
+          {
+            "term": "Structured logging",
+            "definition": "Logs emitted as JSON objects with typed fields rather than free-form strings, enabling reliable filtering and correlation."
+          },
+          {
+            "term": "Sampling",
+            "definition": "The practice of recording a fraction of traces to keep storage and compute costs manageable while preserving statistical significance."
+          }
         ]
       }
     },
@@ -38,24 +67,169 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Instrumentation checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Baseline instrumentation checklist",
+        "items": [
+          {
+            "text": "Every HTTP endpoint emits a duration metric labeled by route and status code",
+            "hint": "Use middleware or an AOT filter so instrumentation is unavoidable."
+          },
+          {
+            "text": "Every log line includes timestamp, severity, service, trace ID, and span ID",
+            "hint": "Add a scoped logger that enriches context automatically."
+          },
+          {
+            "text": "Database queries are wrapped with timing and connection-count metrics",
+            "hint": "EF Core interceptors and ADO.NET event listeners can emit these without touching business logic."
+          },
+          {
+            "text": "Health-check endpoints verify downstream dependencies, not just process uptime",
+            "hint": "A check that returns 200 OK with a dead Redis instance is a false negative."
+          },
+          {
+            "text": "SLOs are documented in a runbook with breach procedures and escalation paths",
+            "hint": "Runbooks reduce mean time to recovery by removing decision fatigue."
+          }
+        ]
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding baseline healthy application and telemetry is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "When you add instrumentation, instrument the critical path first. A payment API benefits more from a latency histogram than a marketing landing page. Start with the endpoints that directly affect revenue or safety, then expand outward. Also instrument failure paths. A system that only measures successes hides slow failures until users complain."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Middleware that emits latency and error metrics",
+        "content": "AspNetCore middleware can record per-endpoint golden signals without changing controller code:",
+        "code": "public class TelemetryMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly IMeter _meter;\n    private readonly Histogram<double> _latency;\n\n    public TelemetryMiddleware(RequestDelegate next, IMeterFactory factory)\n    {\n        _next = next;\n        _meter = factory.Create(\"app.http\");\n        _latency = _meter.CreateHistogram<double>(\"request.duration\",\n            unit: \"ms\");\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var sw = Stopwatch.StartNew();\n        try\n        {\n            await _next(context);\n            _latency.Record(sw.Elapsed.TotalMilliseconds,\n                new KeyValuePair<string, object?>\n                    (\"route\", context.GetEndpoint()?.DisplayName),\n                new KeyValuePair<string, object?>\n                    (\"status\", context.Response.StatusCode));\n        }\n        catch (Exception ex)\n        {\n            _meter.CreateCounter<int>(\"request.errors\").Add(1);\n            throw;\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-baseline-telemetry",
+        "caption": "Telemetry pipeline from application to observability backend",
+        "definition": "graph LR\n    A[App Request] --> B[Metrics Collector]\n    A --> C[Structured Logger]\n    A --> D[Tracer]\n    B --> E[Prometheus / Metrics DB]\n    C --> F[Log Aggregator]\n    D --> G[Tracing Backend]\n    E --> H[Dashboard]\n    F --> H\n    G --> H\n    H --> I[Alert Manager]\n    I --> J[On-call Engineer]"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Observability backends and their trade-offs",
+        "cards": [
+          {
+            "title": "Prometheus + Grafana",
+            "description": "Open-source pull-based metrics with a powerful dashboarding ecosystem.",
+            "pros": ["Self-hosted, no per-series cost", "Huge community and pre-built dashboards", "Works well with Kubernetes"],
+            "cons": ["Cardinality limits require careful label design", "Long-term storage is expensive without Thanos"]
+          },
+          {
+            "title": "Datadog",
+            "description": "Hosted SaaS platform combining metrics, logs, traces, and synthetics.",
+            "pros": ["Fast time-to-value", "Built-in anomaly detection and correlation", "Unified search across signals"],
+            "cons": ["Cost grows with volume and retention", "Vendor lock-in for custom queries"]
+          },
+          {
+            "title": "OpenTelemetry collector",
+            "description": "Vendor-neutral pipeline that receives, processes, and exports telemetry data.",
+            "pros": ["Avoids vendor lock-in", "Single instrumentation layer for all backends", "Supports metrics, logs, and traces"],
+            "cons": ["Operational overhead to self-host", "Still maturing in the logs space"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with baseline healthy application and telemetry, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid vanity metrics",
+        "text": "Do not instrument what is easy to instrument. Instrument what helps you decide. A dashboard with 200 panels that no one reads is worse than three panels the on-call engineer consults during an incident. Audit dashboards quarterly and remove panels that have not been viewed in thirty days."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "How many metrics should I collect per service?",
+            "answer": "Start with the four golden signals plus saturation for each dependency. Add metrics only when you have a specific decision to make. More metrics mean more storage, more dashboard noise, and more alert fatigue."
+          },
+          {
+            "question": "Should I log every request or sample them?",
+            "answer": "Log every request at a structured level if you have the storage budget. If volume is high, emit full logs for errors and sampled traces for successful requests, and keep the sampling rate tied to your error budget."
+          },
+          {
+            "question": "Who owns the telemetry pipeline?",
+            "answer": "The platform or SRE team owns the pipeline and infrastructure, but each service team owns the instrumentation code inside their service. Shared ownership of dashboards without clear ownership of the underlying metrics leads to stale alerts."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design a telemetry baseline",
+        "description": "Pick a service you know well. List the golden signals you would instrument, the log fields you would add, and the three alerts you would create first. Explain why each metric matters and what decision it enables.",
+        "steps": [
+          "Draw the service and its dependencies",
+          "Assign one metric to each dependency boundary",
+          "Define alert thresholds using SLO math, not guesswork",
+          "Write a one-paragraph runbook for each alert"
+        ],
+        "expectedOutcome": "You should produce a prioritized instrumentation plan that a team could implement in one sprint, with clear owners and success criteria."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Baseline instrumentation turns 'something feels off' into 'error rate spiked 3x in 2 minutes'",
+          "Golden signals give you a universal vocabulary across services",
+          "Structured logs with trace IDs connect metrics to traces to logs",
+          "Alert on decisions, not on numbers; every alert needs a runbook",
+          "Regularly audit and prune dashboards to prevent noise"
+        ],
+        "takeaway": "A senior engineer treats observability as a feature, not an afterthought. The time spent on baseline instrumentation pays back every time an incident occurs."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "introduce-database-performance-regression",
+    "introduce-memory-leak",
+    "investigate-using-logs-metrics-and-traces",
+    "write-a-root-cause-analysis-and-remediation-plan"
+  ],
+  "furtherReading": [
+    {
+      "title": "The Four Golden Signals",
+      "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+      "type": "article",
+      "author": "Google SRE",
+      "description": "Chapter 6 of the SRE book explains why traffic, errors, latency, and saturation are the four metrics you always need."
+    },
+    {
+      "title": "OpenTelemetry Documentation",
+      "url": "https://opentelemetry.io/docs/",
+      "type": "tool",
+      "author": "OpenTelemetry Community",
+      "description": "Vendor-neutral instrumentation framework for metrics, logs, and traces."
+    }
+  ]
 }

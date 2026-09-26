@@ -4,33 +4,46 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Environment promotion",
-  "description": "Learn about Environment promotion. Master the concepts, patterns, and best practices.",
+  "description": "Promote the same immutable artifact through development, staging, and production environments without rebuilding.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "CI/CD",
+    "environments",
+    "promotion",
+    "staging"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Environment promotion** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with environment promotion."
+        "text": "Environment promotion is the practice of moving an already-built artifact through a series of environments: development, test, staging, and production. The artifact never changes during promotion. Only configuration, such as connection strings and feature flags, changes between environments. This separation is what makes rollback safe and audits possible."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Teams that rebuild per environment often discover that 'it works on my machine' becomes 'it works in staging but not in production.' Rebuilding introduces subtle differences in compiler versions, dependency resolution, timestamps, and machine-specific paths. Promotion eliminates those differences entirely."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Environment isolation principles"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
+        "title": "Isolation rules",
         "items": [
-          "Understand the fundamental principles of environment promotion",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "The same artifact runs in every environment. Do not rebuild.",
+          "Environment-specific values live in configuration, not in the artifact.",
+          "Promotion is a deployment action, not a build action.",
+          "Each environment has its own data store and external dependencies.",
+          "Production environment changes require approval gates and audit trails."
         ]
       }
     },
@@ -38,24 +51,145 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Promotion workflow example"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding environment promotion is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The following workflow shows a single artifact being promoted from staging to production. The package job produces the artifact once. Subsequent jobs download and deploy the exact same archive."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Promoting an artifact across environments",
+        "content": "The artifact is built once and promoted by redeploying it with different configuration.",
+        "code": "jobs:\n  build-and-package:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: dotnet publish -c Release -o out\n      - uses: actions/upload-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: out/\n\n  promote-staging:\n    needs: build-and-package\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: deploy/\n      - run: ./deploy.sh staging\n\n  promote-production:\n    needs: promote-staging\n    runs-on: ubuntu-latest\n    environment: production\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: deploy/\n      - run: ./deploy.sh production",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configuration per environment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Environment-specific values should be injected at deploy time, not baked into the artifact. Modern platforms support environment variables, secret references, and configuration providers. The application reads configuration from the environment, so the same binary behaves correctly everywhere."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Environment variable",
+            "definition": "A name-value pair injected at runtime. Secrets should use platform-native secret stores, not plain-text variables."
+          },
+          {
+            "term": "Approval gate",
+            "definition": "A manual check that blocks promotion until an authorized person approves. Common for production deployments."
+          },
+          {
+            "term": "Deployment slot",
+            "definition": "A staging instance with its own hostname, used for swapping traffic with zero downtime."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with environment promotion, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use deployment slots when available",
+        "text": "Azure App Service deployment slots let you warm up a new version before swapping traffic. This reduces user-facing downtime and gives you an instant rollback target if the swap fails."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Environment promotion checklist",
+        "items": [
+          {
+            "text": "Artifacts are built once and reused in every environment.",
+            "hint": "Verify by checking artifact hashes across environments."
+          },
+          {
+            "text": "Secrets are stored in the platform's secret manager, not in the artifact.",
+            "hint": "Azure Key Vault, GitHub Secrets, or AWS Secrets Manager."
+          },
+          {
+            "text": "Production promotions require an approval gate.",
+            "hint": "Use environment protection rules in your CI/CD platform."
+          },
+          {
+            "text": "Each environment has its own data store.",
+            "hint": "Never point staging at production databases."
+          },
+          {
+            "text": "Promotion failures are retried without rebuilding.",
+            "hint": "Infrastructure issues should not trigger a new build."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Promotion means redeploying the same artifact with different configuration.",
+          "Rebuilding per environment introduces non-reproducible differences.",
+          "Use platform-native secrets and environment variables for configuration.",
+          "Approval gates on production reduce the blast radius of human error."
+        ],
+        "takeaway": "If your artifact changes between environments, you are not promoting; you are rebuilding."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What if staging and production use different infrastructure?",
+            "answer": "Infrastructure differences are acceptable, but the application artifact should remain the same. Use infrastructure-as-code to keep infrastructure consistent, and test the artifact on infrastructure that matches production as closely as possible."
+          },
+          {
+            "question": "Can I run extra tests in staging?",
+            "answer": "Yes. Staging is the right place for integration, performance, and user-acceptance tests. Just remember that these tests run against the promoted artifact, not a newly built one."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "artifact-versioning",
+    "blue-green-deployments"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Deployment Environments",
+      "url": "https://learn.microsoft.com/en-us/azure/deployment-environments/",
+      "type": "article",
+      "description": "How to define reproducible environments as infrastructure-as-code."
+    },
+    {
+      "title": "GitHub Environments",
+      "url": "https://docs.github.com/en/actions/deployment/targeting-different-environments",
+      "type": "article",
+      "description": "Using environment protection rules and secrets for promotion workflows."
+    },
+    {
+      "title": "The Twelve-Factor App: Config",
+      "url": "https://12factor.net/config",
+      "type": "article",
+      "description": "Storing configuration in the environment, not in the artifact."
+    }
+  ]
 }

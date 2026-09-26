@@ -4,59 +4,169 @@
   "moduleSlug": "c-net-follow-ups",
   "courseSlug": "interview-qa",
   "title": "Dependency injection: what happens when a singleton depends on a scoped service?",
-  "description": "Interview question: Dependency injection: what happens when a singleton depends on a scoped service?. Learn the answer with detailed explanation and examples.",
+  "description": "Understand DI lifetimes in ASP.NET Core, why a singleton holding a scoped service is problematic, and the correct patterns to resolve it.",
   "order": 2,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": [
+    "dependency-injection",
+    "lifetimes",
+    "singleton",
+    "scoped",
+    "transient"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Dependency injection: what happens when a singleton depends on a scoped service?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with dependency injection: what happens when a singleton depends on a scoped service?."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of dependency injection: what happens when a singleton depends on a scoped service?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "ASP.NET Core's built-in dependency injection container manages three service lifetimes: transient, scoped, and singleton. Interviewers love this question because it tests whether you understand the container's contracts or just memorized definitions."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding dependency injection: what happens when a singleton depends on a scoped service? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A singleton lives once for the entire application lifetime. A scoped service lives once per HTTP request (or explicit scope). If a singleton depends on a scoped service, the container faces an impossible choice: should it inject one instance and reuse it across requests, or create a new one for each request?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What ASP.NET Core does"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In ASP.NET Core, the default container throws `InvalidOperationException` at build time or resolve time when a singleton directly depends on a scoped or transient service. The framework prevents you from making the mistake rather than silently producing incorrect behavior."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Problematic registration",
+        "content": "This code will fail because the container cannot resolve the scoped dependency into the singleton.",
+        "code": "builder.Services.AddScoped<IOrderRepository, OrderRepository>();\nbuilder.Services.AddSingleton<ICacheService, CacheService>();\n\n// CacheService takes IOrderRepository in its constructor\n// -> throws InvalidOperationException when the app starts",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with dependency injection: what happens when a singleton depends on a scoped service?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Resolved, not injected",
+        "text": "If you inject an `IServiceProvider` into the singleton and call `GetRequiredService<IOrderRepository>()` inside a request, the container will hand you a scoped instance. That is technically allowed, but you are now hiding a dependency and coupling the singleton to the container's resolve-time behavior."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct solutions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The right fix depends on intent. If the singleton genuinely needs per-request data, it should not be a singleton. If it only needs the scoped service for a small operation, introduce an abstraction that the singleton can call safely."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Preferred approaches",
+        "items": [
+          "Change the singleton to scoped or transient if it genuinely needs request-scoped state.",
+          "Introduce a factory interface that accepts the scoped dependency as a method parameter.",
+          "Inject `IServiceProvider` and resolve the scoped service inside a manually created scope.",
+          "Use `IOptions<T>` or configuration objects to pass read-only settings from singleton to scoped code."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Factory pattern",
+        "content": "The singleton calls a factory method that receives the scoped dependency only when needed, keeping lifetimes clean.",
+        "code": "public interface IOrderProcessorFactory\n{\n    OrderProcessor Create(IOrderRepository repository);\n}\n\npublic class CacheService\n{\n    private readonly IOrderProcessorFactory _factory;\n\n    public CacheService(IOrderProcessorFactory factory)\n    {\n        _factory = factory;\n    }\n\n    public async Task RefreshAsync()\n    {\n        // repository is resolved per-call, not stored in the singleton\n        using var scope = _serviceProvider.CreateScope();\n        var repo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();\n        var processor = _factory.Create(repo);\n        await processor.RebuildCacheAsync();\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Behavioral interview angle"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers often ask this to see if you think about object lifetimes, thread safety, and testability. A strong answer mentions: why the default container rejects the registration, what happens if you bypass the check with `IServiceProvider`, and how you would redesign the class graph so each layer has a clear responsibility."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Lifetime",
+          "Created per",
+          "Typical use"
+        ],
+        "rows": [
+          [
+            "Transient",
+            "Injection",
+            "Lightweight, stateless services"
+          ],
+          [
+            "Scoped",
+            "HTTP request",
+            "Database contexts, repositories"
+          ],
+          [
+            "Singleton",
+            "Application lifetime",
+            "Caches, configuration, logging"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "A singleton should never directly own a scoped or transient instance.",
+          "The default ASP.NET Core container throws to protect you.",
+          "Use factories or redesign boundaries when lifetimes conflict.",
+          "Always explain the 'why' behind the lifetime choice in interviews."
+        ],
+        "takeaway": "Mismatched lifetimes are a design smell: fix the class graph, not just the registration."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation",
+    "garbage-collection-how-would-you-investigate-allocation-and-gc-pressure",
+    "concurrency-how-would-you-diagnose-a-race-condition-that-occurs-once-a-day"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft — Dependency injection in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection",
+      "type": "article"
+    },
+    {
+      "title": "Steve Gordon — Understanding service lifetimes",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection#service-lifetimes",
+      "type": "article"
+    },
+    {
+      "title": "Nick Chapsas — Avoiding common DI mistakes",
+      "url": "https://www.youtube.com/watch?v=ei3NQGiRWDY",
+      "type": "video"
+    }
+  ],
+  "technology": "C#"
 }

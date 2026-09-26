@@ -4,33 +4,94 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Multi-stage builds",
-  "description": "Learn about Multi-stage builds. Master the concepts, patterns, and best practices.",
+  "description": "Learn how multi-stage Docker builds separate build-time tools from run-time images, producing smaller and more secure containers.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["docker", "multi-stage-builds", "image-optimization"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Multi-stage builds** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with multi-stage builds."
+        "text": "Production containers should contain only what they need to run. They should not carry compilers, SDKs, build tools, or test frameworks. Multi-stage builds make this practical by letting you use one full image to compile code and a separate minimal image to ship it."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What a multi-stage build is"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A multi-stage build is a Dockerfile that contains more than one `FROM` instruction. Each `FROM` starts a new stage. You can copy artifacts from earlier stages into later stages, and only the final stage determines the image you ship. Earlier stages disappear from the final image, along with their tools, caches, and temporary files."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Why this matters",
+        "text": "A single-stage build that compiles a .NET app with the SDK image ships the entire SDK. A multi-stage build copies only the compiled binary into a slim runtime image, cutting image size by 90 percent or more."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Multi-stage build examples"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Go multi-stage build",
+        "content": "The first stage uses the full Go SDK to compile the binary. The second stage uses a minimal scratch image. Only the compiled binary is copied forward.",
+        "language": "dockerfile",
+        "code": "# Stage 1: build\nFROM golang:1.23-alpine AS builder\nWORKDIR /src\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app/server .\n\n# Stage 2: run\nFROM scratch\nCOPY --from=builder /app/server /server\nEXPOSE 8080\nENTRYPOINT [\"/server\"]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": ".NET multi-stage build",
+        "content": "The SDK stage compiles the application. The ASP.NET runtime stage serves it. Only the compiled output and runtime dependencies are copied forward.",
+        "language": "dockerfile",
+        "code": "# Stage 1: build\nFROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY [\"MyApp.csproj\", \"./\"]\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o /app/publish\n\n# Stage 2: runtime\nFROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime\nWORKDIR /app\nCOPY --from=build /app/publish ./\nEXPOSE 8080\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js multi-stage build",
+        "content": "The first stage installs dependencies and builds the app. The second stage copies only the production node_modules and compiled assets.",
+        "language": "dockerfile",
+        "code": "# Stage 1: build\nFROM node:20-slim AS build\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\n# Stage 2: runtime\nFROM node:20-alpine AS runtime\nWORKDIR /app\nCOPY --from=build /app/node_modules ./node_modules\nCOPY --from=build /app/dist ./dist\nCOPY package.json ./\nEXPOSE 3000\nCMD [\"node\", \"dist/server.js\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Naming stages for clarity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every `FROM` instruction can be given a name with `AS <name>`. Named stages are easier to read and allow you to reference stages out of order. The final stage without a name, or with `AS runtime`, is the one that becomes the published image."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Stage naming conventions",
         "items": [
-          "Understand the fundamental principles of multi-stage builds",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Use descriptive names such as `builder`, `build`, `deps`, or `runtime`",
+          "Reference stages explicitly with `--from=builder` instead of relying on stage index",
+          "If you omit `AS name`, the stage is addressed by its numeric position starting from zero"
         ]
       }
     },
@@ -38,24 +99,73 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Copying artifacts between stages"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding multi-stage builds is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The `COPY --from=<stage>` instruction is the bridge between stages. It copies files or directories from another stage's filesystem into the current stage. You can copy binaries, compiled assets, `node_modules`, configuration files, or anything else your runtime needs."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with multi-stage builds, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Copy only what you need",
+        "text": "Do not copy the entire build stage. A full build stage contains source code, tests, and build tools. Copy only the artifacts the runtime actually uses. This keeps the final image minimal and reduces the attack surface."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Combining with cache mounts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "BuildKit supports cache mounts with `RUN --mount=type=cache`. This lets you persist package manager caches between builds without committing them to an image layer. Combine cache mounts with multi-stage builds for the fastest and smallest images."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BuildKit cache mount for apt",
+        "content": "The apt cache is persisted across builds but does not appear in any image layer.",
+        "language": "dockerfile",
+        "code": "RUN --mount=type=cache,target=/var/cache/apt \\\n    --mount=type=cache,target=/var/lib/apt \\\n    apt-get update && apt-get install -y --no-install-recommends curl \\\n    && rm -rf /var/lib/apt/lists/*"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "A multi-stage build uses multiple FROM instructions to separate build and runtime environments",
+          "Only the final stage becomes the published image, discarding build tools and intermediate files",
+          "Use COPY --from to move only the artifacts the runtime needs between stages",
+          "Named stages with AS make Dockerfiles easier to read and maintain",
+          "Combine multi-stage builds with BuildKit cache mounts for maximum build speed"
+        ],
+        "takeaway": "Multi-stage builds are the standard pattern for production Docker images: one stage to build, one stage to run."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["image-layers-and-build-cache", "minimal-and-secure-runtime-images"],
+  "furtherReading": [
+    {
+      "title": "Docker documentation: Multi-stage builds",
+      "url": "https://docs.docker.com/build/building/multi-stage/",
+      "type": "article",
+      "author": "Docker"
+    },
+    {
+      "title": "BuildKit cache mounts",
+      "url": "https://docs.docker.com/build/cache/",
+      "type": "article",
+      "author": "Docker"
+    }
+  ]
 }

@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a singleton service that captures a scoped dependency** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a singleton service that captures a scoped dependency."
+        "text": "A singleton service constructor accepts a scoped DbContext or repository. Because the singleton is created once, it captures the first scoped instance and reuses it across all subsequent requests. The second request receives a DbContext that is already disposed, or worse, it sees stale data from the first request. This bug is silent in development and catastrophic in production."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a singleton service that captures a scoped dependency",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand the three service lifetimes in ASP.NET Core: transient, scoped, and singleton",
+          "Learn why capturing a scoped dependency in a singleton constructor creates a hidden captive dependency",
+          "Identify runtime symptoms: ObjectDisposedException, cross-request data leakage, and incorrect audit trails",
+          "Apply factory patterns or IServiceScopeFactory to resolve scoped services safely"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Service lifetime",
+            "definition": "The container's rule for how long an instance lives: transient (new every time), scoped (one per request), or singleton (one per application)."
+          },
+          {
+            "term": "Captive dependency",
+            "definition": "A dependency that outlives its intended lifetime because a longer-lived service holds a reference to it."
+          },
+          {
+            "term": "IServiceScopeFactory",
+            "definition": "A service that creates a new IServiceScope, giving you a fresh scoped container inside a singleton or background thread."
+          },
+          {
+            "term": "DbContext",
+            "definition": "Entity Framework Core's unit-of-work. It is registered as scoped by default because it holds a database connection and change tracker that must not be shared across requests."
+          }
         ]
       }
     },
@@ -44,15 +67,173 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a singleton service that captures a scoped dependency is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Captive dependencies violate the dependency inversion principle and create race conditions that are nearly impossible to reproduce in a single-threaded test. In production, under concurrent load, the singleton's captured DbContext is accessed from multiple requests simultaneously. Entity Framework Core is not thread-safe, so the result is intermittent crashes, corrupted queries, and data bleeding between users."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a singleton service that captures a scoped dependency, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Captive dependency is a production time bomb",
+        "text": "The bug may not surface in local development because requests are sequential and the app restarts often. It appears under load, when the singleton's captured scoped service is accessed concurrently from multiple requests."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic code injects a scoped service into a singleton's constructor. The .NET container resolves the singleton once, constructs it with the first scoped instance, and then reuses that same instance for every request. The scoped service is now effectively a singleton, which breaks its contract."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Captive dependency in a singleton",
+        "content": "A singleton that captures a scoped DbContext:",
+        "code": "// Registered as Singleton in Program.cs\npublic class ReportGenerator\n{\n    private readonly AppDbContext _context;\n\n    public ReportGenerator(AppDbContext context)\n    {\n        _context = context; // Captures the first scoped instance\n    }\n\n    public async Task<Report> GenerateAsync(int userId)\n    {\n        // Reuses the same DbContext across all requests\n        return await _context.Reports.Where(r => r.UserId == userId).ToListAsync();\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There are three safe ways to use scoped services inside a singleton: inject IServiceScopeFactory and create a scope per operation, inject an ILogger (which is designed to be a singleton), or change the lifetime of the consuming service to scoped if it does not need to be a singleton. The factory pattern is the most common fix."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: create a scope per operation",
+        "content": "Use IServiceScopeFactory to resolve scoped services inside the method instead of the constructor:",
+        "code": "public class ReportGenerator\n{\n    private readonly IServiceScopeFactory _scopeFactory;\n\n    public ReportGenerator(IServiceScopeFactory scopeFactory)\n    {\n        _scopeFactory = scopeFactory;\n    }\n\n    public async Task<Report> GenerateAsync(int userId)\n    {\n        using var scope = _scopeFactory.CreateScope();\n        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n\n        return await context.Reports\n            .Where(r => r.UserId == userId)\n            .ToListAsync();\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Lifetime mismatch fixes",
+        "cards": [
+          {
+            "title": "Inject IServiceScopeFactory",
+            "description": "Create a new scope inside the singleton method.",
+            "pros": ["Keeps singleton behavior", "Fresh scoped dependencies per call"],
+            "cons": ["Boilerplate", "Easy to forget dispose scope"]
+          },
+          {
+            "title": "Change to scoped service",
+            "description": "Make the consuming service scoped if it does not need to be a singleton.",
+            "pros": ["Simplest fix", "No factory pattern needed"],
+            "cons": ["May not fit architectural intent", "Creates a new instance per request"]
+          },
+          {
+            "title": "Use a factory delegate",
+            "description": "Inject Func<AppDbContext> and call it inside the method.",
+            "pros": ["Clean syntax", "Container resolves fresh instance"],
+            "cons": ["Less explicit than IServiceScopeFactory", "Can hide expensive resolution"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "lifetimes-diagram",
+        "caption": "How a captive dependency breaks the service lifetime contract",
+        "definition": "graph TD\n    A[Container creates Singleton] --> B[Constructor receives Scoped DbContext]\n    B --> C[Singleton captures first instance]\n    C --> D[Request 1 uses captured DbContext]\n    C --> E[Request 2 uses same captured DbContext]\n    E --> F{DbContext thread-safe?}\n    F -->|No| G[Concurrent access exception]\n    F -->|Yes| H[Stale data from Request 1]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "How to detect captive dependencies",
+        "text": "Enable the .NET service provider validation warning in development. The container throws at startup when it detects a captive dependency. In production, monitor for ObjectDisposedException and cross-request data leakage as early warning signs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Code Review Checklist"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "What to look for in a pull request",
+        "items": [
+          "Singleton constructor parameters that are registered as scoped or transient",
+          "DbContext or repository injected into a singleton",
+          "Missing IServiceScopeFactory usage in long-lived services",
+          "No using statement around a manually created scope",
+          "Comments suggesting the developer was unsure about lifetime"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Is ILogger safe to inject into a singleton?",
+            "answer": "Yes. ILogger and ILoggerFactory are designed to be singletons. They are thread-safe and do not hold request-scoped state."
+          },
+          {
+            "question": "Can I use a static DbContext instance?",
+            "answer": "Never. DbContext is explicitly not thread-safe and is designed to be scoped. A static instance will cause data corruption under concurrent access."
+          },
+          {
+            "question": "What about IOptions<T> in a singleton?",
+            "answer": "IOptions<T> is safe in a singleton because it is a singleton itself. IOptionsSnapshot<T> is scoped and should not be injected into singletons."
+          },
+          {
+            "question": "Does IServiceScopeFactory create a new scope for every call?",
+            "answer": "Yes. Each call to CreateScope returns a new IServiceScope with its own scoped service provider. Dispose it when done."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Refactor a captive dependency",
+        "description": "Given a singleton service that takes a scoped repository in its constructor, refactor it to use IServiceScopeFactory without changing the public API.",
+        "steps": [
+          "Identify all scoped dependencies in the singleton constructor",
+          "Replace constructor injection with IServiceScopeFactory injection",
+          "Create a scope inside each method that needs the scoped service",
+          "Add using statements to dispose scopes properly",
+          "Write a test that creates multiple concurrent requests and asserts no exceptions"
+        ],
+        "expectedOutcome": "The singleton no longer holds a captive dependency. Each call gets a fresh scoped instance, and concurrent requests do not interfere with each other."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Never inject a scoped service into a singleton constructor",
+          "Use IServiceScopeFactory to create scopes inside singleton methods",
+          "Enable service provider validation at startup to catch these bugs early",
+          "Understand the lifetime of every service you consume"
+        ],
+        "takeaway": "A captive dependency is a hidden coupling between lifetimes. Fix it at construction time, not in production."
       }
     }
   ],

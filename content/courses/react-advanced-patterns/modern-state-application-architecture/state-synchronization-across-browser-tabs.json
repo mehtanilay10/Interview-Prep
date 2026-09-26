@@ -4,58 +4,176 @@
   "moduleSlug": "modern-state-application-architecture",
   "courseSlug": "react-advanced-patterns",
   "title": "State synchronization across browser tabs",
-  "description": "Learn about State synchronization across browser tabs. Master the concepts, patterns, and best practices.",
+  "description": "Learn how to keep application state consistent across multiple browser tabs. Covers the BroadcastChannel API, storage events, and practical patterns for multi-tab React applications.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "browser-tabs",
+    "synchronization",
+    "broadcastchannel",
+    "react"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**State synchronization across browser tabs** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with state synchronization across browser tabs."
+        "text": "Users often keep the same application open in multiple browser tabs. If each tab maintains its own isolated copy of the state, actions taken in one tab are invisible to the others until a full page reload. Multi-tab synchronization is especially important for authentication state, theme preferences, draft data, and notifications."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson shows how to use browser APIs and React patterns to propagate state changes across tabs efficiently."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "BroadcastChannel API"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`BroadcastChannel` allows different browsing contexts on the same origin to send messages to each other. It is the cleanest modern solution for cross-tab communication because it is explicit, typed, and does not rely on storage side effects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BroadcastChannel setup in React",
+        "content": "A custom hook opens a channel on mount, listens for messages, and closes the channel on cleanup.",
+        "language": "tsx",
+        "code": "const CHANNEL_NAME = 'app-state-sync';\n\ntype Message<T> = { type: string; payload: T };\n\nfunction useCrossTabSync<T>(onMessage: (payload: T) => void) {\n  useEffect(() => {\n    const channel = new BroadcastChannel(CHANNEL_NAME);\n    channel.onmessage = (event: MessageEvent<Message<T>>) => {\n      onMessage(event.message.payload);\n    };\n    return () => channel.close();\n  }, [onMessage]);\n}\n\nfunction ThemeSyncProvider({ children }: { children: ReactNode }) {\n  const [theme, setTheme] = useState<'light' | 'dark'>('light');\n\n  useCrossTabSync<{ theme: 'light' | 'dark' }>((payload) => {\n    setTheme(payload.theme);\n  });\n\n  const toggleTheme = () =>\n    setTheme((prev) => {\n      const next = prev === 'light' ? 'dark' : 'light';\n      localStorage.setItem('theme', next);\n      window.dispatchEvent(new CustomEvent('app-theme-changed', { detail: next }));\n      return next;\n    });\n\n  return (\n    <ThemeContext.Provider value={{ theme, toggleTheme }}>\n      {children}\n    </ThemeContext.Provider>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage events"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before `BroadcastChannel`, the most common approach was to listen for the `storage` event on `window`. The event fires whenever `localStorage` is modified in another tab. This approach works everywhere but couples your state synchronization to `localStorage` semantics, so it is best used for simple key-value preferences rather than rich application state."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "storage event behavior",
         "items": [
-          "Understand the fundamental principles of state synchronization across browser tabs",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Fires only in other tabs, not in the tab that wrote the value.",
+          "Fires for every key in `localStorage` that changed.",
+          "Cannot distinguish between tabs with custom logic.",
+          "Works in all modern browsers."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Syncing a theme preference with storage events",
+        "content": "The effect listens for `storage` changes and updates local React state when another tab modifies the theme.",
+        "language": "tsx",
+        "code": "function useSyncedTheme() {\n  const [theme, setTheme] = useState(() =>\n    (localStorage.getItem('theme') as 'light' | 'dark') ?? 'light'\n  );\n\n  useEffect(() => {\n    const handler = (event: StorageEvent) => {\n      if (event.key === 'theme' && event.newValue) {\n        setTheme(event.newValue as 'light' | 'dark');\n      }\n    };\n    window.addEventListener('storage', handler);\n    return () => window.removeEventListener('storage', handler);\n  }, []);\n\n  const toggle = () => {\n    const next = theme === 'light' ? 'dark' : 'light';\n    setTheme(next);\n    localStorage.setItem('theme', next);\n  };\n\n  return { theme, toggle };\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Choosing the right mechanism"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding state synchronization across browser tabs is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`BroadcastChannel` is preferred when you want a dedicated, typed communication channel. `storage` events are useful as a fallback for simple preferences or when you need to support older browsers. For complex shared state, consider a backend channel such as WebSockets or server-sent events instead of pure browser APIs."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Mechanism",
+          "Browser support",
+          "Best for",
+          "Limitations"
+        ],
+        "rows": [
+          [
+            "BroadcastChannel",
+            "Modern browsers",
+            "Typed messages between tabs on the same origin",
+            "Not available in some older browsers"
+          ],
+          [
+            "storage event",
+            "All modern browsers",
+            "localStorage-based preferences",
+            "Limited to string values, fires for every key change"
+          ],
+          [
+            "SharedWorker",
+            "Most browsers",
+            "Shared background state and connections",
+            "More complex setup, not needed for simple cases"
+          ],
+          [
+            "WebSockets",
+            "All modern browsers",
+            "Real-time server-driven updates across all clients",
+            "Requires a server component"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with state synchronization across browser tabs, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Don't forget server state",
+        "text": "Cross-tab synchronization only solves the problem within the browser. If a user changes data in another browser or device, you still need polling, WebSockets, or push notifications to stay synchronized with the server."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "BroadcastChannel is the preferred modern API for cross-tab messaging.",
+          "Storage events are a simple fallback for localStorage-backed preferences.",
+          "Keep cross-tab messages small and explicit; avoid broadcasting the entire application state.",
+          "Combine browser-side synchronization with server-side updates for complete consistency."
+        ],
+        "takeaway": "Cross-tab synchronization prevents the common bug where a user performs an action in one tab, refreshes another, and sees stale or conflicting data."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "local-state-vs-server-state-vs-url-state",
+    "react-queryserver-cache-architecture"
+  ],
+  "furtherReading": [
+    {
+      "title": "MDN - BroadcastChannel API",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel_API",
+      "type": "article"
+    },
+    {
+      "title": "MDN - StorageEvent",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/StorageEvent",
+      "type": "article"
+    },
+    {
+      "title": "TanStack Query - Broadcast updates",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/guides/broadcasting-queries-to-multiple-tabs",
+      "type": "article"
+    }
+  ]
 }

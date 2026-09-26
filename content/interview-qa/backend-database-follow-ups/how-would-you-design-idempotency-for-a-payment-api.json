@@ -4,33 +4,45 @@
   "moduleSlug": "backend-database-follow-ups",
   "courseSlug": "interview-qa",
   "title": "How would you design idempotency for a payment API?",
-  "description": "Interview question: How would you design idempotency for a payment API?. Learn the answer with detailed explanation and examples.",
+  "description": "Idempotency ensures that calling a payment API multiple times has the same effect as calling it once — critical for retries and network glitches.",
   "order": 3,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "backend",
+    "payments",
+    "idempotency",
+    "api-design"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**How would you design idempotency for a payment API?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with how would you design idempotency for a payment api?."
+        "text": "Payments are one domain where idempotency is non-negotiable. Networks glitch, clients retry, and users double-click. If a charge call is processed twice, the customer is charged twice. Idempotency means that submitting the same payment request multiple times produces the same result — one charge — without side effects."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The industry standard is the Idempotency-Key pattern, popularized by Stripe. The client generates a unique key for each logical payment attempt and sends it with the request. The server stores the result of the first execution and returns the stored result for any subsequent request with the same key."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How it works"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the step-by-step process of would you design idempotency for a payment api?",
-          "Identify the key components and their interactions",
-          "Recognize common failure points and how to avoid them",
-          "Apply best practices for reliable implementation"
+          "Client generates a UUID v4 idempotency key before sending the payment request.",
+          "Server checks whether that key already exists in the idempotency records table.",
+          "If it exists and the original request completed, return the stored result immediately.",
+          "If it exists but the original request is still processing, return 409 Conflict or a polling endpoint.",
+          "If it does not exist, process the payment, store the key with the result, and return the result."
         ]
       }
     },
@@ -38,25 +50,115 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Database design"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding how would you design idempotency for a payment api? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The idempotency record must be written before any external charge is attempted. This prevents a window where a retry could create a duplicate charge. The record captures the request parameters, the result, and a timestamp for expiry cleanup."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Server: Idempotency records table",
+        "language": "sql",
+        "code": "CREATE TABLE PaymentIdempotency (\n    IdempotencyKey CHAR(36) PRIMARY KEY,\n    PaymentId CHAR(36) NULL,\n    Status        NVARCHAR(20) NOT NULL,\n    RequestBody   NVARCHAR(MAX) NOT NULL,\n    ResponseBody  NVARCHAR(MAX) NULL,\n    CreatedAt     DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),\n    ExpiresAt     DATETIME2 NOT NULL\n);\n\nCREATE NONCLUSTERED INDEX IX_PaymentIdempotency_ExpiresAt\nON PaymentIdempotency (ExpiresAt);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# API implementation"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Minimal API endpoint with idempotency guard",
+        "language": "csharp",
+        "code": "app.MapPost(\"/payments\", async (PaymentRequest req, HttpContext ctx, AppDb db) => {\n    var key = ctx.Request.Headers[\"Idempotency-Key\"].ToString();\n    if (string.IsNullOrWhiteSpace(key))\n        return Results.BadRequest(\"Idempotency-Key header is required.\");\n\n    var existing = await db.PaymentIdempotency\n        .FirstOrDefaultAsync(x => x.IdempotencyKey == key);\n\n    if (existing is not null) {\n        if (existing.Status == \"processing\")\n            return Results.Conflict(\"Payment is already being processed.\");\n        return Results.Content(existing.ResponseBody!, \"application/json\");\n    }\n\n    var record = new PaymentIdempotency {\n        IdempotencyKey = key,\n        Status = \"processing\",\n        RequestBody = JsonSerializer.Serialize(req),\n        ExpiresAt = DateTime.UtcNow.AddHours(24)\n    };\n    db.PaymentIdempotency.Add(record);\n    await db.SaveChangesAsync();\n\n    try {\n        var result = await ProcessPaymentAsync(req);\n        record.Status = \"succeeded\";\n        record.PaymentId = result.Id;\n        record.ResponseBody = JsonSerializer.Serialize(result);\n        await db.SaveChangesAsync();\n        return Results.Created($\"/payments/{result.Id}\", result);\n    }\n    catch (Exception ex) {\n        record.Status = \"failed\";\n        record.ResponseBody = JsonSerializer.Serialize(new { error = ex.Message });\n        await db.SaveChangesAsync();\n        throw;\n    }\n})\n.WithName(\"CreatePayment\");"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Key lifetime: expire records after a reasonable window (24-72 hours) to keep the table small.",
+          "Atomicity: write the idempotency record in the same transaction scope as any internal ledger entries to prevent orphan states.",
+          "Concurrency: use the idempotency key as the primary key so the database enforces uniqueness naturally.",
+          "Client responsibility: the client must generate a fresh key for each new logical payment, not reuse old keys."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with how would you design idempotency for a payment api?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Never charge first and record later",
+        "text": "Always write the idempotency record before calling the payment processor. If the charge succeeds but the record write fails, you have no way to detect and prevent a duplicate on retry."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up angles interviewers probe"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What happens if two requests arrive with the same key simultaneously? (Answer: database primary-key constraint + transaction isolation handles it.)",
+          "How do you handle key expiry without losing traceability? (Answer: move completed records to an archive table before deleting.)",
+          "Should the idempotency check happen before authentication or after? (Answer: authenticate first to avoid leaking payment state to unauthenticated callers.)"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Generate the idempotency key on the client and pass it in every request header.",
+          "Write the idempotency record before any external charge to close the duplicate window.",
+          "Use the key as the primary key so the database enforces uniqueness automatically.",
+          "Return the stored response for duplicate keys — do not re-process."
+        ],
+        "takeaway": "Idempotency is about writing the marker before taking the action, not after."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "how-do-you-handle-a-database-transaction-that-succeeds-but-event-publishing-fails",
+    "how-would-you-design-retry-behavior-without-creating-a-retry-storm"
+  ],
+  "furtherReading": [
+    {
+      "title": "Stripe idempotency documentation",
+      "url": "https://stripe.com/docs/api/idempotent_requests",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft REST API guidelines — idempotency",
+      "url": "https://microsoft.github.io/idle/",
+      "type": "article"
+    },
+    {
+      "title": "Designing Data-Intensive Applications, Chapter 7",
+      "url": "https://dataintensive.net/",
+      "type": "course"
+    }
+  ],
+  "technology": "Backend & Database"
 }

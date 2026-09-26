@@ -4,58 +4,116 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Large Object Heap and pinned objects",
-  "description": "Learn about Large Object Heap and pinned objects. Master the concepts, patterns, and best practices.",
+  "description": "Understand the Large Object Heap threshold, why fragmentation occurs, how pinned objects block compaction, and how to manage them effectively.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["LOH", "pinning", "fragmentation", "compaction", "GCSettings"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Large Object Heap and pinned objects** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with large object heap and pinned objects."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of large object heap and pinned objects",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Most .NET objects are small — a few dozen bytes for a business entity, a few hundred bytes for a string. But some objects are large: byte arrays that hold image data, buffers that hold network packets, or character arrays that hold serialized JSON. The runtime places objects larger than 85,000 bytes on the Large Object Heap, or LOH. The LOH has no generational structure; it is a single generation 2 segment. And unlike the small object heap, the LOH is not compacted by default — which means it is prone to fragmentation over time."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding large object heap and pinned objects is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Fragmentation means free space is scattered across many small holes instead of being available as one large contiguous block. If your application repeatedly allocates and frees 100 KB buffers, the LOH will eventually look like a Swiss cheese of free spaces. A new 120 KB allocation will fail even if there is 200 KB of free space total, because no single hole is large enough. Compacting the LOH moves objects together, but it requires pinning — the runtime must update every pointer to every moved object."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The 85,000-byte threshold"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The 85,000-byte limit is not arbitrary. It corresponds to the largest size that the GC can allocate efficiently in the ephemeral segment using a bump-pointer allocator. Objects larger than this cannot use the fast bump-pointer path; they need to be placed on a separate heap with a free-list allocator. The LOH uses a free-list allocator by default. When you allocate a large object, the runtime finds the first free block that is large enough and splits it. This is slower than the bump-pointer path, and it creates fragmentation over time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Observing LOH behavior with GCSettings",
+        "code": "using System;\nusing System.Runtime;\n\n// Allocate a large array (goes to LOH)\nbyte[] buffer = new byte[100_000];\n\nConsole.WriteLine($\"LOH size: {GCSettings.LargeObjectHeapCompactionMode}\");\nConsole.WriteLine($\"LOH generation: {GC.GetGeneration(buffer)}\");\n\n// Force a full collection to see LOH in action\nGC.Collect(2, GCCollectionMode.Forced, blocking: true);\n\n// Check free space before and after compaction\nlong before = GC.GetGCMemoryInfo().HighMemLoadThresholdBytes;\nGCSettings.LargeObjectHeapCompactionMode =\n    GCLargeObjectHeapCompactionMode.CompactOnce;\nGC.Collect(2, GCCollectionMode.Forced, blocking: true);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pinned objects and why they fragment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The GC moves objects during compaction. When it moves an object, it updates every pointer that references it. This works automatically for managed references, but it cannot update pointers held by unmanaged code. When you pin an object — using `fixed`, `GCHandle.Alloc`, or `pin` — you tell the GC: do not move this object. Pinning creates an anchor point on the heap. Objects allocated after the pinned object cannot be placed before it, even if the space is free. This causes fragmentation in the small object heap as well as the LOH."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pinning with fixed and GCHandle",
+        "code": "byte[] managedBuffer = new byte[8192];\n\n// Pin with fixed (short-lived, safe)\nfixed (byte* pinned = managedBuffer)\n{\n    // Pass pinned pointer to unmanaged API\n    NativeMethods.WriteBuffer(pinned, managedBuffer.Length);\n} // automatically unpinned here\n\n// Pin with GCHandle (long-lived, must free)\nGCHandle handle = GCHandle.Alloc(managedBuffer, GCHandleType.Pinned);\ntry\n{\n    IntPtr address = handle.AddrOfPinnedObject();\n    NativeMethods.ProcessBuffer(address, managedBuffer.Length);\n}\nfinally\n{\n    handle.Free(); // must free or the object stays pinned\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ArrayPool<T> to reduce LOH pressure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest way to reduce LOH pressure is to rent arrays from `ArrayPool<T>` instead of allocating new ones every time. The pool reuses arrays across calls, so large allocations happen less frequently. The arrays in the pool are already on the LOH, so they do not cause new LOH fragmentation. When you return an array to the pool, the pool clears it before re-renting it, preventing data leaks between callers."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with large object heap and pinned objects, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Pinning pooled arrays is still a risk",
+        "text": "If you pin an array rented from `ArrayPool<T>` and hold the pin for a long time, you fragment the LOH just as you would with a freshly allocated array. Always return pooled arrays as quickly as possible. If you need a long-lived pointer, consider `Memory<byte>` and `Span<byte>` slicing instead — these give you a view into the array without pinning the entire buffer."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Objects larger than 85,000 bytes go directly to the LOH as generation 2, bypassing the ephemeral segment.",
+          "The LOH is not compacted by default, causing fragmentation when large objects are frequently allocated and freed.",
+          "Pinned objects block compaction and create heap fragmentation; always unpin as soon as possible.",
+          "ArrayPool<T> reduces LOH pressure by reusing large arrays, but pinned pooled arrays still fragment."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["managed-heap-and-allocation-lifecycle", "gc-generations-and-collection-behavior", "allocation-pressure-and-latency", "arraypoolt-and-memorypoolt"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Large Object Heap documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap"
+    },
+    {
+      "type": "article",
+      "title": "GCHandle class documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.interopservices.gchandle"
+    },
+    {
+      "type": "article",
+      "title": "ArrayPool<T> documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.buffers.arraypool-1"
+    }
+  ]
 }

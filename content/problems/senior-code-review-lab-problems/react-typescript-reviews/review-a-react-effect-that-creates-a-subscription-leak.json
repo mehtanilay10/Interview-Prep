@@ -13,24 +13,53 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a React effect that creates a subscription leak** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a react effect that creates a subscription leak."
+        "text": "**Review a React effect that creates a subscription leak** is a memory-management bug. When a useEffect subscribes to an event source, timer, or WebSocket and does not return a cleanup function, the subscription outlives the component. The callback continues to fire after unmount, holding a closure over stale state and preventing garbage collection. In a long-lived SPA with frequent navigation, leaked subscriptions accumulate and eventually crash the tab."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What leaks in a React effect"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a react effect that creates a subscription leak",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "setInterval and setTimeout callbacks that are never cleared",
+          "addEventListener calls to window, document, or DOM elements without matching removeEventListener",
+          "WebSocket and EventSource connections left open after unmount",
+          "RxJS subscriptions not unsubscribed in the cleanup return",
+          "Firebase listeners, Pusher channels, and SSE connections that are never disconnected",
+          "requestAnimationFrame loops that keep running after the component is gone"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Subscription leak",
+            "definition": "An event listener, timer, or connection that continues to fire after the subscribing component unmounts."
+          },
+          {
+            "term": "Cleanup function",
+            "definition": "The function returned from useEffect that runs before unmount and before the next effect invocation."
+          },
+          {
+            "term": "Closure",
+            "definition": "A function that captures variables from its outer scope. If the function outlives the component, the captured variables stay in memory."
+          },
+          {
+            "term": "Detached DOM node",
+            "definition": "A DOM element removed from the document but still referenced by JavaScript, preventing garbage collection."
+          },
+          {
+            "term": "Strict Mode",
+            "definition": "React 18+ development mode that double-invokes effects to surface missing cleanup functions."
+          }
         ]
       }
     },
@@ -38,24 +67,193 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The bug pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a react effect that creates a subscription leak is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The leak happens in three steps. First, the effect subscribes to something external. Second, the component unmounts because the user navigates away. Third, the subscription continues to fire because there is no cleanup. Each callback closes over the component's state and setState, so even though the component is gone, the closure keeps it alive."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Leak: interval not cleared on unmount",
+        "content": "The component sets an interval but never clears it. After unmount, the interval fires forever, each callback closing over the stale setPrice reference:",
+        "code": "function LiveTicker() {\n  const [price, setPrice] = useState(0);\n\n  useEffect(() => {\n    const id = setInterval(() => {\n      fetch('/api/price').then(r => r.json()).then(setPrice);\n    }, 1000);\n    // Missing cleanup: return () => clearInterval(id);\n  }, []);\n\n  return <div>Price: {price}</div>;\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: always return a cleanup function",
+        "content": "The cleanup function runs before unmount and before the next effect run, breaking the reference:",
+        "code": "function LiveTicker() {\n  const [price, setPrice] = useState(0);\n\n  useEffect(() => {\n    const id = setInterval(() => {\n      fetch('/api/price').then(r => r.json()).then(setPrice);\n    }, 1000);\n    return () => clearInterval(id); // cleanup on unmount\n  }, []);\n\n  return <div>Price: {price}</div>;\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The cleanup function contract"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Rules for useEffect cleanup",
+        "items": [
+          "If the effect subscribes to anything, it must return a cleanup function that unsubscribes",
+          "If the effect uses addEventListener, the cleanup must call removeEventListener with the same handler reference",
+          "If the effect starts a WebSocket, the cleanup must call .close()",
+          "If the effect starts an RxJS subscription, the cleanup must call .unsubscribe()",
+          "If the effect uses requestAnimationFrame, the cleanup must call cancelAnimationFrame",
+          "The cleanup function is also called before the next effect run when dependencies change"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-subscription-leak",
+        "caption": "Effect lifecycle with and without cleanup",
+        "definition": "flowchart TD\n    A[Component mounts] --> B[useEffect fires]\n    B --> C[Subscribe: interval / event / socket]\n    C --> D{Component unmounts?}\n    D -->|Yes| E{Cleanup returned?}\n    E -->|Yes| F[Unsubscribe: clear / remove / close]\n    E -->|No| G[Subscription continues firing]\n    G --> H[Closure holds component state]\n    H --> I[Component cannot be garbage collected]\n    F --> J[Memory freed]\n    D -->|No| K[Component continues]\n    K --> L{Dependencies change?}\n    L -->|Yes| M[Cleanup runs, then effect re-runs]\n    M --> C"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React 18 Strict Mode as a safety net"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React 18 Strict Mode double-invokes effects in development. If your cleanup is missing, you will see duplicate intervals or subscriptions immediately. This is not a bug in React; it is a feature designed to expose leaks before they reach production. Always develop with Strict Mode enabled and treat duplicate-effect warnings as real defects."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a react effect that creates a subscription leak, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "The fetch-in-interval trap",
+        "text": "A fetch inside setInterval that uses a stale closure is especially dangerous. Each callback captures the setPrice from the render when the interval was created. After unmount, the interval keeps firing and each call allocates a Promise. In a long-lived SPA, mount and unmount happen repeatedly, multiplying the leak."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detecting leaks in production"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use the Performance API with memory (Chrome-only) to log usedJSHeapSize on a schedule",
+          "Alert when usedJSHeapSize grows past a threshold without plateauing",
+          "Compare heap snapshots in Chrome DevTools before and after navigating away from a suspect page",
+          "Look for 'Detached HTMLDivElement' or 'closure' entries that grew significantly",
+          "Trace retainers back to your code to find the effect keeping them alive"
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Effect cleanup audit",
+        "items": [
+          {
+            "text": "Every addEventListener has a matching removeEventListener in the cleanup return",
+            "hint": "Use the same handler reference—do not define the handler inline"
+          },
+          {
+            "text": "Every setInterval / setTimeout is cleared in cleanup",
+            "hint": "Store the ID in a ref if the callback references changing state"
+          },
+          {
+            "text": "WebSocket and EventSource are closed in cleanup",
+            "hint": "Check for .close() calls in the return function"
+          },
+          {
+            "text": "Subscriptions (RxJS, Firebase) are unsubscribed",
+            "hint": "Use takeUntil with a Subject for RxJS; call unsubscribe() for Firebase"
+          },
+          {
+            "text": "Large objects in closures are not captured unnecessarily",
+            "hint": "If the interval only needs a small value, extract just that value into the closure"
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix subscription leaks",
+        "description": "Open a project with multiple useEffect hooks. Audit each one for missing cleanup functions. Add cleanup, then verify with Strict Mode and Chrome DevTools heap snapshots.",
+        "steps": [
+          "Search the codebase for useEffect without a return statement",
+          "For each, identify whether it subscribes to an external source",
+          "Add the matching cleanup: clearInterval, removeEventListener, close, or unsubscribe",
+          "Run the app in Strict Mode and confirm no duplicate effects appear",
+          "Take a heap snapshot before and after navigating to and from the page"
+        ],
+        "expectedOutcome": "No detached DOM nodes or retained closures should remain after navigating away from the page."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-ups",
+        "items": [
+          {
+            "question": "Can React itself leak memory?",
+            "answer": "React is careful with memory. Leaks almost always come from developer-written effects, third-party libraries holding references, or closures capturing more than needed. React 19's use() and useEffect Event patterns reduce the leak surface."
+          },
+          {
+            "question": "What is a WeakRef and when would I use it?",
+            "answer": "WeakRef holds a weak reference to an object so it does not prevent garbage collection. You would use it for a cache where you want entries to expire automatically. Most React leaks are better fixed by removing the strong reference entirely."
+          },
+          {
+            "question": "How do I find a leak without DevTools in production?",
+            "answer": "Log usedJSHeapSize from the Performance API on a timer. Alert when it grows past a threshold and correlate with user actions. Pair with server-side error tracking to catch crashes caused by memory pressure."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Every useEffect that subscribes to something external must return a cleanup function",
+          "Strict Mode double-invoking effects is your friend—it catches leaks in development",
+          "Use heap snapshots to find detached DOM nodes and retained closures",
+          "Clear intervals, remove listeners, close sockets, and unsubscribe in cleanup",
+          "Avoid capturing large objects in closures that outlive the component"
+        ],
+        "takeaway": "Memory leaks in React are effect-management bugs. The fix is always the same: clean up."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "React Docs: Synchronizing with Effects",
+      "url": "https://react.dev/learn/synchronizing-with-effects",
+      "type": "article",
+      "description": "Official guidance on useEffect, cleanup functions, and common effect patterns."
+    },
+    {
+      "title": "web.dev: Find Unused JavaScript",
+      "url": "https://web.dev/find-unused-javascript/",
+      "type": "article",
+      "description": "Techniques for detecting and fixing memory leaks in web applications."
+    }
+  ]
 }

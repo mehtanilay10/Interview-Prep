@@ -4,33 +4,39 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Assembly loading and metadata",
-  "description": "Learn about Assembly loading and metadata. Master the concepts, patterns, and best practices.",
+  "description": "Understand how .NET assemblies are loaded, how metadata describes types, and how the runtime resolves dependencies.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["assemblies", "metadata", "loading", "binding", "AssemblyLoadContext"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Assembly loading and metadata** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with assembly loading and metadata."
+        "text": "When your C# program references another project or NuGet package, you are referencing an assembly. The .NET runtime must locate that assembly, load it into memory, read its metadata, and wire up all the type references. This process — assembly loading — happens quietly on every program start, but it has profound implications for startup time, memory usage, and application isolation."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every assembly carries a manifest: a table of contents that lists the assembly's name, version, culture, public key token, referenced assemblies, and exported types. The CLR reads this manifest before executing any code. Metadata describes every type, method, property, and event in the assembly in a machine-readable format. This is why reflection can discover types at runtime — the information is already embedded inside the assembly."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Assembly structure at a glance"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of assembly loading and metadata",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**Assembly manifest** — name, version, culture, strong name, and list of referenced assemblies.",
+          "**Type metadata** — every class, struct, interface, and delegate with its members.",
+          "**CIL code** — the compiled method bodies in platform-neutral intermediate language.",
+          "**Resources** — embedded strings, images, or other files packaged inside the assembly."
         ]
       }
     },
@@ -38,24 +44,94 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "How the runtime finds an assembly"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding assembly loading and metadata is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "When your code calls a method in another assembly, the CLR must locate that assembly on disk. It follows a well-defined probing order: the application base directory, any paths configured in `deps.json`, the NuGet package folders, and finally the global assembly cache. In .NET Core and later, `deps.json` is the critical file — it is generated at build time and tells the runtime exactly where every dependency lives."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspecting assembly metadata with reflection",
+        "code": "using System.Reflection;\n\nAssembly assembly = Assembly.GetExecutingAssembly();\n\nConsole.WriteLine($\"Name: {assembly.GetName().Name}\");\nConsole.WriteLine($\"Version: {assembly.GetName().Version}\");\n\n// List all public types\nforeach (Type type in assembly.GetExportedTypes())\n{\n    Console.WriteLine($\"  {type.FullName}\");\n}\n\n// Read a custom attribute from the assembly\nvar attr = assembly.GetCustomAttribute<AssemblyTitleAttribute>();\nConsole.WriteLine($\"Title: {attr?.Title}\");",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Loading assemblies dynamically"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes you need to load an assembly at runtime that was not known at compile time. Common scenarios include plugin systems, scripting engines, and hot-patching. .NET provides `Assembly.LoadFrom` for file-based loading and `Assembly.Load` for display-name loading. The critical distinction is that `LoadFrom` uses a load-from context, while `Load` uses the default load context — and assemblies loaded into different contexts cannot easily share types."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Loading an assembly by display name",
+        "code": "using System.Reflection;\n\n// Load by full display name (name, version, culture, public key token)\nAssembly plugin = Assembly.Load(\n    \"MyPlugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=abc123\");\n\n// Enumerate types in the loaded assembly\nforeach (Type type in plugin.GetTypes())\n{\n    if (typeof(IPlugin).IsAssignableFrom(type) && !type.IsAbstract)\n    {\n        IPlugin instance = (IPlugin)Activator.CreateInstance(type);\n        instance.Run();\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with assembly loading and metadata, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "The load-from context trap",
+        "text": "`Assembly.LoadFrom` and `Assembly.LoadFile` both create separate load contexts. If your dynamically loaded assembly references another assembly, the runtime may load it twice — once in the default context and once in the load-from context. This causes type identity failures: `typeof(SharedType) != pluginAssembly.GetType(\"SharedType\")`. Prefer `AssemblyLoadContext` for dynamic loading scenarios in modern .NET."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strong naming and the GAC"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A strongly named assembly has a digital signature embedded in its manifest. The signature covers the assembly's contents, so any modification to the file invalidates the signature. Strong naming enables side-by-side versioning — multiple versions of the same assembly can coexist in the Global Assembly Cache. The GAC is a machine-wide store for strong-named assemblies. Note that .NET Core and .NET 5+ do not use the GAC; they rely on dependency context files and local NuGet caches instead."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Every .NET assembly contains a manifest with metadata describing its types, version, and dependencies.",
+          "PEVerify validates CIL type safety at build time; it does not catch runtime behavior issues.",
+          "`AssemblyLoadContext` is the modern replacement for AppDomain-based loading in .NET Core and later.",
+          "The load-from context can cause duplicate type loading; prefer `AssemblyLoadContext` for plugins."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["clr-architecture-and-execution-model", "reflection-and-its-trade-offs"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Assembly loading in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/assembly/"
+    },
+    {
+      "type": "article",
+      "title": "Metadata and self-describing components",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/metadata"
+    },
+    {
+      "type": "article",
+      "title": "AssemblyLoadContext class documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext"
+    }
+  ]
 }

@@ -4,33 +4,110 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "A retry policy creates a retry storm during a downstream outage",
-  "description": "Problem: A retry policy creates a retry storm during a downstream outage. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose a retry storm that amplifies a downstream outage into a cascading failure, and apply circuit breakers, backoff, and bulkhead patterns to contain it.",
   "order": 7,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["retry-storm", "circuit-breaker", "backoff", "resilience", "cascading-failure"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A retry policy creates a retry storm during a downstream outage** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a retry policy creates a retry storm during a downstream outage."
+        "text": "A downstream payment service goes down for maintenance. Within seconds, your API servers spike to 100% CPU and start returning 503s to healthy endpoints. The root cause is an aggressive retry policy: every failed request is retried three times with no delay, multiplying load on an already struggling service. You need to explain how retry storms form and how to prevent them."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How a retry storm forms"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of a retry policy creates a retry storm during a downstream outage",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Client sends request to downstream service",
+          "Downstream service is slow or returning 503",
+          "Client waits a fixed timeout (e.g., 2 seconds) then retries",
+          "Retry arrives while the first request is still failing, doubling load",
+          "Multiple clients repeat this simultaneously, creating exponential traffic growth",
+          "Downstream service is overwhelmed and cannot recover even after maintenance ends",
+          "Upstream services start timing out and propagating failures backward"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Retry storm",
+            "definition": "A cascading failure caused by uncoordinated retries that multiply load on a degraded service."
+          },
+          {
+            "term": "Circuit breaker",
+            "definition": "A pattern that stops sending requests to a failing service after a threshold of failures is reached."
+          },
+          {
+            "term": "Exponential backoff",
+            "definition": "Increasing the wait time between retries to reduce pressure on recovering services."
+          },
+          {
+            "term": "Jitter",
+            "definition": "Adding randomness to backoff intervals to prevent synchronized retries from multiple clients."
+          },
+          {
+            "term": "Bulkhead pattern",
+            "definition": "Isolating critical resources so that a failure in one area does not consume all available capacity."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-retry-storm",
+        "caption": "Retry storm amplification during a downstream outage",
+        "definition": "graph TD\n    A[Client 1] --> B[Retry 1]\n    C[Client 2] --> D[Retry 2]\n    E[Client 3] --> F[Retry 3]\n    B --> G[Downstream Service]\n    D --> G\n    F --> G\n    G -->|Overwhelmed| H[503 Responses]\n    H --> I[More retries]\n    I --> G\n    G -->|Complete overload| J[Total outage]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resilience patterns"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Retry and resilience patterns",
+        "cards": [
+          {
+            "title": "Exponential backoff with jitter",
+            "description": "Wait 1s, 2s, 4s, 8s between retries, with random jitter added.",
+            "pros": ["Reduces synchronized retries", "Gives downstream time to recover"],
+            "cons": ["Increases end-to-end latency", "Still sends load during recovery"]
+          },
+          {
+            "title": "Circuit breaker",
+            "description": "Stop sending requests after N failures and return a fallback immediately.",
+            "pros": ["Prevents retry storms", "Fast failure with fallback", "Self-healing after timeout"],
+            "cons": ["Requires tuning thresholds", "May trigger on transient blips"]
+          },
+          {
+            "title": "Bulkhead isolation",
+            "description": "Allocate separate thread pools or connection pools per downstream service.",
+            "pros": ["Contains failures to one dependency", "Protects critical paths"],
+            "cons": ["Increased memory usage", "Complex pool sizing"]
+          },
+          {
+            "title": "Timeout and deadline",
+            "description": "Set strict timeouts on every outbound call and propagate deadlines downstream.",
+            "pros": ["Prevents hung connections", "Enables cascading cancellation"],
+            "cons": ["Too short timeouts cause false failures", "Requires consistent propagation"]
+          }
         ]
       }
     },
@@ -38,24 +115,86 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Implementation guidelines"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding a retry policy creates a retry storm during a downstream outage is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Set a maximum retry count of 3 for non-idempotent operations and 5 for idempotent reads",
+          "Use exponential backoff with full jitter: delay = random(0, min(cap, base * 2^attempt))",
+          "Configure circuit breakers with a failure threshold of 50% and a recovery timeout of 30 seconds",
+          "Add per-client rate limiting so one misbehaving service does not consume all connections",
+          "Always log retry attempts with the downstream service name and error category"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a retry policy creates a retry storm during a downstream outage, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Retries are not free",
+        "text": "Every retry consumes a thread, a connection, and downstream capacity. In a cloud-native system with hundreds of services, an unregulated retry policy is a reliability anti-pattern. Design for failure, not for retry."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How do I choose the right timeout?",
+            "answer": "Measure the p99 latency of the healthy service and set the timeout to 2-3x that value. For critical paths, use shorter timeouts with circuit breakers rather than long timeouts with retries."
+          },
+          {
+            "question": "Should I retry 503 errors?",
+            "answer": "Yes, 503 means the service is temporarily unavailable. Retry with backoff. Do not retry 401 or 403 unless you have refreshed credentials."
+          },
+          {
+            "question": "What if the circuit breaker itself becomes a bottleneck?",
+            "answer": "Use a fast-fail strategy when the circuit is open. Return cached data, a default value, or a degraded response instead of blocking on the breaker state check."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add resilience to an HTTP client",
+        "description": "Take an existing HTTP client in your codebase. Add Polly (C#) or resilience4j (Java) or similar policies for timeout, retry with exponential backoff, and circuit breaker.",
+        "steps": [
+          "Identify all outbound HTTP calls and their current timeout settings",
+          "Add a circuit breaker policy with a 50% failure threshold",
+          "Add a retry policy with exponential backoff and jitter",
+          "Add logging for each retry attempt and circuit breaker state change",
+          "Simulate a downstream outage and verify the circuit opens and falls back gracefully"
+        ],
+        "expectedOutcome": "You should see the circuit open within seconds of a downstream outage, and the client should return a fallback response instead of hanging."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Retry storms form when uncoordinated retries multiply load on a failing service",
+          "Use exponential backoff with jitter to reduce synchronized retries",
+          "Circuit breakers stop the storm by failing fast when a service is unhealthy",
+          "Bulkheads and timeouts contain failures to a single dependency"
+        ],
+        "takeaway": "A resilient system does not just retry; it knows when to stop retrying and fall back gracefully."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Release It!",
+      "url": "https://www.amazon.com/Release-It-Production-Ready-Software/dp/1680502395",
+      "type": "book",
+      "author": "Michael Nygard",
+      "description": "Patterns for stabilizing and scaling production services, including circuit breakers and bulkheads."
+    }
+  ]
 }

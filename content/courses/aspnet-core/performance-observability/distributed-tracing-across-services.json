@@ -3,59 +3,136 @@
   "slug": "distributed-tracing-across-services",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Distributed tracing across services",
-  "description": "Learn about Distributed tracing across services. Master the concepts, patterns, and best practices.",
+  "title": "Distributed Tracing Across Services",
+  "description": "Implement end-to-end request tracing across multiple ASP.NET Core services using OpenTelemetry and W3C trace context propagation.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Distributed tracing across services** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with distributed tracing across services."
+        "text": "When a user action triggers calls across several microservices, traditional logs and metrics only tell you that something is slow. **Distributed tracing** stitches every hop into a single trace, showing you exactly which service, database call, or external dependency is the bottleneck."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of distributed tracing across services",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Traces, Spans, and Context Propagation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding distributed tracing across services is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A trace is a directed acyclic graph of spans. The root span represents the incoming request, and child spans represent downstream calls. Each span carries a trace ID that ties it back to the original request. To make this work across service boundaries, the trace context must be injected into HTTP headers and extracted by the next service."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Trace",
+            "definition": "A complete journey of a request as it moves through one or more services."
+          },
+          {
+            "term": "Span",
+            "definition": "A single unit of work within a trace, such as an HTTP call or database query."
+          },
+          {
+            "term": "W3C Trace Context",
+            "definition": "A standardized set of HTTP headers (`traceparent` and `tracestate`) that propagate trace IDs across services."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enabling OpenTelemetry in Program.cs",
+        "content": "Register OpenTelemetry with automatic instrumentation for ASP.NET Core, HTTP client calls, and an OTLP exporter.",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddOpenTelemetry()\n    .WithTracing(tracing =>\n    {\n        tracing.AddAspNetCoreInstrumentation();\n        tracing.AddHttpClientInstrumentation();\n        tracing.AddEntityFrameworkCoreInstrumentation();\n        tracing.AddOtlpExporter(options =>\n        {\n            options.Endpoint = new Uri(\"http://jaeger:4317\");\n        });\n    });\n\nvar app = builder.Build();\napp.MapControllers();\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating Custom Spans"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Automatic instrumentation covers HTTP, EF Core, and outgoing HTTP calls. For business logic or third-party libraries, create spans manually with an `ActivitySource`. The .NET runtime propagates the trace context automatically when you use `HttpClient`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Manual Span for Business Logic",
+        "content": "Wrap expensive logic or third-party calls in a custom span so they appear in your trace.",
+        "code": "public static class OrderProcessingActivities\n{\n    public const string SourceName = \"InterviewPrep.Orders\";\n    private static readonly ActivitySource s_source = new(SourceName);\n\n    public static ActivitySource Source => s_source;\n}\n\npublic class OrderService\n{\n    private readonly ActivitySource _activitySource;\n\n    public OrderService(ActivitySource activitySource)\n    {\n        _activitySource = activitySource;\n    }\n\n    public async Task ProcessAsync(Order order)\n    {\n        using var activity = _activitySource.StartActivity(\"ProcessOrder\", ActivityKind.Internal);\n        activity?.SetTag(\"order.id\", order.Id);\n        activity?.SetTag(\"order.items\", order.Items.Count);\n\n        await ValidateInventoryAsync(order);\n        await ChargePaymentAsync(order);\n        await FulfillAsync(order);\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with distributed tracing across services, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Sample in High-Traffic Services",
+        "text": "Collecting every trace in production can be expensive. Use head-based or tail-based sampling to keep storage costs manageable while still capturing enough data to debug incidents."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Best Practices",
+        "items": [
+          "Give spans descriptive names and add tags for business identifiers like `order.id` or `user.id`.",
+          "Keep spans short-lived; do not span minutes unless you are tracking a long-running job.",
+          "Never log sensitive data such as credit card numbers into span attributes.",
+          "Use W3C trace context so traces work across languages and vendors."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Distributed tracing connects spans across services using a shared trace ID.",
+          "OpenTelemetry automates instrumentation for ASP.NET Core, EF Core, and HttpClient.",
+          "Add custom spans for business-critical operations that automatic instrumentation misses.",
+          "Use sampling to control cost while retaining the ability to debug production issues."
+        ],
+        "takeaway": "Traces turn 'something is slow' into 'this specific downstream call is slow,' which is the difference between hours and minutes of debugging."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "application-metrics-vs-logs-vs-traces",
+    "structured-logging-and-correlation-ids",
+    "request-latency-decomposition"
+  ],
+  "furtherReading": [
+    {
+      "title": "OpenTelemetry distributed tracing concepts",
+      "url": "https://opentelemetry.io/docs/concepts/signals/traces/",
+      "type": "article"
+    },
+    {
+      "title": "W3C Trace Context specification",
+      "url": "https://www.w3.org/TR/trace-context/",
+      "type": "article"
+    },
+    {
+      "title": "OpenTelemetry .NET getting started",
+      "url": "https://opentelemetry.io/docs/languages/net/getting-started/",
+      "type": "article"
+    }
+  ]
 }

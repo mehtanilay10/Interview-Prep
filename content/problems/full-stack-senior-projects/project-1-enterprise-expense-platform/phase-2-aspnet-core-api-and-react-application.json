@@ -4,58 +4,218 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 2: ASP.NET Core API and React application",
-  "description": "Project: Phase 2: ASP.NET Core API and React application. Build and understand this project with step-by-step guidance.",
+  "description": "Scaffold the ASP.NET Core minimal API and React 19 application shells. Establish the vertical-slice folder layout, configure dependency injection, and wire up the first end-to-end flow for submitting an expense report.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "asp.net-core",
+    "react",
+    "vertical-slice",
+    "mediatr",
+    "api-design",
+    "vite"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 2: ASP.NET Core API and React application** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 2: asp.net core api and react application."
+        "text": "In this phase you'll stand up the application shells. The API and React app will evolve together, but the API must be usable independently — never let the React component dictate backend structure."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Vertical slice vs. layered folder structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For the Application layer, we prefer vertical slices over the traditional feature-less Service/Repository separation. Each feature (e.g., SubmitExpenseReport) owns its handler, validator, DTOs, and mapper in one folder. This keeps related changes together during code reviews and reduces the blast radius of refactors."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Vertical slice structure",
         "items": [
-          "Understand the fundamental principles of phase 2: asp.net core api and react application",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Expense.Application/ExpenseReports/Submit/ → SubmitExpenseReportCommand, Handler, Validator, Mapper.",
+          "Expense.Application/ExpenseReports/Approve/ → ApproveExpenseReportCommand, Handler, Validator.",
+          "Expense.Application/Shared/ → cross-cutting concerns like IPipelineBehavior, Result<T>."
         ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-vertical-slice",
+        "caption": "Vertical slice: one folder per use case",
+        "definition": "graph LR\n    subgraph SubmitExpense\n        C1[SubmitExpenseReportCommand]\n        H1[SubmitExpenseReportHandler]\n        V1[SubmitExpenseReportValidator]\n        M1[SubmitExpenseReportMapper]\n    end\n    subgraph ApproveExpense\n        C2[ApproveExpenseReportCommand]\n        H2[ApproveExpenseReportHandler]\n        V2[ApproveExpenseReportValidator]\n        M2[ApproveExpenseReportMapper]\n    end\n    subgraph Shared\n        P[IPipelineBehavior]\n        R[Result&lt;T&gt;]\n        E[IValidator&lt;T&gt;]\n    end\n    C1 --> H1 --> P\n    C2 --> H2 --> P\n    P --> R"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "ASP.NET Core project setup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs: minimal API with vertical slice registration",
+        "content": "Keep Program.cs focused on composition. Handlers should not be added here one-by-one — use Scrutor or reflection.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<ExpenseDbContext>(opt =>\n    opt.UseSqlServer(builder.Configuration.GetConnectionString(\"Expense\")));\n\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n{\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n    opt.InstanceName = \"ExpensePlatform:\";\n});\n\nbuilder.Services.AddMediatR(cfg =>\n    cfg.RegisterServicesFromAssembly(typeof(SubmitExpenseReportHandler).Assembly));\n\nbuilder.Services.AddValidatorsFromAssemblyContaining<SubmitExpenseReportValidator>();\nbuilder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationPipelineBehavior<,>));\nbuilder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingPipelineBehavior<,>));\n\nbuilder.Services.AddScoped<IExpenseReportRepository, ExpenseReportRepository>();\nbuilder.Services.AddScoped<IPolicyEngine, PolicyEngine>();\nbuilder.Services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\napp.MapGet(\"/health\", () => Results.Ok(new { status = \"healthy\" }));\n\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "First use case: SubmitExpenseReport"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 2: asp.net core api and react application is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The submit flow is the heart of the platform. It accepts a list of line items with optional receipt metadata, validates against policy, and returns a report ID with validation errors if any."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: SubmitExpenseReportCommand DTO",
+        "content": "DTOs are records for immutability. Domain-specific types (Money, LineItemCategory) prevent invalid input at compile time.",
+        "language": "csharp",
+        "code": "public sealed record SubmitExpenseReportCommand(\n    Guid OrganizationId,\n    Guid EmployeeId,\n    List<CreateLineItemDto> LineItems\n) : IRequest<Result<Guid>>;\n\npublic sealed record CreateLineItemDto(\n    LineItemCategory Category,\n    Money Amount,\n    DateOnly Date,\n    string? Description,\n    Guid? ReceiptId\n);"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: SubmitExpenseReportHandler",
+        "content": "Handlers are thin orchestration layers. They map input, call domain methods, persist via unit of work, and return a Result<T>.",
+        "language": "csharp",
+        "code": "public sealed class SubmitExpenseReportHandler : IRequestHandler<SubmitExpenseReportCommand, Result<Guid>>\n{\n    private readonly IExpenseReportRepository _reports;\n    private readonly IPolicyEngine _policy;\n    private readonly IUnitOfWork _uow;\n    private readonly ILogger<SubmitExpenseReportHandler> _log;\n\n    public SubmitExpenseReportHandler(\n        IExpenseReportRepository reports,\n        IPolicyEngine policy,\n        IUnitOfWork uow,\n        ILogger<SubmitExpenseReportHandler> log)\n    {\n        _reports = reports;\n        _policy = policy;\n        _uow = uow;\n        _log = log;\n    }\n\n    public async Task<Result<Guid>> Handle(SubmitExpenseReportCommand request, CancellationToken ct)\n    {\n        _log.LogInformation(\"Submitting expense report for employee {EmployeeId}\", request.EmployeeId);\n\n        var report = new ExpenseReport(request.EmployeeId, request.OrganizationId);\n        foreach (var line in request.LineItems)\n        {\n            report.AddLineItem(line.ToDomain());\n        }\n\n        try\n        {\n            report.Submit(_policy);\n        }\n        catch (DomainException ex)\n        {\n            _log.LogWarning(ex, \"Policy validation failed for report draft.\");\n            return Result<Guid>.Failure([ex.Message]);\n        }\n\n        await _reports.AddAsync(report, ct);\n        await _uow.SaveChangesAsync(ct);\n\n        return Result<Guid>.Success(report.Id);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React application scaffold"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The React app is a Vite + TypeScript + React 19 project. Feature-based folder structure mirrors the backend vertical slices."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "React folder structure",
+        "items": [
+          "src/features/expense-reports/ → components, hooks, api.ts, types.ts, pages.",
+          "src/features/auth/ → login, session management, role guards.",
+          "src/features/shared/ → UI primitives (Button, Card, DataTable).",
+          "src/lib/ → axios instance with auth interceptor, react-query hooks, error mapping."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TypeScript: expense report submit API client",
+        "content": "The API client returns typed responses and maps backend errors to user-friendly messages. Never expose raw ProblemDetails to the UI.",
+        "language": "typescript",
+        "code": "// src/features/expense-reports/api.ts\nimport axios from 'axios';\nimport type { AxiosError } from 'axios';\nimport type { ExpenseReport, LineItem } from './types';\n\nconst api = axios.create({ baseURL: import.meta.env.VITE_API_URL });\n\napi.interceptors.request.use((config) => {\n  const token = localStorage.getItem('auth_token');\n  if (token) config.headers.Authorization = `Bearer ${token}`;\n  return config;\n});\n\napi.interceptors.response.use(\n  (res) => res,\n  (err: AxiosError<{ title: string; detail: string }>) => {\n    const msg = err.response?.data?.detail ?? 'Something went wrong';\n    return Promise.reject(new Error(msg));\n  }\n);\n\nexport const submitExpenseReport = async (\n  orgId: string,\n  items: Omit<LineItem, 'id'>[]\n): Promise<ExpenseReport> => {\n  const { data } = await api.post('/api/expense-reports', {\n    organizationId: orgId,\n    lineItems: items.map((i) => ({\n      category: i.category,\n      amount: { amount: i.amount.amount, currency: i.amount.currency },\n      date: i.date,\n      description: i.description,\n    })),\n  });\n  return data;\n};\n\n// Infer response shape from backend\ninterface SubmitResponse {\n  id: string;\n  status: 'Draft' | 'Submitted' | 'Approved' | 'Rejected' | 'Paid';\n  totalAmount: { amount: number; currency: string };\n  submittedAt?: string;\n}\n\n// src/features/expense-reports/hooks.ts\nexport function useSubmitExpenseReport() {\n  const queryClient = useQueryClient();\n  return useMutation({\n    mutationFn: submitExpenseReport,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['expense-reports'] });\n    },\n  });\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 2: asp.net core api and react application, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid leaking backend shapes to the frontend",
+        "text": "Map DTOs to presentation models in the API layer or a dedicated shared-types package. If you return EF Core navigation properties in a JSON response, you've leaked your persistence model to every consumer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React: NewExpenseReport form component",
+        "content": "The form collects line items and submits. Validation errors from the backend are surfaced inline.",
+        "language": "tsx",
+        "code": "// src/features/expense-reports/components/NewExpenseReportForm.tsx\n'use client';\nimport { useState } from 'react';\nimport { useSubmitExpenseReport } from '../hooks';\nimport type { LineItemCategory } from '../types';\n\nconst CATEGORIES: LineItemCategory[] = [\n  'Meals', 'Travel', 'Lodging', 'Transport', 'Software', 'Equipment', 'Other'\n];\n\nexport function NewExpenseReportForm({ organizationId }: { organizationId: string }) {\n  const [items, setItems] = useState<CreateLineItem>([emptyItem()]);\n  const mutation = useSubmitExpenseReport();\n  const [error, setError] = useState<string | null>(null);\n\n  const addItem = () => setItems((prev) => [...prev, emptyItem()]);\n  const removeItem = (index: number) =>\n    setItems((prev) => prev.filter((_, i) => i !== index));\n\n  const handleSubmit = async (e: React.FormEvent) => {\n    e.preventDefault();\n    setError(null);\n    try {\n      await mutation.mutateAsync({ organizationId, lineItems: items });\n      alert('Report submitted successfully!');\n      setItems([emptyItem()]);\n    } catch (err) {\n      setError(err instanceof Error ? err.message : 'Submission failed');\n    }\n  };\n\n  return (\n    <form onSubmit={handleSubmit} className=\"space-y-4\">\n      <h2 className=\"text-xl font-semibold\">New Expense Report</h2>\n      {items.map((item, idx) => (\n        <div key={idx} className=\"grid grid-cols-1 sm:grid-cols-5 gap-2\">\n          <select\n            value={item.category}\n            onChange={(e) => updateItem(idx, 'category', e.target.value as LineItemCategory)}\n          >\n            {CATEGORIES.map((c) => (\n              <option key={c} value={c}>{c}</option>\n            ))}\n          </select>\n          <input\n            type=\"number\"\n            step=\"0.01\"\n            value={item.amount}\n            onChange={(e) => updateItem(idx, 'amount', parseFloat(e.target.value))}\n            placeholder=\"Amount\"\n          />\n          <input\n            type=\"date\"\n            value={item.date}\n            onChange={(e) => updateItem(idx, 'date', e.target.value)}\n          />\n          <input\n            value={item.description ?? ''}\n            onChange={(e) => updateItem(idx, 'description', e.target.value)}\n            placeholder=\"Description\"\n          />\n          <button type=\"button\" onClick={() => removeItem(idx)} className=\"btn btn-danger\">\n            Remove\n          </button>\n        </div>\n      ))}\n      <button type=\"button\" onClick={addItem} className=\"btn btn-secondary\">\n        Add Line Item\n      </button>\n      {error && <p className=\"text-red-500\">{error}</p>}\n      <button type=\"submit\" disabled={mutation.isPending} className=\"btn btn-primary\">\n        {mutation.isPending ? 'Submitting...' : 'Submit Report'}\n      </button>\n    </form>\n  );\n}\n\nfunction emptyItem(): CreateLineItem {\n  return {\n    category: 'Other',\n    amount: 0,\n    date: new Date().toISOString().slice(0, 10),\n    description: '',\n  };\n}\n\nfunction updateItem(idx: number, field: keyof CreateLineItem, value: string | number) {\n  setItems((prev) => {\n    const next = [...prev];\n    next[idx] = { ...next[idx], [field]: value };\n    return next;\n  });\n}"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 2 deliverables",
+        "items": [
+          {
+            "text": "ASP.NET Core API solution with 5 projects (Domain, Application, Infrastructure, Api, Shared)."
+          },
+          {
+            "text": "First MediatR handler (SubmitExpenseReport) end-to-end wired with DI."
+          },
+          {
+            "text": "React 19 + Vite app scaffolded with Vite proxy to API."
+          },
+          {
+            "text": "axios client with auth interceptor and typed error mapping."
+          },
+          {
+            "text": "NewExpenseReport form with dynamic line items and submit mutation."
+          },
+          {
+            "text": "OpenAPI/Swagger available at /swagger for API exploration."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 2 summary",
+        "points": [
+          "Vertical slices keep handlers, validators, and DTOs co-located per use case.",
+          "MediatR + ValidationBehavior keeps controllers thin and controllers testable.",
+          "React mirrors the backend slices under features/ for parity.",
+          "API contract is the boundary: never return EF entities directly."
+        ],
+        "takeaway": "You now have a running shell. The next phases add the security, data, and resilience layers — but the skeleton is stable enough to build on."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "MediatR: In-Process Notification Bus",
+      "url": "https://github.com/jbogard/MediatR",
+      "type": "tool",
+      "author": "Jimmy Bogard"
+    },
+    {
+      "title": "Microsoft: Vertical slice architecture",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/portable-class-libraries-in-net/vertical-slice",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Vite: Next Generation Frontend Tooling",
+      "url": "https://vitejs.dev/",
+      "type": "tool"
+    },
+    {
+      "title": "React 19 Documentation",
+      "url": "https://react.dev/",
+      "type": "article"
+    }
+  ]
 }

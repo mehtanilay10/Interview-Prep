@@ -1,61 +1,148 @@
 {
   "id": "lesson-csharp-fundamentals-advanced-c-runtime-memory-concurrency-spant-memoryt-and-ref-structs",
-  "slug": "spant-memoryt-and-ref-structs",
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
-  "title": "Span<T>, Memory<T> and ref structs",
-  "description": "Learn about Span<T>, Memory<T> and ref structs. Master the concepts, patterns, and best practices.",
   "order": 14,
+  "slug": "spant-memoryt-and-ref-structs",
+  "title": "Span<T>, Memory<T> and ref structs",
+  "description": "Master Span<T> and Memory<T> for zero-allocation slicing, understand ref struct restrictions, and apply these types in performance-critical code.",
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["Span", "Memory", "ref-struct", "stackalloc", "zero-allocation", "slicing"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Span<T>, Memory<T> and ref structs** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with span<t>, memory<t> and ref structs."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of span<t>, memory<t> and ref structs",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "`Span<T>` and `Memory<T>` are the foundation of modern high-performance .NET code. They represent a contiguous region of memory — an array slice, a string segment, a stack-allocated buffer — without allocating a new object. Before `Span<T>` existed, slicing an array required `ArraySegment<T>`, which created a wrapper object and did not work with strings or stack memory. `Span<T>` unifies all these scenarios into a single, allocation-free abstraction that the JIT can optimize aggressively."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding span<t>, memory<t> and ref structs is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The key difference between `Span<T>` and `Memory<T>` is their lifetime restrictions. `Span<T>` is a `ref struct` — it can only live on the stack. You cannot store a `Span<T>` in a class field, a `Dictionary`, or an async method's state machine. `Memory<T>` is a regular `struct` that can be stored anywhere, including heap-allocated objects. `Memory<T>` provides a `Span` property when you need to access the underlying memory. This design gives you both safety (the compiler prevents dangling references) and flexibility (async methods can use `Memory<T>`)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Span<T>: the stack-only memory view"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Span<T>` is a `ref struct` backed by a pointer and a length. The pointer can point to a managed array, a stack-allocated buffer from `stackalloc`, or memory on the stack obtained via `MemoryMarshal`. Because `Span<T>` lives on the stack, the GC can never move it while it is in scope — the compiler guarantees that `Span<T>` never escapes the method that created it. This makes `Span<T>` safe to use with pointers and unmanaged code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Span<T> slicing without allocation",
+        "code": "byte[] buffer = File.ReadAllBytes(\"document.pdf\");\n\n// Create a Span over the entire buffer — no copy\nSpan<byte> data = buffer;\n\n// Slice into header, body, and footer — still no allocation\nSpan<byte> header = data.Slice(0, 4);\nSpan<byte> body = data.Slice(4, data.Length - 8);\nSpan<byte> footer = data.Slice(data.Length - 4, 4);\n\n// Parse an integer from the header directly from memory\nint fileType = BitConverter.ToInt32(header);\nConsole.WriteLine($\"File type: 0x{fileType:X8}\");\n\n// Span works with strings via ReadOnlySpan<char>\nReadOnlySpan<char> text = \"Hello, Span<T>\".AsSpan();\nReadOnlySpan<char> word = text.Slice(7, 4);\nConsole.WriteLine(word.ToString()); // Span",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "stackalloc: stack-allocated buffers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`stackalloc` allocates memory directly on the current thread's stack. In safe code, the allocated memory is automatically bounded — you cannot allocate more than a few kilobytes, and the runtime tracks the bounds. The result is a `Span<T>` that points to the stack buffer. When the method returns, the stack frame is destroyed and the memory is reclaimed. No heap allocation, no GC pressure, no cleanup needed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using stackalloc for a small buffer",
+        "code": "// Allocate 128 bytes on the stack\nSpan<byte> stackBuffer = stackalloc byte[128];\n\n// Fill the buffer with random bytes\nRandom.Shared.NextBytes(stackBuffer);\n\n// Write the buffer to a file asynchronously\nawait File.WriteAllBytesAsync(\"random.bin\", stackBuffer.ToArray());\n// stackBuffer is reclaimed automatically here\n\n// Parsing a number from a stack-allocated char buffer\nSpan<char> digits = stackalloc char[10];\nint length = int.TryParse(\"12345\", digits, out int parsed);\nConsole.WriteLine($\"Parsed {length} chars: {parsed}\");",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Memory<T>: the heap-safe alternative"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Memory<T>` wraps the same underlying memory as `Span<T>` but without the stack-only restriction. You can store `Memory<T>` in a class field, pass it to async methods, and keep it for as long as you need. When you are ready to access the data, call `.Span` to get a `Span<T>` view. This indirection is the key to using sliceable memory in async code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using Memory<T> in an async method",
+        "code": "public async Task ProcessChunkAsync(Memory<byte> chunk)\n{\n    // Memory<T> can be stored in fields, passed to async methods\n    // Access the Span when ready to work\n    Span<byte> span = chunk.Span;\n\n    // Process synchronously (CPU-bound)\n    int checksum = ComputeChecksum(span);\n\n    // Write asynchronously (I/O-bound)\n    await _stream.WriteAsync(chunk);\n}\n\n// Calling with an array slice — no copy\nbyte[] largeBuffer = GetData();\nawait ProcessChunkAsync(largeBuffer.AsMemory(1024, 4096));",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ref struct restrictions: what Span<T> cannot do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because `Span<T>` is a `ref struct`, the C# compiler enforces strict rules. You cannot box a `Span<T>`, store it in a `Dictionary`, use it as a generic type argument without constraints, or capture it in a lambda. You cannot `await` inside a method that contains a `Span<T>` local variable. These restrictions exist because the compiler cannot prove that a `Span<T>` would not outlive the stack frame it was created in. The rules are strict, but they prevent an entire class of memory-safety bugs."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with span<t>, memory<t> and ref structs, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Cannot await in a method that holds a Span<T>",
+        "text": "If your method allocates a `Span<T>` and then hits an `await`, the compiler will reject it. The span lives on the stack, but `await` splits the method into a state machine that may resume on a different stack frame. To work around this, use `Memory<T>` instead, or process the span synchronously before awaiting. This is the single most common `ref struct` restriction developers encounter."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "span-memory-hierarchy",
+        "code": "flowchart TB\n    A[\"Memory Region\"] --> B[\"Span<T>\n(stack-only, ref struct)\"]\n    A --> C[\"Memory<T>\n(heap-safe, regular struct)\"]\n\n    B --> D[\"Slice()\nZero-copy sub-view\nNo allocation\"]\n    C --> E[\".Span property\nReturns Span<T>\nwhen needed\"]\n\n    F[\"stackalloc\nStack-allocated buffer\nAuto-reclaimed\"] --> B\n    G[\"byte[].AsSpan()\nManaged array view\nNo copy\"] --> B\n    H[\"string.AsSpan()\nReadOnlySpan<char>\nZero-copy\"] --> B\n\n    style B fill:#2563eb,color:#fff\n    style C fill:#16a34a,color:#fff\n    style D fill:#f59e0b,color:#fff",
+        "caption": "Span<T> and Memory<T> provide zero-allocation views into memory from arrays, strings, and stackalloc buffers."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "`Span<T>` is a stack-only, allocation-free view over contiguous memory from arrays, strings, or stackalloc.",
+          "`Memory<T>` is the heap-safe alternative that can be stored in fields and passed to async methods.",
+          "`ref struct` restrictions prevent `Span<T>` from being boxed, stored in collections, or captured across await points.",
+          "`stackalloc` allocates on the thread stack and is automatically reclaimed when the method returns."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["boxing-and-hidden-allocations", "arraypoolt-and-memorypoolt", "idisposable-finalization-and-deterministic-cleanup"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Span<T> and Memory<T> overview",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/memory-and-spans/"
+    },
+    {
+      "type": "article",
+      "title": "ref structs and the ref safety rules",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct"
+    },
+    {
+      "type": "article",
+      "title": "stackalloc and stack-only types",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/stackalloc"
+    }
+  ]
 }

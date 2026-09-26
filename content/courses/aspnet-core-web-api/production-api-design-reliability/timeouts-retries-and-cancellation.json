@@ -4,58 +4,164 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Timeouts, retries and cancellation",
-  "description": "Learn about Timeouts, retries and cancellation. Master the concepts, patterns, and best practices.",
+  "description": "Handle transient failures gracefully. Learn timeout strategies, retry policies with Polly, and how to wire CancellationToken through every layer of an ASP.NET Core API.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Timeouts, retries and cancellation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with timeouts, retries and cancellation."
+        "text": "External calls fail. Databases hiccup, third-party APIs return 503, and networks blip. The difference between a resilient API and a fragile one is not that failures disappear—it is that the API handles them without corrupting data, exhausting threads, or cascading the failure to every downstream caller."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers three pillars of resilience: timeouts that bound how long you wait, retry policies that recover from transient faults, and cancellation tokens that stop work cleanly when the caller gives up."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Timeouts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every outbound HTTP call and database query should have a timeout. Without one, a slow dependency ties up a thread indefinitely. In ASP.NET Core, the default `HttpClient` timeout is 100 seconds, which is almost always too long for an API that should respond in under 5 seconds."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HttpClient with explicit timeout",
+        "code": "public class OrderApiClient\n{\n    private readonly HttpClient _http;\n    private readonly TimeSpan _timeout = TimeSpan.FromSeconds(5);\n\n    public OrderApiClient(HttpClient http)\n    {\n        _http = http;\n        _http.Timeout = _timeout;\n    }\n\n    public async Task<OrderResult> GetOrderAsync(Guid id, CancellationToken ct)\n    {\n        var response = await _http.GetAsync($\"/orders/{id}\", ct);\n        response.EnsureSuccessStatusCode();\n        return await response.Content.ReadFromJsonAsync<OrderResult>(cancellationToken: ct)\n            ?? throw new InvalidOperationException(\"Empty response.\");\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always pass the incoming `CancellationToken` to downstream calls. If the client disconnects or its own timeout fires, the cancellation token propagates and stops work immediately instead of leaving orphaned operations running."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry policies with Polly"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Polly is the de facto resilience library for .NET. It provides fluent policies for retry, circuit breaker, timeout, and fallback. A retry policy automatically re-executes an operation when a transient exception occurs. Not every failure is transient: a 400 Bad Request should not be retried. A 503 Service Unavailable or a transient network exception usually is."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Retry policy with exponential backoff",
+        "code": "public static class ResiliencePolicies\n{\n    public static IAsyncPolicy<HttpResponseMessage> CreateHttpRetryPolicy()\n    {\n        return HttpPolicyExtensions\n            .HandleTransientHttpError()\n            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.NotFound)\n            .WaitAndRetryAsync(\n                retryCount: 3,\n                sleepDurationProvider: attempt =>\n                    TimeSpan.FromMilliseconds(200 * Math.Pow(2, attempt)),\n                onRetry: (outcome, timespan, attempt, context) =>\n                {\n                    Console.WriteLine($\"Retry {attempt} after {timespan.TotalMilliseconds}ms: \" +\n                        outcome.Exception?.Message ?? outcome.Result.StatusCode.ToString());\n                    return Task.CompletedTask;\n                }\n            );\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Exponential backoff with jitter prevents thundering herds. If 1000 clients retry at the same fixed interval after an outage, they all hit the recovering service at once and push it back down. Jitter randomizes each retry delay so the load spreads naturally."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cancellation tokens in ASP.NET Core"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core automatically binds `CancellationToken` from the HTTP request to controller action parameters. Pass that token into every `async` method, EF Core query, `HttpClient` call, and background task. When the client closes the browser or its own timeout fires, ASP.NET cancels the token and your code stops."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Controller action with cancellation",
+        "code": "[HttpGet(\"{id:guid}\")]\npublic async Task<IActionResult> Get(Guid id, CancellationToken ct)\n{\n    var order = await _db.Orders\n        .FirstOrDefaultAsync(o => o.Id == id, ct);\n\n    if (order is null) return NotFound();\n\n    var result = await _externalService.EnrichAsync(order, ct);\n    return Ok(result);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When not to retry"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of timeouts, retries and cancellation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "4xx client errors except 408 and 429: the client should fix the request, not retry.",
+          "Validation failures: retrying the same bad payload will never succeed.",
+          "Non-idempotent POST without an idempotency key: retrying may create duplicate records.",
+          "Compensation already triggered: if a saga rolled back, do not retry the original action."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding timeouts, retries and cancellation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with timeouts, retries and cancellation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Resilience rule",
+        "text": "Retry, timeout, and cancellation belong together. A retry policy without a timeout can hang forever; a timeout without retry wastes recoverable requests; cancellation without retry leaks resources."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Set explicit, short timeouts on all outbound calls; default to under five seconds for API-to-API calls.",
+          "Use Polly with exponential backoff and jitter for retries of transient failures only.",
+          "Pass the request `CancellationToken` through every layer so cancelled requests stop work promptly.",
+          "Never retry client errors or non-idempotent mutations without an idempotency key."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "idempotency-keys-and-duplicate-request-handling",
+    "rate-limiting-and-load-shedding"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs: Polly integration",
+      "url": "https://learn.microsoft.com/aspnet/core/http/ Polly",
+      "type": "article"
+    },
+    {
+      "title": "Polly Documentation",
+      "url": "https://www.pollydocs.org",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs: Controller action return types",
+      "url": "https://learn.microsoft.com/aspnet/core/web-api/action-return-types",
+      "type": "article"
+    }
+  ]
 }

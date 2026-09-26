@@ -13,24 +13,53 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a React context used for rapidly changing server state** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a react context used for rapidly changing server state."
+        "text": "**Review a React context used for rapidly changing server state** is a state-architecture smell. React Context broadcasts any value change to every consumer, regardless of whether they care about that specific update. When the value is server state that updates frequently—API responses, WebSocket messages, or polling data—every consumer re-renders on every tick, even if its branch of the tree does not use the changed data."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Context is a poor fit for server state"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a react context used for rapidly changing server state",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Context triggers re-renders for every consumer when the value reference changes, even if the consumer uses memoization",
+          "Server state updates on a timer (polling, SSE, WebSocket) can fire dozens of times per minute",
+          "Merging server state into a single context value creates a single point of update with a large blast radius",
+          "Context does not provide caching, deduplication, or background refetching",
+          "Caching and invalidation logic must be written by hand, often incorrectly",
+          "Testing requires wrapping every test in the full provider tree"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Server state",
+            "definition": "Data that lives on the server and is fetched over the network. It is inherently asynchronous and can become stale."
+          },
+          {
+            "term": "Client state",
+            "definition": "Data that lives in the browser and is local to the app: UI toggles, form inputs, modal open flags."
+          },
+          {
+            "term": "Stale-while-revalidate",
+            "definition": "A caching strategy that returns cached data immediately while refreshing it in the background."
+          },
+          {
+            "term": "Cache invalidation",
+            "definition": "Marking cached data as outdated so it is refetched on the next read."
+          },
+          {
+            "term": "Blast radius",
+            "definition": "The number of components that must re-render when a piece of state changes."
+          }
         ]
       }
     },
@@ -38,24 +67,165 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The anti-pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a react context used for rapidly changing server state is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The typical anti-pattern is a single ApiContext that stores the entire server state tree. A polling interval updates the context every five seconds, and every component that calls useContext(ApiContext) re-renders even if it only reads user.profile while the update changed user.notifications."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Context for rapidly changing server state",
+        "content": "This pattern causes every consumer to re-render on every poll, even if their slice of state did not change:",
+        "code": "const ApiContext = createContext<ApiState | null>(null);\n\nfunction App() {\n  const [state, setState] = useState<ApiState>({ user: null, posts: [] });\n\n  useEffect(() => {\n    const id = setInterval(async () => {\n      const data = await fetch('/api/state').then(r => r.json());\n      setState(data); // Every consumer re-renders every 5 seconds\n    }, 5000);\n    return () => clearInterval(id);\n  }, []);\n\n  return (\n    <ApiContext.Provider value={state}>\n      <Dashboard />\n    </ApiContext.Provider>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Better alternatives"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "React Query / TanStack Query: per-query caching, background refetching, and selective subscriptions",
+          "Zustand with selectors: components subscribe to slices of state and only re-render when their slice changes",
+          "Split contexts: separate UserContext, PostsContext, and NotificationsContext so updates are scoped",
+          "Event-driven updates: dispatch fine-grained events to individual stores instead of broadcasting a monolithic state",
+          "URL state: cacheable and shareable server state can live in the URL via query parameters"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "State management for server data",
+        "cards": [
+          {
+            "title": "Single Context",
+            "description": "One context holds all server state and updates on a timer.",
+            "pros": ["Simple to set up", "No external library"],
+            "cons": ["All consumers re-render on every update", "No caching or deduplication", "Hard to test"]
+          },
+          {
+            "title": "React Query",
+            "description": "Per-query cache with background refetching and stale-while-revalidate.",
+            "pros": ["Selective subscriptions", "Built-in caching and deduplication", "DevTools"],
+            "cons": ["Learning curve", "Requires query key discipline"]
+          },
+          {
+            "title": "Split Contexts",
+            "description": "Multiple small contexts, each managing its own domain of server state.",
+            "pros": ["Scoped re-renders", "No external library"],
+            "cons": ["Provider boilerplate", "Still no caching or refetch logic"]
+          },
+          {
+            "title": "Zustand with selectors",
+            "description": "Global store where components subscribe to specific slices.",
+            "pros": ["Minimal re-renders", "Simple API", "No provider wrapping"],
+            "cons": ["Still global coupling", "No built-in async lifecycle"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a react context used for rapidly changing server state, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Separate client state from server state",
+        "text": "Client state is UI toggles, form inputs, and local selections. Server state is data that originated on the server and can become stale. Treat them with different tools. Context is fine for client state; use React Query or a dedicated server-state library for data that changes on a schedule."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migration path"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Identify the server-state queries currently in Context",
+          "Install React Query and create query hooks for each endpoint",
+          "Replace useContext reads with useQuery calls in the components that need them",
+          "Remove the ApiContext provider and related polling effect",
+          "Verify render counts with React DevTools Profiler"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Migrate server state out of Context",
+        "description": "Take a component that reads server state from a single Context. Migrate it to React Query with per-query hooks. Measure render counts before and after.",
+        "steps": [
+          "Identify the Context value and how often it updates",
+          "Create a useQuery hook for the specific endpoint the component needs",
+          "Replace the useContext call with the query hook",
+          "Remove the component from the Context consumer list",
+          "Profile render counts in React DevTools to confirm the reduction"
+        ],
+        "expectedOutcome": "The component should re-render only when its specific query data changes, not on every global state update."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-ups",
+        "items": [
+          {
+            "question": "Is Context always wrong for server state?",
+            "answer": "Context is fine for server state that changes rarely, like feature flags or user profile. It becomes a problem when the value updates frequently and many consumers do not need every update."
+          },
+          {
+            "question": "What about WebSocket messages?",
+            "answer": "WebSocket data is ideal for React Query with a custom query function that returns a promise resolving on the next message. Alternatively, use a Zustand store with a selector so each component subscribes to the channel it cares about."
+          },
+          {
+            "question": "Can I use Context for server state if I memoize the value?",
+            "answer": "Memoizing the value object only prevents re-renders when the reference is stable. If the inner data changes, you still need to create a new reference, which triggers all consumers. Memoization does not solve the broadcast problem."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Context broadcasts changes to every consumer, regardless of whether they use the changed data",
+          "Use React Query or per-query hooks for server state that updates frequently",
+          "Split large contexts into domain-specific ones if you must use Context",
+          "Measure render counts before and after to verify the improvement",
+          "Keep client state and server state in separate tools"
+        ],
+        "takeaway": "The right tool for server state is one that knows about caching, staleness, and background refetching. Context is not that tool."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "TanStack Query: Overview",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/overview",
+      "type": "article",
+      "description": "Introduction to React Query and why it is the standard for server state in React."
+    },
+    {
+      "title": "React Docs: Sharing State Between Components",
+      "url": "https://react.dev/learn/sharing-state-between-components",
+      "type": "article",
+      "description": "Official guidance on when to use Context versus other state-sharing patterns."
+    }
+  ]
 }

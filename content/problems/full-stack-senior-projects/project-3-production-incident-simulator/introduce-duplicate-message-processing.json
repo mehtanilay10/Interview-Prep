@@ -8,54 +8,211 @@
   "order": 5,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["message-queue", "idempotency", "distributed-systems", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce duplicate message processing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce duplicate message processing."
+        "text": "Message queues promise at-least-once delivery, which means consumers must handle duplicates gracefully. Without idempotency, a retried message or a redelivered event can create duplicate charges, double bookings, or corrupt aggregates. This lesson covers the duplicate-message problem, idempotency key design, and deduplication strategies at the consumer level."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How duplicates arise"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce duplicate message processing",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Consumer crashes after processing but before acknowledging the message",
+          "Network partition causes the broker to redeliver unacknowledged messages",
+          "Consumer group rebalance causes partitions to be reassigned and offsets to reset",
+          "Manual retries in the application layer without tracking processed message IDs",
+          "Poison messages that fail repeatedly and are eventually retried after TTL expiry"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Idempotency key",
+            "definition": "A unique identifier included in a message that the consumer uses to detect and skip duplicate processing."
+          },
+          {
+            "term": "Exactly-once semantics",
+            "definition": "A messaging guarantee where each message is delivered and processed exactly once, regardless of retries or failures."
+          },
+          {
+            "term": "Dead-letter queue",
+            "definition": "A queue where messages are routed after repeated processing failures, allowing operators to inspect and replay them manually."
+          },
+          {
+            "term": "Poison message",
+            "definition": "A message that consistently causes consumer failures due to bad data or serialization errors."
+          },
+          {
+            "term": "Deduplication window",
+            "definition": "The time period during which a consumer should remember processed message IDs to reject duplicates."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Idempotency is most critical on write operations. Reading the same message twice is harmless; charging a customer twice is not. Design your consumer so that reprocessing produces the same result as processing once. The easiest way is to make every handler a pure function of the idempotency key and the message payload."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent message handler with Redis deduplication",
+        "content": "A background service that checks a deduplication store before processing:",
+        "code": "public class OrderCreatedHandler : IBackgroundService\n{\n    private readonly IDatabase _redis;\n    private readonly IOrderRepository _orders;\n\n    public async Task ProcessAsync(Message envelope, CancellationToken ct)\n    {\n        var key = $\"dedup:{envelope.MessageId}\";\n        var exists = await _redis.KeyExistsAsync(key);\n        if (exists)\n        {\n            _logger.LogInformation(\"Duplicate message {Id} skipped\",\n                envelope.MessageId);\n            return;\n        }\n\n        var order = MapToOrder(envelope);\n        await _orders.CreateAsync(order, ct);\n        await _redis.StringSetAsync(key, \"1\", TimeSpan.FromHours(24));\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Deduplication strategies"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding introduce duplicate message processing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Use the message ID as a deduplication key stored in Redis or a database with TTL",
+          "Leverage broker-native deduplication where available, such as Kafka idempotent producers",
+          "Use database unique constraints on business keys as the final guard against duplicates",
+          "Design handlers so reprocessing is safe even when the deduplication store is cold",
+          "Route poison messages to a dead-letter queue after a configurable retry limit"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Messaging guarantees and their trade-offs",
+        "cards": [
+          {
+            "title": "At-least-once with dedup",
+            "description": "Broker may redeliver; consumer must handle duplicates.",
+            "pros": ["Simple broker configuration", "Widely supported", "Consumer has full control"],
+            "cons": ["Consumer must implement dedup logic", "Requires durable dedup store"]
+          },
+          {
+            "title": "Exactly-once (Kafka)",
+            "description": "Broker and consumer cooperate to process each message once.",
+            "pros": ["No consumer dedup logic", "Stronger consistency guarantees", "Atomic offset commit with state"],
+            "cons": ["Higher latency from two-phase commit", "Requires idempotent producer config"]
+          },
+          {
+            "title": "At-most-once",
+            "description": "Messages may be dropped but never duplicated.",
+            "pros": ["Simplest to implement", "No dedup overhead"],
+            "cons": ["Data loss under failures", "Not suitable for financial or audit events"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-dedup-flow",
+        "caption": "Message processing flow with idempotency check",
+        "definition": "graph TD\n    A[Message received] --> B{Check dedup store}\n    B -->|Found| C[Skip and ack]\n    B -->|Not found| D[Process message]\n    D --> E{Processing succeeded?}\n    E -->|Yes| F[Write result]\n    F --> G[Store dedup key with TTL]\n    G --> H[Ack message]\n    E -->|No| I[Log error]\n    I --> J[Retry or DLQ]\n    C --> K[Done]\n    H --> K\n    J --> K"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce duplicate message processing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Deduplication stores can fail too",
+        "text": "If the deduplication store is unavailable, the consumer must choose between blocking or processing. Blocking preserves dedup guarantees but reduces throughput. Processing preserves throughput but risks duplicates. Document this trade-off explicitly and choose based on the business impact of duplicates."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "How long should the deduplication window be?",
+            "answer": "Long enough to exceed the maximum redelivery delay for your broker. For RabbitMQ with TTL, 24 hours is a common choice. For Kafka, the window should cover the maximum log retention period plus processing delay."
+          },
+          {
+            "question": "Do I need deduplication if I use a transaction?",
+            "answer": "Database transactions prevent partial writes but do not prevent duplicate messages from being processed. A transaction can succeed twice on two redeliveries if the consumer does not track message IDs. Use transactions for atomicity and dedup for idempotency."
+          },
+          {
+            "question": "Can I rely on the broker for deduplication?",
+            "answer": "Some brokers offer idempotent consumers or deduplication plugins. These are helpful but should be treated as an additional layer, not a replacement for application-level idempotency. Broker behavior can change across versions or during failover."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add idempotency to a payment processor",
+        "description": "Your payment processor consumes events from a queue and charges customers. A retried event has already charged some customers twice. Design the idempotency mechanism and describe how you would recover from the duplicate charges already made.",
+        "steps": [
+          "Identify the business key for each payment event",
+          "Design the idempotency key and where to store it",
+          "Define the recovery process for already-duplicated charges",
+          "Add monitoring for duplicate detection rate"
+        ],
+        "expectedOutcome": "You should produce an idempotent consumer design with a rollback plan and observability for duplicate detection."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "At-least-once delivery means duplicates are inevitable; design for them",
+          "Idempotency keys with TTL-based dedup stores are the standard defense",
+          "Database unique constraints are the final guard against duplicates",
+          "Poison messages need a dead-letter path, not infinite retries",
+          "Test dedup behavior by replaying the same message twice"
+        ],
+        "takeaway": "A senior engineer assumes every message will be delivered more than once and builds the consumer so that reprocessing is harmless. This assumption is the difference between a system that survives failures and one that silently corrupts data."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-downstream-timeout",
+    "introduce-broken-deployment",
+    "write-a-root-cause-analysis-and-remediation-plan"
+  ],
+  "furtherReading": [
+    {
+      "title": "Idempotency in Distributed Systems",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/idempotency",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Azure Architecture Center guide to idempotency patterns and their use cases."
+    },
+    {
+      "title": "Kafka Idempotent Producer",
+      "url": "https://kafka.apache.org/documentation/#producerconfigs_enable.idempotence",
+      "type": "article",
+      "author": "Apache Kafka",
+      "description": "Official documentation on enabling idempotent producers in Kafka."
+    }
+  ]
 }

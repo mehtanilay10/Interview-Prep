@@ -8,54 +8,211 @@
   "order": 8,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["kubernetes", "health-checks", "devops", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce Kubernetes health-check failure** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce kubernetes health-check failure."
+        "text": "Kubernetes uses three types of probes to manage pod lifecycle: liveness, readiness, and startup. A misconfigured probe can kill a healthy pod, route traffic to an unready instance, or block deployments indefinitely. This lesson covers how each probe type works, common configuration mistakes, and how to diagnose probe failures from events and metrics."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Probe types and their roles"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce kubernetes health-check failure",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Liveness probe: detects if the application is running; failure causes a restart",
+          "Readiness probe: detects if the application can serve traffic; failure removes the pod from the service",
+          "Startup probe: delays liveness and readiness checks until the application has finished initialization",
+          "Probe thresholds: failureThreshold and successThreshold control how many attempts before a decision is made",
+          "Probe timing: initialDelaySeconds, periodSeconds, and timeoutSeconds determine how aggressively Kubernetes probes"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Liveness probe",
+            "definition": "A Kubernetes probe that determines whether a container is running; failure triggers a restart of the container."
+          },
+          {
+            "term": "Readiness probe",
+            "definition": "A Kubernetes probe that determines whether a container is ready to accept traffic; failure removes the pod from endpoints."
+          },
+          {
+            "term": "Startup probe",
+            "definition": "A Kubernetes probe that delays liveness and readiness checks until the application has completed startup."
+          },
+          {
+            "term": "Pod disruption budget",
+            "definition": "A policy that limits how many pods of a replicated application can be unavailable simultaneously."
+          },
+          {
+            "term": "Rolling update",
+            "definition": "A deployment strategy that gradually replaces old pods with new ones while maintaining availability."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common mistake is setting liveness and readiness probes to the same endpoint with the same timing. A liveness probe that checks the database will restart the pod during a database blip, even if the pod could recover on its own. Readiness probes should be more sensitive than liveness probes because they affect traffic routing rather than process lifecycle."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Correct probe configuration",
+        "content": "A deployment with distinct liveness, readiness, and startup probes:",
+        "code": "livenessProbe:\n  httpGet:\n    path: /health/live\n    port: 8080\n  initialDelaySeconds: 5\n  periodSeconds: 10\n  failureThreshold: 3\n\nreadinessProbe:\n  httpGet:\n    path: /health/ready\n    port: 8080\n  initialDelaySeconds: 2\n  periodSeconds: 5\n  failureThreshold: 2\n\nstartupProbe:\n  httpGet:\n    path: /health/startup\n    port: 8080\n  failureThreshold: 30\n  periodSeconds: 2",
+        "language": "yaml"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Diagnosing probe failures"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding introduce kubernetes health-check failure is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Check pod events with kubectl describe pod for ProbeError or Unhealthy events",
+          "Verify the probe path responds correctly from inside the cluster network",
+          "Confirm the probe timeout is shorter than the endpoint processing time",
+          "Check whether the probe port matches the container port and containerPort",
+          "Review pod logs around the time of restart to identify application-level errors"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Deployment strategies and probe behavior",
+        "cards": [
+          {
+            "title": "Rolling update",
+            "description": "Gradually replaces old pods with new ones.",
+            "pros": ["No downtime if probes are correct", "Automatic rollback on failure", "Standard Kubernetes behavior"],
+            "cons": ["Requires proper readiness probes", "Can cause resource spikes during rollout"]
+          },
+          {
+            "title": "Recreate",
+            "description": "Tears down all old pods before starting new ones.",
+            "pros": ["Simple", "No mixed-version traffic"],
+            "cons": ["Downtime during the gap", "No gradual validation"]
+          },
+          {
+            "title": "Blue-green",
+            "description": "Switches traffic between two complete environments.",
+            "pros": ["Instant rollback", "Full environment for validation"],
+            "cons": ["Requires duplicate infrastructure", "Complex state migration"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-k8s-probe-lifecycle",
+        "caption": "Kubernetes pod lifecycle managed by liveness, readiness, and startup probes",
+        "definition": "graph TD\n    A[Pod scheduled] --> B{Startup probe passes?}\n    B -->|No| C[Restart container]\n    B -->|Yes| D[Liveness + Readiness active]\n    D --> E{Readiness passes?}\n    E -->|No| F[Remove from service endpoints]\n    E -->|Yes| G[Add to service endpoints]\n    D --> H{Liveness fails?}\n    H -->|Yes| I[Kill and recreate pod]\n    H -->|No| J[Continue serving]\n    F --> K[Wait for readiness recovery]\n    K --> E\n    I --> A\n\n    note right of B\n        Startup probe gives slow-starting\n        apps time before liveness kills them.\n    end note\n\n    note right of H\n        Liveness is for broken processes,\n        not for overloaded dependencies.\n    end note"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce kubernetes health-check failure, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Liveness probes should not check downstream dependencies",
+        "text": "A liveness probe that checks a database or external API will restart the pod whenever that dependency has a blip, even if the pod itself is healthy. Liveness should verify the process is running; readiness should verify dependencies are reachable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Why is my pod stuck in CrashLoopBackOff?",
+            "answer": "Check the startup probe failureThreshold. If the application takes longer to start than the total startup window, Kubernetes kills and restarts it. Increase failureThreshold or fix the slow startup."
+          },
+          {
+            "question": "Why does traffic stop reaching my pod?",
+            "answer": "The readiness probe is likely failing. Describe the pod and look for Unhealthy events. Verify the readiness endpoint is accessible from the cluster network and responds within the timeout."
+          },
+          {
+            "question": "Should I use TCP sockets instead of HTTP probes?",
+            "answer": "TCP probes are useful for non-HTTP services such as databases, but they only verify the port is open, not that the application can serve requests. Prefer HTTP probes for web services; use TCP probes only as a fallback."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Diagnose and fix a probe misconfiguration",
+        "description": "A pod is repeatedly restarting and failing its health checks. The readiness probe endpoint checks a database that is temporarily unavailable. Diagnose the issue and propose a fix.",
+        "steps": [
+          "Use kubectl describe pod to identify which probe is failing",
+          "Determine whether liveness or readiness is the culprit",
+          "Propose separate endpoints for liveness and readiness",
+          "Adjust timing and thresholds to tolerate brief dependency unavailability"
+        ],
+        "expectedOutcome": "You should produce a corrected probe configuration that prevents unnecessary restarts while still routing traffic away from unhealthy pods."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Use distinct endpoints for liveness, readiness, and startup probes",
+          "Liveness should not depend on downstream services",
+          "Startup probes protect slow-starting applications from premature kills",
+          "Diagnose probe failures from kubectl describe and pod events",
+          "Test probe configurations in staging under dependency failures"
+        ],
+        "takeaway": "Kubernetes probes are the safety net that keeps deployments healthy. A senior engineer configures them deliberately because a bad probe can turn a recoverable error into a cascading restart storm."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-broken-deployment",
+    "introduce-downstream-timeout",
+    "investigate-using-logs-metrics-and-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article",
+      "author": "Kubernetes",
+      "description": "Official documentation on configuring liveness, readiness, and startup probes."
+    },
+    {
+      "title": "Pod Disruption Budgets",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/disruptions/",
+      "type": "article",
+      "author": "Kubernetes",
+      "description": "How to protect workloads from voluntary disruptions during cluster operations."
+    }
+  ]
 }

@@ -3,196 +3,192 @@
   "slug": "layout-thrashing",
   "moduleSlug": "runtime-performance",
   "courseSlug": "frontend-performance-engineering",
-  "title": "layout-thrashing",
-  "description": "Learn about layout-thrashing. Master the concepts, patterns, and best practices.",
+  "title": "Layout Thrashing",
+  "description": "Learn how forced synchronous layout kills rendering performance, how to detect it in DevTools, and how to batch DOM reads and writes to eliminate it.",
   "order": 2,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": [
+    "reflow",
+    "forced-layout",
+    "dom",
+    "devtools"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "Layout thrashing occurs when JavaScript forces the browser to repeatedly recalculate layout and repaint, causing performance degradation. This happens when you read layout information, modify the DOM, then read layout information again in a loop."
+        "text": "Layout thrashing happens when JavaScript interleaves reads and writes to the DOM in a way that forces the browser to calculate layout repeatedly. A single layout pass can take 10–50 ms; doing it dozens of times in one frame drops frames and makes the page feel sluggish."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Browser Rendering Pipeline"
+        "text": "The Browser Rendering Pipeline"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "The browser rendering pipeline includes style calculation, layout, paint, and composite stages. Forcing layout calculations synchronously disrupts this pipeline and causes repeated expensive recalculations."
+        "text": "Before pixels reach the screen, the browser parses HTML into a DOM tree, parses CSS into a CSSOM tree, combines them into a render tree, calculates geometry (layout), paints pixels, and finally composites layers. Each stage depends on the previous one, and forced layout breaks the pipeline by inserting an unexpected extra pass."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "render-pipeline-thrash",
+        "caption": "Browser rendering pipeline with a forced layout inserted by JavaScript.",
+        "definition": "flowchart TB\n    A[HTML/CSS] --> B[DOM + CSSOM]\n    B --> C[Render Tree]\n    C --> D{JavaScript reads layout?}\n    D -- No --> E[Layout]\n    D -- Yes --> E\n    E --> F[Paint]\n    F --> G[Composite]\n    G --> H[Pixels]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Properties That Force Layout"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not all DOM reads are equal. Accessing layout-dependent properties like offsetWidth, getBoundingClientRect, or getComputedStyle().width forces the browser to flush pending style changes and recalculate layout immediately. Reading these inside a loop or between writes is the classic cause of layout thrashing."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Rendering Pipeline Stages",
-        "content": "How browsers render web pages.",
+        "title": "Layout-Triggering vs Safe Reads",
+        "content": "Know which properties force a synchronous layout pass.",
+        "language": "javascript",
+        "code": "const el = document.querySelector('.card');\n\n// These force layout (synchronous reflow):\nel.offsetWidth;\nel.offsetHeight;\nel.offsetTop;\nel.scrollWidth;\nel.scrollHeight;\nel.clientWidth;\nel.clientHeight;\nel.getBoundingClientRect();\ngetComputedStyle(el).width;\n\n// These do NOT force layout:\nel.classList;\nel.getAttribute('data-id');\nel.children.length;\nel.style.opacity; // reads inline style only\n\n// Example: reading layout, then mutating, then reading again\nconst boxes = document.querySelectorAll('.box');\nboxes.forEach(box => {\n  const width = box.offsetWidth; // forces layout\n  box.style.width = width + 20 + 'px'; // write\n  const newWidth = box.offsetWidth; // forces layout AGAIN\n});\n// For 100 boxes, this can force 200 layout passes"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Thrashing Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The anti-pattern is always the same: read a layout property, write to the DOM, then read a layout property again. Because the browser must satisfy reads immediately, it performs a full layout calculation between every write. The more iterations, the worse the impact."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Layout Thrashing in the Wild",
+        "content": "A common real-world pattern that causes repeated layout.",
+        "language": "javascript",
+        "code": "// BAD: forces layout on every iteration\nfunction alignGrid(items) {\n  items.forEach(item => {\n    // Read layout\n    const rect = item.getBoundingClientRect();\n\n    // Mutate DOM\n    item.style.transform = `translateY(${rect.height}px)`;\n\n    // Read layout again — forces layout AGAIN\n    const newRect = item.getBoundingClientRect();\n  });\n}\n\n// Result: 2 layout calculations per item\n// 100 items = 200 forced layouts\n// On a slow device, this can exceed 1 second"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixing Layout Thrashing with Batching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The fix is to separate reads from writes. Read everything you need first, store values in local variables, perform all mutations, then read again if absolutely necessary. This reduces N layout passes to just one or two, regardless of how many elements you touch."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Batched Reads and Writes",
+        "content": "Eliminate layout thrashing by batching reads and writes.",
+        "language": "javascript",
+        "code": "function alignGrid(items) {\n  // Phase 1: READ all layout values\n  const rects = Array.from(items).map(item => ({\n    height: item.getBoundingClientRect().height,\n    width: item.getBoundingClientRect().width\n  }));\n\n  // Phase 2: WRITE all mutations\n  items.forEach((item, i) => {\n    item.style.transform = `translateY(${rects[i].height}px)`;\n    item.style.width = rects[i].width + 'px';\n  });\n\n  // Phase 3: READ again only if needed\n  const newRects = Array.from(items).map(item =>\n    item.getBoundingClientRect()\n  );\n}\n\n// Result: 1 read pass + 1 write pass + 1 final read pass\n// 100 items = 3 layout calculations instead of 200\n\n// React-specific tip: avoid refs inside render for layout reads\nfunction Grid({ items }) {\n  const gridRef = useRef(null);\n\n  // BAD: reading layout during render causes thrashing\n  // const width = gridRef.current?.offsetWidth;\n\n  // Good: read layout in a layout effect or callback\n  useEffect(() => {\n    if (gridRef.current) {\n      const width = gridRef.current.offsetWidth;\n      // use width here, not during render\n    }\n  }, [items]);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detecting Layout Thrashing in DevTools"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Chrome DevTools makes layout thrashing visible. The Performance tab highlights forced synchronous layouts with red warning bars. You can also enable the 'Layout Shifts' checkbox in the Rendering tab to see live layout events as they happen during interaction."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "DevTools Layout Thrashing Detection",
+        "content": "Use Chrome DevTools to find and confirm layout thrashing.",
         "language": "text",
-        "code": "Browser Rendering Pipeline:\n\n1. Parse HTML → DOM Tree\n2. Parse CSS → CSSOM Tree\n3. Combine DOM + CSSOM → Render Tree\n4. Layout (Reflow)\n   - Calculate element positions and sizes\n   - Most expensive stage\n5. Paint\n   - Fill pixels with colors\n6. Composite\n   - Combine layers for display\n\nForced Layout (Layout Thrashing):\n- JavaScript reads layout property\n- Browser must perform layout to calculate value\n- JavaScript modifies DOM\n- JavaScript reads layout property again\n- Browser must perform layout again\n- Repeat = layout thrashing\n\nPerformance Impact:\n- Each layout is expensive (10-50ms)\n- Layout thrashing = 10-100x slower\n- Causes janky animations and scrolling"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Layout-Triggering Properties"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Certain JavaScript properties force layout calculations when accessed. These include offset dimensions, scroll positions, and computed styles that depend on layout."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Layout-Triggering Properties",
-        "content": "Properties that force layout calculation.",
-        "language": "javascript",
-        "code": "// Properties that force layout\nconst element = document.getElementById('myElement');\n\n// These trigger layout:\nelement.offsetWidth;      // Forces layout\nelement.offsetHeight;     // Forces layout\nelement.offsetLeft;       // Forces layout\nelement.offsetTop;        // Forces layout\nelement.scrollWidth;      // Forces layout\nelement.scrollHeight;     // Forces layout\nelement.clientWidth;      // Forces layout\nelement.clientHeight;     // Forces layout\n\n// These also trigger layout:\ngetComputedStyle(element).width;\ngetComputedStyle(element).height;\ngetComputedStyle(element).left;\ngetComputedStyle(element).top;\n\n// Rect is particularly expensive\nelement.getBoundingClientRect(); // Forces layout\n\n// Safe properties (don't force layout):\nelement.style.width;         // Just reads inline style\nelement.getAttribute('width'); // Just reads attribute"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Layout Thrashing Pattern"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "The classic layout thrashing pattern involves reading layout properties, modifying the DOM, then reading layout properties again. This causes repeated layout calculations."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Layout Thrashing Example",
-        "content": "Pattern that causes layout thrashing.",
-        "language": "javascript",
-        "code": "// Bad: Layout thrashing\nfunction animateElements(elements) {\n  for (const element of elements) {\n    // Read layout (forces layout)\n    const width = element.offsetWidth;\n    \n    // Modify DOM\n    element.style.width = width + 10 + 'px';\n    \n    // Read layout again (forces layout again)\n    const newWidth = element.offsetWidth;\n    \n    // Modify DOM again\n    element.style.marginLeft = newWidth + 'px';\n  }\n}\n// N elements = N × 2 layout calculations\n// Extremely slow for many elements"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Fixing Layout Thrashing"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Fix layout thrashing by batching reads and writes. Read all layout properties first, store them, then perform all DOM modifications, then optionally read again if needed."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Batch Read-Write Pattern",
-        "content": "Optimize by batching reads and writes.",
-        "language": "javascript",
-        "code": "// Good: Batch reads and writes\nfunction animateElementsOptimized(elements) {\n  // Phase 1: Read all layout properties\n  const widths = elements.map(el => el.offsetWidth);\n  \n  // Phase 2: Write all DOM modifications\n  elements.forEach((element, index) => {\n    element.style.width = widths[index] + 10 + 'px';\n    element.style.marginLeft = widths[index] + 10 + 'px';\n  });\n  \n  // Phase 3: Read again if needed\n  const newWidths = elements.map(el => el.offsetWidth);\n}\n// 1 layout calculation (initial reads)\n// 1 layout calculation (final reads)\n// Much faster for many elements"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Using requestAnimationFrame"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Use requestAnimationFrame to schedule DOM modifications at optimal times, right before the browser's next paint. This ensures you're working with the most up-to-date layout state."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "requestAnimationFrame Pattern",
-        "content": "Schedule DOM modifications optimally.",
-        "language": "javascript",
-        "code": "function smoothAnimation(element) {\n  let width = element.offsetWidth;\n  \n  function animate() {\n    // Read layout at start of frame\n    const currentWidth = element.offsetWidth;\n    \n    requestAnimationFrame(() => {\n      // Modify DOM during frame\n      element.style.width = currentWidth + 1 + 'px';\n      \n      requestAnimationFrame(animate);\n    });\n  }\n  \n  animate();\n}\n\n// Or use the pattern of reading outside rAF\nfunction optimizedAnimation(element) {\n  let width = element.offsetWidth;\n  \n  function animate() {\n    requestAnimationFrame(() => {\n      // Write only inside rAF\n      element.style.width = width + 1 + 'px';\n      width += 1;\n      \n      requestAnimationFrame(animate);\n    });\n  }\n  \n  animate();\n}"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Detecting Layout Thrashing"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Use Chrome DevTools to detect layout thrashing. The Performance tab shows forced layout calculations with red warning indicators."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "DevTools Detection",
-        "content": "Find layout thrashing in Chrome DevTools.",
-        "language": "text",
-        "code": "Chrome DevTools Layout Thrashing Detection:\n\n1. Open DevTools (F12)\n2. Go to Performance tab\n3. Click Record\n4. Perform actions that might cause layout thrashing\n5. Stop recording\n6. Look for:\n   - Red bars in the timeline (forced layouts)\n   - \"Layout\" events appearing frequently\n   - \"Recalculate Style\" followed by \"Layout\"\n\nInterpreting Results:\n- Frequent layout events = potential thrashing\n- Long layout durations = expensive calculations\n- Layout in animation frames = poor performance\n\nCommon Patterns:\n- Read-Read-Write (OK)\n- Read-Write-Read (thrashing)\n- Write-Write-Read (OK)"
+        "code": "Steps to detect layout thrashing:\n\n1. Open DevTools (F12)\n2. Go to Performance tab\n3. Enable 'Screenshots' and 'Layout Shifts' in capture settings\n4. Click Record\n5. Trigger the suspected action (scroll, resize, interaction)\n6. Stop recording\n7. Inspect the flame chart\n\nWhat to look for:\n- Red markers labeled 'Forced Reflow' or 'Layout (forced)'\n- Rapid alternating 'Layout' and 'Recalculate Style' events\n- Long 'Layout' tasks during user interaction\n- Layout events appearing inside 'Execute Script' tasks\n\nQuick check in Rendering tab:\n- Open More Tools > Rendering\n- Check 'Layout Shifts Regions'\n- Interact with page; red boxes show forced layouts"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "React and Layout Thrashing",
-        "text": "React's virtual DOM helps avoid layout thrashing by batching DOM updates. However, direct DOM manipulation in useEffect or event handlers can still cause thrashing. Prefer React's declarative approach."
+        "title": "React and Forced Layout",
+        "text": "React's concurrent renderer and automatic batching reduce layout thrashing, but useEffect callbacks that read layout values after a state update can still trigger it. When you need layout measurements, prefer layoutEffects or ResizeObserver over synchronous reads in event handlers."
       }
     },
     {
-      "type": "heading",
+      "type": "checklist",
       "data": {
-        "level": 2,
-        "text": "Best Practices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
+        "title": "Layout Thrashing Prevention Checklist",
         "items": [
-          "Batch reads and writes to avoid interleaved read-write-read patterns",
-          "Use requestAnimationFrame for animations and DOM modifications",
-          "Cache layout property values instead of repeatedly reading them",
-          "Avoid querying layout properties in tight loops",
-          "Use CSS transforms and opacity for animations (don't trigger layout)",
-          "Use DevTools to identify and fix layout thrashing",
-          "Prefer CSS over JavaScript for layout when possible",
-          "Use will-change to hint which elements will change (use sparingly)"
+          {
+            "text": "Batch DOM reads before DOM writes in every animation or scroll handler"
+          },
+          {
+            "text": "Cache layout values in variables instead of re-reading them"
+          },
+          {
+            "text": "Avoid getBoundingClientRect() and offsetWidth inside loops"
+          },
+          {
+            "text": "Use requestAnimationFrame for DOM updates"
+          },
+          {
+            "text": "Move layout reads to layoutEffects or ResizeObserver in React"
+          },
+          {
+            "text": "Audit third-party libraries that manipulate DOM directly"
+          }
         ]
       }
     },
     {
-      "type": "key-terms",
+      "type": "relatedLessons",
       "data": {
-        "terms": [
+        "lessons": [
+          "painting-and-compositing",
+          "js-engine-optimization",
+          "debugging-performance"
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": {
+        "items": [
           {
-            "term": "Layout Thrashing",
-            "definition": "Performance problem caused by repeatedly forcing layout calculations through interleaved read-write operations."
+            "title": "Avoid Layout Thrashing",
+            "url": "https://web.dev/avoid-large-complex-layouts-and-layout-thrashing/",
+            "type": "article",
+            "description": "Google's guidance on preventing forced synchronous layouts."
           },
           {
-            "term": "Forced Synchronous Layout",
-            "definition": "Layout calculation triggered synchronously by JavaScript reading layout properties, disrupting the rendering pipeline."
-          },
-          {
-            "term": "requestAnimationFrame",
-            "definition": "Browser API that schedules callbacks to run before the next paint, optimal for DOM modifications."
+            "title": "Rendering Performance on MDN",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/Performance/Rendering",
+            "type": "article",
+            "description": "Comprehensive overview of browser rendering and common pitfalls."
           }
         ]
       }
@@ -202,19 +198,34 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Layout thrashing occurs when interleaved read-write operations force repeated layout calculations",
+          "Layout thrashing is caused by interleaved DOM reads and writes",
           "Properties like offsetWidth, getBoundingClientRect, and getComputedStyle force layout",
-          "Batch reads together, then batch writes together to avoid thrashing",
-          "Use requestAnimationFrame to schedule DOM modifications optimally",
-          "Cache layout property values instead of repeatedly reading them",
-          "Detect layout thrashing with Chrome DevTools Performance tab",
-          "Use CSS transforms for animations to avoid layout recalculation",
-          "React's virtual DOM helps but direct DOM manipulation can still cause thrashing"
+          "Batch all reads first, then all writes to eliminate thrashing",
+          "DevTools highlights forced layouts with red markers in the Performance panel",
+          "React's batching helps, but direct DOM reads in effects can still cause thrashing",
+          "One layout pass per frame is acceptable; dozens is not"
         ],
-        "takeaway": "Layout thrashing is a common performance issue that can be eliminated by batching reads and writes, using requestAnimationFrame, and avoiding layout-triggering properties in loops."
+        "takeaway": "Layout thrashing is one of the most common runtime performance problems. It is almost always solved by batching reads before writes and measuring layout only when absolutely necessary."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "painting-and-compositing",
+    "js-engine-optimization",
+    "debugging-performance"
+  ],
+  "furtherReading": [
+    {
+      "title": "Avoid Layout Thrashing",
+      "url": "https://web.dev/avoid-large-complex-layouts-and-layout-thrashing/",
+      "type": "article",
+      "description": "Google's guidance on preventing forced synchronous layouts."
+    },
+    {
+      "title": "Rendering Performance on MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/Performance/Rendering",
+      "type": "article",
+      "description": "Comprehensive overview of browser rendering and common pitfalls."
+    }
+  ]
 }

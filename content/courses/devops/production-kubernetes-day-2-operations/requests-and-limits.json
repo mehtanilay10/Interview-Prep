@@ -3,34 +3,57 @@
   "slug": "requests-and-limits",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Requests and limits",
-  "description": "Learn about Requests and limits. Master the concepts, patterns, and best practices.",
+  "title": "Requests and Limits",
+  "description": "Set CPU and memory requests and limits on containers to ensure fair resource scheduling, prevent noisy neighbors, and keep production clusters stable.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "kubernetes",
+    "resources",
+    "cpu",
+    "memory",
+    "limits",
+    "requests"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Requests and limits** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with requests and limits."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Resource Problem in Shared Clusters"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of requests and limits",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "In a shared Kubernetes cluster, every container competes for CPU and memory on the same nodes. Without resource constraints, a single buggy or greedy container can consume all available memory, causing the Linux OOM killer to terminate other Pods. CPU-heavy containers can starve other workloads of processing time. **Requests and limits** are the solution: they tell Kubernetes how much resources a container needs and how much it can burst to."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Request",
+            "definition": "The minimum amount of CPU or memory a container is guaranteed to receive."
+          },
+          {
+            "term": "Limit",
+            "definition": "The maximum amount of CPU or memory a container is allowed to use."
+          },
+          {
+            "term": "CPU throttling",
+            "definition": "When a container exceeds its CPU limit, Kubernetes throttles its CPU time."
+          },
+          {
+            "term": "OOM kill",
+            "definition": "When a container exceeds its memory limit, the Linux kernel kills the process."
+          },
+          {
+            "term": "Quality of Service (QoS)",
+            "definition": "Kubernetes classifies Pods as Guaranteed, Burstable, or BestEffort based on resource settings."
+          }
         ]
       }
     },
@@ -38,24 +61,152 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "CPU Requests and Limits"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding requests and limits is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "CPU is measured in **CPU units**, where 1 CPU equals one physical or virtual core. You can use fractional values like `0.5` (half a core) or `250m` (250 millicores). CPU is a **compressible** resource — if a container exceeds its limit, Kubernetes throttles it by reducing its CPU time, but the container keeps running."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Setting CPU requests and limits",
+        "content": "Guarantee 0.25 CPU cores and allow bursting up to 1 full core.",
+        "code": "resources:\n  requests:\n    cpu: \"250m\"\n    memory: \"256Mi\"\n  limits:\n    cpu: \"1000m\"\n    memory: \"512Mi\"",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Memory Requests and Limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Memory is measured in bytes, typically expressed as Mi (mebibytes) or Gi (gibibytes). Unlike CPU, memory is an **incompressible** resource. If a container tries to use more memory than its limit, Kubernetes terminates the container with an OOMKilled status. This is by design — it prevents one runaway container from crashing the entire node."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with requests and limits, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Set memory limits carefully",
+        "text": "Setting a memory limit too low causes OOMKilled errors. Setting it too high wastes node capacity. Start with observed peak usage plus a 20% buffer, then refine based on metrics."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Quality of Service Classes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kubernetes automatically assigns a QoS class to each Pod based on its resource settings. This class determines which Pods get evicted first when a node runs out of resources. Understanding QoS helps you protect critical workloads."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "QoS Class",
+          "Criteria",
+          "Eviction Priority"
+        ],
+        "rows": [
+          [
+            "Guaranteed",
+            "CPU and memory requests equal limits for every container",
+            "Last to be evicted"
+          ],
+          [
+            "Burstable",
+            "Requests set, limits higher than requests (or only requests set)",
+            "Evicted before Guaranteed"
+          ],
+          [
+            "BestEffort",
+            "No requests or limits set",
+            "First to be evicted"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-resource-qos",
+        "caption": "How resource requests and limits map to Kubernetes QoS classes.",
+        "definition": "graph TD\n    A[Pod with resources] --> B{Requests == Limits?}\n    B -->|Yes for all| C[Guaranteed]\n    B -->|No| D[Burstable]\n    E[No requests/limits] --> F[BestEffort]\n    C --> G[Last evicted]\n    D --> H[Evicted second]\n    F --> I[First evicted]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Set resource quotas for production workloads",
+        "description": "Practice setting CPU and memory requests and limits.",
+        "steps": [
+          "Create a Namespace named \"production\".",
+          "Apply a ResourceQuota to limit total CPU and memory in the namespace.",
+          "Deploy an API Pod with CPU request 250m, CPU limit 1000m, memory request 256Mi, memory limit 512Mi.",
+          "Deploy a second Pod without any resource settings.",
+          "Describe both Pods and note their QoS classes.",
+          "Simulate memory pressure by deploying a stress Pod and observe eviction behavior."
+        ],
+        "expectedOutcome": "You understand how requests and limits affect scheduling, QoS class, and eviction behavior."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "CPU requests guarantee minimum CPU; limits cap maximum CPU (throttling beyond limit).",
+          "Memory requests guarantee minimum memory; limits cap maximum memory (OOMKilled beyond limit).",
+          "QoS classes (Guaranteed, Burstable, BestEffort) determine eviction priority.",
+          "Set requests based on observed averages and limits based on observed peaks plus buffer.",
+          "Use ResourceQuotas to enforce cluster-wide resource constraints per namespace."
+        ],
+        "takeaway": "Requests and limits protect your cluster from resource exhaustion and ensure predictable performance for all workloads."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "pods-and-workload-controllers",
+    "horizontal-pod-autoscaler",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Resource Management",
+      "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes QoS Classes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/quality-of-service-classes/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes ResourceQuota",
+      "url": "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+      "type": "article"
+    }
+  ]
 }

@@ -4,33 +4,74 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "Tracking vs AsNoTracking",
-  "description": "Learn about Tracking vs AsNoTracking. Master the concepts, patterns, and best practices.",
+  "description": "Understand EF Core change tracking behavior and learn how AsNoTracking can dramatically improve query performance for read-only scenarios.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "tracking", "AsNoTracking", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Tracking vs AsNoTracking** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with tracking vs asnotracking."
+        "text": "By default, EF Core tracks every entity it materializes from the database. This tracking enables features like change detection and automatic `SaveChanges()`, but it also adds memory overhead and CPU work. For read-only queries, turning off tracking with `AsNoTracking()` is one of the simplest and most effective performance optimizations available."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is change tracking?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When EF Core reads a row from the database, it creates an entity instance and stores it in its change tracker — an internal dictionary keyed by primary key. On every `SaveChanges()`, EF Core compares the current values against the originals to determine what SQL UPDATE or DELETE statements to generate. This is powerful, but it means EF Core must allocate memory and maintain state for every tracked entity."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Snapshot vs. notification tracking",
+        "text": "EF Core 6+ uses snapshot-based change tracking by default, which compares current and original values at SaveChanges time. With proxy-based notification tracking, entities raise PropertyChanged events immediately, which can be faster for frequent changes but requires lazy-loading proxies."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using AsNoTracking"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`AsNoTracking()` tells EF Core to materialize entities without adding them to the change tracker. The entities are still fully populated, but EF Core will not monitor them for changes. This reduces memory usage, skips snapshot creation, and speeds up query execution — sometimes by 20-40% for large result sets."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Default tracking vs AsNoTracking",
+        "code": "// Tracked: EF Core allocates and monitors each Product entity\nvar trackedProducts = await dbContext.Products\n    .Where(p => p.Category.Name == \"Electronics\")\n    .ToListAsync();\n\ntrackedProducts[0].Price = 99.99m;\nawait dbContext.SaveChangesAsync(); // Produces an UPDATE\n\n// No tracking: faster, lighter, but changes are ignored\nvar readOnlyProducts = await dbContext.Products\n    .AsNoTracking()\n    .Where(p => p.Category.Name == \"Electronics\")\n    .ToListAsync();\n\nreadOnlyProducts[0].Price = 99.99m;\nawait dbContext.SaveChangesAsync(); // No UPDATE — entity was never tracked",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use tracking"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the core differences between tracking and asnotracking",
-          "Know when to choose tracking over asnotracking",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "You plan to modify entities and call SaveChanges() in the same DbContext scope.",
+          "You are updating related entities through navigation properties.",
+          "You need concurrency token handling with automatic conflict detection."
         ]
       }
     },
@@ -38,13 +79,18 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When to use AsNoTracking"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding tracking vs asnotracking is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Read-only API endpoints that return data without modifications.",
+          "Large list or search results that are immediately serialized and returned.",
+          "Queries used for reporting, analytics, or dashboard data.",
+          "Any query where the result set is large and entities will not be updated."
+        ]
       }
     },
     {
@@ -52,10 +98,54 @@
       "data": {
         "variant": "tip",
         "title": "Pro Tip",
-        "text": "When working with tracking vs asnotracking, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "text": "In ASP.NET Core, consider configuring a default no-tracking query filter if your DbContext is scoped per-request. This prevents accidental tracking on GET endpoints without requiring AsNoTracking() on every query."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring default no-tracking behavior",
+        "code": "protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)\n{\n    optionsBuilder.UseSqlServer(connectionString)\n        .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "AsNoTracking with projections"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you project into a DTO or anonymous type, EF Core does not track the result regardless of `AsNoTracking()`. The projection itself avoids tracking because the result is not an entity type. However, adding `AsNoTracking()` explicitly can still improve performance slightly by telling EF Core to skip certain query-planning steps."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Projection with AsNoTracking for maximum read-only performance",
+        "code": "var summaries = await dbContext.Orders\n    .AsNoTracking()\n    .Where(o => o.OrderDate >= DateTime.UtcNow.AddMonths(-1))\n    .Select(o => new OrderSummaryDto\n    {\n        Id = o.Id,\n        CustomerName = o.Customer.FullName,\n        Total = o.OrderItems.Sum(oi => oi.Quantity * oi.UnitPrice)\n    })\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Change tracking adds memory and CPU overhead for every materialized entity.",
+          "Use AsNoTracking() for read-only queries to eliminate tracking overhead.",
+          "Projected DTOs are never tracked, even without AsNoTracking().",
+          "Consider setting QueryTrackingBehavior.NoTracking as a default for read-heavy applications."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["linq-expression-trees-and-sql-translation", "projection-vs-include"],
+  "furtherReading": [
+    { "title": "EF Core change tracking overview", "url": "https://learn.microsoft.com/en-us/ef/core/change-tracking/", "type": "article" },
+    { "title": "No-tracking queries", "url": "https://learn.microsoft.com/en-us/ef/core/querying/no-tracking", "type": "article" }
+  ]
 }

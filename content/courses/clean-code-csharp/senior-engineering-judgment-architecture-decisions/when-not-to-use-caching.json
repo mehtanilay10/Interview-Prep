@@ -3,34 +3,104 @@
   "slug": "when-not-to-use-caching",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "When not to use caching",
-  "description": "Learn about When not to use caching. Master the concepts, patterns, and best practices.",
+  "title": "When Not to Use Caching",
+  "description": "Understand the hidden costs of caching, recognize when it makes systems more fragile, and learn to evaluate whether a cache is actually helping or hurting your C# application.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": [
+    "caching",
+    "performance",
+    "architecture",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When not to use caching** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when not to use caching."
+        "text": "Caching is one of the most common performance optimizations, and also one of the most overused. A cache adds complexity: stale data, invalidation logic, memory pressure, and debugging difficulty. Every cache is a bet that the read-to-write ratio is high enough to justify those costs. When that bet is wrong, the cache becomes a liability that masks real problems and creates mysterious production bugs."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In C# applications, caching appears in many forms: in-memory `IMemoryCache`, distributed Redis caches, CDN caches for static assets, HTTP response caching, and even database query plan caches. Each has its place, and each has situations where it does more harm than good. The senior engineer evaluates the actual access pattern before adding any cache."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "When Caching Hurts"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Scenarios where caching is the wrong choice",
         "items": [
-          "Understand the fundamental principles of when not to use caching",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Data changes on every request. A cache with a 100 percent miss rate is pure overhead.",
+          "Staleness is unacceptable. Financial transactions, inventory counts, and auth state usually fall in this category.",
+          "The dataset is small enough that the database query is already fast. Caching adds latency, not removes it.",
+          "Memory is constrained. In-memory caches compete with the garbage collector and can cause out-of-memory exceptions under load.",
+          "The cache invalidation logic is more complex than the original query. If maintaining the cache is harder than running the query, drop the cache."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cache invalidation is one of the hardest problems in computer science",
+        "text": "Phil Karlton's famous observation applies directly to C# applications. A cache that serves stale data is often worse than no cache at all, because it creates a false sense of performance while silently corrupting user experience. If you cannot clearly define when and how the cache is invalidated, do not add it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Measuring Before Caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before adding a cache, measure the actual query performance under realistic load. In a .NET application, you can use MiniProfiler, Application Insights, or built-in diagnostic sources to measure database round-trip times. If the database query already completes in under five milliseconds and your p99 latency target is 200 milliseconds, caching will not help. Optimize the query, add an index, or change the data access pattern instead."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Caching without measurement",
+        "content": "A common anti-pattern: caching data that is already fast to retrieve, adding complexity without benefit.",
+        "language": "csharp",
+        "code": "// Anti-pattern: caching data that is already fast\npublic async Task<Product> GetProductAsync(Guid id)\n{\n    // IMemoryCache adds overhead for every request,\n    // even cache misses.\n    return await _cache.GetOrCreateAsync(id, async entry =>\n    {\n        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);\n        return await _dbContext.Products.FindAsync(id);\n    });\n}\n\n// Better approach: measure first, then decide\npublic async Task<Product> GetProductAsync(Guid id)\n{\n    // Direct query. If this is slow, optimize the query\n    // or add an index before adding a cache.\n    return await _dbContext.Products.FindAsync(id);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Caching Decision Tree"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use this decision tree to evaluate whether a cache is appropriate for a given scenario. The key insight is that caching is a performance optimization for a bottleneck, not a general-purpose speed booster. If there is no bottleneck, there is no reason to cache."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Caching evaluation steps",
+        "items": [
+          "Measure the current query or computation time under realistic load.",
+          "Determine the data freshness requirement: can the result be stale, and for how long?",
+          "Calculate the read-to-write ratio. Caching helps when reads vastly outnumber writes.",
+          "Estimate the memory cost and eviction strategy for the expected cache size.",
+          "Define the invalidation trigger: what event, timer, or mutation clears or refreshes the cache?",
+          "If any step reveals an insurmountable problem, stop and reconsider the underlying performance issue."
         ]
       }
     },
@@ -38,24 +108,66 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When Caching Is Appropriate"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding when not to use caching is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Caching is appropriate when the cost of recomputation is high, the read-to-write ratio is extreme, and occasional staleness is acceptable. Classic examples include rendered HTML fragments, expensive aggregate queries, and reference data like country codes or tax tables. In these cases, the cache eliminates repeated work and the invalidation logic is simple because the underlying data changes rarely."
       }
     },
     {
-      "type": "callout",
+      "type": "key-terms",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when not to use caching, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "terms": [
+          {
+            "term": "Cache invalidation",
+            "definition": "The process of removing or refreshing stale entries from a cache when the underlying data changes."
+          },
+          {
+            "term": "Cache hit ratio",
+            "definition": "The percentage of requests served from the cache rather than the underlying data source."
+          },
+          {
+            "term": "Stampede",
+            "definition": "A situation where a popular cache entry expires and many simultaneous requests recompute or fetch the same value simultaneously."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Caching adds complexity: staleness, invalidation, memory pressure, and debugging difficulty.",
+          "Measure performance before caching. If the query is already fast, the cache is overhead.",
+          "Do not cache data that must always be fresh or that changes on every request.",
+          "Define invalidation rules before adding the cache; if you cannot, do not cache."
+        ],
+        "takeaway": "Caching is a powerful optimization, but it is not free. Senior engineers add caches only after measuring, defining invalidation, and confirming that the read-to-write ratio justifies the complexity."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "making-technical-trade-offs-explicit",
+    "synchronous-vs-asynchronous-workflows"
+  ],
+  "furtherReading": [
+    {
+      "title": "Caching Fundamentals",
+      "url": "https://docs.microsoft.com/en-us/aspnet/core/performance/caching/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official ASP.NET Core caching documentation with guidance on when and how to cache."
+    },
+    {
+      "title": "Cache Invalidation: The Hard Problem",
+      "url": "https://en.wikipedia.org/wiki/Cache_invalidation",
+      "type": "article",
+      "author": "Wikipedia",
+      "description": "An overview of cache invalidation strategies and their trade-offs."
+    }
+  ]
 }

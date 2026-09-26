@@ -3,39 +3,45 @@
   "slug": "memory-management",
   "moduleSlug": "runtime-performance",
   "courseSlug": "frontend-performance-engineering",
-  "title": "memory-management",
-  "description": "Learn about memory-management. Master the concepts, patterns, and best practices.",
+  "title": "Memory Management and Leak Prevention",
+  "description": "Understand JavaScript garbage collection, identify common memory leak patterns, and apply memory-efficient coding practices in browser applications.",
   "order": 5,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "gc",
+    "memory-leaks",
+    "heap",
+    "weakref",
+    "profiling"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "JavaScript automatically manages memory through garbage collection, but understanding how it works helps you write more efficient code and avoid memory leaks. Proper memory management ensures your applications remain responsive and don't crash from memory exhaustion."
+        "text": "JavaScript garbage collection automatically reclaims memory from objects that are no longer reachable. But automatic does not mean free: leaks still happen, and memory pressure causes slow garbage-collection pauses, tab crashes, and degraded performance on low-memory devices."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "JavaScript Memory Model"
+        "text": "Stack vs Heap Memory"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "JavaScript memory is divided into two main areas: the stack and the heap. The stack stores primitive values and references to objects, while the heap stores objects and dynamic data. Understanding this model helps you write memory-efficient code."
+        "text": "Primitives like numbers and booleans live on the stack, while objects, arrays, and functions live on the heap. The stack is fast and bounded; the heap is large but slower. Most performance problems come from how the heap is used, not the stack."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Stack vs Heap Memory",
-        "content": "How JavaScript allocates memory.",
+        "title": "Memory Allocation in Practice",
+        "content": "Understanding where JavaScript values are stored.",
         "language": "javascript",
-        "code": "// Stack Memory (fast, limited size)\nlet a = 10; // Primitive value on stack\nlet b = 'hello'; // String on stack\nlet c = true; // Boolean on stack\n\n// Heap Memory (slower, larger capacity)\nlet obj = { x: 1, y: 2 }; // Object on heap, reference on stack\nlet arr = [1, 2, 3]; // Array on heap, reference on stack\nlet func = () => {}; // Function on heap, reference on stack\n\n// Memory lifecycle\nlet data = createLargeObject(); // Allocate on heap\nuseData(data); // Use the data\ndata = null; // Deallocate (eligible for GC)\n\n// Stack limitations\nfunction recursiveStack() {\n  recursiveStack(); // Stack overflow if not bounded\n}"
+        "code": "// Stack values (fast, limited)\nlet count = 42;\nlet active = true;\nlet name = 'Frontend';\n\n// Heap values (slower allocation, larger capacity)\nlet user = {\n  id: 1,\n  name: 'Alice',\n  preferences: { theme: 'dark' }\n}; // object on heap\n\nlet history = [];\nfor (let i = 0; i < 100_000; i++) {\n  history.push({ step: i }); // 100k objects on heap\n}\n\n// Releasing references\nuser = null; // user object becomes eligible for GC\nhistory = null; // entire array becomes eligible"
       }
     },
     {
@@ -48,38 +54,38 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "JavaScript engines use different garbage collection algorithms to reclaim memory. Modern engines use generational garbage collection with mark-and-sweep algorithms for efficient memory management."
+        "text": "Modern engines use generational, incremental, and concurrent garbage collection. New objects go in the young generation and are collected frequently because most objects die young. Survivors are promoted to the old generation, where collection is slower but less frequent."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Mark-and-Sweep Algorithm",
-        "content": "How garbage collection identifies unused memory.",
+        "title": "Generational GC Overview",
+        "content": "How modern engines organize and collect memory.",
         "language": "text",
-        "code": "Mark-and-Sweep Garbage Collection:\n\n1. Mark Phase\n   - Start from \"roots\" (global objects, stack variables)\n   - Mark all reachable objects\n   - Follow references recursively\n   - All marked objects are \"live\"\n\n2. Sweep Phase\n   - Scan entire heap\n   - Reclaim memory from unmarked objects\n   - Return memory to free pool\n\nGenerational Collection:\n- Young Generation: New objects, frequent GC\n- Old Generation: Long-lived objects, infrequent GC\n- Objects promoted from young to old after surviving\n\nPerformance Characteristics:\n- Fast for young generation (most objects die young)\n- Slower for old generation (fewer objects, more expensive)"
+        "code": "Generational Garbage Collection:\n\nYoung Generation (Nursery):\n- New objects allocated here\n- Frequent, fast minor GC\n- Most objects die here (generational hypothesis)\n\nOld Generation:\n- Objects that survived young-gen GC\n- Infrequent, expensive major GC\n- Contains long-lived caches, closures, DOM wrappers\n\nScavenge (Minor GC):\n- Copies live objects from young to young\n- Reclaims memory by wiping the from-space\n- Very fast (milliseconds)\n\nMark-and-Sweep (Major GC):\n- Marks all reachable objects from roots\n- Sweeps unmarked objects\n- May require compaction to reduce fragmentation\n\nConcurrent Marking:\n- Marks reachable objects on a background thread\n- Reduces main-thread pause time\n- Available in modern V8"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Memory Leak Patterns"
+        "text": "Common Memory Leak Patterns"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Memory leaks occur when objects remain reachable unintentionally, preventing garbage collection. Common patterns include event listeners, closures, DOM references, and global variables."
+        "text": "The most common leaks in web apps are accidental global references, uncleared timers, unreleased event listeners, closures capturing large objects, and detached DOM nodes kept alive by JavaScript references."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Common Memory Leak Patterns",
-        "content": "Patterns that cause memory leaks.",
+        "title": "Leak Patterns and Fixes",
+        "content": "Identify and fix common memory leaks.",
         "language": "javascript",
-        "code": "// 1. Event Listener Leaks\nconst button = document.getElementById('myButton');\nbutton.addEventListener('click', handleClick);\n// If button removed, listener keeps it in memory\n\n// Fix: Remove listener\nbutton.removeEventListener('click', handleClick);\n\n// 2. Closure Leaks\nfunction createLeak() {\n  const largeData = new Array(1000000).fill('data');\n  return function() {\n    console.log(largeData.length); // Captures largeData\n  };\n}\n\n// Fix: Minimize closure scope\nfunction createOptimized() {\n  const largeData = new Array(1000000).fill('data');\n  const summary = largeData.length;\n  return function() {\n    console.log(summary); // Only keep needed data\n  };\n}\n\n// 3. DOM Reference Leaks\nlet removedElement;\nfunction removeElement() {\n  const element = document.getElementById('myElement');\n  removedElement = element; // Keeps reference\n  element.remove();\n}\n\n// Fix: Clear reference\nremovedElement = null;"
+        "code": "// LEAK 1: Accidental global variable\nfunction init() {\n  cache = {}; // missing 'const' → global\n}\n\n// FIX: always declare variables\nfunction init() {\n  const cache = {};\n}\n\n// LEAK 2: Uncleared interval\nconst id = setInterval(() => check(), 1000);\n// Component unmounts → interval keeps running\n\n// FIX: clear on cleanup\nuseEffect(() => {\n  const id = setInterval(() => check(), 1000);\n  return () => clearInterval(id);\n}, []);\n\n// LEAK 3: Event listener on removed element\nconst btn = document.getElementById('btn');\nbtn.addEventListener('click', handler);\n// Later: btn.remove() — listener keeps btn in memory\n\n// FIX: remove listener before removing element\nbtn.removeEventListener('click', handler);\nbtn.remove();\n\n// LEAK 4: Closure over large object\nfunction createHandler() {\n  const hugeData = new Array(1_000_000).fill('x');\n  return () => console.log('still alive');\n}\n\n// FIX: extract only what is needed\nfunction createHandler() {\n  const count = 1_000_000;\n  return () => console.log(count);\n}\n\n// LEAK 5: Detached DOM node held by JS\nlet removed = null;\nfunction removeNode() {\n  const node = document.querySelector('.box');\n  removed = node; // JS keeps reference\n  node.remove(); // DOM removed, but JS reference prevents GC\n}\n\n// FIX: clear reference\nremoved = null;"
       }
     },
     {
@@ -92,77 +98,46 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Adopt memory-efficient coding patterns to reduce memory pressure and improve performance. These include object pooling, typed arrays, and strategic reuse of objects."
+        "text": "Object pooling, typed arrays, and WeakMap/WeakSet caching reduce allocation pressure. For numeric-heavy workloads, typed arrays use contiguous memory and avoid boxing overhead."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Object Pooling",
-        "content": "Reuse objects instead of creating new ones.",
+        "title": "Object Pool and Typed Arrays",
+        "content": "Reduce allocation pressure in hot paths.",
         "language": "javascript",
-        "code": "class ObjectPool {\n  constructor(createFn, resetFn, initialSize = 10) {\n    this.createFn = createFn;\n    this.resetFn = resetFn;\n    this.pool = [];\n    \n    for (let i = 0; i < initialSize; i++) {\n      this.pool.push(createFn());\n    }\n  }\n  \n  acquire() {\n    return this.pool.length > 0 \n      ? this.pool.pop() \n      : this.createFn();\n  }\n  \n  release(obj) {\n    this.resetFn(obj);\n    this.pool.push(obj);\n  }\n}\n\n// Usage for particles\nconst particlePool = new ObjectPool(\n  () => ({ x: 0, y: 0, vx: 0, vy: 0 }),\n  (p) => { p.x = 0; p.y = 0; p.vx = 0; p.vy = 0; }\n);\n\nfunction updateParticles() {\n  const particle = particlePool.acquire();\n  // Use particle\n  particlePool.release(particle);\n}"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Typed Arrays for Numeric Data",
-        "content": "Use typed arrays for memory-efficient numeric data.",
-        "language": "javascript",
-        "code": "// Regular arrays (memory-intensive)\nconst regularArray = [1, 2, 3, 4, 5];\n// Each element is a separate object\n\n// Typed arrays (memory-efficient)\nconst typedArray = new Int32Array([1, 2, 3, 4, 5]);\n// Contiguous memory, 8x more efficient\n\n// Performance comparison\nconst largeRegular = new Array(1000000).fill(0);\nconst largeTyped = new Int32Array(1000000);\n\n// Memory usage:\n// Regular array: ~24MB\n// Typed array: ~4MB (6x less)\n\n// Access is also faster\ntypedArray[0] = 100; // Direct memory access"
+        "code": "// Object pool for particles or frequent allocations\nclass Pool {\n  constructor(factory, reset, size = 50) {\n    this.factory = factory;\n    this.reset = reset;\n    this.items = Array.from({ length: size }, factory);\n  }\n  acquire() {\n    return this.items.length ? this.items.pop() : this.factory();\n  }\n  release(item) {\n    this.reset(item);\n    this.items.push(item);\n  }\n}\n\nconst particlePool = new Pool(\n  () => ({ x: 0, y: 0, vx: 0, vy: 0 }),\n  (p) => { p.x = 0; p.y = 0; p.vx = 0; p.vy = 0; }\n);\n\n// Typed arrays for numeric data\nfunction processSamples(samples) {\n  const out = new Float32Array(samples.length);\n  for (let i = 0; i < samples.length; i++) {\n    out[i] = samples[i] * 1.5;\n  }\n  return out;\n}\n\n// WeakMap cache for DOM metadata\nconst meta = new WeakMap();\nfunction setMeta(el, data) { meta.set(el, data); }\nfunction getMeta(el) { return meta.get(el); }\n// When element is removed from DOM, cache entry is GC'd automatically"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Weak References"
+        "text": "Monitoring Memory in DevTools"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "WeakMap and WeakSet allow garbage collection of their keys/values when no other references exist. Use them for caching and metadata storage where appropriate."
+        "text": "Use Chrome DevTools Memory panel to detect leaks. Take heap snapshots before and after an action. If the heap grows unexpectedly and retained size stays high, you likely have a leak. The Allocation Instrumentation timeline shows allocation stacks in real time."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "WeakMap for Caching",
-        "content": "Use WeakMap to prevent memory leaks in caches.",
-        "language": "javascript",
-        "code": "// Regular Map (prevents GC)\nconst cache = new Map();\n\nfunction getData(obj) {\n  if (cache.has(obj)) {\n    return cache.get(obj);\n  }\n  const result = expensiveOperation(obj);\n  cache.set(obj, result);\n  return result;\n}\n// Objects in cache never get garbage collected\n\n// WeakMap (allows GC)\nconst weakCache = new WeakMap();\n\nfunction getDataOptimized(obj) {\n  if (weakCache.has(obj)) {\n    return weakCache.get(obj);\n  }\n  const result = expensiveOperation(obj);\n  weakCache.set(obj, result);\n  return result;\n}\n// Objects can be garbage collected when no longer referenced"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Monitoring Memory Usage"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Monitor memory usage to identify leaks and optimize consumption. Use browser DevTools and programmatic APIs to track memory over time."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Memory Monitoring",
-        "content": "Track memory usage programmatically.",
-        "language": "javascript",
-        "code": "function monitorMemory() {\n  if (!performance.memory) {\n    console.warn('Memory API not available');\n    return;\n  }\n  \n  const checkMemory = () => {\n    const memory = performance.memory;\n    const usedMB = (memory.usedJSHeapSize / 1048576).toFixed(2);\n    const totalMB = (memory.totalJSHeapSize / 1048576).toFixed(2);\n    const limitMB = (memory.jsHeapSizeLimit / 1048576).toFixed(2);\n    \n    console.log(`Memory: ${usedMB}MB / ${totalMB}MB (limit: ${limitMB}MB)`);\n    \n    if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.9) {\n      console.warn('Memory usage approaching limit!');\n    }\n  };\n  \n  const intervalId = setInterval(checkMemory, 5000);\n  \n  return () => clearInterval(intervalId);\n}"
+        "title": "DevTools Memory Workflow",
+        "content": "Systematic approach to finding memory leaks.",
+        "language": "text",
+        "code": "Memory leak investigation workflow:\n\n1. Open DevTools > Memory\n2. Select 'Heap snapshot' and click 'Take snapshot'\n3. Perform the suspected leak action (open/close, add/remove)\n4. Take another snapshot\n5. Compare snapshots\n\nWhat to look for:\n- Objects with increasing 'Distance' from GC roots\n- Detached DOM nodes growing between snapshots\n- Closures retaining large arrays or strings\n- Event listeners or timers not released\n\nAllocation timeline:\n- Record allocation over time\n- Interact with the app\n- Look for allocations that never get reclaimed"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "Memory Limits",
-        "text": "Browsers have memory limits per tab (typically 1-4GB). Exceeding these limits causes tab crashes. Monitor memory usage and implement cleanup strategies for long-running applications."
+        "title": "Browsers Enforce Memory Limits",
+        "text": "Most browsers enforce per-tab memory limits (often 1–4 GB on desktop, much less on mobile). Exceeding these limits crashes the tab. Long-running SPAs, image galleries, and offline apps are especially prone to leaks; build cleanup routines and test navigation cycles."
       }
     },
     {
@@ -170,16 +145,45 @@
       "data": {
         "terms": [
           {
-            "term": "Garbage Collection",
-            "definition": "Automatic memory management that reclaims memory from objects that are no longer reachable."
+            "term": "Generational GC",
+            "definition": "A garbage collection strategy that divides objects into young and old generations and collects them at different frequencies."
           },
           {
-            "term": "Mark-and-Sweep",
-            "definition": "Garbage collection algorithm that marks reachable objects and sweeps away unmarked ones."
+            "term": "Detached DOM",
+            "definition": "A DOM node removed from the document but still referenced by JavaScript, preventing garbage collection."
           },
           {
-            "term": "WeakMap/WeakSet",
-            "definition": "Data structures that allow garbage collection of their keys/values when no other references exist."
+            "term": "WeakMap",
+            "definition": "A map that does not prevent its keys from being garbage collected, useful for metadata caches."
+          }
+        ]
+      }
+    },
+    {
+      "type": "relatedLessons",
+      "data": {
+        "lessons": [
+          "cpu-profiling",
+          "js-engine-optimization",
+          "debugging-performance"
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": {
+        "items": [
+          {
+            "title": "Memory Management on MDN",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_Management",
+            "type": "article",
+            "description": "Foundation concepts of JavaScript memory and garbage collection."
+          },
+          {
+            "title": "Chrome DevTools Memory Panel",
+            "url": "https://developer.chrome.com/blog/devtools-blog-archive-2023#memory",
+            "type": "article",
+            "description": "How to use heap snapshots and allocation timelines."
           }
         ]
       }
@@ -189,19 +193,36 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "JavaScript uses stack for primitives/references, heap for objects",
-          "Garbage collection uses mark-and-sweep with generational optimization",
-          "Common memory leaks: event listeners, closures, DOM references, globals",
-          "Use object pooling to reuse objects instead of creating new ones",
-          "Use typed arrays for memory-efficient numeric data storage",
-          "WeakMap/WeakSet allow garbage collection for caching scenarios",
-          "Monitor memory usage to identify leaks and optimize consumption",
-          "Clean up event listeners and references to prevent leaks"
+          "JavaScript uses stack for primitives and heap for objects",
+          "Generational GC collects young objects frequently and old objects rarely",
+          "Common leaks: globals, timers, listeners, closures, detached DOM",
+          "Clear timers and listeners on unmount or cleanup",
+          "Use object pools for high-frequency allocations",
+          "Use typed arrays for numeric-heavy workloads",
+          "Use WeakMap/WeakSet for caches that should not prevent GC",
+          "Detect leaks with heap snapshots in DevTools"
         ],
-        "takeaway": "Understanding JavaScript memory management helps you write efficient code that avoids memory leaks and remains responsive under memory pressure."
+        "takeaway": "Memory leaks are not mysterious: they are references that live too long. Audit cleanup paths, use heap snapshots regularly, and keep long-lived references minimal."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "cpu-profiling",
+    "js-engine-optimization",
+    "debugging-performance"
+  ],
+  "furtherReading": [
+    {
+      "title": "Memory Management on MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_Management",
+      "type": "article",
+      "description": "Foundation concepts of JavaScript memory and garbage collection."
+    },
+    {
+      "title": "Chrome DevTools Memory Panel",
+      "url": "https://developer.chrome.com/blog/devtools-blog-archive-2023#memory",
+      "type": "article",
+      "description": "How to use heap snapshots and allocation timelines."
+    }
+  ]
 }

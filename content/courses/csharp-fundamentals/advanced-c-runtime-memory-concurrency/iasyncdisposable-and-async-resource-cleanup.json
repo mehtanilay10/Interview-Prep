@@ -1,61 +1,119 @@
 {
   "id": "lesson-csharp-fundamentals-advanced-c-runtime-memory-concurrency-iasyncdisposable-and-async-resource-cleanup",
-  "slug": "iasyncdisposable-and-async-resource-cleanup",
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
-  "title": "IAsyncDisposable and async resource cleanup",
-  "description": "Learn about IAsyncDisposable and async resource cleanup. Master the concepts, patterns, and best practices.",
   "order": 13,
+  "slug": "iasyncdisposable-and-async-resource-cleanup",
+  "title": "IAsyncDisposable and async resource cleanup",
+  "description": "Use IAsyncDisposable for async cleanup, understand await using, and avoid blocking on async dispose in ASP.NET Core.",
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": ["IAsyncDisposable", "async-dispose", "using-statement", "ASP.NET", "cleanup"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**IAsyncDisposable and async resource cleanup** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with iasyncdisposable and async resource cleanup."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of iasyncdisposable and async resource cleanup",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Not all resources can be cleaned up synchronously. A `Stream` that writes to a network socket may need to flush a buffer and wait for the remote endpoint to acknowledge receipt. A database connection may need to commit a transaction before closing. These operations take time, and blocking a thread while they complete wastes a thread-pool thread. `IAsyncDisposable` was introduced in .NET Core 3.0 and standardized in C# 8.0 to provide a cleanup pattern that works with `await` instead of blocking."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding iasyncdisposable and async resource cleanup is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`IAsyncDisposable` mirrors `IDisposable` but with an asynchronous `DisposeAsync` method that returns a `ValueTask`. The `await using` statement calls `DisposeAsync` and awaits the result. When `DisposeAsync` completes, all async cleanup has finished. This is especially important in ASP.NET Core, where blocking on async code can cause thread-pool starvation and deadlocks under load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing IAsyncDisposable"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `IAsyncDisposable` interface declares a single method: `ValueTask DisposeAsync()`. Returning `ValueTask` avoids the allocation that `Task` would create for the common case where `DisposeAsync` completes synchronously. Inside `DisposeAsync`, you await any async cleanup operations — `FlushAsync`, `CommitAsync`, `CloseAsync` — and then release unmanaged resources. If your type also holds managed resources that implement `IAsyncDisposable`, dispose them first before touching unmanaged resources."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Implementing IAsyncDisposable",
+        "code": "using System;\n\npublic sealed class BufferedWriter : IAsyncDisposable\n{\n    private FileStream _stream;\n    private bool _disposed;\n\n    public BufferedWriter(string path)\n    {\n        _stream = new FileStream(\n            path, FileMode.Create, FileAccess.Write,\n            FileShare.None, 4096, useAsync: true);\n    }\n\n    public async ValueTask WriteAsync(ReadOnlyMemory<byte> data)\n    {\n        if (_disposed)\n            throw new ObjectDisposedException(nameof(BufferedWriter));\n        await _stream.WriteAsync(data);\n    }\n\n    public async ValueTask DisposeAsync()\n    {\n        if (_disposed) return;\n\n        try\n        {\n            // Flush any buffered data to disk asynchronously\n            await _stream.FlushAsync();\n        }\n        finally\n        {\n            await _stream.DisposeAsync();\n            _disposed = true;\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "await using in C# 8.0 and later"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `await using` statement works exactly like `using`, but it awaits the `DisposeAsync` call. When the `await using` block exits — whether normally or via an exception — the compiler generates a `try`/`finally` that calls `DisposeAsync` and awaits it. This means your cleanup code is exception-safe without any extra effort. In C# 11, `await using` also works with `foreach` over `IAsyncEnumerable<T>` to dispose the enumerator when iteration ends."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using await using with an async stream",
+        "code": "// C# 8.0 — await using for IAsyncDisposable\nawait using var writer = new BufferedWriter(\"output.json\");\n\nforeach (var record in await GetRecordsAsync())\n{\n    byte[] json = JsonSerializer.SerializeToUtf8Bytes(record);\n    await writer.WriteAsync(json);\n}\n// writer.DisposeAsync() is called and awaited here.\n\n// C# 11 — await foreach with IAsyncEnumerable\nawait foreach (var record in GetRecordsAsync().ConfigureAwait(false))\n{\n    // The enumerator is disposed automatically\n    Console.WriteLine(record.Id);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ASP.NET Core and the disposal contract"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core's `IHostedService` and middleware pipelines rely heavily on `IAsyncDisposable`. The generic host calls `StopAsync` on all hosted services, and `DisposeAsync` on the application container. If your hosted service or database connection class only implements `IDisposable`, the host will call `Dispose` synchronously — which may block the shutdown thread if your cleanup involves network I/O. Always implement `IAsyncDisposable` for resources that require async cleanup in ASP.NET Core applications."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with iasyncdisposable and async resource cleanup, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Never block on async dispose",
+        "text": "Calling `.GetAwaiter().GetResult()` or `.Wait()` inside `Dispose()` to invoke `DisposeAsync` defeats the purpose of async cleanup and can cause deadlocks in ASP.NET Core. If you must bridge sync and async cleanup, use `DisposeAsync().AsTask().GetAwaiter().GetResult()` only as a last resort, and document why it is safe in your specific context. Prefer making the entire call chain async."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "`IAsyncDisposable` provides async cleanup via `ValueTask DisposeAsync()`; use it for resources that need I/O to release.",
+          "`await using` ensures `DisposeAsync` is called and awaited, providing exception-safe async cleanup.",
+          "ASP.NET Core prefers `IAsyncDisposable` for hosted services and database connections to avoid blocking shutdown.",
+          "Never block on async dispose synchronously — it can deadlock and defeats the purpose of async cleanup."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["idisposable-finalization-and-deterministic-cleanup", "managed-heap-and-allocation-lifecycle"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "IAsyncDisposable documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.iasyncdisposable"
+    },
+    {
+      "type": "article",
+      "title": "Implementing async dispose pattern",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-disposeasync"
+    },
+    {
+      "type": "article",
+      "title": "ASP.NET Core resource disposal",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services"
+    }
+  ]
 }

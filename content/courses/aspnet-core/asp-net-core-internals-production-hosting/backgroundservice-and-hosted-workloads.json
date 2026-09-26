@@ -3,59 +3,179 @@
   "slug": "backgroundservice-and-hosted-workloads",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "BackgroundService and hosted workloads",
-  "description": "Learn about BackgroundService and hosted workloads. Master the concepts, patterns, and best practices.",
+  "title": "BackgroundService and Hosted Workloads",
+  "description": "Implement long-running background tasks with BackgroundService, integrate with DI and logging, and learn when to use IHostedService versus worker services.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "background-service",
+    "hosted-service",
+    "worker",
+    "tasks"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**BackgroundService and hosted workloads** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with backgroundservice and hosted workloads."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of backgroundservice and hosted workloads",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Web applications do more than respond to HTTP requests. They also process queued messages, poll external APIs, run scheduled jobs, and maintain caches. ASP.NET Core provides `IHostedService` for any background workload that starts with the application and stops when it shuts down. `BackgroundService` is a convenience base class that simplifies the most common pattern: a long-running loop with cancellation support."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding backgroundservice and hosted workloads is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Worker Services are console applications built on the Generic Host that run `BackgroundService` implementations. They can run standalone, in Docker containers, or as Windows services. Because they use the same Generic Host as ASP.NET Core, they get DI, logging, and configuration for free."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "BackgroundService vs IHostedService"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`IHostedService` is the low-level interface with `StartAsync` and `StopAsync`. You use it when you need explicit control over startup and shutdown sequencing. `BackgroundService` implements `IHostedService` and provides a single `ExecuteAsync` method that runs a loop until a cancellation token is triggered. For most long-running tasks, `BackgroundService` is the simpler and safer choice."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Polling external API with BackgroundService",
+        "content": "A background service that polls an external API and updates a local cache.",
+        "language": "csharp",
+        "code": "public class WeatherPollingService : BackgroundService\n{\n    private readonly ILogger<WeatherPollingService> _logger;\n    private readonly IServiceProvider _services;\n    private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);\n\n    public WeatherPollingService(ILogger<WeatherPollingService> logger, IServiceProvider services)\n    {\n        _logger = logger;\n        _services = services;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        _logger.LogInformation(\"Weather polling service started\");\n\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                using var scope = _services.CreateScope();\n                var client = scope.ServiceProvider.GetRequiredService<WeatherApiClient>();\n                var forecast = await client.GetForecastAsync(stoppingToken);\n\n                // Update cache or database here\n                _logger.LogInformation(\"Updated weather forecast at {Time}\", DateTimeOffset.Now);\n            }\n            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)\n            {\n                _logger.LogError(ex, \"Failed to update weather forecast\");\n            }\n\n            await Task.Delay(_interval, stoppingToken);\n        }\n\n        _logger.LogInformation(\"Weather polling service stopped\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating Scopes in Background Tasks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Background services run outside the HTTP request pipeline, so there is no ambient scoped service provider. If you need scoped services like `DbContext` or `IHttpClientFactory` inside your background loop, create a new scope using `IServiceProvider.CreateScope()` for each unit of work. This ensures proper disposal and lifetime boundaries."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with backgroundservice and hosted workloads, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Always Create a Scope for Scoped Services",
+        "text": "Never inject a scoped service directly into a BackgroundService constructor. The service is resolved from the root provider at startup and will be treated as a singleton, causing lifetime validation errors and data leakage. Always create a scope inside your loop."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Worker Service Project Template"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `dotnet new worker` template creates a project pre-configured for background workloads. It uses `Host.CreateApplicationBuilder`, registers your `BackgroundService`, and runs the host. You can add web endpoints to a Worker Service if needed, or run it purely as a background process."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs for a Worker Service",
+        "content": "The minimal entry point for a background workload.",
+        "language": "csharp",
+        "code": "var host = Host.CreateApplicationBuilder(args);\nhost.Services.AddHostedService<Worker>();\nhost.Services.AddHttpClient();\nhost.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(host.Configuration.GetConnectionString(\"Default\")));\n\nawait host.RunAsync();"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "When to use which pattern",
+        "items": [
+          "Use BackgroundService for simple periodic tasks, polling loops, or queue consumers.",
+          "Use IHostedService when you need separate StartAsync and StopAsync logic without a loop.",
+          "Use a Worker Service project for standalone background applications that may run in Docker or as a Windows service.",
+          "Use ASP.NET Core with BackgroundService for background tasks that need to share a process with your web API."
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "BackgroundService",
+            "definition": "A base class that implements IHostedService and provides an ExecuteAsync loop with built-in cancellation support."
+          },
+          {
+            "term": "IHostedService",
+            "definition": "An interface for starting and stopping background tasks with the host lifecycle."
+          },
+          {
+            "term": "Worker Service",
+            "definition": "A console application template built on the Generic Host for running background workloads without HTTP endpoints."
+          },
+          {
+            "term": "IServiceScope",
+            "definition": "A scope created from IServiceProvider to resolve scoped services outside the request pipeline."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Create a Queue Processing Service",
+        "description": "Build a BackgroundService that polls a database for pending jobs and processes them.",
+        "steps": [
+          "Create a new Worker Service project using 'dotnet new worker -n JobProcessor'.",
+          "Define a Job entity and a DbContext for tracking pending and completed jobs.",
+          "Register the DbContext and a scoped IJobProcessor service.",
+          "In BackgroundService.ExecuteAsync, create a scope, resolve IJobProcessor, and poll the database for pending jobs.",
+          "Use CancellationToken to exit the loop gracefully when the host stops.",
+          "Run the service and verify jobs are processed and marked complete."
+        ],
+        "expectedOutcome": "A production-pattern background service that safely uses scoped services within a long-running loop and handles graceful shutdown."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "BackgroundService Summary",
+        "points": [
+          "BackgroundService is the simplest way to run long-running background tasks in ASP.NET Core.",
+          "Always create a scope when you need scoped services inside a background loop.",
+          "IHostedService gives you explicit StartAsync and StopAsync control.",
+          "Worker Services are standalone background apps using the Generic Host.",
+          "CancellationToken lets you stop the loop gracefully when the host shuts down."
+        ],
+        "takeaway": "Background workloads are first-class citizens in ASP.NET Core. Using BackgroundService with proper scoping and cancellation lets you build reliable background processing that integrates cleanly with the host lifecycle."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "generic-host-and-application-lifetime",
+    "ihttpclientfactory-and-handler-lifetimes"
+  ],
+  "furtherReading": [
+    {
+      "title": "Background tasks with hosted services",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to IHostedService, BackgroundService, and Worker Service templates."
+    },
+    {
+      "title": "Create a Worker Service",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/extensions/windows-service",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How to create and deploy a Worker Service, including running as a Windows service."
+    }
+  ]
 }

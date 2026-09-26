@@ -4,33 +4,39 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Container health checks",
-  "description": "Learn about Container health checks. Master the concepts, patterns, and best practices.",
+  "description": "Configure Docker HEALTHCHECK instructions, understand startup versus liveness versus readiness probes, and use health checks to make your orchestrator self-healing.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["docker", "healthchecks", "orchestration", "resilience"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Container health checks** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with container health checks."
+        "text": "A running container is not necessarily a healthy container. A process can be alive but deadlocked, listening but not serving, or starting but not yet ready. Health checks give Docker and your orchestrator the ability to distinguish a running container from a working one, and to restart or reroute traffic automatically when something goes wrong."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Types of health checks"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of container health checks",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Docker has one native health check concept: the `HEALTHCHECK` instruction in a Dockerfile. Kubernetes expands this into three separate probes: `startupProbe`, `livenessProbe`, and `readinessProbe`. Each probe answers a different question about the container's state."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Probe", "Asks", "Failure action", "Docker equivalent"],
+        "rows": [
+          ["Startup", "Has the application finished initializing?", "Kills container after timeout", "Startup period in HEALTHCHECK"],
+          ["Liveness", "Is the application still alive and responsive?", "Restarts the container", "HEALTHCHECK retries and interval"],
+          ["Readiness", "Is the application ready to serve traffic?", "Removes from service endpoints", "No direct Docker equivalent"]
         ]
       }
     },
@@ -38,24 +44,124 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The Docker HEALTHCHECK instruction"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding container health checks is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The `HEALTHCHECK` instruction tells Docker how to test whether a container is healthy. Docker runs the health check command at the interval you specify. If the command succeeds, the container is `healthy`. If it fails too many times, the container is marked `unhealthy`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HTTP health check for a Node.js API",
+        "content": "This Dockerfile uses curl to check the /health endpoint every 30 seconds.",
+        "language": "dockerfile",
+        "code": "FROM node:20-alpine\n\nRUN apk add --no-cache curl\n\nHEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\\n  CMD curl -f http://localhost:3000/health || exit 1"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TCP health check for a database",
+        "content": "For services that do not expose an HTTP endpoint, use a TCP connection check.",
+        "language": "dockerfile",
+        "code": "FROM postgres:16-alpine\n\nHEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \\\n  CMD pg_isready -U \"$POSTGRES_USER\" || exit 1"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "HEALTHCHECK options",
+        "items": [
+          "--interval: time between checks, default 30s",
+          "--timeout: maximum time to wait for a check to complete, default 30s",
+          "--start-period: grace period after container start, default 0s",
+          "--retries: number of consecutive failures before marking unhealthy, default 3",
+          "NONE: disable the default health check inherited from the base image"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Kubernetes probes in depth"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In Kubernetes, probes are configured in the Pod spec. The `startupProbe` runs first and disables the liveness and readiness probes until it succeeds. This gives slow-starting applications time to initialize without being killed prematurely."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Kubernetes probes for a web API",
+        "content": "A Pod spec with startup, liveness, and readiness probes.",
+        "language": "yaml",
+        "code": "containers:\n  - name: api\n    image: myapp:latest\n    ports:\n      - containerPort: 3000\n    startupProbe:\n      httpGet:\n        path: /health/startup\n        port: 3000\n      failureThreshold: 30\n      periodSeconds: 2\n    livenessProbe:\n      httpGet:\n        path: /health/live\n        port: 3000\n      failureThreshold: 3\n      periodSeconds: 10\n    readinessProbe:\n      httpGet:\n        path: /health/ready\n        port: 3000\n      failureThreshold: 3\n      periodSeconds: 5"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with container health checks, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Design your health endpoints",
+        "text": "Expose at least two endpoints: one for startup or deep dependency checks and one for liveness. A readiness endpoint should verify the database connection, cache availability, and any other dependency the container needs to serve traffic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common health check mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "What to avoid",
+        "items": [
+          "Using the root URL as a health check when it triggers side effects such as sending email or writing logs",
+          "Setting the interval too low, which causes unnecessary load on the application",
+          "Setting the timeout too high, which delays detection of genuinely failed containers",
+          "Forgetting the startup period for applications that take more than a few seconds to initialize",
+          "Running the health check as a command that always returns success, which defeats the purpose"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "A running process is not the same as a healthy application",
+          "Use HEALTHCHECK in Dockerfiles for standalone Docker deployments",
+          "Use Kubernetes probes for fine-grained startup, liveness, and readiness control",
+          "Design dedicated /health endpoints that do not trigger side effects",
+          "Give slow-starting applications a generous startup period before liveness checks begin"
+        ],
+        "takeaway": "Health checks are the difference between a container that restarts itself and one that quietly fails to serve traffic."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["resource-limits", "container-networking"],
+  "furtherReading": [
+    {
+      "title": "Docker documentation: HEALTHCHECK",
+      "url": "https://docs.docker.com/engine/reference/builder/#healthcheck",
+      "type": "article",
+      "author": "Docker"
+    },
+    {
+      "title": "Kubernetes documentation: Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article",
+      "author": "Kubernetes"
+    }
+  ]
 }

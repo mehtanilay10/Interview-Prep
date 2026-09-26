@@ -3,59 +3,169 @@
   "slug": "endpoint-routing-internals",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Endpoint routing internals",
-  "description": "Learn about Endpoint routing internals. Master the concepts, patterns, and best practices.",
+  "title": "Endpoint Routing Internals",
+  "description": "Deep dive into endpoint routing, route matching algorithms, endpoint metadata, and how to extend the routing system with custom conventions and filters.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "routing",
+    "endpoints",
+    "matchers",
+    "urls"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Endpoint routing internals** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with endpoint routing internals."
+        "text": "Endpoint routing is the system that matches an incoming URL to an endpoint and then executes the associated handler. Introduced in ASP.NET Core 3.0, it replaced the older IRouter-based system and unified routing for both MVC and minimal APIs. Understanding its internals helps you diagnose 404s, optimize route tables, and build advanced routing behaviors."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An **endpoint** in ASP.NET Core is more than a URL pattern. It is an object that contains a route pattern, a request delegate, metadata (such as authorization or CORS policies), and display information. When a request arrives, the routing middleware compares it against the endpoint table and selects the best match."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Route Matching Basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The route matcher uses a sophisticated algorithm that considers the HTTP method, path, and any route constraints. It processes endpoints in the order they were added, picking the first one that matches. Once a match is found, the endpoint is stored in `HttpContext.GetEndpoint()` so downstream middleware can inspect it."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Route matching inputs",
         "items": [
-          "Understand the fundamental principles of endpoint routing internals",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "HTTP method (GET, POST, PUT, DELETE, etc.)",
+          "Request path and query string (query parameters do not affect matching unless used in constraints)",
+          "Route values extracted from the path pattern",
+          "Metadata attached to the endpoint, such as authorization policies or output formatters"
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Minimal API endpoint with route constraints",
+        "content": "Endpoints support inline constraints such as int, bool, and datetime.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\nvar app = builder.Build();\n\napp.MapGet(\"/products/{id:int}\", (int id) =>\n{\n    return Results.Ok(new { Id = id, Name = \"Product \" + id });\n});\n\napp.MapPost(\"/orders/{orderId:guid}\", (Guid orderId) =>\n{\n    return Results.Accepted(\"/orders/{orderId}\", new { orderId });\n});\n\n// Fallback for unmatched routes\napp.MapFallback(() => Results.NotFound(\"Route not found\"));\n\napp.Run();"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Endpoint Metadata and Filters"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding endpoint routing internals is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Endpoints carry metadata that influences how they are processed. For example, `[Authorize]` adds an authorization policy to the endpoint metadata. `RequireCors` adds CORS policy names. You can read this metadata in middleware or apply it dynamically using endpoint filters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading endpoint metadata in middleware",
+        "content": "Inspect endpoint metadata before the endpoint executes.",
+        "language": "csharp",
+        "code": "app.Use(async (context, next) =>\n{\n    var endpoint = context.GetEndpoint();\n    if (endpoint is null)\n    {\n        await next();\n        return;\n    }\n\n    var displayName = endpoint.DisplayName;\n    var routePattern = (endpoint as RouteEndpoint)?.RoutePattern;\n\n    context.Response.Headers[\"X-Endpoint\"] = displayName ?? \"unknown\";\n    await next();\n});"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with endpoint routing internals, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Endpoint Metadata is Powerful",
+        "text": "Endpoint metadata decouples routing from behavior. Instead of hardcoding checks in every controller or minimal API handler, you can write a single middleware or filter that inspects metadata and enforces policies, rate limits, or feature flags."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Endpoint Routing vs Legacy Routing"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Endpoint Routing vs Legacy IRouter",
+        "cards": [
+          {
+            "title": "Endpoint Routing",
+            "description": "The modern system introduced in ASP.NET Core 3.0.",
+            "pros": [
+              "Unified routing for MVC and minimal APIs",
+              "Rich metadata system",
+              "Supports endpoint filters and conventions",
+              "Better performance with compiled route matchers"
+            ],
+            "cons": [
+              "Steeper learning curve for advanced scenarios",
+              "Requires explicit UseRouting and UseEndpoints calls in some hosting models"
+            ]
+          },
+          {
+            "title": "Legacy IRouter",
+            "description": "The older routing system used before ASP.NET Core 3.0.",
+            "pros": [
+              "Simpler for very basic scenarios",
+              "Well-documented in older tutorials"
+            ],
+            "cons": [
+              "Separate systems for MVC and Web API",
+              "No built-in metadata or endpoint filters",
+              "Slower route matching for large route tables"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Endpoint Routing Summary",
+        "points": [
+          "Endpoint routing matches requests to endpoint objects that carry route patterns, handlers, and metadata.",
+          "The matcher considers HTTP method, path, and constraints in registration order.",
+          "Endpoint metadata enables cross-cutting behavior like authorization, CORS, and rate limiting.",
+          "Endpoint filters provide a way to run code before or after an endpoint handler.",
+          "Modern ASP.NET Core uses endpoint routing; legacy IRouter is obsolete."
+        ],
+        "takeaway": "Endpoint routing is the central nervous system of request dispatch in ASP.NET Core. By understanding how routes are matched and how metadata flows through the system, you can build more maintainable and performant applications."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "request-pipeline-and-middleware-execution",
+    "dependency-injection-lifetimes-and-scope-validation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Endpoint routing in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comprehensive guide to endpoint routing, route patterns, and constraints."
+    },
+    {
+      "title": "Endpoint filters in minimal APIs",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/filters",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How to create and apply endpoint filters for cross-cutting concerns."
+    }
+  ]
 }

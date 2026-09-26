@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an async method that blocks on .Result** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an async method that blocks on .result."
+        "text": "A developer writes an async method that calls another async method but blocks on it with .Result or .Wait() to get a synchronous return value. In a console app or background service, this can cause deadlocks, thread pool starvation, and unresponsive applications. In ASP.NET Classic, it deadlocks the request thread. In ASP.NET Core, it causes thread pool exhaustion under load. The code compiles, passes unit tests, and fails in production."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an async method that blocks on .result",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand the async await state machine and how it schedules work on the thread pool",
+          "Learn why blocking on async code causes deadlocks in synchronization context environments",
+          "Identify thread pool starvation symptoms: high CPU, slow responses, and unresponsive endpoints",
+          "Apply async all the way: propagate async signatures from top to bottom"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SynchronizationContext",
+            "definition": "A context that controls where continuations run. ASP.NET Classic uses a request context that allows only one thread at a time."
+          },
+          {
+            "term": "Deadlock",
+            "definition": "A state where two or more threads are blocked forever, each waiting for the other to release a resource."
+          },
+          {
+            "term": "Thread pool starvation",
+            "definition": "A condition where all thread pool threads are blocked, preventing the runtime from processing queued work items."
+          },
+          {
+            "term": "Async all the way",
+            "definition": "A design principle where async methods call other async methods without blocking, keeping the call chain asynchronous from entry point to IO."
+          }
         ]
       }
     },
@@ -44,15 +67,178 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an async method that blocks on .result is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Blocking on async code defeats the purpose of async IO. Instead of freeing threads to serve other requests, the thread sits idle waiting for an operation to complete. Under light load, the application appears to work. Under production load, thread pool starvation causes requests to queue, latency spikes, and eventually timeouts. The fix is simple: make the calling method async and await the operation."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an async method that blocks on .result, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": ".Result and .Wait() are not free",
+        "text": "Blocking on async code holds a thread for the entire duration of the IO operation. In a server environment, that thread cannot serve another request. The cost is not visible in a single-user test but explodes under concurrent load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic code calls an async method from a synchronous method using .Result. The async method needs to resume on the original context, but the original context is blocked waiting for the result. The two threads wait for each other forever: the classic deadlock."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Blocking on async code",
+        "content": "A synchronous method that blocks on an async operation:",
+        "code": "public User GetUser(int id)\n{\n    // Blocks the calling thread until the async operation completes\n    return _userService.GetUserAsync(id).Result;\n}\n\n// The async method tries to resume on the captured context\npublic async Task<User> GetUserAsync(int id)\n{\n    var response = await _httpClient.GetAsync($\"users/{id}\");\n    return await response.Content.ReadAsAsync<User>();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct approach is to make the calling method async and propagate the async signature all the way up the call stack. If you cannot make the entry point async, use .GetAwaiter().GetResult() only as a last resort in console applications where no synchronization context exists. In ASP.NET Core, always prefer async all the way."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Async all the way",
+        "content": "Propagate async signatures from the controller to the data access layer:",
+        "code": "// Controller\n[HttpGet(\"{id}\")]\npublic async Task<ActionResult<User>> Get(int id)\n{\n    var user = await _userService.GetUserAsync(id);\n    if (user == null) return NotFound();\n    return Ok(user);\n}\n\n// Service\npublic async Task<User> GetUserAsync(int id)\n{\n    var response = await _httpClient.GetAsync($\"users/{id}\");\n    response.EnsureSuccessStatusCode();\n    return await response.Content.ReadFromJsonAsync<User>();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Async patterns compared",
+        "cards": [
+          {
+            "title": "Blocking with .Result",
+            "description": "Call async code synchronously and block the thread.",
+            "pros": ["Appears simple in synchronous code"],
+            "cons": ["Deadlocks in synchronization contexts", "Thread pool starvation", "Unreliable under load"]
+          },
+          {
+            "title": "Blocking with .GetAwaiter().GetResult()",
+            "description": "Block without wrapping exceptions in AggregateException.",
+            "pros": ["Preserves original exception type"],
+            "cons": ["Still blocks thread", "Still starves thread pool", "Not a real fix"]
+          },
+          {
+            "title": "Async all the way",
+            "description": "Propagate async signatures from the top of the call stack to the bottom.",
+            "pros": ["Scales under load", "No deadlocks", "Efficient thread usage"],
+            "cons": ["Requires async signatures at every layer"]
+          },
+          {
+            "title": "ValueTask for hot paths",
+            "description": "Use ValueTask when the result is often already available synchronously.",
+            "pros": ["Reduces allocation overhead", "Faster for cached results"],
+            "cons": ["More complex to consume correctly", "Must not await multiple times"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "async-deadlock",
+        "caption": "How blocking on async code causes a deadlock in a synchronization context",
+        "definition": "graph LR\n    A[Thread A calls .Result] --> B[Thread A blocks waiting]\n    B --> C[Async operation completes]\n    C --> D[Continuation tries to resume on captured context]\n    D --> E{Context has free thread?}\n    E -->|No| F[Continuation queued]\n    F --> G[Deadlock: both threads waiting]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When Blocking Is Acceptable"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Limited acceptable scenarios",
+        "items": [
+          "Console application Main method: no synchronization context exists, so .GetAwaiter().GetResult() is safe",
+          "Top-level statements in .NET 6+: the entry point can be async directly",
+          "Legacy code boundaries where you cannot change the signature: wrap the call in Task.Run and accept the thread pool cost",
+          "Unit tests that need to call async methods: use async test methods instead of blocking"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "ConfigureAwait in libraries",
+        "text": "Library code should use ConfigureAwait(false) to avoid capturing the synchronization context. This prevents deadlocks when the library is consumed by UI or ASP.NET Classic applications. ASP.NET Core does not have a synchronization context, so ConfigureAwait(false) is optional but still a good practice."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Does ASP.NET Core have a synchronization context?",
+            "answer": "No. ASP.NET Core removed the synchronization context to improve scalability. Blocking with .Result does not deadlock, but it still blocks a thread and causes thread pool starvation under load."
+          },
+          {
+            "question": "What is the difference between .Result and .Wait()?",
+            "answer": ".Result blocks the thread and returns the result or throws an AggregateException wrapping the original. .Wait() blocks the thread and returns only a bool or throws AggregateException. Both are bad in async code."
+          },
+          {
+            "question": "Can I use .GetAwaiter().GetResult() in ASP.NET Core?",
+            "answer": "It will not deadlock because there is no synchronization context. However, it still blocks a thread and hurts scalability. Use async all the way instead."
+          },
+          {
+            "question": "What is thread pool starvation?",
+            "answer": "When all available thread pool threads are blocked, the runtime cannot process new work items. Requests queue up, latency increases, and the application becomes unresponsive until threads are released."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Eliminate blocking calls",
+        "description": "Refactor a codebase that uses .Result and .Wait() to use async all the way.",
+        "steps": [
+          "Search the codebase for .Result and .Wait() calls on Task types",
+          "For each call, make the containing method async and await the operation",
+          "Update the method signature and all callers up to the entry point",
+          "Run a load test before and after to measure thread pool usage and request latency",
+          "Add a code analysis rule to block new .Result and .Wait() calls"
+        ],
+        "expectedOutcome": "No .Result or .Wait() calls remain on Task types. The application handles concurrent load with fewer threads and lower latency."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Blocking on async code wastes threads and causes deadlocks or starvation",
+          "Async all the way is the only scalable pattern for server applications",
+          "Use ConfigureAwait(false) in libraries to avoid synchronization context issues",
+          "Treat .Result and .Wait() as code smells in any async codebase"
+        ],
+        "takeaway": "Async code is contagious. If one method blocks, the whole chain suffers."
       }
     }
   ],

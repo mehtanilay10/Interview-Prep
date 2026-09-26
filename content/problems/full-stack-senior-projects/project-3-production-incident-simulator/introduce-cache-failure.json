@@ -8,54 +8,212 @@
   "order": 6,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["caching", "redis", "resilience", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce cache failure** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce cache failure."
+        "text": "Caching is one of the most effective performance optimizations available, but it introduces failure modes that do not exist without it. A cache failure can mean slow responses, stale data, or a cascading database outage. This lesson covers cache failure patterns, invalidation strategies, and how to build a cache layer that degrades gracefully under failure."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Cache failure patterns"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce cache failure",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Cache stampede: a popular key expires and all requests hit the database simultaneously",
+          "Thundering herd: multiple concurrent requests recompute the same expensive value",
+          "Cache penetration: queries for data that never exists bypass the cache and hit the database every time",
+          "Cache avalanche: many keys expire at the same time, causing a sudden load spike",
+          "Stale data serving after an invalidation failure, leading to user-visible inconsistencies",
+          "Redis failover without proper sentinel or cluster configuration causing connection drops"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache-aside",
+            "definition": "The application reads from the cache and falls back to the database on a miss, then writes the result back to the cache."
+          },
+          {
+            "term": "TTL",
+            "definition": "Time-to-live: the duration after which a cached entry expires and is removed or marked stale."
+          },
+          {
+            "term": "Cache stampede",
+            "definition": "A sudden surge of requests for an expired key that all try to recompute or fetch the value simultaneously."
+          },
+          {
+            "term": "Jitter",
+            "definition": "A small random delay added to TTLs or retries to prevent synchronized behavior across clients."
+          },
+          {
+            "term": "Write-through",
+            "definition": "A cache strategy where writes go to both the cache and the data store simultaneously, keeping them consistent."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest cache architecture treats the cache as optional. Every cache read should have a fast fallback to the database, and every cache write should be retried idempotently. If you find yourself building logic that is too complex to run without the cache, the cache has become a single point of failure rather than an optimization."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache-aside with jittered TTL",
+        "content": "A Redis-backed cache wrapper that adds jitter to prevent stampedes:",
+        "code": "public async Task<T?> GetOrSetAsync<T>(\n    string key,\n    Func<Task<T>> factory,\n    TimeSpan ttl,\n    CancellationToken ct)\n{\n    var cached = await _redis.StringGetAsync(key);\n    if (cached.HasValue)\n    {\n        return JsonSerializer.Deserialize<T>(cached!);\n    }\n\n    var jitter = TimeSpan.FromMilliseconds(\n        Random.Shared.NextDouble() * 500);\n    await Task.Delay(jitter, ct);\n\n    var value = await factory();\n    var options = new DistributedCacheEntryOptions\n    {\n        AbsoluteExpirationRelativeToNow = ttl\n    };\n    await _redis.StringSetAsync(key,\n        JsonSerializer.Serialize(value),\n        options);\n    return value;\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Invalidation strategies"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding introduce cache failure is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Use cache keys that include a version or timestamp prefix for bulk invalidation",
+          "Delete related keys explicitly on writes instead of relying solely on TTL",
+          "Use Redis key notifications or Pub/Sub to trigger proactive invalidation across instances",
+          "Keep critical reads consistent by querying the database when a transaction commits",
+          "Monitor cache hit rate and p95 latency separately to detect degradation early"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Caching patterns and their trade-offs",
+        "cards": [
+          {
+            "title": "Cache-aside (lazy loading)",
+            "description": "Application handles cache misses by loading from the database on demand.",
+            "pros": ["Resilient to cache failures", "Only caches requested data", "Simple to implement"],
+            "cons": ["Cache misses are slower", "Stale data until TTL expires"]
+          },
+          {
+            "title": "Write-through",
+            "description": "Writes update both cache and database synchronously.",
+            "pros": ["Strong consistency on reads", "Write penalty is predictable"],
+            "cons": ["Write latency includes cache write", "Cache pollution from rarely-read writes"]
+          },
+          {
+            "title": "Write-behind (write-back)",
+            "description": "Writes update cache immediately and flush to the database asynchronously.",
+            "pros": ["Fastest write path", "Can batch database writes"],
+            "cons": ["Risk of data loss on crash", "Complex failure semantics"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-cache-failure-flow",
+        "caption": "Cache request flow showing hit, miss, and fallback paths",
+        "definition": "graph TD\n    A[Client request] --> B{Cache hit?}\n    B -->|Yes| C[Return cached value]\n    B -->|No| D{Cache available?}\n    D -->|Yes| E[Fetch from DB]\n    E --> F[Store in cache with TTL + jitter]\n    F --> C\n    D -->|No| G{Fallback to DB?}\n    G -->|Yes| H[Fetch from DB directly]\n    H --> I[Return value]\n    G -->|No| J[Return degraded response]\n\n    note right of C\n        Fast path.\n        Monitor hit rate.\n    end note\n\n    note right of H\n        Slow path.\n        Alert when hit rate drops.\n    end note"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce cache failure, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Monitor cache hit rate, not just latency",
+        "text": "A cache that serves all requests from memory is fast, but a cache that misses on every request is just an expensive database proxy. Alert on hit rate drops below 80 percent before latency increases."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "What should the Redis eviction policy be?",
+            "answer": "Use allkeys-lru for caches where any key can be recomputed. Use volatile-lru if you need TTL-based eviction for specific keys. Avoid noeviction unless you have a clear memory limit and monitoring; it causes write failures when memory is full."
+          },
+          {
+            "question": "How do I handle a Redis outage?",
+            "answer": "Route requests directly to the database, but ensure the database can handle the load. Use connection timeouts on the Redis client so the fallback triggers within milliseconds, not seconds."
+          },
+          {
+            "question": "Should I cache database query results or domain objects?",
+            "answer": "Cache query results if the data is read-heavy and changes infrequently. Cache domain objects if they are expensive to serialize or assemble. The choice affects invalidation complexity more than performance."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Harden an existing cache layer",
+        "description": "Your application uses Redis without jittered TTLs, without fallback on Redis failure, and without monitoring. Enhance the cache wrapper to handle these gaps.",
+        "steps": [
+          "Add jitter to all TTL assignments to reduce stampede risk",
+          "Configure Redis connection timeout and retry policy",
+          "Add a cache hit rate metric and an alert threshold",
+          "Implement a fallback path when Redis is unreachable"
+        ],
+        "expectedOutcome": "You should have a cache wrapper that survives Redis failures, prevents synchronized expiry, and reports its own health metrics."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Treat the cache as optional; every cache read needs a database fallback",
+          "Add jitter to TTLs to prevent synchronized cache stampedes",
+          "Use database unique constraints as the final guard against duplicate writes",
+          "Monitor hit rate and alert before latency degrades",
+          "Choose an invalidation strategy that matches your consistency requirements"
+        ],
+        "takeaway": "Caching is a reliability decision, not just a performance decision. A senior engineer designs caches that degrade gracefully and never become a hidden single point of failure."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-downstream-timeout",
+    "introduce-database-performance-regression",
+    "introduce-broken-deployment"
+  ],
+  "furtherReading": [
+    {
+      "title": "Cache-Aside Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Azure Architecture Center guidance on the cache-aside pattern and its trade-offs."
+    },
+    {
+      "title": "Redis Eviction Policies",
+      "url": "https://redis.io/docs/management/config-limit/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Official documentation on memory limits and eviction policy configuration."
+    }
+  ]
 }

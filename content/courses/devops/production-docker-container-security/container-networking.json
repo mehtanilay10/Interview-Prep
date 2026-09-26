@@ -4,33 +4,56 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Container networking",
-  "description": "Learn about Container networking. Master the concepts, patterns, and best practices.",
+  "description": "Understand Docker's networking models, bridge and host networks, network isolation, and how to configure secure container communication in production.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["docker", "networking", "container-security"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Container networking** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with container networking."
+        "text": "Docker networking controls which containers can talk to each other, how they discover each other, and how traffic flows between containers and the outside world. A misconfigured network can expose internal services to the internet or allow a compromised container to reach systems it should never touch."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Docker's default network model"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of container networking",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "When you install Docker, it creates three networks automatically: `bridge`, `host`, and `none`. If you do not specify a network when you start a container, Docker connects it to the default `bridge` network. Every container on the same user-defined bridge network can communicate with every other container on that network by name."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Built-in networks are for Docker's internal use",
+        "text": "Do not attach production containers directly to the built-in `bridge` network. Create a user-defined bridge network for your application so containers can resolve each other by name and are isolated from unrelated containers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Network drivers and their security properties"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Driver", "Use case", "Isolation", "Notes"],
+        "rows": [
+          ["bridge", "Default for standalone containers", "Low", "All containers on the same bridge can reach each other"],
+          ["host", "Maximum performance", "None", "Container shares the host network stack; no network isolation"],
+          ["none", "Disconnected containers", "Full", "Container has no network interfaces"],
+          ["overlay", "Swarm services", "High", "Encrypted traffic between swarm nodes with VXLAN"],
+          ["macvlan", "Physical network assignment", "High", "Container gets its own MAC and IP on the LAN"]
         ]
       }
     },
@@ -38,24 +61,98 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Isolating application tiers with networks"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding container networking is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A typical three-tier application has a frontend, an API, and a database. Each tier should live on its own Docker network. The frontend needs to reach the API. The API needs to reach the database. The frontend should never reach the database directly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Isolated tier networks with Docker Compose",
+        "content": "This Compose file creates separate networks for each tier. Containers can only communicate along the paths you explicitly allow.",
+        "language": "yaml",
+        "code": "services:\n  frontend:\n    image: myapp-frontend\n    networks:\n      - public\n      - backend\n  api:\n    image: myapp-api\n    networks:\n      - backend\n      - data\n  database:\n    image: postgres:16-alpine\n    networks:\n      - data\n\nnetworks:\n  public:\n    driver: bridge\n  backend:\n    driver: bridge\n    internal: true\n  data:\n    driver: bridge\n    internal: true"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with container networking, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "The host network is almost never what you want",
+        "text": "`network_mode: host` removes all network isolation. The container shares the host's IP addresses, ports, and firewall rules. Use it only for high-performance monitoring agents or when a specific application cannot operate inside a network namespace."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Port publishing and exposure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`EXPOSE` in a Dockerfile is documentation. It does not open any ports. `docker run -p` or the `ports` section in Compose is what actually publishes container ports to the host. Only publish the ports that external systems need. Do not publish database ports to the host network."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Port publishing rules of thumb",
+        "items": [
+          "Bind to `127.0.0.1` on the host when only the host or a reverse proxy needs access: `-p 127.0.0.1:8080:3000`",
+          "Avoid `-p 0.0.0.0:PORT` for internal services",
+          "Use Compose `expose` for service-to-service communication without host publishing",
+          "Reserve `ports` for services that must be reachable from outside the Docker host"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Network policies and firewalls"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Docker network isolation is not a complete security boundary. A root user inside a container can manipulate network namespaces. Treat Docker networking as one layer of defense and enforce host-level firewall rules, Kubernetes NetworkPolicy, or service mesh policies for sensitive workloads."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "User-defined bridge networks provide name-based discovery and basic isolation",
+          "Separate application tiers onto separate networks to limit blast radius",
+          "Avoid the host network driver except for narrow use cases",
+          "Bind published ports to localhost when external access is not required",
+          "Complement Docker networking with host firewalls and, in Kubernetes, NetworkPolicy"
+        ],
+        "takeaway": "Good container networking is about least privilege: every container should be able to reach only what it truly needs."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["volumes-and-persistent-data", "container-secrets", "resource-limits"],
+  "furtherReading": [
+    {
+      "title": "Docker documentation: Networking overview",
+      "url": "https://docs.docker.com/network/",
+      "type": "article",
+      "author": "Docker"
+    },
+    {
+      "title": "Docker Compose networking",
+      "url": "https://docs.docker.com/compose/networking/",
+      "type": "article",
+      "author": "Docker"
+    }
+  ]
 }

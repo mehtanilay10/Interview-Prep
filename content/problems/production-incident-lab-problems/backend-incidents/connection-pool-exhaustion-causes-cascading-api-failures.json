@@ -4,33 +4,62 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Connection pool exhaustion causes cascading API failures",
-  "description": "Problem: Connection pool exhaustion causes cascading API failures. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose and fix database connection pool exhaustion that triggers cascading API failures under load, using connection leak detection, pool sizing, and circuit breakers.",
   "order": 4,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["connection-pool", "cascading-failure", "database", "circuit-breaker", "connection-leak"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Connection pool exhaustion causes cascading API failures** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with connection pool exhaustion causes cascading api failures."
+        "text": "During a flash sale, your API starts returning 500 and 503 errors across multiple endpoints. CPU and memory are fine, but database connection pool metrics show 100% utilization with a growing queue of waiting requests. A single slow query on a reporting endpoint is holding connections, starving the rest of the application."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Symptoms of connection pool exhaustion"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of connection pool exhaustion causes cascading api failures",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Database connection pool utilization hits 100% and stays there",
+          "New requests wait in a connection queue until they timeout (typically 15-30 seconds)",
+          "Healthy endpoints start returning 503 because they cannot get a connection in time",
+          "Application logs show 'Timeout expired' or 'Connection pool full' errors",
+          "The database CPU remains low because connections are waiting, not querying",
+          "Thread dump reveals many threads blocked on connection acquisition"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Connection pool",
+            "definition": "A cache of database connections maintained so they can be reused when future requests to the database are required."
+          },
+          {
+            "term": "Connection leak",
+            "definition": "A connection that is opened but never returned to the pool, often due to missing Dispose() or unclosed using blocks."
+          },
+          {
+            "term": "Cascading failure",
+            "definition": "A failure in one component that causes failures in dependent components, propagating through the system."
+          },
+          {
+            "term": "Bulkhead pattern",
+            "definition": "Isolating resources such as connection pools so that one failing endpoint cannot consume all connections."
+          },
+          {
+            "term": "Circuit breaker",
+            "definition": "A pattern that stops sending requests to a failing service after a threshold, giving it time to recover."
+          }
         ]
       }
     },
@@ -38,24 +67,115 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Root causes"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding connection pool exhaustion causes cascading api failures is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "A long-running query holds connections for seconds while the pool is sized for millisecond operations",
+          "Connection leaks in a new code path that does not properly dispose DbContext or IDbConnection",
+          "Pool size was never tuned for the application's concurrency requirements",
+          "A retry policy retries failed queries, multiplying the number of open connections",
+          "Multiple microservices share the same database user and connection pool limits"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Connection pool sizing approaches",
+        "cards": [
+          {
+            "title": "Default pool size",
+            "description": "Use the framework default (e.g., 100 for .NET, 20 for Npgsql).",
+            "pros": ["No configuration required", "Works for low-traffic apps"],
+            "cons": ["Often wrong for production load", "Can cause exhaustion under spikes"]
+          },
+          {
+            "title": "Formula-based sizing",
+            "description": "Calculate based on cores, latency, and concurrency: (cores * 2) + spindles.",
+            "pros": ["Data-driven", "Accounts for workload characteristics"],
+            "cons": ["Requires performance testing", "May need iteration"]
+          },
+          {
+            "title": "Bulkhead pools",
+            "description": "Separate pools for critical and non-critical operations.",
+            "pros": ["Protects critical paths", "Contains failures"],
+            "cons": ["More complex configuration", "Higher total connection count"]
+          },
+          {
+            "title": "Connection multiplexing",
+            "description": "Use a proxy like PgBouncer to pool connections at the infrastructure layer.",
+            "pros": ["Transparent to application", "Reduces backend connection churn"],
+            "cons": ["Additional infrastructure", "Session state limitations"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connection leak from missing dispose",
+        "content": "A DbContext is created but never disposed, leaking connections:",
+        "code": "// Leak: DbContext not disposed\npublic async Task<List<Order>> GetOrdersAsync()\n{\n    var ctx = new AppDbContext(); // Never disposed!\n    return await ctx.Orders.Where(o => o.UserId == _userId).ToListAsync();\n}\n\n// Fix: use using statement\npublic async Task<List<Order>> GetOrdersAsync()\n{\n    await using var ctx = new AppDbContext();\n    return await ctx.Orders.Where(o => o.UserId == _userId).ToListAsync();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-connection-pool-exhaustion",
+        "caption": "Connection pool exhaustion leading to cascading failures",
+        "definition": "graph TD\n    A[Flash sale traffic spike] --> B[More requests need DB connections]\n    B --> C[Slow query holds connection for 5s]\n    C --> D[Pool utilization reaches 100%]\n    D --> E[New requests queue for connection]\n    E --> F[Request timeout after 15s]\n    F --> G[503 returned to client]\n    G --> H[Healthy endpoints also timeout]\n    H --> I[Cascading API failures]"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with connection pool exhaustion causes cascading api failures, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Pool size is not the only knob",
+        "text": "Increasing the pool size without fixing the underlying leak or slow query only delays the failure. Address connection lifecycle and query performance first, then tune the pool."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Detect and fix a connection leak",
+        "description": "Use a profiling tool or APM to find connection leaks in an application. Fix the leak and document the root cause.",
+        "steps": [
+          "Enable connection pool performance counters or APM connection tracking",
+          "Identify endpoints with the highest connection acquisition time",
+          "Search the codebase for DbContext or IDbConnection instances without using statements",
+          "Fix each leak by adding proper disposal",
+          "Verify pool utilization returns to normal under the same load"
+        ],
+        "expectedOutcome": "You should see connection pool metrics return to healthy levels and a reduction in timeout errors under load."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Monitor connection pool utilization, queue length, and acquisition time",
+          "Fix connection leaks before increasing pool size",
+          "Use bulkhead pools to protect critical endpoints from noisy neighbors",
+          "Add circuit breakers so timeouts do not cascade into full outages"
+        ],
+        "takeaway": "Connection pool exhaustion is a reliability problem, not just a performance problem. It turns one slow query into a system-wide outage."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "ADO.NET Connection Pooling",
+      "url": "https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/connection-pooling",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How connection pooling works in .NET and how to configure it."
+    }
+  ]
 }

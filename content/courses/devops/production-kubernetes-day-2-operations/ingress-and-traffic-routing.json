@@ -3,34 +3,62 @@
   "slug": "ingress-and-traffic-routing",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Ingress and traffic routing",
-  "description": "Learn about Ingress and traffic routing. Master the concepts, patterns, and best practices.",
+  "title": "Ingress and Traffic Routing",
+  "description": "Route external HTTP/HTTPS traffic to your cluster services using Ingress resources and controllers, with path-based and host-based routing rules.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "ingress",
+    "traffic-routing",
+    "tls",
+    "nginx"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Ingress and traffic routing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with ingress and traffic routing."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What Is Ingress?"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of ingress and traffic routing",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "An **Ingress** is a Kubernetes API object that manages external access to services, typically HTTP and HTTPS. Instead of exposing every service through its own LoadBalancer — which costs money and creates multiple public endpoints — an Ingress acts as a single entry point that routes traffic to the correct backend service based on rules you define."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An **Ingress controller** is a separate daemon that enforces the Ingress rules. Popular controllers include NGINX Ingress Controller, Traefik, HAProxy, and cloud-managed options like AWS ALB Ingress Controller. Without an installed controller, Ingress resources do nothing."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Ingress",
+            "definition": "A Kubernetes API object that exposes HTTP/HTTPS routes from outside the cluster to Services."
+          },
+          {
+            "term": "Ingress Controller",
+            "definition": "A daemon that implements Ingress rules (e.g., NGINX, Traefik)."
+          },
+          {
+            "term": "Host-based routing",
+            "definition": "Routes traffic based on the domain name in the request (e.g., api.example.com vs app.example.com)."
+          },
+          {
+            "term": "Path-based routing",
+            "definition": "Routes traffic based on the URL path (e.g., /api vs /web)."
+          },
+          {
+            "term": "TLS termination",
+            "definition": "Decrypting HTTPS traffic at the Ingress layer so backend services receive plain HTTP."
+          }
         ]
       }
     },
@@ -38,24 +66,161 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Path-Based and Host-Based Routing"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding ingress and traffic routing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Ingress rules let you direct traffic to different services based on the requested hostname (host-based) or URL path (path-based). This is how a single cluster can serve multiple applications — such as an API at `/api`, a web app at `/`, and a documentation site at `/docs` — from the same external IP."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Ingress with path and host rules",
+        "content": "Route traffic to different services based on path and hostname.",
+        "code": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: app-ingress\n  annotations:\n    nginx.ingress.kubernetes.io/rewrite-target: /\nspec:\n  ingressClassName: nginx\n  rules:\n  - host: myapp.example.com\n    http:\n      paths:\n      - path: /api\n        pathType: Prefix\n        backend:\n          service:\n            name: api-service\n            port:\n              number: 8000\n      - path: /web\n        pathType: Prefix\n        backend:\n          service:\n            name: web-service\n            port:\n              number: 80",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "TLS Termination"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "TLS termination at the Ingress layer means the Ingress controller decrypts incoming HTTPS requests and forwards plain HTTP traffic to the backend services. This centralizes certificate management and reduces the TLS workload on individual application Pods. You store your certificate and private key in a Kubernetes Secret of type `tls`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Ingress with TLS termination",
+        "content": "Serve HTTPS traffic using a TLS certificate stored in a Secret.",
+        "code": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: secure-ingress\nspec:\n  ingressClassName: nginx\n  tls:\n  - hosts:\n    - secure.myapp.com\n    secretName: tls-secret\n  rules:\n  - host: secure.myapp.com\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: web-service\n            port:\n              number: 80",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with ingress and traffic routing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "An Ingress resource needs a controller",
+        "text": "Creating an Ingress manifest alone does nothing. You must install an Ingress controller in your cluster first. NGINX Ingress Controller is the most common choice, but Traefik and others are also widely used."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Annotations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Ingress controllers expose many features through Kubernetes annotations. These are key-value pairs in the Ingress metadata that customize behavior without changing the core Kubernetes API."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Annotation",
+          "Purpose"
+        ],
+        "rows": [
+          [
+            "nginx.ingress.kubernetes.io/rewrite-target",
+            "Rewrite the request URL path before forwarding to the backend"
+          ],
+          [
+            "nginx.ingress.kubernetes.io/ssl-redirect",
+            "Redirect HTTP to HTTPS (default: true)"
+          ],
+          [
+            "nginx.ingress.kubernetes.io/proxy-body-size",
+            "Set maximum uploaded file size"
+          ],
+          [
+            "nginx.ingress.kubernetes.io/rate-limit",
+            "Rate-limit requests per client IP"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-ingress-routing",
+        "caption": "How Ingress routes external traffic to backend services.",
+        "definition": "graph TB\n    A[External User] --> B[Ingress Controller]\n    B --> C{Ingress Rules}\n    C -->|/api| D[api-service]\n    C -->|/web| E[web-service]\n    C -->|/docs| F[docs-service]\n    D --> G[API Pods]\n    E --> H[Web Pods]\n    F --> I[Docs Pods]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Configure Ingress routing and TLS",
+        "description": "Set up an Ingress controller and define routing rules.",
+        "steps": [
+          "Install the NGINX Ingress Controller in your cluster.",
+          "Deploy two services (api-service and web-service) with Pods.",
+          "Create an Ingress that routes /api to api-service and / to web-service.",
+          "Create a TLS Secret with a self-signed certificate.",
+          "Update the Ingress to enable HTTPS with TLS termination.",
+          "Verify both HTTP and HTTPS routing with curl."
+        ],
+        "expectedOutcome": "External traffic is routed correctly by hostname and path, with HTTPS termination handled by the Ingress."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Ingress provides a single entry point for HTTP/HTTPS traffic, reducing cost and complexity.",
+          "An Ingress controller must be installed for Ingress resources to take effect.",
+          "Path-based and host-based rules let you serve multiple applications from one IP.",
+          "TLS termination at the Ingress layer centralizes certificate management.",
+          "Annotations customize Ingress behavior without modifying the Kubernetes API."
+        ],
+        "takeaway": "Ingress turns your cluster into a proper web host with flexible, production-grade traffic routing."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "services-and-service-discovery",
+    "configmaps-and-secrets",
+    "rolling-deployments-and-rollback"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Ingress",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "type": "article"
+    },
+    {
+      "title": "NGINX Ingress Controller",
+      "url": "https://kubernetes.github.io/ingress-nginx/",
+      "type": "article"
+    },
+    {
+      "title": "Traefik Proxy",
+      "url": "https://doc.traefik.io/traefik/",
+      "type": "article"
+    }
+  ]
 }

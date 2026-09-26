@@ -3,59 +3,130 @@
   "slug": "connection-pool-exhaustion",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Connection pool exhaustion",
-  "description": "Learn about Connection pool exhaustion. Master the concepts, patterns, and best practices.",
+  "title": "Connection Pool Exhaustion",
+  "description": "Diagnose and fix SQL Server connection pool exhaustion in ASP.NET Core applications by understanding pooling behavior, connection leaks, and correct async usage.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Connection pool exhaustion** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with connection pool exhaustion."
+        "text": "When every connection in the pool is in use, new requests wait—or fail with a timeout. **Connection pool exhaustion** is one of the most common production issues for data-driven ASP.NET Core apps. It usually stems from unclosed connections, long-running queries, or thread pool pressure that prevents connections from being returned quickly."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of connection pool exhaustion",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How SQL Server Connection Pooling Works"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding connection pool exhaustion is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "ADO.NET maintains a pool of physical connections per unique connection string. When you call `Open()`, it tries to borrow a connection from the pool. When you call `Close()` or `Dispose()`, the connection returns to the pool. If all connections are busy and the pool limit is reached, the call blocks until a connection is released or the connection timeout expires."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Max Pool Size",
+            "definition": "The maximum number of physical connections allowed in a pool. Defaults to 100 for SQL Server."
+          },
+          {
+            "term": "Connection Leak",
+            "definition": "A connection that is opened but never closed or disposed, permanently removing it from the pool."
+          },
+          {
+            "term": "Connection Timeout",
+            "definition": "The time to wait for a connection from the pool before throwing a timeout exception. Defaults to 15 seconds."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connection String with Pooling Settings",
+        "content": "Configure pooling behavior explicitly in your connection string to match your workload.",
+        "code": "\"Server=prod-db;Database=InterviewPrep;\n User Id=app;Password=secret;\n Max Pool Size=150;\n Connection Timeout=30;\n Pooling=true;\"",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detecting Pool Exhaustion"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Symptoms include `SqlException` timeout errors after 15–30 seconds, thread dump accumulation, and CPU spikes from blocked threads. Performance counters such as `.NET Data Provider for SqlServer` -> `NumberOfPooledConnections` and `NumberOfActiveConnections` reveal the pool state. You can also enable EF Core logging to see connection open and close events."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Logging Connection Events with EF Core",
+        "content": "Configure EF Core to log when connections are opened and closed so you can spot leaks.",
+        "code": "optionsBuilder.UseSqlServer(connectionString)\n    .LogTo(Console.WriteLine, LogLevel.Information)\n    .EnableSensitiveDataLogging();\n\n// Look for these log entries:\n// \"Opening connection\"\n// \"Closing connection\"\n// \"Opened connection\"",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with connection pool exhaustion, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Connection Leaks Are Silent Killers",
+        "text": "A single unclosed connection in a high-traffic loop will exhaust the pool in seconds. Always use `using` statements or dependency injection with scoped DbContext instances. Never cache a DbContext or SqlConnection in a singleton."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Fixes",
+        "items": [
+          "Wrap `SqlConnection` in `using` or call `DisposeAsync()` explicitly.",
+          "Ensure DbContext is registered as scoped, not singleton or transient.",
+          "Keep queries short; long-running transactions hold connections longer.",
+          "Increase `Max Pool Size` only after confirming the workload genuinely needs more concurrent connections."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Connection pooling reuses physical connections, but only if you close or dispose them.",
+          "Monitor pool counters and EF Core logs to catch leaks before they cause outages.",
+          "The fix is almost always correct lifetime management, not a larger pool size."
+        ],
+        "takeaway": "Pool exhaustion is a symptom of resource management bugs, not a configuration problem. Find the leak first."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "thread-pool-starvation",
+    "slow-api-investigation-workflow",
+    "profiling-cpu-and-allocations"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL Server connection pooling",
+      "url": "https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-connection-pooling",
+      "type": "article"
+    },
+    {
+      "title": "EF Core performance best practices",
+      "url": "https://learn.microsoft.com/en-us/ef/core/performance/",
+      "type": "article"
+    }
+  ]
 }

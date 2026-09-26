@@ -4,58 +4,199 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 8: Background jobs and message processing",
-  "description": "Project: Phase 8: Background jobs and message processing. Build and understand this project with step-by-step guidance.",
+  "description": "Offload long-running work (OCR receipt processing, accounting exports, email notifications) from the request path using MassTransit with the outbox pattern. Implement retry, dead-letter, and idempotency guarantees.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "masstransit",
+    "background-jobs",
+    "outbox",
+    "rabbitmq",
+    "idempotency",
+    "retry",
+    "message-queue"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 8: Background jobs and message processing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 8: background jobs and message processing."
+        "text": "Some work must not block the user's HTTP request: OCR scanning a receipt image, exporting thousands of expense rows to CSV, or sending a notification email. These operations should be reliable, retryable, and idempotent. In this phase, you'll use MassTransit + RabbitMQ for message routing and the transactional outbox to guarantee delivery."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why message-based processing"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Benefits",
         "items": [
-          "Understand the fundamental principles of phase 8: background jobs and message processing",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Decouples the API from downstream consumers (OCR service, email provider, accounting export).",
+          "Retries automatically on transient failures without user intervention.",
+          "Dead-letter queue isolates poison messages without crashing the consumer.",
+          "Outbox pattern guarantees exactly-once publishing even after database rollbacks."
         ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-message-flow",
+        "caption": "Message flow: API → Outbox → RabbitMQ → Consumers",
+        "definition": "sequenceDiagram\n    participant H as MediatR Handler\n    participant D as ExpenseDbContext\n    participant O as Outbox Service\n    participant MQ as RabbitMQ\n    participant C1 as ReceiptOcrConsumer\n    participant C2 as NotificationConsumer\n    participant C3 as AccountingExportConsumer\n\n    H->>D: Save expense report + domain events\n    D->>O: Move events to Outbox table (same transaction)\n    O->>MQ: Publish events (background worker)\n    MQ->>C1: ReceiptUploaded\n    MQ->>C2: ExpenseReportApproved\n    MQ->>C3: ExpenseReportPaid\n\n    Note over O,MQ: If worker crashes, outbox retries on next poll. No message is lost."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The transactional outbox"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 8: background jobs and message processing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The outbox is the single most important reliability pattern in distributed systems. Without it, your handler might persist the ExpenseReport but crash before publishing the event — leaving the database updated but no downstream side effect triggered."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Outbox message entity and EF Core interceptor",
+        "content": "An EF Core SaveChangesInterceptor atomically saves domain events into the Outbox table alongside the aggregate.",
+        "language": "csharp",
+        "code": "public class OutboxMessage\n{\n    public Guid Id { get; set; } = Guid.NewGuid();\n    public string Type { get; set; } = string.Empty;\n    public string Content { get; set; } = string.Empty;\n    public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;\n    public DateTimeOffset? ProcessedAt { get; set; }\n    public string? Error { get; set; }\n}\n\npublic class OutboxInterceptor : SaveChangesInterceptor\n{\n    private readonly IPublishEndpoint _publisher;\n    private readonly ILogger<OutboxInterceptor> _log;\n\n    public OutboxInterceptor(IPublishEndpoint publisher, ILogger<OutboxInterceptor> log)\n    {\n        _publisher = publisher;\n        _log = log;\n    }\n\n    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken ct = default)\n    {\n        var db = eventData.Context!;\n        var aggregates = db.ChangeTracker\n            .Entries<AggregateRoot<,>>()\n            .Where(e => e.Entity.GetUncommittedEvents().Any())\n            .ToList();\n\n        if (!aggregates.Any()) return await base.SavingChangesAsync(eventData, result, ct);\n\n        var outboxMessages = aggregates\n            .SelectMany(a => a.Entity.GetUncommittedEvents())\n            .Select(e => new OutboxMessage\n            {\n                Type = e.GetType().FullName!,\n                Content = JsonSerializer.Serialize(e, e.GetType()),\n                OccurredAt = e.OccurredAt\n            })\n            .ToList();\n\n        db.Set<OutboxMessage>().AddRange(outboxMessages);\n        aggregates.ForEach(a => a.Entity.ClearUncommittedEvents());\n\n        return await base.SavingChangesAsync(eventData, result, ct);\n    }\n}\n\n// In DbContext options:\noptions.AddInterceptors(new OutboxInterceptor(publisher, logger));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "MassTransit consumers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Consumers are lightweight, focused classes that handle one message type. They receive messages from RabbitMQ queues and perform the actual side effect."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: ReceiptOcrConsumer using MassTransit",
+        "content": "Consume ReceiptUploaded, send image to OCR service, persist extracted fields back to the database.",
+        "language": "csharp",
+        "code": "public class ReceiptOcrConsumer(\n    IReceiptRepository receipts,\n    IOcrService ocr,\n    ILogger<ReceiptOcrConsumer> log)\n    : IConsumer<ReceiptUploaded>\n{\n    public async Task Consume(ConsumeContext<ReceiptUploaded> ctx)\n    {\n        var msg = ctx.Message;\n        log.LogInformation(\"Processing receipt {ReceiptId} for report {ReportId}\", msg.ReceiptId, msg.ExpenseReportId);\n\n        try\n        {\n            using var stream = await ocr.DownloadAsync(msg.StorageUrl);\n            var result = await ocr.ExtractAsync(stream);\n\n            await receipts.UpdateExtractedFieldsAsync(msg.ReceiptId, new ReceiptExtractionResult\n            {\n                Vendor = result.Vendor,\n                Amount = result.Amount,\n                Date = result.Date,\n                Confidence = result.Confidence\n            }, ctx.CancellationToken);\n\n            // Publish follow-up event for potential re-validation\n            await ctx.Publish(new ReceiptOcrCompleted(msg.ReceiptId, result.Confidence), ctx.CancellationToken);\n        }\n        catch (OcrException ex)\n        {\n            log.LogWarning(ex, \"OCR failed for receipt {ReceiptId} — will retry\", msg.ReceiptId);\n            throw; // MassTransit retries on transient exceptions\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Idempotency and deduplication"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RabbitMQ guarantees at-least-once delivery. If your consumer crashes after processing but before acknowledging, the message is redelivered. Use message IDs or natural keys to make handlers idempotent."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Idempotent handler using message ID",
+        "content": "Skip processing if the message was already handled.",
+        "language": "csharp",
+        "code": "public async Task Consume(ConsumeContext<ExpenseReportApproved> ctx)\n{\n    var msg = ctx.Message;\n    var existing = await _eventLogRepo.ExistsAsync(msg.ApprovalEventId, ctx.CancellationToken);\n    if (existing)\n    {\n        log.LogInformation(\"Duplicate event {EventId} — skipping\", msg.ApprovalEventId);\n        return; // idempotent skip\n    }\n\n    // Process...\n    await _notificationService.NotifyApprovalAsync(msg.ReportId, msg.ApproverId, ctx.CancellationToken);\n    await _eventLogRepo.RecordAsync(msg.ApprovalEventId, ctx.CancellationToken);\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 8: background jobs and message processing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "MassTransit retry policy",
+        "text": "Configure retry with exponential backoff: immediate (3x), then 1s, 5s, 30s. Use a dead-letter queue for messages that exhaust retries. Monitor the DLQ — a growing queue signals a bug or an external outage."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: MassTransit configuration with outbox and retry",
+        "content": "Use the built-in Entity Framework Core outbox for reliable publishing.",
+        "language": "csharp",
+        "code": "builder.Services.AddMassTransit(x =>\n{\n    x.AddEntityFrameworkOutbox<ExpenseDbContext>(o =>\n    {\n        o.QueryDelay = TimeSpan.FromSeconds(10);\n        o.UsePostgres(); // or UseSqlServer for SQL Server\n        o.DisableInboxCleanupService();\n    });\n\n    x.AddConsumers([\n        typeof(ReceiptOcrConsumer),\n        typeof(NotificationConsumer),\n        typeof(AccountingExportConsumer)\n    ]);\n\n    x.UsingRabbitMq((ctx, cfg) =>\n    {\n        cfg.Host(\"localhost\", \"/\", h =>\n        {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n\n        cfg.ConfigureEndpoints(ctx);\n\n        cfg.ReceiveEndpoint(\"expense-receipt-ocr\", e =>\n        {\n            e.PrefetchCount = 16;\n            e.UseMessageRetry(r => r.Exponential(5, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)));\n            e.UseInMemoryOutbox(); // additional dedup safeguard\n            e.ConfigureConsumer<ReceiptOcrConsumer>(ctx);\n        });\n    });\n});"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 8 deliverables",
+        "items": [
+          {
+            "text": "RabbitMQ running locally (Docker Compose) with MassTransit configured."
+          },
+          {
+            "text": "Outbox interceptor moves domain events to Outbox table in the same transaction."
+          },
+          {
+            "text": "Background worker publishes outbox messages to RabbitMQ every 10 seconds."
+          },
+          {
+            "text": "ReceiptOcrConsumer processes receipts with retry and exponential backoff."
+          },
+          {
+            "text": "All consumers are idempotent (checked via message ID or natural key)."
+          },
+          {
+            "text": "Dead-letter queue alerts are wired to a monitoring channel."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 8 summary",
+        "points": [
+          "Outbox pattern guarantees event delivery without dual-write hazards.",
+          "MassTransis consumers are focused, retryable, and idempotent.",
+          "DLQ isolates poison messages without crashing the consumer.",
+          "Background jobs keep the HTTP request path under 200ms."
+        ],
+        "takeaway": "Reliability is built in layers: the outbox protects against crashes, retry handles transient failures, idempotency handles redeliveries, and the DLQ handles permanent failures."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "MassTransit Documentation",
+      "url": "https://masstransit.io/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft: Transactional outbox pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/transactional-outbox",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "RabbitMQ Tutorials",
+      "url": "https://www.rabbitmq.com/getstarted.html",
+      "type": "article"
+    },
+    {
+      "title": "Idempotency in distributed systems",
+      "url": "https://blog.pragmaticengineer.com/distributed-systems-idempotency/",
+      "type": "article",
+      "author": "Gergely Orosz"
+    }
+  ]
 }

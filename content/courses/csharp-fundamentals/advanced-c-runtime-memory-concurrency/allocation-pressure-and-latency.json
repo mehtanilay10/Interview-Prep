@@ -4,58 +4,130 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Allocation pressure and latency",
-  "description": "Learn about Allocation pressure and latency. Master the concepts, patterns, and best practices.",
+  "description": "Identify allocation patterns that drive GC pressure, understand how latency modes work, and reduce pause times in latency-sensitive applications.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["GC", "latency", "allocation", "pause-time", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Allocation pressure and latency** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with allocation pressure and latency."
+        "text": "GC pressure is the rate at which your application allocates objects on the managed heap. High allocation pressure forces the GC to run more often, which means more pause times — moments when the runtime stops your application code to reclaim memory. In a web service, these pauses add up to slower response times and lower throughput. In a real-time application, a single 50-millisecond GC pause can cause a dropped frame or a missed deadline. Understanding allocation pressure is the first step to writing predictable, low-latency code."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not all allocations are equally harmful. An allocation of a tiny object that becomes unreachable within the same method is cheap — it is reclaimed in the next gen 0 collection in microseconds. An allocation of an object that lives for seconds and holds references to other long-lived objects is expensive — it promotes to gen 1 and then gen 2, making future collections more expensive. The goal is not zero allocations; it is allocations that do not survive long enough to cause problems."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Measuring allocation pressure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before you can reduce allocation pressure, you must measure it. `GC.GetAllocatedBytesForCurrentThread()` returns the total bytes allocated on the current thread since it started. `dotnet-counters` shows the allocation rate in bytes per second. PerfView can capture ETW events and produce a GC allocation stack trace that shows exactly which methods are allocating the most memory. The ETW event `GC/AllocationTick` fires for every allocation above a configurable threshold and includes the call stack."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using dotnet-counters to monitor allocations",
+        "code": "# Monitor allocation rate in real time\ndotnet-counters monitor --process-id 1234 \\\n  System.Runtime\n\n# Sample output:\n# % Time in GC        : 2.345%\n# Allocation Rate     : 12.5 MB/s\n# GC Heap Size        : 256 MB\n\n# PerfView: capture a 30-second trace\nPerfView collect -providers \"Microsoft-Windows-DotNETRuntime:0x2000:5\" \\\n  -maxCollectSec:30 \\\n  -stackWalkDepth:50",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common allocation-heavy patterns"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of allocation pressure and latency",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**String concatenation in loops** — `string` is immutable; `+=` in a loop allocates a new string on every iteration. Use `StringBuilder` instead.",
+          "**LINQ query overhead** — LINQ methods like `Select`, `Where`, and `OrderBy` allocate enumerator structs and closures. For hot paths, hand-written loops are allocation-free.",
+          " **Task.FromResult in tight loops** — `Task.FromResult` returns a cached completed task for value types but may allocate for reference types.",
+          "**Async/await state machines** — every `async` method that does not complete synchronously allocates a state machine object. Configure `ValueTask` or `IValueTaskSource` for high-frequency async paths.",
+          "**Boxing in generic code** — `where T : struct` constraints do not prevent boxing if you cast to `object`, `Enum`, or `IComparable`."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Allocation-heavy vs allocation-free LINQ",
+        "code": "// Allocates: enumerator + closure + result list\nvar sum = Enumerable.Range(0, 1_000_000)\n    .Select(x => x * 2)\n    .Where(x => x > 100)\n    .Sum();\n\n// Allocation-free: stack-only loop\nint sum = 0;\nfor (int i = 0; i < 1_000_000; i++)\n{\n    int doubled = i * 2;\n    if (doubled > 100)\n        sum += doubled;\n}\n\n// Or use System.Linq.Async with ValueTask\nIAsyncEnumerable<int> source = GetDataAsync();\nawait foreach (int item in source.WithCancellation(ct))\n{\n    // enumerator may allocate per async iteration\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Reducing pause times with latency modes"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding allocation pressure and latency is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "When you cannot eliminate allocations entirely, you can use GC latency modes to control when collections run. The `LowLatency` mode suppresses background GC for the duration of a time-sensitive operation. It is useful for rendering frames, processing audio buffers, or handling network packets. The trade-off is that memory usage grows during the low-latency window. If you exceed the available memory, the runtime may throw an `OutOfMemoryException` or force an blocking collection."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "LowLatency mode around a critical section",
+        "code": "GCLatencyMode previousMode = GCSettings.LatencyMode;\ntry\n{\n    GCSettings.LatencyMode = GCLatencyMode.LowLatency;\n\n    // Critical section: avoid allocations here.\n    // GC pauses are suppressed, but watch memory growth.\n    RenderFrame(frameBuffer);\n}\nfinally\n{\n    GCSettings.LatencyMode = previousMode;\n}\n\n// Check if a blocking collection occurred during LowLatency\nif (previousMode == GCLatencyMode.NoGCRegion &&\n    GCSettings.LatencyMode != GCLatencyMode.NoGCRegion)\n{\n    Console.WriteLine(\"A blocking GC occurred during NoGCRegion\");\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with allocation pressure and latency, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Measure % Time in GC before and after",
+        "text": "The `% Time in GC` counter from `dotnet-counters` tells you what fraction of wall-clock time the application spends paused in GC. A value under 5% is healthy for most server applications. If you are above 10%, you have meaningful allocation pressure that is costing throughput. Before refactoring, capture a trace with PerfView, identify the top allocating methods, and then apply targeted fixes."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Allocation pressure is the rate of heap allocations; high pressure increases GC pause times and reduces throughput.",
+          "Measure allocations with `GC.GetAllocatedBytesForCurrentThread`, `dotnet-counters`, or PerfView before optimizing.",
+          "String concatenation, LINQ in hot paths, and async state machines are common allocation-heavy patterns.",
+          "GCLatencyMode.LowLatency suppresses background GC for critical sections, but watch for memory growth."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["large-object-heap-and-pinned-objects", "server-gc-vs-workstation-gc", "boxing-and-hidden-allocations"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Reducing GC pressure",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/ reducing-gc-pressure"
+    },
+    {
+      "type": "article",
+      "title": "PerfView for GC analysis",
+      "url": "https://learn.microsoft.com/en-us/dotnet/framework/perfview/perfview-gc-tips"
+    },
+    {
+      "type": "article",
+      "title": "GCLatencyMode documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.gcsettings.latencymode"
+    }
+  ]
 }

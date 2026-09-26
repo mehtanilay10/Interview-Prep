@@ -3,59 +3,184 @@
   "slug": "refresh-token-rotation",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "Refresh token rotation",
-  "description": "Learn about Refresh token rotation. Master the concepts, patterns, and best practices.",
+  "title": "Refresh Token Rotation",
+  "description": "Learn why access tokens are short-lived and how refresh token rotation prevents stolen tokens from being reused. Implement a secure refresh flow in .NET with token family tracking and reuse detection.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "refresh-token",
+    "token-rotation",
+    "access-token",
+    "session-management",
+    "oauth"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Refresh token rotation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with refresh token rotation."
+        "text": "Access tokens are the keys to your API, so they need to be short-lived. If an access token is stolen, the attacker can use it until it expires. Refresh tokens solve this problem by having a longer lifetime while still allowing the server to control sessions. **Refresh token rotation** is the practice of issuing a new refresh token every time the old one is used, and immediately invalidating the previous one. If the old token is ever presented again, it signals that it has been stolen."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of refresh token rotation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Access Tokens vs Refresh Tokens"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding refresh token rotation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "An access token is a short-lived credential (usually 5-15 minutes) that the client presents to API endpoints. Because it is short-lived, the damage from theft is limited. A refresh token is a long-lived credential (hours or days) that the client uses to obtain a new access token without asking the user to log in again. The refresh token never goes to the API — it only talks to the authorization server."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Access token",
+            "definition": "A short-lived token used to call resource APIs. Typically expires in 5-15 minutes."
+          },
+          {
+            "term": "Refresh token",
+            "definition": "A long-lived token used to obtain new access tokens without user interaction."
+          },
+          {
+            "term": "Refresh token rotation",
+            "definition": "Issuing a new refresh token on each use and invalidating the old one to detect token theft."
+          },
+          {
+            "term": "Token family",
+            "definition": "A set of refresh tokens linked by rotation, tracked together to detect reuse."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Normal refresh flow",
+        "content": "The client sends the refresh token, the server validates it, issues a new access token and a new refresh token, and invalidates the old refresh token.",
+        "code": "// Client requests a new access token:\nPOST /oauth/token\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=refresh_token\n&refresh_token=eyJhbGciOi...\n\n// Server response:\n{\n  \"access_token\": \"new-access-token\",\n  \"expires_in\": 900,\n  \"refresh_token\": \"new-rotated-refresh-token\",\n  \"token_type\": \"Bearer\"\n}",
+        "language": "javascript"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with refresh token rotation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Rotation is not just best practice — it is expected",
+        "text": "The OAuth 2.0 Security Best Current Practice (BCP) explicitly recommends refresh token rotation for public clients (SPAs, mobile apps). Without it, a stolen refresh token grants an attacker indefinite access until the user notices and revokes it manually."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Rotation with Reuse Detection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a refresh token is presented, the server looks up its token family in the database. If the presented token matches the current valid token, the server issues new tokens and replaces the stored token. If the presented token does not match — meaning it is an older token from the same family — the server treats this as a theft event: it revokes the entire token family and forces the user to log in again."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Refresh token rotation in .NET",
+        "content": "This example uses a database table to track token families and detect reuse.",
+        "code": "public record RefreshTokenFamily(\n    Guid Id,\n    string UserId,\n    string CurrentTokenHash,\n    DateTimeOffset CreatedAt,\n    DateTimeOffset? RevokedAt\n);\n\napp.MapPost(\"/oauth/token\", async (TokenRequest req, AppDbContext db) =>\n{\n    if (req.GrantType != \"refresh_token\")\n        return Results.BadRequest();\n\n    var tokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(req.RefreshToken));\n    var family = await db.RefreshTokenFamilies\n        .FirstOrDefaultAsync(f => f.CurrentTokenHash == tokenHash\n                               && f.RevokedAt == null);\n\n    if (family == null)\n    {\n        // Token not found — possible theft of an old token\n        await RevokeEntireFamilyAsync(db, req.RefreshToken);\n        return Results.BadRequest(new { error = \"invalid_grant\" });\n    }\n\n    // Rotate: generate new token and replace the hash\n    var newRefreshToken = GenerateSecureToken();\n    var newHash = SHA256.HashData(Encoding.UTF8.GetBytes(newRefreshToken));\n    family.CurrentTokenHash = newHash;\n    await db.SaveChangesAsync();\n\n    var accessToken = GenerateAccessToken(family.UserId);\n    return Results.Ok(new\n    {\n        access_token = accessToken,\n        expires_in = 900,\n        refresh_token = newRefreshToken\n    });\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Token Reuse Events"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a reused refresh token is detected, revoke the entire token family immediately. This means all devices logged in with that refresh token are logged out. It is a disruptive but necessary security action — if the old token was stolen, the attacker might already have a new valid token. After revocation, the user must authenticate again. Log the event, alert the user, and consider requiring multi-factor authentication on the next login."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JavaScript refresh token handling",
+        "content": "The React client stores the refresh token in an httpOnly cookie but handles the access token in memory.",
+        "code": "async function refreshAccessToken() {\n  const response = await fetch('/oauth/token', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: new URLSearchParams({\n      grant_type: 'refresh_token',\n      refresh_token: 'the-cookie-is-sent-automatically'\n    }),\n    credentials: 'same-origin'\n  });\n\n  if (!response.ok) {\n    // Token was rejected — redirect to login\n    window.location.href = '/login';\n    return;\n  }\n\n  const data = await response.json();\n  // Store access token in memory only (not localStorage)\n  window.accessToken = data.access_token;\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Refresh token rotation checklist",
+        "items": [
+          {
+            "text": "Keep access tokens short-lived (5-15 minutes).",
+            "hint": "The shorter the access token, the less damage from theft."
+          },
+          {
+            "text": "Implement refresh token rotation with a server-side token family.",
+            "hint": "Store a hash of the current valid refresh token, not the token itself."
+          },
+          {
+            "text": "Revoke the entire token family when a reused token is detected.",
+            "hint": "Reuse detection means theft; revoke everything and force re-authentication."
+          },
+          {
+            "text": "Store refresh tokens in httpOnly, Secure, SameSite cookies.",
+            "hint": "This prevents JavaScript access and mitigates CSRF when combined with SameSite=Lax."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Access tokens are short-lived; refresh tokens are long-lived and rotated.",
+          "Rotation limits theft impact because old tokens stop working after one use.",
+          "Reuse detection revokes the entire token family and forces re-authentication.",
+          "Store refresh tokens in httpOnly cookies and access tokens in memory."
+        ],
+        "takeaway": "Rotate every use, detect reuse, and revoke families. Short lifetimes limit the damage window."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "jwt-pitfalls-and-token-storage",
+    "oauth-20-roles-and-flows",
+    "authorization-code-flow-with-pkce"
+  ],
+  "furtherReading": [
+    {
+      "title": "IETF — OAuth 2.0 Security Best Current Practice (refresh token rotation)",
+      "url": "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics",
+      "type": "article"
+    },
+    {
+      "title": "Auth0 — Refresh Tokens: When to Use Them and How They Work",
+      "url": "https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — Persist granted permissions and refresh tokens",
+      "url": "https://learn.microsoft.com/en-us/azure/active-directory/develop/refresh-tokens",
+      "type": "article"
+    }
+  ]
 }

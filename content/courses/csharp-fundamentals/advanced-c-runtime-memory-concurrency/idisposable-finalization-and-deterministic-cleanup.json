@@ -1,61 +1,130 @@
 {
   "id": "lesson-csharp-fundamentals-advanced-c-runtime-memory-concurrency-idisposable-finalization-and-deterministic-cleanup",
-  "slug": "idisposable-finalization-and-deterministic-cleanup",
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
-  "title": "IDisposable, finalization and deterministic cleanup",
-  "description": "Learn about IDisposable, finalization and deterministic cleanup. Master the concepts, patterns, and best practices.",
   "order": 12,
+  "slug": "idisposable-finalization-and-deterministic-cleanup",
+  "title": "IDisposable, finalization and deterministic cleanup",
+  "description": "Learn the Dispose pattern, how finalizers work as a safety net, and how SafeHandle wraps unmanaged resources reliably.",
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["IDisposable", "finalizer", "SafeHandle", "deterministic-cleanup", "unmanaged"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**IDisposable, finalization and deterministic cleanup** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with idisposable, finalization and deterministic cleanup."
+        "text": "C# classes that wrap unmanaged resources — file handles, database connections, network sockets, native memory — must release those resources when they are no longer needed. The CLR's garbage collector only manages managed memory. It does not know about operating-system handles or native allocations. If you rely on the GC alone, those resources will stay open until the finalizer thread gets around to cleaning them up — which could be seconds or minutes later. `IDisposable` gives you a way to clean up deterministically: you decide exactly when the resource is released, not the runtime."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `IDisposable` interface has a single method: `Dispose()`. When you call `Dispose()`, you are telling the object: I am done with you, release everything you hold now. The canonical pattern wraps `Dispose` with a finalizer as a safety net. If the consumer forgets to call `Dispose`, the finalizer runs eventually and releases the unmanaged resource. But finalizers are unpredictable — they run on a separate thread, they may not run at all if the process terminates abruptly, and they delay garbage collection by one extra cycle."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The canonical Dispose pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The standard Dispose pattern uses a boolean `disposing` parameter to distinguish between explicit cleanup and finalizer cleanup. When `disposing` is `true`, the call came from `Dispose()` or the `using` statement — you should release both managed and unmanaged resources. When `disposing` is `false`, the call came from the finalizer — you should release only unmanaged resources, because managed objects may already be finalized."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Implementing the Dispose pattern",
+        "code": "using System;\n\npublic sealed class DataProcessor : IDisposable\n{\n    private SafeHandle _handle;\n    private bool _disposed;\n\n    public DataProcessor(SafeHandle handle)\n    {\n        _handle = handle ?? throw new ArgumentNullException(nameof(handle));\n    }\n\n    public void Process()\n    {\n        if (_disposed)\n            throw new ObjectDisposedException(nameof(DataProcessor));\n        // Use _handle here...\n    }\n\n    public void Dispose()\n    {\n        Dispose(disposing: true);\n        GC.SuppressFinalization(this);\n    }\n\n    private void Dispose(bool disposing)\n    {\n        if (_disposed) return;\n\n        if (disposing)\n        {\n            // Release managed resources\n            _handle?.Dispose();\n        }\n\n        // Release unmanaged resources here\n        _disposed = true;\n    }\n\n    ~DataProcessor() => Dispose(disposing: false);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SafeHandle: the preferred unmanaged wrapper"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`SafeHandle` is an abstract class in `Microsoft.Win32.SafeHandles` designed specifically to wrap operating-system handles. It is preferable to manually writing finalizers because the runtime guarantees that `SafeHandle` finalizers run even during AppDomain unloads or constrained execution regions. `SafeHandle` also supports reference counting for handles shared across multiple objects. The most common subclasses are `SafeFileHandle`, `SafeWaitHandle`, and `SafeMemoryMappedFileHandle`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using SafeFileHandle with a StreamReader",
+        "code": "using System.IO;\nusing Microsoft.Win32.SafeHandles;\n\nSafeFileHandle handle = File.OpenHandle(\n    path: \"data.json\",\n    mode: FileMode.Open,\n    access: FileAccess.Read);\n\nusing var reader = new StreamReader(\n    new FileStream(handle, FileAccess.Read));\n\nstring content = reader.ReadToEnd();\n// FileStream.Dispose calls handle.ReleaseHandle()\n// automatically. No finalizer needed on your side.",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Finalizers: the safety net you do not want to rely on"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A finalizer (`~ClassName()`) is a method the GC calls before reclaiming an object's memory. It runs on the finalizer thread, not your application thread. Objects with finalizers survive at least one full GC cycle because the runtime moves them to the finalization queue first. This delays memory reclamation. If the finalizer thread falls behind — for example, because many objects were finalized at once — you may see high memory usage even when the GC has identified the objects as unreachable."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of idisposable, finalization and deterministic cleanup",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Finalizers run on a dedicated thread; exceptions in finalizers terminate the process in .NET 2.0+.",
+          "Objects with finalizers are promoted to generation 2, increasing full GC pressure.",
+          "`GC.SuppressFinalization(this)` in `Dispose()` prevents the finalizer from running if cleanup is done early.",
+          "Never reference managed objects in a finalizer — they may already be finalized."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding idisposable, finalization and deterministic cleanup is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with idisposable, finalization and deterministic cleanup, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Critical finalizers and CERs are advanced techniques",
+        "text": "`CriticalFinalizerObject` and constrained execution regions (CERs) guarantee that a finalizer runs even during resource constraints or AppDomain unloads. They are used internally by `SafeHandle` and are rarely needed in application code. Misusing CERs can cause hangs and deadlocks because the runtime pre-allocates resources for them. Prefer `SafeHandle` and `IDisposable` over raw critical finalizers."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "`IDisposable` provides deterministic cleanup; `using` ensures `Dispose()` runs even when exceptions occur.",
+          "Finalizers are a safety net, not a primary cleanup mechanism — they are slow and unpredictable.",
+          "`SafeHandle` is the preferred way to wrap OS handles; it avoids manual finalizer bugs.",
+          "Always call `GC.SuppressFinalization(this)` in `Dispose()` so the finalizer does not run after cleanup."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["iasyncdisposable-and-async-resource-cleanup", "spant-memoryt-and-ref-structs"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Implementing a Dispose method",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose"
+    },
+    {
+      "type": "article",
+      "title": "SafeHandle class",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.safehandles.safehandle"
+    },
+    {
+      "type": "article",
+      "title": "CriticalFinalizerObject documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.constrainedexecution.criticalfinalizerobject"
+    }
+  ]
 }

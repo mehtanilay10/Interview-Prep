@@ -4,58 +4,149 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "ReadyToRun and Native AOT",
-  "description": "Learn about ReadyToRun and Native AOT. Master the concepts, patterns, and best practices.",
+  "description": "Compare ReadyToRun and Native AOT compilation strategies, understand their trade-offs, and learn when to use each.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["ReadyToRun", "NativeAOT", "AOT", "deployment", "startup"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**ReadyToRun and Native AOT** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with readytorun and native aot."
+        "text": "Traditional .NET applications rely on the JIT compiler to produce native code at runtime. This gives you flexibility — the same assembly runs on x64, ARM64, and Linux without recompilation — but it also means every cold start includes JIT work. ReadyToRun and Native AOT are two different strategies for moving that compilation work out of the critical startup path and into the build pipeline."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ReadyToRun produces a partially compiled application. Native AOT produces a fully compiled, self-contained executable with no runtime dependency. Choosing between them is not about which is objectively better — it is about which trade-off your application can tolerate. Serverless functions, containerized microservices, and CLI tools each have different constraints."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "ReadyToRun: ahead-of-time, but not alone"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you publish with ReadyToRun, the .NET SDK produces a native image for your target architecture. This image contains precompiled versions of the methods in your assemblies. At startup, the runtime loads these images directly instead of JIT-compiling from CIL. The startup is faster, especially for large applications with many assemblies. However, the runtime still needs the .NET runtime libraries, and some methods — like generics instantiated with new types at runtime — will still be JIT-compiled on demand."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of readytorun and native aot",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Produces a `.dll` or `.exe` alongside a `.ni.dll` native image.",
+          "Requires the .NET runtime to be present on the target machine (framework-dependent) or shipped (self-contained).",
+          "Reduces JIT time by 30-70% for typical web applications.",
+          "Does not eliminate the runtime entirely — GC, reflection, and dynamic code generation still work.",
+          "Publish size increases by roughly 10-20% due to the native images."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Publishing ReadyToRun images",
+        "code": "# Self-contained publish with ReadyToRun for Linux ARM64\ndotnet publish -c Release -r linux-arm64 \\\n  -p:PublishReadyToRun=true \\\n  -p:PublishSingleFile=false \\\n  --self-contained true\n\n# Inspect the ReadyToRun header of an assembly\ndotnet dump analyze --type r2r <path-to-app.dll>",
+        "language": "bash"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Native AOT: fully native, no runtime"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding readytorun and native aot is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Native AOT takes compilation further. It compiles your entire application — including the runtime libraries it uses — into a single native executable. The resulting binary starts in milliseconds, uses less memory at rest, and does not require the .NET runtime to be installed separately. The trade-off is significant: compilation times are much longer, publish sizes are larger, and some runtime features like reflection and `dynamic` are heavily restricted or require pre-configuration."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Produces a single native executable file with no runtime dependency.",
+          "Startup times measured in milliseconds — ideal for serverless and CLI tools.",
+          "Smaller memory footprint because the runtime is stripped to only what is used.",
+          "Reflection and `dynamic` are limited by trimming; you must configure supported types explicitly.",
+          "Generic types must be known at compile time or pre-registered."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Native AOT project file configuration",
+        "code": "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>net8.0</TargetFramework>\n    <PublishAot>true</PublishAot>\n    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>\n    <InvariantGlobalization>true</InvariantGlobalization>\n    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>\n  </PropertyGroup>\n</Project>",
+        "language": "xml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing between ReadyToRun and Native AOT"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "ReadyToRun",
+            "description": "Best for server applications, containers, and long-running services where startup improvement matters but runtime flexibility is needed. Faster publish, broader API compatibility, still requires .NET runtime."
+          },
+          {
+            "title": "Native AOT",
+            "description": "Best for serverless functions, CLI tools, edge deployments, and environments where you cannot install a runtime. Ultra-fast startup, minimal deployment footprint, but requires trimming configuration and loses some runtime features."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with readytorun and native aot, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Trimming is the hidden cost of AOT",
+        "text": "Both ReadyToRun and Native AOT enable the ILLinker tree-shaker by default in Release builds. The linker removes unused code to reduce size. If your application uses reflection — especially common in ASP.NET Core minimal APIs or serialization libraries — the linker may remove types your application needs at runtime. You must configure `rd.xml` or use the `DynamicDependency` attribute to preserve those types. Test your AOT builds thoroughly with reflection-heavy code paths."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "ReadyToRun precompiles to native images at build time and requires the .NET runtime at deployment.",
+          "Native AOT produces a fully standalone native executable with no runtime dependency.",
+          "Both technologies use the ILLinker for tree-shaking; reflection-heavy code needs explicit preservation.",
+          "Choose ReadyToRun for services and containers; choose Native AOT for serverless, CLI, and edge scenarios."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["jit-compilation-and-tiered-compilation", "reflection-and-its-trade-offs"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Native AOT deployment",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/"
+    },
+    {
+      "type": "article",
+      "title": "ReadyToRun compilation guide",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/deploying/ready-to-run"
+    },
+    {
+      "type": "article",
+      "title": "ILLinker and trimming annotations",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/deploying/trimming/annotations"
+    }
+  ]
 }

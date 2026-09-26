@@ -3,59 +3,202 @@
   "slug": "path-traversal-and-file-upload-security",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "Path traversal and file upload security",
-  "description": "Learn about Path traversal and file upload security. Master the concepts, patterns, and best practices.",
+  "title": "Path Traversal and File Upload Security",
+  "description": "Learn how path traversal attacks let users read files outside intended directories, and how insecure file uploads can turn your server into a malware host. Explore path validation, file type restrictions, and safe storage patterns in .NET.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "path-traversal",
+    "file-upload",
+    "directory-traversal",
+    "file-validation",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Path traversal and file upload security** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with path traversal and file upload security."
+        "text": "Path traversal and insecure file uploads are two sides of the same problem: trusting user input to define file paths or file contents. A path traversal vulnerability lets an attacker read or write files outside the intended directory by using special characters like `../` to climb up the folder tree. Insecure file uploads let an attacker upload a web shell or malware that the server later executes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of path traversal and file upload security",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Path Traversal Explained"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding path traversal and file upload security is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Path traversal happens when an application uses user input to construct a file path without proper validation. On Windows and Unix-like systems, `../` moves up one directory. An attacker who requests `../../../../etc/passwd` from a file-serving endpoint might escape the web root and read sensitive system files. Double encoding, null bytes, and Unicode normalization can bypass naive filters."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Path traversal",
+            "definition": "An attack that uses special path sequences like ../ to access files outside the intended directory."
+          },
+          {
+            "term": "Web shell",
+            "definition": "A malicious script uploaded to a server that gives the attacker remote command execution through the web server."
+          },
+          {
+            "term": "File upload validation",
+            "definition": "Checks performed before storing an uploaded file, including type, size, content, and name validation."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable file-serving endpoint",
+        "content": "This C# endpoint reads a file based on user input without validating the path.",
+        "code": "app.MapGet(\"/files/{filename}\", async (string filename, string webRoot) =>\n{\n    var filePath = Path.Combine(webRoot, \"uploads\", filename);\n    // If filename is ../../../../etc/passwd, this escapes the directory\n    if (!System.IO.File.Exists(filePath))\n        return Results.NotFound();\n\n    var content = await System.IO.File.ReadAllTextAsync(filePath);\n    return Results.Text(content);\n});",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with path traversal and file upload security, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Never trust filenames or paths from users",
+        "text": "Path traversal is not just a .NET issue — it affects every platform. The fix is to resolve the final path and verify it starts with the expected base directory. If the resolved path escapes the base directory, reject the request immediately."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixing Path Traversal"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct approach is to resolve the full path using `Path.GetFullPath` and then verify that the result starts with the expected base directory. This handles `../` sequences, double encoding, and symbolic links. Even better, avoid taking user input as a filename entirely — use a database ID to look up the file path on the server."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe path resolution",
+        "content": "Resolve the path and verify it stays within the uploads directory.",
+        "code": "app.MapGet(\"/files/{id}\", async (int id, AppDbContext db, IWebHostEnvironment env) =>\n{\n    var fileRecord = await db.UploadedFiles.FindAsync(id);\n    if (fileRecord == null) return Results.NotFound();\n\n    var basePath = Path.GetFullPath(Path.Combine(env.WebRootPath, \"uploads\"));\n    var fullPath = Path.GetFullPath(Path.Combine(basePath, fileRecord.StoredFileName));\n\n    if (!fullPath.StartsWith(basePath, StringComparison.Ordinal))\n        return Results.Forbid(); // Path traversal attempt\n\n    var contentType = fileRecord.ContentType ?? \"application/octet-stream\";\n    return Results.File(fullPath, contentType, fileRecord.OriginalFileName);\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Secure File Uploads"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "File uploads require multiple layers of defense. First, validate the file extension against an explicit allowlist. Second, inspect the file content (magic bytes) to confirm the file type matches the extension. Third, store uploads outside the web root or on a dedicated storage service like Azure Blob Storage. Fourth, generate a new random filename on the server instead of trusting the original name."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Secure file upload in .NET",
+        "content": "Validate the extension, inspect the content, and store with a random name.",
+        "code": "app.MapPost(\"/api/upload\", async (IFormFile file, AppDbContext db, IWebHostEnvironment env) =>\n{\n    var allowedExtensions = new[] { \".jpg\", \".png\", \".pdf\" };\n    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();\n\n    if (!allowedExtensions.Contains(extension))\n        return Results.BadRequest(\"File type not allowed\");\n\n    var newFileName = Guid.NewGuid().ToString() + extension;\n    var savePath = Path.Combine(env.WebRootPath, \"uploads\", newFileName);\n\n    await using var stream = new FileStream(savePath, FileMode.Create);\n    await file.CopyToAsync(stream);\n\n    await db.UploadedFiles.AddAsync(new UploadedFile\n    {\n        OriginalFileName = file.FileName,\n        StoredFileName = newFileName,\n        ContentType = file.ContentType,\n        Size = file.Length\n    });\n    await db.SaveChangesAsync();\n\n    return Results.Ok(new { id = 1 });\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JavaScript Client Considerations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Client-side validation improves the user experience but cannot be trusted for security. An attacker can bypass JavaScript restrictions by crafting raw HTTP requests with curl or Burp Suite. Always enforce the same validation rules on the server. The browser also sends the original filename in the `Content-Disposition` header of multipart uploads, which is why the server must rename the file."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React file upload form",
+        "content": "The form accepts a file and posts it to the API. Server-side validation is the real security gate.",
+        "code": "function UploadForm() {\n  const [file, setFile] = useState(null);\n\n  async function handleSubmit(e) {\n    e.preventDefault();\n    const formData = new FormData();\n    formData.append('file', file);\n\n    const response = await fetch('/api/upload', {\n      method: 'POST',\n      body: formData\n    });\n\n    if (response.ok) {\n      alert('Upload successful');\n    } else {\n      const error = await response.json();\n      alert(error);\n    }\n  }\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input type=\"file\" onChange={(e) => setFile(e.target.files[0])} />\n      <button type=\"submit\">Upload</button>\n    </form>\n  );\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Path traversal and file upload checklist",
+        "items": [
+          {
+            "text": "Resolve file paths and verify they stay inside the intended directory.",
+            "hint": "Use Path.GetFullPath and check the result starts with the base path."
+          },
+          {
+            "text": "Use database IDs instead of filenames when serving files.",
+            "hint": "This eliminates path traversal entirely because the server controls the path mapping."
+          },
+          {
+            "text": "Allowlist file extensions and validate magic bytes.",
+            "hint": "A .exe renamed to .jpg must still be rejected by content inspection."
+          },
+          {
+            "text": "Store uploads outside the web root or on dedicated blob storage.",
+            "hint": "Azure Blob Storage, S3, or a directory with no execute permission."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Path traversal uses ../ sequences to escape intended directories and access sensitive files.",
+          "Always resolve paths with GetFullPath and verify the result is inside the base directory.",
+          "File uploads need extension allowlisting, content validation, safe storage, and server-generated names.",
+          "Client-side validation is a usability feature, not a security control."
+        ],
+        "takeaway": "Trust no path or filename from the client. Resolve, validate, and regenerate names on the server."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "ssrf-and-server-side-request-validation",
+    "sql-injection-and-parameterization",
+    "open-redirects-and-url-validation"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP Path Traversal",
+      "url": "https://owasp.org/www-community/attacks/Path_Traversal",
+      "type": "article"
+    },
+    {
+      "title": "OWASP Unrestricted File Upload",
+      "url": "https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — File uploads in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads",
+      "type": "article"
+    }
+  ]
 }

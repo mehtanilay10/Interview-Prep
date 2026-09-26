@@ -3,34 +3,75 @@
   "slug": "pods-and-workload-controllers",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Pods and workload controllers",
-  "description": "Learn about Pods and workload controllers. Master the concepts, patterns, and best practices.",
+  "title": "Pods and Workload Controllers",
+  "description": "Understand how Pods are the smallest deployable units in Kubernetes and how workload controllers like Deployments, StatefulSets, and DaemonSets manage them in production.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "pods",
+    "deployments",
+    "statefulsets",
+    "daemonsets"
+  ],
   "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Is a Pod?"
+      }
+    },
     {
       "type": "paragraph",
       "data": {
-        "text": "**Pods and workload controllers** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with pods and workload controllers."
+        "text": "A **Pod** is the smallest and simplest unit in the Kubernetes object model that you create or deploy. It represents a single instance of a running process in your cluster. Pods contain one or more containers (such as Docker containers), storage resources, and a unique network IP. Think of a Pod as a logical host — similar to a physical machine or a VM in the non-container world — but much lighter and meant to run a single application."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Pods are designed to be **ephemeral**. They do not heal themselves if they fail, and they are not meant to persist. If a Pod dies, Kubernetes creates a replacement — but that replacement is a brand new Pod with a new identity. This is why you rarely create Pods directly; instead, you use workload controllers that manage Pods for you."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Controllers Matter"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of pods and workload controllers",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Workload controllers are the brain of Kubernetes operations. They watch the current state of your cluster and continuously work to move it toward the desired state you declared. If a Pod crashes, a node fails, or you want to scale up during a traffic spike, the controller handles it automatically."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Pod",
+            "definition": "The smallest deployable unit in Kubernetes, containing one or more containers."
+          },
+          {
+            "term": "Deployment",
+            "definition": "A controller that manages stateless Pods and supports rolling updates."
+          },
+          {
+            "term": "StatefulSet",
+            "definition": "A controller for stateful applications requiring stable network identities and persistent storage."
+          },
+          {
+            "term": "DaemonSet",
+            "definition": "A controller that ensures a Pod runs on every (or selected) node in the cluster."
+          },
+          {
+            "term": "ReplicaSet",
+            "definition": "The controller Deployment uses to maintain a stable set of Pod replicas."
+          }
         ]
       }
     },
@@ -38,24 +79,194 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Deployments — Managing Stateless Workloads"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding pods and workload controllers is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A **Deployment** gives you declarative updates for Pods and ReplicaSets. It is the workhorse for stateless applications like APIs, web servers, and microservices. When you create a Deployment, Kubernetes creates a ReplicaSet, which in turn creates the actual Pods."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deploying a web API with a Deployment",
+        "content": "Create a Deployment that maintains three replicas of an API service.",
+        "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api-deployment\n  labels:\n    app: api\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: api\n  template:\n    metadata:\n      labels:\n        app: api\n    spec:\n      containers:\n      - name: api\n        image: myregistry.io/api:2.1.0\n        ports:\n        - containerPort: 8080",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with pods and workload controllers, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use Deployments for stateless apps",
+        "text": "If your application does not need stable network IDs or persistent storage, use a Deployment. It handles rolling updates, rollbacks, and scaling automatically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "StatefulSets — Managing Stateful Workloads"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **StatefulSet** is for applications that require stable, unique network identifiers and stable persistent storage. Databases like PostgreSQL, MySQL, and message queues like Kafka are common use cases. Unlike Deployments, StatefulSets assign a persistent name to each replica (e.g., `web-0`, `web-1`) that survives restarts."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "StatefulSet for a database cluster",
+        "content": "Deploy a 3-replica StatefulSet with persistent volume claims.",
+        "code": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: postgres\nspec:\n  serviceName: \"postgres\"\n  replicas: 3\n  selector:\n    matchLabels:\n      app: postgres\n  template:\n    metadata:\n      labels:\n        app: postgres\n    spec:\n      containers:\n      - name: postgres\n        image: postgres:16\n        ports:\n        - containerPort: 5432\n          name: postgres\n        volumeMounts:\n        - name: data\n          mountPath: /var/lib/postgresql/data\n  volumeClaimTemplates:\n  - metadata:\n      name: data\n    spec:\n      accessModes: [\"ReadWriteOnce\"]\n      resources:\n        requests:\n          storage: 20Gi",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "DaemonSets — One Pod Per Node"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **DaemonSet** ensures that a copy of a Pod runs on all (or a subset of) nodes in a cluster. This is perfect for node-level utilities like log collectors, monitoring agents, or network proxies. As new nodes join the cluster, the DaemonSet automatically schedules the Pod onto them."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "DaemonSet for a log collector",
+        "content": "Run Fluentd on every node to collect container logs.",
+        "code": "apiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: fluentd\n  namespace: kube-system\nspec:\n  selector:\n    matchLabels:\n      name: fluentd\n  template:\n    metadata:\n      labels:\n        name: fluentd\n    spec:\n      containers:\n      - name: fluentd\n        image: fluent/fluentd:v1.16\n        volumeMounts:\n        - name: varlog\n          mountPath: /var/log\n      volumes:\n      - name: varlog\n        hostPath:\n          path: /var/log",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Which controller should you use?",
+        "cards": [
+          {
+            "title": "Deployment",
+            "description": "For stateless apps that can scale horizontally.",
+            "tags": [
+              "Stateless"
+            ],
+            "pros": [
+              "Rolling updates",
+              "Rollbacks",
+              "Scaling"
+            ],
+            "cons": [
+              "Pods are interchangeable",
+              "No stable network ID"
+            ]
+          },
+          {
+            "title": "StatefulSet",
+            "description": "For stateful apps needing stable identity and storage.",
+            "tags": [
+              "Stateful"
+            ],
+            "pros": [
+              "Stable network IDs",
+              "Persistent storage per replica",
+              "Ordered deployment"
+            ],
+            "cons": [
+              "More complex",
+              "Scaling down requires care"
+            ]
+          },
+          {
+            "title": "DaemonSet",
+            "description": "For node-level tasks that must run on every node.",
+            "tags": [
+              "Node-level"
+            ],
+            "pros": [
+              "Auto-schedules on new nodes",
+              "Great for monitoring/logging"
+            ],
+            "cons": [
+              "Runs on every node by default",
+              "Not for application workloads"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Deploy a stateless API and a DaemonSet",
+        "description": "Practice creating Deployments and DaemonSets in a cluster.",
+        "steps": [
+          "Create a Deployment named \"web-api\" with 3 replicas using the nginx image.",
+          "Scale the Deployment to 5 replicas and observe the new Pods.",
+          "Create a DaemonSet named \"node-exporter\" that runs on every node.",
+          "Verify the DaemonSet Pods are running on all nodes with kubectl get pods -o wide.",
+          "Delete one DaemonSet Pod and watch Kubernetes recreate it automatically."
+        ],
+        "expectedOutcome": "You understand when to use each controller and how Kubernetes maintains the desired state."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Pods are ephemeral and rarely created directly — controllers manage them.",
+          "Deployments are the default for stateless applications and support rolling updates.",
+          "StatefulSets provide stable identities and persistent storage for stateful workloads.",
+          "DaemonSets ensure a Pod runs on every node for node-level tasks.",
+          "Choose the right controller based on whether your workload is stateless, stateful, or node-level."
+        ],
+        "takeaway": "Controllers abstract Pod lifecycle management, letting you declare intent rather than micromanage instances."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "rolling-deployments-and-rollback",
+    "rbac-and-namespaces",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Pods",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Deployments",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes StatefulSets",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes DaemonSets",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "type": "article"
+    }
+  ]
 }

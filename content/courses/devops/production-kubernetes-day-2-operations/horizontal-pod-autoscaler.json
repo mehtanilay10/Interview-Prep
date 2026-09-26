@@ -4,33 +4,62 @@
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
   "title": "Horizontal Pod Autoscaler",
-  "description": "Learn about Horizontal Pod Autoscaler. Master the concepts, patterns, and best practices.",
+  "description": "Automatically scale application Pods up or down based on CPU, memory, or custom metrics using Kubernetes Horizontal Pod Autoscaler.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kubernetes",
+    "hpa",
+    "autoscaling",
+    "metrics",
+    "cpu",
+    "memory"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Horizontal Pod Autoscaler** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with horizontal pod autoscaler."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What Is the Horizontal Pod Autoscaler?"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of horizontal pod autoscaler",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "The **Horizontal Pod Autoscaler (HPA)** automatically adjusts the number of Pod replicas in a Deployment, StatefulSet, or ReplicaSet based on observed CPU utilization, memory usage, or custom metrics. Instead of manually scaling your application during peak traffic or quiet periods, the HPA monitors metrics and scales your workload up or down to match demand — saving resources and maintaining performance."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "HPA is a Kubernetes resource in the `autoscaling/v2` API group. It polls the Metrics Server (or a custom metrics adapter) every 15 seconds by default, compares the current metric value to the target you set, and calculates the desired replica count. If the desired count differs from the current count, the HPA updates the underlying ReplicaSet."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Horizontal Pod Autoscaler",
+            "definition": "Automatically scales the number of Pod replicas based on observed metrics."
+          },
+          {
+            "term": "Metrics Server",
+            "definition": "A cluster-wide aggregator of resource usage data; provides CPU and memory metrics to the HPA."
+          },
+          {
+            "term": "Custom metrics",
+            "definition": "Application-specific metrics (e.g., requests per second) from Prometheus or other adapters."
+          },
+          {
+            "term": "External metrics",
+            "definition": "Metrics from outside the cluster, such as SQS queue depth or CloudWatch alarms."
+          },
+          {
+            "term": "ScaleDown",
+            "definition": "The HPA reducing the number of Pod replicas when demand decreases."
+          }
         ]
       }
     },
@@ -38,24 +67,149 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "CPU-Based Autoscaling"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding horizontal pod autoscaler is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "CPU-based autoscaling is the simplest form. You tell the HPA to maintain a target CPU utilization percentage across all Pods. For example, if you set the target to 70% and your Pods are averaging 90% CPU, the HPA adds more replicas to bring the average down. If utilization drops to 30%, the HPA removes excess replicas."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HPA targeting 70% CPU utilization",
+        "content": "Scale a Deployment between 2 and 10 replicas based on CPU usage.",
+        "code": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: api-hpa\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: api-deployment\n  minReplicas: 2\n  maxReplicas: 10\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 70",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom and External Metrics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CPU and memory are useful, but real-world scaling often depends on business metrics. An API might need to scale based on requests per second, a message consumer based on queue depth, or a video encoder based on job backlog. Kubernetes supports **custom metrics** (from Prometheus, Datadog, etc.) and **external metrics** (from cloud services or databases) through metric adapters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HPA using custom Prometheus metrics",
+        "content": "Scale based on HTTP requests per second from Prometheus.",
+        "code": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: api-hpa\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: api-deployment\n  minReplicas: 2\n  maxReplicas: 20\n  metrics:\n  - type: Pods\n    pods:\n      metric:\n        name: http_requests_per_second\n      target:\n        type: AverageValue\n        averageValue: 1000m",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with horizontal pod autoscaler, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Always set minReplicas and maxReplicas",
+        "text": "Without maxReplicas, the HPA can scale indefinitely during a traffic spike, exhausting cluster capacity. Without minReplicas, your application might scale to zero and become unavailable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "HPA Behavior in Practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "HPAs do not react instantly. The default polling interval is 15 seconds, and there is a cool-down period before scaling down to prevent flapping. You can tune these with `--horizontal-pod-autoscaler-sync-period` on the controller manager and the `behavior` section in the HPA spec."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Behavior Setting",
+          "Purpose"
+        ],
+        "rows": [
+          [
+            "stabilizationWindowSeconds",
+            "Prevents flapping by using the highest desired scale from a recent window"
+          ],
+          [
+            "scaleUp.policies",
+            "Controls how fast replicas can increase"
+          ],
+          [
+            "scaleDown.policies",
+            "Controls how fast replicas can decrease"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Configure HPA for an API Deployment",
+        "description": "Set up CPU-based and custom metric autoscaling.",
+        "steps": [
+          "Ensure Metrics Server is installed in your cluster.",
+          "Deploy an API Deployment with CPU requests set to 200m.",
+          "Create an HPA targeting 60% CPU utilization with minReplicas=2 and maxReplicas=10.",
+          "Generate load with a stress test tool or kubectl run.",
+          "Watch the HPA scale up: kubectl get hpa -w.",
+          "Stop the load and observe the HPA scale down after the stabilization window."
+        ],
+        "expectedOutcome": "The HPA automatically adds replicas under load and removes them when traffic drops, keeping CPU utilization near target."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "HPA automatically scales Pod replicas based on CPU, memory, or custom metrics.",
+          "Metrics Server is required for CPU and memory autoscaling; custom metrics need an adapter.",
+          "Always set minReplicas and maxReplicas to bound scaling behavior.",
+          "HPAs poll metrics on a schedule and have built-in stabilization to prevent flapping.",
+          "Use custom metrics (e.g., requests per second) for business-aware autoscaling."
+        ],
+        "takeaway": "HPA lets your cluster automatically match supply to demand, keeping performance high and costs low."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "requests-and-limits",
+    "rolling-deployments-and-rollback",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Horizontal Pod Autoscaler",
+      "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes Custom Metrics API",
+      "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#autoscaling-on-metrics-not-related-to-kubernetes-objects",
+      "type": "article"
+    },
+    {
+      "title": "Metrics Server",
+      "url": "https://github.com/kubernetes-sigs/metrics-server",
+      "type": "tool"
+    }
+  ]
 }

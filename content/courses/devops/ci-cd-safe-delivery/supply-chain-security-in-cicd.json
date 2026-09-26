@@ -4,33 +4,46 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Supply-chain security in CI/CD",
-  "description": "Learn about Supply-chain security in CI/CD. Master the concepts, patterns, and best practices.",
+  "description": "Secure every stage of the CI/CD pipeline from source code to deployed artifact against tampering and dependency attacks.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "CI/CD",
+    "security",
+    "supply-chain",
+    "dependencies",
+    "signing"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Supply-chain security in CI/CD** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with supply-chain security in ci/cd."
+        "text": "Software supply chain attacks exploit the trust between your code, your dependencies, and your build tools. If an attacker can inject malicious code into a package you consume, or alter your build output before it reaches production, they can compromise your entire application without ever touching your source repository."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Securing the supply chain in CI/CD means verifying who wrote the code, validating every dependency, measuring reproducibility, and proving that the artifact running in production is the same one your pipeline built."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Threats in the pipeline"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common attack vectors",
         "items": [
-          "Understand the fundamental principles of supply-chain security in ci/cd",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Dependency confusion: attacker publishes a package with the same name as an internal package to a public registry.",
+          "Compromised maintainer: attacker takes over a legitimate package and injects malicious code.",
+          "CI token theft: attacker steals a pipeline token and pushes a malicious artifact.",
+          "Build tampering: attacker modifies build scripts or runners to inject code during compilation."
         ]
       }
     },
@@ -38,24 +51,167 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Dependency validation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding supply-chain security in ci/cd is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Lock files such as package-lock.json, packages.lock.json, or Pipfile.lock pin exact dependency versions. They are your first defense against dependency confusion. Always commit lock files to source control and never allow pipelines to resolve dependencies from mutable registries without validation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validate dependencies in CI",
+        "content": "Fail the build if the lock file is missing, out of date, or contains known vulnerabilities.",
+        "code": "jobs:\n  dependency-check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: \"8.0.x\"\n      - run: dotnet restore --locked-mode\n      - uses: github/codeql-action/upload-sarif@v3\n        with:\n          sarif_file: results.sarif",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Signing and provenance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Signing an artifact means attaching a cryptographic signature that proves it was built by your pipeline and has not been modified. Sigstore, Azure Sign Tool, and Docker Content Trust are common signing mechanisms. When you combine signing with a software bill of materials, or SBOM, you get a verifiable record of exactly what went into each release."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SBOM",
+            "definition": "Software Bill of Materials. A list of every component, dependency, and version included in an artifact."
+          },
+          {
+            "term": "SLSA",
+            "definition": "Supply-chain Levels for Software Artifacts. A security framework that defines provenance and build integrity standards."
+          },
+          {
+            "term": "Sigstore",
+            "definition": "A free, open-source project that simplifies signing and verifying software artifacts."
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with supply-chain security in ci/cd, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Use SLSA for build integrity",
+        "text": "SLSA defines how to make your build process verifiable. Start with SLSA Level 1 by generating provenance metadata, then progress to Level 3 by hardening your build service and verifying source and build integrity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CI/CD hardening"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your pipeline is itself a high-value target. Limit who can modify workflow files, require pull request reviews for workflow changes, and use OIDC to avoid long-lived secrets. In GitHub Actions, use the permissions key to restrict workflow tokens to the minimum required access."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Least-privilege GitHub Actions workflow",
+        "content": "The workflow explicitly limits token permissions to read-only for most operations.",
+        "code": "name: Secure Pipeline\non:\n  push:\n    branches: [ main ]\npermissions:\n  contents: read\n  packages: write\n  id-token: write\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: sigstore/gh-action-sigstore-artifacts@v2\n        with:\n          inputs: out/\n      - uses: actions/upload-artifact@v4\n        with:\n          name: signed-app\n          path: out/*.sig",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Supply-chain security checklist",
+        "items": [
+          {
+            "text": "Lock files are committed and restored with locked mode in CI.",
+            "hint": "Block builds that modify lock files unexpectedly."
+          },
+          {
+            "text": "Dependencies are scanned for known vulnerabilities in every build.",
+            "hint": "Use GitHub Dependabot, Snyk, or Grype."
+          },
+          {
+            "text": "Artifacts are signed before they leave the pipeline.",
+            "hint": "Store signatures alongside the artifact."
+          },
+          {
+            "text": "Workflow changes require pull request review.",
+            "hint": "Treat .github/workflows as production code."
+          },
+          {
+            "text": "Long-lived secrets are replaced with OIDC or short-lived tokens.",
+            "hint": "Rotate any secret older than 90 days."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Supply chain attacks target dependencies and build pipelines, not just application code.",
+          "Lock files, dependency scanning, and artifact signing form a layered defense.",
+          "SLSA and SBOMs provide verifiable evidence of what you built and how.",
+          "Harden your CI/CD platform itself; it is a high-value target."
+        ],
+        "takeaway": "Security is only as strong as the weakest link in the chain from commit to production."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Is signing really necessary for internal applications?",
+            "answer": "Yes. Internal applications still run on production infrastructure. An attacker who compromises an internal dependency or build tool can pivot to production systems. Signing makes tampering detectable."
+          },
+          {
+            "question": "What is the fastest way to improve supply chain security?",
+            "answer": "Enable Dependabot or an equivalent dependency scanner, require pull request reviews for workflow changes, and enforce locked dependency restores in CI. These three steps block the most common attack vectors."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "artifact-versioning",
+    "feature-flags"
+  ],
+  "furtherReading": [
+    {
+      "title": "SLSA Framework",
+      "url": "https://slsa.dev/",
+      "type": "article",
+      "description": "Supply-chain Levels for Software Artifacts and the provenance specification."
+    },
+    {
+      "title": "Sigstore Documentation",
+      "url": "https://docs.sigstore.dev/",
+      "type": "article",
+      "description": "How to sign and verify software artifacts with Sigstore."
+    },
+    {
+      "title": "GitHub Dependabot",
+      "url": "https://docs.github.com/en/code-security/dependabot",
+      "type": "tool",
+      "description": "Automated dependency updates and vulnerability alerts on GitHub."
+    }
+  ]
 }

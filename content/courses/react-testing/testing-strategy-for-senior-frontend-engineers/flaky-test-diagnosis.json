@@ -4,33 +4,45 @@
   "moduleSlug": "testing-strategy-for-senior-frontend-engineers",
   "courseSlug": "react-testing",
   "title": "Flaky test diagnosis",
-  "description": "Learn about Flaky test diagnosis. Master the concepts, patterns, and best practices.",
+  "description": "Learn to identify, diagnose, and fix flaky tests in React codebases using systematic debugging, proper async handling, and deterministic test patterns.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "testing",
+    "flaky",
+    "debugging",
+    "react"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Flaky test diagnosis** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with flaky test diagnosis."
+        "text": "A flaky test is one that passes or fails without any code change between runs. It is the most expensive form of test debt: it erodes trust in the entire test suite, slows down CI, and conditions engineers to re-run tests instead of investigating failures. Senior frontend engineers treat flakiness as a P1 bug and have a systematic approach to tracking it down."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common causes in React testing are race conditions in async state updates, shared mutable module state, timing-dependent animations, and tests that depend on network or system clock."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common causes of flakiness"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of flaky test diagnosis",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Missing waitFor or findBy queries when asserting on data that loads asynchronously.",
+          "Using a real network request without a mock or fake, so the test outcome depends on network speed.",
+          "Shared module state: a previous test mutates a global variable that the next test reads.",
+          "Animations or transitions that delay when an element appears in the DOM.",
+          "Date-dependent logic: tests that use new Date() without controlling the clock."
         ]
       }
     },
@@ -38,24 +50,117 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Diagnosing a flaky test step by step"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Reproduce locally by running the test in a loop: vitest runs the file in-band (--threads=false) and watch mode.",
+          "Isolate the test by commenting out nearby tests. If the flakiness disappears, shared state is the cause.",
+          "Add explicit waitFor or findBy queries where the test reaches into the DOM before React finishes rendering.",
+          "Replace real timers with fake timers if the component uses setTimeout or setInterval.",
+          "Check for animations: CSS transitions can delay when getByRole finds an element."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixing a race condition with waitFor"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding flaky test diagnosis is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "One of the most common flaky patterns is asserting on content that appears after an async fetch. Here is the broken version and the fix:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Flaky: asserts immediately before the async update finishes",
+        "code": "// ❌ Flaky: the assertion runs before React commits the updated DOM.\nrender(<ProfilePage userId=\"1\" />)\nexpect(screen.getByText('Ada Lovelace')).toBeDefined()"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Fixed: uses findByText which waits for the element to appear",
+        "code": "// ✅ Stable: findByText retries until the element appears or times out.\nrender(<ProfilePage userId=\"1\" />)\nconst name = await screen.findByText('Ada Lovelace')\nexpect(name).toBeDefined()"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "React Testing Library's findBy family uses waitFor under the hood. They retry the query until it succeeds or the default timeout expires. This is almost always the right tool for async content."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Controlling the clock with fake timers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Components that use setTimeout, setInterval, or date formatting can behave differently depending on when the test runs. Vitest fake timers make time deterministic:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Using fake timers to test a debounced search input",
+        "code": "import { render, screen, fireEvent } from '@testing-library/react'\nimport { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'\nimport SearchInput from './SearchInput'\n\ndescribe('SearchInput', () => {\n  beforeEach(() => vi.useFakeTimers())\n  afterEach(() => vi.useRealTimers())\n\n  it('debounces the API call by 300ms', async () => {\n    render(<SearchInput onSearch={vi.fn()} />)\n\n    fireEvent.change(screen.getByRole('searchbox'), {\n      target: { value: 'react' },\n    })\n\n    // No call yet — the debounce timer is waiting.\n    expect(screen.getByRole('searchbox').value).toBe('react')\n\n    // Advance time past the 300ms debounce window.\n    await vi.advanceTimersByTimeAsync(350)\n\n    expect(onSearch).toHaveBeenCalledWith('react')\n  })\n})"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with flaky test diagnosis, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Do not fix flakiness with sleep",
+        "text": "Adding a fixed waitFor(500) or await new Promise(r => setTimeout(r, 500)) is not a fix. It merely hides the race condition and slows down the suite. The right fix is to wait for a specific, observable condition: an element, a call count, or a state change."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Reproduce flakiness by running tests in isolation and in loops.",
+          "Use findBy queries or waitFor for async content instead of immediate assertions.",
+          "Use fake timers to eliminate race conditions from setTimeout and setInterval.",
+          "Track flaky tests in CI dashboards and treat them as P1 bugs."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "playwright-based-e2e-testing",
+    "mutation-testing-and-test-quality"
+  ],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Flaky Tests - Google Testing Blog",
+      "url": "https://testing.googleblog.com/2015/04/are-your-tests-flaky.html"
+    },
+    {
+      "type": "article",
+      "title": "Vitest Fake Timers",
+      "url": "https://vitest.dev/api/#vi-useFakeTimers"
+    },
+    {
+      "type": "article",
+      "title": "Testing Library - findBy queries",
+      "url": "https://testing-library.com/docs/queries/about#bytype"
+    }
+  ]
 }

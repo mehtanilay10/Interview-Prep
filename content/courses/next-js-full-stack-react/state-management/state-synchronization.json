@@ -3,34 +3,46 @@
   "slug": "state-synchronization",
   "moduleSlug": "state-management",
   "courseSlug": "next-js-full-stack-react",
-  "title": "state-synchronization",
-  "description": "Learn about state-synchronization. Master the concepts, patterns, and best practices.",
+  "title": "State Synchronization",
+  "description": "Learn strategies for keeping local state, server state, and URL state in sync, including optimistic updates, cache invalidation, and handling race conditions.",
   "order": 7,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["React Query", "Synchronization", "Optimistic Updates"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**state-synchronization** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with state-synchronization."
+        "text": "In a real application, state is never isolated. A user updates their profile name, and that change needs to appear in the nav bar, the settings page, and any cached API responses. This is **state synchronization**: making sure every copy of the same piece of data reflects reality."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Synchronization is hardest when you have multiple sources of truth. Local component state, server data cached in React Query, and URL parameters can all describe the same concept. When they drift apart, users see stale or conflicting UI. The goal is to choose a single source of truth and keep the others derived from it."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Single Source of Truth"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For any piece of data, designate one place as the source of truth. Server data belongs in the query cache. UI toggles belong in local state or the URL. Do not duplicate the same fact in two places and try to keep them in sync manually — that pattern is fragile and almost always leads to bugs."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of state-synchronization",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Server data: source of truth is the API. Cache in React Query.",
+          "Filter state: source of truth is the URL. Read from searchParams.",
+          "UI toggles: source of truth is local state or Context.",
+          "Derived values: compute from the source, do not store separately."
         ]
       }
     },
@@ -38,24 +50,81 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Optimistic Updates"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding state-synchronization is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "When a user performs an action — liking a post, adding to a cart, saving a draft — you can update the UI immediately before the server confirms. This is an **optimistic update**. React Query makes this straightforward: you modify the cached data in `onMutate`, then either roll it back on error or let the real response overwrite it on success."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Optimistic Like Button with React Query",
+        "language": "typescript",
+        "code": "function LikeButton({ postId, initialLiked }: { postId: string; initialLiked: boolean }) {\n  const queryClient = useQueryClient();\n\n  const mutation = useMutation({\n    mutationFn: async () => {\n      const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST' });\n      if (!res.ok) throw new Error('Failed');\n      return res.json();\n    },\n    onMutate: async () => {\n      await queryClient.cancelQueries({ queryKey: ['posts'] });\n      const previous = queryClient.getQueryData<Post[]>(['posts']);\n      queryClient.setQueryData<Post[]>(['posts'], (old = []) =>\n        old.map((p) => p.id === postId ? { ...p, liked: !p.liked } : p)\n      );\n      return { previous };\n    },\n    onError: (_err, _vars, ctx) => {\n      queryClient.setQueryData(['posts'], ctx?.previous);\n    },\n    onSettled: () => {\n      queryClient.invalidateQueries({ queryKey: ['posts'] });\n    },\n  });\n\n  return (\n    <button onClick={() => mutation.mutate()} disabled={mutation.isPending}>\n      {initialLiked ? 'Unlike' : 'Like'}\n    </button>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After a mutation changes data on the server, the cached version is now stale. Calling `invalidateQueries` tells React Query to refetch the affected data. You can invalidate broadly by key prefix or precisely by full key. A good rule: invalidate the list query after creating or deleting an item, and invalidate the item query after updating it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Race Conditions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Race conditions happen when a slower request resolves after a newer one, overwriting fresh data with stale data. React Query handles this by canceling previous queries when a new one with the same key starts. But in mutations, you need to be careful: disable the button during submission, and do not allow the user to fire the same action multiple times."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with state-synchronization, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Watch Out",
+        "text": "Never store derived server data in local state. If you need a filtered version of a posts list, filter the React Query cache result inside your component, not by copying it into useState. Copying breaks cache invalidation and causes drift."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "items": [
+          "Pick one source of truth for each piece of data",
+          "Optimistic updates make the UI feel instant while keeping the cache correct",
+          "Invalidate queries after mutations so stale data is refetched",
+          "Disable mutation buttons during submission to prevent duplicate requests"
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["react-query-for-server-state", "url-as-state", "local-state-vs-server-state"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "React Query: Optimistic Updates",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates"
+    },
+    {
+      "type": "article",
+      "title": "React Query: Mutation",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/guides/mutations"
+    }
+  ]
 }

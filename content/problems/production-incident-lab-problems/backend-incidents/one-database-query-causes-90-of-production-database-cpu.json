@@ -4,33 +4,61 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "One database query causes 90% of production database CPU",
-  "description": "Problem: One database query causes 90% of production database CPU. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose and fix a single database query that consumes 90% of production database CPU by analyzing execution plans, adding indexes, and query rewriting.",
   "order": 9,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["database", "query-optimization", "execution-plan", "index", "n-plus-1", "cpu"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**One database query causes 90% of production database CPU** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with one database query causes 90% of production database cpu."
+        "text": "Your production database CPU spikes to 95% during peak hours. The slow query log reveals one query accounting for 90% of total CPU time. The query joins three large tables and returns a paginated result set. You need to optimize it without changing the application behavior or breaking existing functionality."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How to identify the culprit"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of one database query causes 90% of production database cpu",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Enable the slow query log with a low threshold (e.g., 100ms) to capture the offending query",
+          "Use pg_stat_statements (PostgreSQL) or sys.dm_exec_query_stats (SQL Server) to find the top CPU consumer",
+          "Obtain the execution plan with EXPLAIN ANALYZE or SQL Server Management Studio",
+          "Look for full table scans, missing index warnings, or nested loops with high row estimates",
+          "Correlate the query text with application code to understand the intent and access pattern"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Execution plan",
+            "definition": "The step-by-step plan the database optimizer chooses to execute a query, including index usage and join strategies."
+          },
+          {
+            "term": "N+1 problem",
+            "definition": "A pattern where N+1 separate queries are executed instead of one joined query, causing excessive database round trips."
+          },
+          {
+            "term": "Table scan",
+            "definition": "Reading every row in a table to find matching rows, which is slow on large tables without indexes."
+          },
+          {
+            "term": "Covering index",
+            "definition": "An index that contains all columns required by a query, allowing the database to satisfy the query from the index alone."
+          },
+          {
+            "term": "Query plan cache",
+            "definition": "A cache of execution plans reused for identical queries to avoid recompilation overhead."
+          }
         ]
       }
     },
@@ -38,24 +66,116 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Optimization techniques"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding one database query causes 90% of production database cpu is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Add a covering index for the query's WHERE, JOIN, and SELECT columns",
+          "Rewrite the query to eliminate unnecessary joins or columns",
+          "Add pagination with keyset criteria instead of OFFSET for deep pages",
+          "Materialize expensive aggregations in a summary table refreshed on a schedule",
+          "Introduce caching at the application layer for frequently accessed results",
+          "Fix N+1 queries by using eager loading or a single joined query"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Database query optimization approaches",
+        "cards": [
+          {
+            "title": "Indexing",
+            "description": "Add B-tree or covering indexes to speed up lookups and joins.",
+            "pros": ["Fastest fix for read-heavy workloads", "Minimal code changes", "Database-enforced"],
+            "cons": ["Slows down writes", "Index bloat over time", "Requires maintenance"]
+          },
+          {
+            "title": "Query rewriting",
+            "description": "Restructure the SQL to use more efficient joins, filters, or subqueries.",
+            "pros": ["No schema changes", "Can eliminate redundant work", "Immediate effect"],
+            "cons": ["May require application changes", "Harder to maintain if logic is complex"]
+          },
+          {
+            "title": "Caching layer",
+            "description": "Store query results in Redis or application memory to reduce database load.",
+            "pros": ["Near-zero latency for hot data", "Reduces DB CPU immediately"],
+            "cons": ["Cache invalidation complexity", "Stale data risk", "Additional infrastructure"]
+          },
+          {
+            "title": "Materialized view",
+            "description": "Pre-compute and store the query result for fast reads.",
+            "pros": ["Complex queries become simple selects", "Refresh on schedule or trigger"],
+            "cons": ["Storage overhead", "Data latency between refreshes", "Refresh can be expensive"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Execution plan showing a table scan",
+        "content": "PostgreSQL EXPLAIN ANALYZE reveals a sequential scan on a 10M row table:",
+        "code": "EXPLAIN ANALYZE SELECT o.id, o.total, c.name\nFROM orders o\nJOIN customers c ON o.customer_id = c.id\nWHERE o.created_at > NOW() - INTERVAL '30 days'\nORDER BY o.created_at DESC\nLIMIT 20;\n\n-- Output:\n-- Limit (cost=0.00..1856.44 rows=20 width=48)\n--   ->  Merge Join (cost=0.00..1856.44 rows=20 width=48)\n--         Merge Cond: (o.customer_id = c.id)\n--         ->  Index Scan using idx_orders_created on orders o\n--         ->  Seq Scan on customers c  -- Full table scan!\n--               Filter: (id IS NOT NULL)",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-query-optimization",
+        "caption": "Query optimization workflow from detection to fix",
+        "definition": "graph TD\n    A[High CPU alert] --> B[Check slow query log]\n    B --> C[Identify top CPU query]\n    C --> D[Get execution plan]\n    D --> E{Missing index?}\n    E -->|Yes| F[Add covering index]\n    E -->|No| G{Full table scan?}\n    G -->|Yes| H[Add index or rewrite query]\n    G -->|No| I{Inefficient join?}\n    I -->|Yes| J[Rewrite join or add index]\n    I -->|No| K[Check for N+1 in app code]\n    F --> L[Verify CPU drops]\n    H --> L\n    J --> L\n    K --> L"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with one database query causes 90% of production database cpu, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Index selectivity matters",
+        "text": "An index on a column with low selectivity (e.g., boolean or enum with two values) will not help. The database optimizer may still choose a table scan. Index columns with high cardinality and use them in WHERE and JOIN clauses."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Optimize a slow query",
+        "description": "Given a slow query and its execution plan, identify the bottleneck and implement a fix.",
+        "steps": [
+          "Obtain the execution plan for the provided slow query",
+          "Identify the operator with the highest cost or execution time",
+          "Determine whether an index, query rewrite, or caching strategy is most appropriate",
+          "Implement the fix in a development database",
+          "Re-run EXPLAIN ANALYZE to verify the improvement"
+        ],
+        "expectedOutcome": "You should reduce the query cost by at least 80% and eliminate full table scans."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Use the slow query log or query stats to identify the top CPU consumer",
+          "Analyze the execution plan for table scans and missing indexes",
+          "Add covering indexes for high-frequency queries",
+          "Fix N+1 problems in application code before tuning individual queries"
+        ],
+        "takeaway": "A single unoptimized query can dominate database CPU. Always profile before and after any change to verify the impact."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Use The Index, Luke",
+      "url": "https://use-the-index-luke.com/",
+      "type": "article",
+      "author": "Markus Winand",
+      "description": "A guide to SQL indexing for developers, covering execution plans and index design."
+    }
+  ]
 }

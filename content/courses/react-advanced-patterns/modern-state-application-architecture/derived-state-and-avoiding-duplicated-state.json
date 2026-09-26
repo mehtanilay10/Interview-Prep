@@ -4,58 +4,172 @@
   "moduleSlug": "modern-state-application-architecture",
   "courseSlug": "react-advanced-patterns",
   "title": "Derived state and avoiding duplicated state",
-  "description": "Learn about Derived state and avoiding duplicated state. Master the concepts, patterns, and best practices.",
+  "description": "Learn to identify derived state, eliminate duplicated state, and use memoization and selectors to keep your UI predictable and your data flow simple.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "derived-state",
+    "react",
+    "memoization",
+    "architecture"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Derived state and avoiding duplicated state** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with derived state and avoiding duplicated state."
+        "text": "One of the most common state-management bugs in React is duplicating a value that can already be computed from existing state. When you store the same fact in two places, you must keep them in sync manually. Eventually they will diverge, and the resulting UI bugs are notoriously difficult to track down."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson teaches you to recognize **derived state** and replace duplicated state with computed values, selectors, and memoization."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is derived state?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Derived state is any value that can be calculated from other state during render. For example, if you store a list of items and a search query, the filtered list is derived state. You do not need a separate `useState` for it; you simply compute it inside your component or a selector function."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Derived state computed during render",
+        "content": "The filtered list is derived from the items and the query. It is not stored in state.",
+        "language": "tsx",
+        "code": "function ProductList({ products }: { products: Product[] }) {\n  const [query, setQuery] = useState('');\n\n  const visibleProducts = useMemo(\n    () =>\n      products.filter((p) =>\n        p.name.toLowerCase().includes(query.toLowerCase())\n      ),\n    [products, query]\n  );\n\n  return (\n    <div>\n      <input value={query} onChange={(e) => setQuery(e.target.value)} />\n      <ul>\n        {visibleProducts.map((p) => (\n          <li key={p.id}>{p.name}</li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Duplicated state is dangerous"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Duplicated state appears whenever the same fact is stored in multiple places. A common example is keeping both a `firstName` and a `fullName` in state and updating `fullName` in a `useEffect` whenever `firstName` changes. If another event handler updates `firstName` without triggering the effect, the two values diverge and the UI becomes inconsistent."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Rule of thumb",
+        "text": "If you can compute a value during render from other state, do not store it in state. If you find yourself writing a `useEffect` whose only purpose is to keep two values in sync, that is a strong signal of duplicated state."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Problematic duplicated state",
+        "content": "Both `items` and `visibleCount` must be kept in sync manually.",
+        "language": "tsx",
+        "code": "function BadList({ items }: { items: Item[] }) {\n  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());\n  const [visibleCount, setVisibleCount] = useState(0);\n\n  useEffect(() => {\n    setVisibleCount(items.filter((i) => selectedIds.has(i.id)).length);\n  }, [items, selectedIds]);\n\n  // If a mutation changes items without triggering setSelectedIds,\n  // visibleCount can become stale.\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fixed with derived state",
+        "content": "The count is computed directly from the current props and state during render.",
+        "language": "tsx",
+        "code": "function GoodList({ items }: { items: Item[] }) {\n  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());\n  const visibleCount = items.filter((i) => selectedIds.has(i.id)).length;\n\n  return <div>{visibleCount} selected</div>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Selectors for derived data"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When derived state is used in many places or computed from a large global store, repeating the same logic becomes fragile. Selectors are pure functions that encapsulate derivation logic in one place. In Redux, `reselect` memoizes selectors so that expensive computations run only when their inputs change."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Benefits of selectors",
         "items": [
-          "Understand the fundamental principles of derived state and avoiding duplicated state",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Derivation logic lives in one place instead of scattered across components.",
+          "Memoized selectors avoid expensive recomputation when inputs have not changed.",
+          "Selectors are easy to unit test in isolation."
         ]
       }
     },
     {
-      "type": "heading",
+      "type": "example",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding derived state and avoiding duplicated state is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "A memoized selector",
+        "content": "The selector recomputes the filtered list only when `items` or `category` changes.",
+        "language": "tsx",
+        "code": "import { createSelector } from 'reselect';\n\nconst selectItems = (state: AppState) => state.items;\nconst selectCategory = (state: AppState) => state.category;\n\nexport const selectFilteredItems = createSelector(\n  [selectItems, selectCategory],\n  (items, category) =>\n    items.filter((item) => item.category === category)\n);\n\nfunction ProductView() {\n  const filteredItems = useSelector(selectFilteredItems);\n  return <ProductList items={filteredItems} />;\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with derived state and avoiding duplicated state, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Quick audit",
+        "text": "Search your codebase for `useEffect` calls that set state based on other state. If the only dependency of the effect is other state or props, replace it with a derived value or a selector."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: eliminate duplicated state",
+        "description": "A component stores `startDate`, `endDate`, and `dateRangeLabel` in separate state variables. Refactor it so that `dateRangeLabel` is derived from `startDate` and `endDate` using a pure function or useMemo.",
+        "expectedOutcome": "The component should no longer synchronize `dateRangeLabel` with an effect; instead, the label is computed during render."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Derived state should be computed during render, not stored.",
+          "Duplicated state requires manual synchronization and eventually causes bugs.",
+          "Selectors and memoization keep derivation logic centralized and efficient.",
+          "Auditing for synchronization effects is a reliable way to find duplicated state."
+        ],
+        "takeaway": "Treat every piece of state as expensive: store only what cannot be derived from something else."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "local-state-vs-server-state-vs-url-state",
+    "choosing-state-ownership-boundaries"
+  ],
+  "furtherReading": [
+    {
+      "title": "React Docs: You Might Not Need an Effect",
+      "url": "https://react.dev/learn/you-might-not-need-an-effect",
+      "type": "article"
+    },
+    {
+      "title": "Reselect documentation",
+      "url": "https://github.com/reduxjs/reselect",
+      "type": "tool"
+    },
+    {
+      "title": "Derived state is a code smell",
+      "url": "https://kentcdodds.com/blog/derived-state-is-a-code-smell",
+      "type": "article"
+    }
+  ]
 }

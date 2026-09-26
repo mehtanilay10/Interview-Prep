@@ -3,34 +3,103 @@
   "slug": "read-replicas-and-readwrite-separation",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Read replicas and read/write separation",
-  "description": "Learn about Read replicas and read/write separation. Master the concepts, patterns, and best practices.",
+  "title": "Read Replicas and Read/Write Separation",
+  "description": "Learn how readable secondary replicas, Always On Availability Groups, and read/write separation scale SQL Server reads and improve production resilience.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "read-replicas",
+    "readable-secondary",
+    "always-on",
+    "high-availability",
+    "sql-server"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Read replicas and read/write separation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with read replicas and read/write separation."
+        "text": "Every production SQL Server eventually hits a wall: the primary server is saturated with read queries, and writes are competing with reads for CPU, memory, and I/O. One of the most effective architectural responses is **read/write separation**: route all writes to the primary server and all reads to one or more secondary servers that receive a near-real-time copy of the data."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In SQL Server, read replicas are implemented through **Always On Availability Groups**. A readable secondary replica receives transaction log records from the primary and replays them asynchronously or synchronously. Applications can direct read-only queries to the secondary using read-only routing or a connection string that targets the secondary listener."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How Readable Secondaries Work"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An Availability Group is a container for a set of user databases that fail over together. Each database in the group has one primary replica (accepting reads and writes) and one or more secondary replicas (receiving log records). If a secondary replica is configured as readable, it can serve read-only workloads while it receives and applies log changes."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "read-write-split",
+        "caption": "Read/write separation with Always On Availability Groups: writes go to the primary, reads go to the readable secondary.",
+        "definition": "flowchart LR\n    App[Application] -->|writes| Primary[Primary Replica]\n    App -->|reads via read-only routing| Secondary[Readable Secondary]\n    Primary -->|log records| Secondary\n    Primary -->|synchronous commit| Secondary\n    Secondary -->|applies changes| DB2[Secondary Database]\n    Primary -->|reads and writes| DB1[Primary Database]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Read-Only Routing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Read-only routing is a listener feature that automatically sends read-only connections to a readable secondary replica. When an application connects to the Availability Group listener with `ApplicationIntent=ReadOnly` in the connection string, the listener routes the connection to the best available secondary replica based on routing configuration and replica health."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connection String for Read-Only Routing",
+        "content": "Configure your connection string to use read-only routing for reporting queries.",
+        "language": "sql",
+        "code": "-- Connection string for read-only routing\n-- This tells the listener to route to a readable secondary\n\"Server=tcp:ag-listener.database.windows.net,1433;Database=AdventureWorks;ApplicationIntent=ReadOnly;MultiSubnetFailover=True;\"\n\n-- Connection string for read-write workloads\n-- This ensures the connection stays on the primary\n\"Server=tcp:ag-listener.database.windows.net,1433;Database=AdventureWorks;ApplicationIntent=ReadWrite;MultiSubnetFailover=True;\""
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Read-Only Routing Requires a Listener",
+        "text": "Read-only routing works only when connecting through an Availability Group listener. Direct connections to a secondary replica by name do not support read-only routing. Always configure a listener for production Availability Groups."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Freshness and Latency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Data on a readable secondary is never perfectly synchronized with the primary in asynchronous commit mode. The amount of lag depends on network bandwidth, redo performance on the secondary, and workload intensity. For reporting and analytics, a lag of a few seconds is usually acceptable. For operational reporting that must see the latest data, synchronous commit may be required — but it adds latency to every write."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Synchronous vs. Asynchronous Commit",
         "items": [
-          "Understand the fundamental principles of read replicas and read/write separation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Synchronous commit — the primary waits for the secondary to harden the log before confirming the commit to the client. Zero data loss on failover, but higher write latency",
+          "Asynchronous commit — the primary confirms the commit immediately and sends log records to the secondary in the background. Lower write latency, but potential data loss during failover",
+          "Read-only routing works with both modes — choose synchronous for critical data and asynchronous for geographic distributions"
         ]
       }
     },
@@ -38,24 +107,96 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Application Design for Read/Write Separation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding read replicas and read/write separation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Read/write separation is not just a database configuration — it requires application awareness. Your data access layer must know which queries are reads and which are writes, and route them accordingly. Mixing read-only and read-write workloads on the same connection can cause errors if the application accidentally writes on a read-only secondary."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Application Design Patterns",
+        "items": [
+          "Use separate connection strings or a routing library that selects the primary for writes and the secondary for reads",
+          "Tag read-only queries explicitly in your data access layer — never rely on developers to remember which queries are safe on a secondary",
+          "Monitor replication lag and fail reads back to the primary if the secondary falls too far behind",
+          "Handle the 'read-only' error (error 3906) gracefully — retry on the primary if a read-only connection accidentally tries to write",
+          "Test failover behavior regularly — a read-only routing configuration that works in dev may break in production if listener DNS or quorum changes"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with read replicas and read/write separation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Licensing and Edition Requirements",
+        "text": "Readable secondaries require SQL Server Enterprise Edition or Standard Edition with at least two cores. In Azure SQL Database, readable secondaries are available in Business Critical and Hyperscale tiers. Verify your licensing before designing a read scale-out architecture."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I have more than one readable secondary?",
+            "answer": "Yes. An Availability Group can have up to eight secondary replicas. You can load-balance read-only traffic across multiple secondaries using read-only routing lists or a custom routing layer in your application."
+          },
+          {
+            "question": "What happens if the secondary falls behind?",
+            "answer": "In asynchronous mode, the secondary can lag behind the primary by seconds to minutes depending on workload. If the secondary is too far behind for your reporting needs, you can either increase the redo thread priority on the secondary or route reads back to the primary temporarily."
+          },
+          {
+            "question": "Does read/write separation help with connection pooling?",
+            "answer": "Indirectly, yes. By routing reads to secondary replicas, you reduce the connection and CPU load on the primary. This means the primary can handle more write transactions and the overall connection pool utilization is lower."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Read replicas in SQL Server are implemented as readable secondary replicas in Always On Availability Groups",
+          "Read-only routing automatically sends read-only connections to secondaries via the listener and ApplicationIntent=ReadOnly",
+          "Asynchronous commit has lower write latency but potential data loss on failover; synchronous commit has zero data loss but higher latency",
+          "Application design must explicitly separate reads from writes — accidental writes on a read-only secondary cause error 3906",
+          "Monitor replication lag and plan for fallback to the primary when the secondary is too far behind"
+        ],
+        "takeaway": "Read/write separation turns a single-server bottleneck into a scalable architecture, but it requires correct Availability Group configuration, listener setup, and application routing discipline."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "database-capacity-planning",
+    "connection-pooling-and-exhaustion"
+  ],
+  "furtherReading": [
+    {
+      "title": "Always On Availability Groups (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/overview-of-always-on-availability-groups",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Read-Only Routing (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/configure-read-only-routing-for-an-availability-group",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Scale Out Read Workloads with Readable Secondary Replicas (Microsoft)",
+      "url": "https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/read-only-secondary-replicas",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

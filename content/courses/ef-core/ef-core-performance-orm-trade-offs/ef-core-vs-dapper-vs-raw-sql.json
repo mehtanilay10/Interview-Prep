@@ -4,32 +4,131 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "EF Core vs Dapper vs raw SQL",
-  "description": "Learn about EF Core vs Dapper vs raw SQL. Master the concepts, patterns, and best practices.",
+  "description": "Compare EF Core, Dapper, and raw SQL for data access, understanding the performance and productivity trade-offs of each approach.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["EF Core", "Dapper", "raw SQL", "micro-ORM", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**EF Core vs Dapper vs raw SQL** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with ef core vs dapper vs raw sql."
+        "text": "EF Core is not the only tool for data access in .NET. Dapper — a lightweight micro-ORM — and plain raw SQL with `DbCommand` each have their own strengths and weaknesses. Choosing the right tool for each workload is a hallmark of senior engineering: use EF Core for productivity and maintainability, but reach for Dapper or raw SQL when raw performance or precise query control matters."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "EF Core"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core is a full-featured ORM that handles change tracking, migrations, relationship management, and LINQ translation. It excels at productivity, code-first schema evolution, and complex domain models. Its overhead comes from the translation pipeline, change tracker, and the abstraction layer between your code and the database."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dapper"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Dapper extends `IDbConnection` with mapping helpers. You write the SQL yourself, and Dapper materializes the results into your POCOs. There is no change tracking, no LINQ translator, and no migration system. The result is near-raw-SQL performance with a small amount of object-mapping convenience."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Same query: EF Core vs Dapper",
+        "code": "// EF Core — LINQ translated to SQL by the framework\nvar orders = await dbContext.Orders\n    .Where(o => o.OrderDate.Year == 2025)\n    .Select(o => new OrderSummaryDto\n    {\n        Id = o.Id,\n        CustomerName = o.Customer.FullName,\n        Total = o.OrderItems.Sum(oi => oi.Quantity * oi.UnitPrice)\n    })\n    .ToListAsync();\n\n// Dapper — you write the SQL, Dapper maps the results\nawait using var connection = new SqlConnection(_connectionString);\nvar orders = await connection.QueryAsync<OrderSummaryDto>(\n    \"SELECT o.Id, c.FullName AS CustomerName, \" +\n    \"       SUM(oi.Quantity * oi.UnitPrice) AS Total \" +\n    \"FROM Orders o \" +\n    \"JOIN Customers c ON o.CustomerId = c.Id \" +\n    \"JOIN OrderItems oi ON oi.OrderId = o.Id \" +\n    \"WHERE YEAR(o.OrderDate) = @Year \" +\n    \"GROUP BY o.Id, c.FullName\",\n    new { Year = 2025 });",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Raw SQL"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core itself supports raw SQL through `FromSqlRaw` and `ExecuteSqlRaw`. These methods let you write exact SQL while still using the DbContext for connection management. Use raw SQL when you need database-specific features like window functions, CTEs, or bulk hints that the LINQ translator cannot express."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Raw SQL with FromSqlRaw",
+        "code": "var topCustomers = await dbContext.Customers\n    .FromSqlRaw(@\"\n        SELECT c.Id, c.FullName, COUNT(o.Id) AS OrderCount,\n               RANK() OVER (ORDER BY COUNT(o.Id) DESC) AS Rank\n        FROM Customers c\n        JOIN Orders o ON o.CustomerId = c.Id\n        GROUP BY c.Id, c.FullName\n        HAVING COUNT(o.Id) > @MinOrders\"\n    , new { MinOrders = 10 })\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
         "items": [
-          "Master advanced aspects of ef core vs dapper vs raw sql",
-          "Master advanced aspects of ef core vs dapper vs raw sql",
-          "Master advanced aspects of ef core vs dapper vs raw sql"
+          {
+            "title": "EF Core",
+            "description": "Full-featured ORM with LINQ, migrations, and change tracking.",
+            "pros": [
+              "High developer productivity",
+              "Automatic schema migrations",
+              "Change tracking and SaveChanges",
+              "Rich LINQ query capabilities"
+            ],
+            "cons": [
+              "Translation overhead on complex queries",
+              "Change tracker memory cost",
+              "Abstraction can hide inefficient SQL"
+            ]
+          },
+          {
+            "title": "Dapper",
+            "description": "Micro-ORM that maps SQL results to POCOs with minimal overhead.",
+            "pros": [
+              "Near-raw SQL performance",
+              "Full control over query text",
+              "Lightweight and fast to execute",
+              "Multi-mapping for complex graphs"
+            ],
+            "cons": [
+              "No change tracking",
+              "No built-in migration tooling",
+              "SQL written as strings — no compile-time safety",
+              "Manual query maintenance across schema changes"
+            ]
+          },
+          {
+            "title": "Raw SQL (FromSqlRaw)",
+            "description": "Write exact SQL executed through EF Core's DbContext.",
+            "pros": [
+              "Complete control over SQL",
+              "Database-specific features available",
+              "Still uses DbContext connection management",
+              "Useful for complex analytical queries"
+            ],
+            "cons": [
+              "SQL embedded in C# strings",
+              "No automatic result mapping beyond entity types",
+              "Harder to refactor than LINQ",
+              "Still subject to DbContext tracking overhead"
+            ]
+          }
         ]
       }
     },
@@ -37,24 +136,36 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When to choose each"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding ef core vs dapper vs raw sql is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Use EF Core for CRUD-heavy applications, complex domain models, and rapid development where productivity outweighs raw speed.",
+          "Use Dapper for high-throughput read paths, reporting endpoints, or queries where LINQ translation produces suboptimal SQL.",
+          "Use raw SQL via FromSqlRaw for database-specific features like CTEs, window functions, or query hints that EF Core LINQ cannot express.",
+          "Mix approaches in the same application: EF Core for the write model and Dapper for reporting or analytics queries."
+        ]
       }
     },
     {
-      "type": "callout",
+      "type": "summary-box",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with ef core vs dapper vs raw sql, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Key takeaways",
+        "items": [
+          "EF Core maximizes productivity with LINQ, tracking, and migrations.",
+          "Dapper maximizes raw performance with minimal abstraction.",
+          "Raw SQL via FromSqlRaw gives full control while keeping DbContext benefits.",
+          "There is no universal winner — combine tools based on each workload's needs."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["when-to-bypass-the-orm", "bulk-operations-and-large-data-changes"],
+  "furtherReading": [
+    { "title": "EF Core performance best practices", "url": "https://learn.microsoft.com/en-us/ef/core/performance/", "type": "article" },
+    { "title": "Dapper documentation", "url": "https://github.com/DapperLib/Dapper", "type": "article" }
+  ]
 }

@@ -3,59 +3,180 @@
   "slug": "broken-access-control-and-idorbola",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "Broken access control and IDOR/BOLA",
-  "description": "Learn about Broken access control and IDOR/BOLA. Master the concepts, patterns, and best practices.",
+  "title": "Broken Access Control and IDOR/BOLA",
+  "description": "Learn how broken access control and IDOR/BOLA vulnerabilities expose private data. Understand vertical and horizontal access control, learn to enforce authorization in .NET APIs, and see how client-side code can accidentally leak resources.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "access-control",
+    "IDOR",
+    "BOLA",
+    "authorization",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Broken access control and IDOR/BOLA** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with broken access control and idor/bola."
+        "text": "Access control is the security backbone of every web application. It decides who can see what, who can change what, and who can delete what. When access control breaks down, users can reach data or actions that should be off-limits. The most common form of broken access control in APIs is **IDOR** — Insecure Direct Object Reference — sometimes called **BOLA** (Broken Object Level Authorization) in mobile and API contexts."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of broken access control and idor/bola",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How Broken Access Control Happens"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding broken access control and idor/bola is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Access control failures usually come in two flavors. **Vertical access control** is about roles: an admin should be able to do things a regular user cannot, and vice versa. **Horizontal access control** is about isolation: a user should only see their own records, not records belonging to other users. When either one is missing, attackers can climb up the role ladder or reach across user boundaries."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "IDOR / BOLA",
+            "definition": "When an application exposes a direct reference to an internal object (like a database ID) and fails to check whether the current user owns that object."
+          },
+          {
+            "term": "Vertical access control",
+            "definition": "Restricting actions based on user roles, such as allowing only admins to delete records."
+          },
+          {
+            "term": "Horizontal access control",
+            "definition": "Restricting access so that users can only interact with their own data, not data belonging to other users."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Unsafe API endpoint",
+        "content": "This C# API endpoint returns an invoice by ID without checking whether the requesting user owns the invoice.",
+        "code": "app.MapGet(\"/api/invoices/{id}\", async (int id, AppDbContext db, HttpContext ctx) =>\n{\n    var invoice = await db.Invoices.FindAsync(id);\n    if (invoice == null) return Results.NotFound();\n\n    return Results.Ok(invoice);\n});",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with broken access control and idor/bola, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Real-world impact",
+        "text": "IDOR/BOLA was the #1 vulnerability category in the OWASP API Security Top 10 (2023). In a well-known breach, attackers enumerated sequential order IDs in an e-commerce API and downloaded thousands of customer invoices containing names, addresses, and payment details."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixing Access Control in .NET"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest pattern is to verify ownership inside the data-access layer. Instead of trusting the client to send the right ID, derive the allowed records from the current user's identity. Resource-based authorization in ASP.NET Core lets you attach authorization rules directly to entity instances."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Safe API endpoint with ownership check",
+        "content": "This example uses resource-based authorization so that only the invoice owner or an admin can access the record.",
+        "code": "app.MapGet(\"/api/invoices/{id}\", async (int id, AppDbContext db, IAuthorizationService auth, HttpContext ctx) =>\n{\n    var invoice = await db.Invoices.FindAsync(id);\n    if (invoice == null) return Results.NotFound();\n\n    var result = await auth.AuthorizeAsync(ctx.User, invoice, \"InvoiceOwnerPolicy\");\n    if (!result.Succeeded) return Results.Forbid();\n\n    return Results.Ok(invoice);\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Client-Side Checks Are Not Enough"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A JavaScript frontend might hide the 'Delete' button for normal users, but that button is purely cosmetic. A determined user can open browser DevTools, replay the request, or write a one-line curl command. Authorization must be enforced on the server for every single request, regardless of what the frontend shows."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Frontend button vs real API call",
+        "content": "The React component hides the button, but the API must still reject unauthorized access.",
+        "code": "// Frontend hides the button — UI only\nfunction InvoiceRow({ invoice, userRole }) {\n  return (\n    <div>\n      <span>{invoice.customerName}</span>\n      {userRole === 'Admin' && (\n        <button onClick={() => deleteInvoice(invoice.id)}>Delete</button>\n      )}\n    </div>\n  );\n}\n\n// But the API must still enforce the same rule:\n// GET /api/invoices/123 should return 403 if the user does not own invoice 123.",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "IDOR/BOLA prevention checklist",
+        "items": [
+          {
+            "text": "Verify ownership on every API endpoint that returns or modifies a single record.",
+            "hint": "Use resource-based authorization or filter queries by the current user's ID."
+          },
+          {
+            "text": "Replace sequential IDs with non-guessable UUIDs for sensitive resources.",
+            "hint": "UUIDs make enumeration harder, but do NOT replace authorization — they are an extra barrier, not a fix."
+          },
+          {
+            "text": "Log and alert on authorization failures.",
+            "hint": "A spike in 403 responses often signals an active IDOR scan."
+          },
+          {
+            "text": "Write automated tests that swap user contexts and verify data isolation.",
+            "hint": "If User A can access User B's record, the test should fail."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Broken access control lets users reach data or actions outside their permissions.",
+          "IDOR/BOLA is the most common API access-control flaw and happens when servers trust client-supplied IDs.",
+          "Authorization must always be enforced server-side; frontend hiding is not a defense.",
+          "Resource-based authorization and ownership checks are the standard fix in .NET APIs."
+        ],
+        "takeaway": "Never trust the client. Every request must be re-authorized on the server."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "sql-injection-and-parameterization",
+    "jwt-pitfalls-and-token-storage",
+    "refresh-token-rotation"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP API Security Top 10 — Broken Object Level Authorization",
+      "url": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — Resource-based authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/resourcebased",
+      "type": "article"
+    },
+    {
+      "title": "CWE-639: Authorization Bypass Through User-Controlled Key",
+      "url": "https://cwe.mitre.org/data/definitions/639.html",
+      "type": "article"
+    }
+  ]
 }

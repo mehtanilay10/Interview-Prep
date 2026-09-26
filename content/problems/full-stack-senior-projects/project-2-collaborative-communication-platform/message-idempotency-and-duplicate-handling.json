@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Message idempotency and duplicate handling** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with message idempotency and duplicate handling."
+        "text": "Duplicate messages are one of the most common bugs in real-time systems. They happen when clients retry after timeout, servers replay events after restart, or message buses deliver a message more than once. Idempotency ensures that processing the same message twice has the same effect as processing it once. For senior engineers, idempotency is not optional; it is a correctness invariant."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of message idempotency and duplicate handling",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Idempotency: processing the same request multiple times yields the same result as processing it once",
+          "Duplicate detection: checking whether a message has already been processed using a unique idempotency key",
+          "Idempotency key: a client-generated or server-generated unique identifier for each logical message",
+          "Deduplication window: the time period during which duplicates are detected and rejected",
+          "Safe retries: clients retry on timeout using the same idempotency key, not a new one",
+          "Exactly-once semantics: combining idempotency with atomic persistence and acknowledgments",
+          "Event sourcing: an architectural pattern where state changes are stored as immutable events, naturally supporting idempotency"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Idempotency",
+            "definition": "The property of an operation whereby it can be applied multiple times without changing the result beyond the initial application."
+          },
+          {
+            "term": "Deduplication",
+            "definition": "The process of identifying and discarding duplicate messages so they are not processed more than once."
+          },
+          {
+            "term": "Exactly-once semantics",
+            "definition": "A delivery guarantee where the recipient processes a message exactly one time, even in the presence of retries and failures."
+          },
+          {
+            "term": "Event sourcing",
+            "definition": "A pattern that stores all state changes as a sequence of events, enabling replay, audit, and idempotent reconstruction."
+          },
+          {
+            "term": "Safe retry",
+            "definition": "Retrying an operation with the same idempotency key so the receiver can recognize it as a duplicate."
+          }
         ]
       }
     },
@@ -44,18 +74,144 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding message idempotency and duplicate handling is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Without idempotency, a single timeout can result in duplicate messages, duplicate database rows, duplicate notifications, and inconsistent state. These bugs are hard to reproduce because they require network conditions that cause timeouts and retries. Senior engineers build idempotency into the protocol from day one so that retries are safe by default."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with message idempotency and duplicate handling, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Generate idempotency keys on the client",
+        "text": "Let the client generate a UUID for every message before sending. The server uses this key to deduplicate. If the server generates the key, it cannot guarantee the same key on retry. Client-generated keys make retries safe without server coordination."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deduplication strategies"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Unique constraint on idempotencyKey per conversation: the database rejects duplicates at insert time",
+          "Redis SET with expiration: fast in-memory deduplication for high-throughput paths",
+          "Bloom filter: probabilistic deduplication with minimal memory, useful when exactness is not required",
+          "Event sourcing: immutable event log where duplicates are naturally prevented by the same event ID",
+          "Idempotency table: a lightweight table mapping idempotency keys to processed result IDs"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-idempotency-flow",
+        "caption": "Idempotent message processing flow",
+        "definition": "graph TD\n    A[Client sends message] --> B[Generate UUID idempotencyKey]\n    B --> C[POST /messages with key]\n    C --> D{Key already processed?}\n    D -->|Yes| E[Return existing message]\n    D -->|No| F[Validate and persist]\n    F --> G[Return 201 with message ID]\n    G --> H[Client stores mapping]\n    I[Client timeout] --> J[Retry with same key]\n    J --> C"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: deduplication storage options"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Where to store idempotency keys",
+        "cards": [
+          {
+            "title": "Database unique constraint",
+            "description": "Relies on the primary database to reject duplicate inserts.",
+            "pros": ["Strong consistency", "No extra infrastructure", "Simple to reason about"],
+            "cons": ["Database round-trip", "Does not protect against duplicate side effects before insert"]
+          },
+          {
+            "title": "Redis SET with TTL",
+            "description": "Stores idempotency keys in Redis with a time-to-live.",
+            "pros": ["Fast lookups", "Automatic expiry", "Scales horizontally"],
+            "cons": ["Eventual consistency risk", "Requires Redis", "Memory cost"]
+          },
+          {
+            "title": "Event sourcing",
+            "description": "Events are immutable and identified by unique event IDs.",
+            "pros": ["Natural idempotency", "Complete audit trail", "Supports replay"],
+            "cons": ["Steeper learning curve", "Complex projections", "Requires event schema design"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement idempotent message ingestion",
+        "description": "Implement a message ingestion endpoint that accepts client-generated idempotency keys and guarantees that each key is processed exactly once, even under concurrent retries.",
+        "steps": [
+          "Create an idempotency_keys table with key, messageId, status, and createdAt",
+          "Create a messages table with idempotencyKey as a unique column",
+          "Implement the ingestion endpoint using a database transaction: insert into idempotency_keys, check for existing key, insert message",
+          "Handle the unique constraint violation gracefully by returning the existing message",
+          "Add a cleanup job that removes idempotency_keys older than twenty-four hours"
+        ],
+        "expectedOutcome": "You should be able to send the same message multiple times with the same idempotency key and receive the same response without creating duplicate messages."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What if the client retries with a different idempotency key?",
+            "answer": "That is a new message from the system perspective. Educate clients to reuse the same key for retries. You can detect suspicious patterns by rate-limiting clients that generate new keys too frequently."
+          },
+          {
+            "question": "How long should I keep idempotency keys?",
+            "answer": "Keep them for at least the maximum expected retry window plus a safety margin. Twenty-four hours is a common default. Longer retention increases storage cost but reduces the risk of rare duplicate scenarios."
+          },
+          {
+            "question": "Can I use the database transaction as the idempotency boundary?",
+            "answer": "Yes. A single transaction that inserts the idempotency key and the message atomically is the simplest and most reliable approach. The unique constraint on idempotencyKey prevents duplicates even under concurrent requests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Use client-generated UUIDs as idempotency keys for every message",
+          "Enforce uniqueness at the database level with a unique constraint",
+          "Return the existing result on duplicate detection instead of an error",
+          "Clean up idempotency keys after the retry window expires"
+        ],
+        "takeaway": "Idempotency is a correctness property, not a performance optimization. Build it into every API that accepts writes."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "message-persistence-and-ordering",
+    "offline-handling-and-reconnect-behavior"
+  ],
+  "furtherReading": [
+    {
+      "title": "Idempotency in REST APIs",
+      "url": "https://www.ietf.org/idempotency/",
+      "type": "article",
+      "author": "IETF",
+      "description": "A draft specification for the Idempotency-Key HTTP header to enable safe retries."
+    }
+  ]
 }

@@ -4,33 +4,51 @@
   "moduleSlug": "react-frontend-follow-ups",
   "courseSlug": "interview-qa",
   "title": "How would you debug a page with poor INP?",
-  "description": "Interview question: How would you debug a page with poor INP?. Learn the answer with detailed explanation and examples.",
+  "description": "Use Chrome DevTools and React Profiler to find long interactions, identify the responsible code, and improve Interaction to Next Paint.",
   "order": 8,
   "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["React", "Performance", "Web Vitals", "INP", "Chrome DevTools"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**How would you debug a page with poor INP?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with how would you debug a page with poor inp?."
+        "text": "INP (Interaction to Next Paint) measures how quickly a page responds to user input—clicks, taps, key presses. A poor INP means the main thread is busy when the user interacts. In React apps, the usual suspects are: large synchronous renders, expensive effects, long JavaScript tasks from third-party scripts, and layout thrashing. Debugging INP requires finding the **long task** that blocked the interaction."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What INP measures"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the step-by-step process of would you debug a page with poor inp?",
-          "Identify the key components and their interactions",
-          "Recognize common failure points and how to avoid them",
-          "Apply best practices for reliable implementation"
+        "text": "INP is based on the latency of all interactions during a page session. Google recommends INP under 200ms. A page scores its INP from roughly the 98th percentile of interaction latencies. So one very slow interaction—like a button click that takes 500ms to respond—can tank your score even if most interactions are fast."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "INP",
+            "definition": "Interaction to Next Paint: a Core Web Vital measuring the latency of all interactions a user makes with a page."
+          },
+          {
+            "term": "Long task",
+            "definition": "Any JavaScript execution that blocks the main thread for more than 50ms."
+          },
+          {
+            "term": "Main thread",
+            "definition": "The single thread where JavaScript runs in the browser. It handles rendering, event processing, and JS execution—all sequentially."
+          },
+          {
+            "term": "Event handler latency",
+            "definition": "The time from when the user triggers an event (click) to when the browser paints the next frame. Includes event dispatch, React render, and layout/paint."
+          }
         ]
       }
     },
@@ -38,25 +56,193 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Debugging workflow"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Chrome DevTools Performance panel",
+        "items": [
+          "Open DevTools → Performance → check 'Screenshots' and 'Web Vitals'",
+          "Click Record, then interact with the page (click buttons, type, scroll)",
+          "Stop recording after 10-20 seconds of activity",
+          "Look for red bars labeled 'Long Task' in the Main thread track",
+          "Click a long task to see its call stack. Look for React, third-party scripts, or your own functions",
+          "If React is in the stack, open the React Profiler to identify which component took the most time"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common React-specific causes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Why React apps have poor INP",
+        "items": [
+          "A click handler triggers a state update that causes a large component subtree to re-render synchronously",
+          "A dropdown menu renders a long list without virtualization—creating hundreds of DOM nodes in one frame",
+          "`useEffect` with expensive synchronous work blocks the commit phase after the event",
+          "Third-party scripts (analytics, A/B testing, chat widgets) compete with React for main-thread time",
+          "Large JSON payloads parsed synchronously in the event handler"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expensive synchronous render on click",
+        "content": "A button click sets state that causes a parent to re-render a large list. The render blocks the main thread for 200ms+.",
+        "code": "function App() {\n  const [filter, setFilter] = useState('');\n  const items = useMemo(\n    () => largeDataset.filter(item => item.name.includes(filter)),\n    [filter]\n  );\n\n  return (\n    <div>\n      <input onChange={e => setFilter(e.target.value)} />\n      {/* Rendering 10,000 items on every keystroke */}\n      <ItemList items={items} />\n    </div>\n  );\n}\n\nfunction ItemList({ items }: { items: Item[] }) {\n  return (\n    <ul>\n      {items.map(item => (\n        <li key={item.id}>{item.name} — {item.description}</li>\n      ))}\n    </ul>\n  );\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fix: virtualization + debounced filtering",
+        "content": "Render only visible items with a virtualizer, and debounce the filter to avoid filtering on every keystroke.",
+        "code": "import { useVirtualizer } from '@tanstack/react-virtual';\nimport { useDebouncedValue } from '@/hooks/useDebouncedValue';\n\nfunction App() {\n  const [filter, setFilter] = useState('');\n  const debouncedFilter = useDebouncedValue(filter, 200);\n  const items = useMemo(\n    () => largeDataset.filter(item => item.name.includes(debouncedFilter)),\n    [debouncedFilter]\n  );\n\n  return (\n    <div>\n      <input onChange={e => setFilter(e.target.value)} />\n      <VirtualizedItemList items={items} />\n    </div>\n  );\n}\n\nfunction VirtualizedItemList({ items }: { items: Item[] }) {\n  const parentRef = useRef<HTMLDivElement>(null);\n  const virtualizer = useVirtualizer({\n    count: items.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 40,\n  });\n\n  return (\n    <div ref={parentRef} style={{ height: '600px', overflow: 'auto' }}>\n      {virtualizer.getVirtualItems().map(virtualItem => (\n        <div key={items[virtualItem.index].id}\n             style={{ height: virtualItem.size }}>\n          {items[virtualItem.index].name}\n        </div>\n      ))}\n    </div>\n  );\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React Profiler for INP"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding how would you debug a page with poor inp? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The React Profiler measures **commit times**—how long React takes to apply changes to the DOM. A commit that takes 100ms will directly contribute to INP if it happens in response to a user event. Use the Profiler during the same interaction you profiled in the Performance panel to correlate the long task with a specific component render."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with how would you debug a page with poor inp?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Focus on the 98th percentile",
+        "text": "Lab tests on fast hardware won't reproduce slow INP. Use Chrome's throttling (6x CPU slowdown) or test on real mid-range mobile devices. CrUX data in Search Console shows your real-world INP distribution."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "INP debugging flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "inp-debug-flow",
+        "caption": "Systematic approach to debugging poor INP",
+        "definition": "flowchart TD\n    A[\"Poor INP in CrUX / Lighthouse\"] --> B[\"Chrome Performance recording\"]\n    B --> C{\"Long task > 50ms?\"}\n    C -->|Yes| D{\"Root cause?\"}\n    C -->|No| E[\"Check for many medium tasks\n(30-50ms each)\"]\n    D -->|React render| F[\"React Profiler: find slow component\"]\n    F --> G[\"Memoize / virtualize / colocate state\"]\n    D -->|Third-party script| H[\"Defer / async / remove script\"]\n    D -->|Custom JS| I[\"break into chunks / use scheduler\"]\n    G --> J[\"Re-measure\"]\n    H --> J\n    I --> J\n    E --> J"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fix strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Virtualize long lists with `@tanstack/react-virtual` so only visible items render",
+          "Wrap expensive event handlers in `requestIdleCallback` or break work into chunks with `setTimeout(0)`",
+          "Use React Compiler (React 19) or manual `useMemo` to avoid redundant work",
+          "Defer third-party scripts with `async` or `defer`, or load them after interaction",
+          "Use `scheduler.yield()` or `startTransition` to break large renders into smaller, interruptible units"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FAQ"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-up questions",
+        "items": [
+          {
+            "question": "What's the difference between INP and FID?",
+            "answer": "FID (First Input Delay) measured only the first interaction's delay. INP replaces it and measures the **worst** interaction latency across the entire page session. A page could have a fast first click but a slow save action later—FID wouldn't catch it; INP does."
+          },
+          {
+            "question": "Does React 19's automatic memoization help with INP?",
+            "answer": "Yes. The React Compiler automatically memoizes components and hooks, reducing unnecessary re-renders that contribute to long commit times. It's one of the most impactful React 19 features for INP, but you should still profile—the compiler can't fix expensive logic inside render."
+          },
+          {
+            "question": "Can Web Workers help with INP?",
+            "answer": "Web Workers move computation off the main thread, which helps for heavy data processing. However, React still needs the main thread to render. Workers are useful for parsing, sorting, or filtering large datasets before sending results to React state."
+          },
+          {
+            "question": "How do I measure INP in local development?",
+            "answer": "Chrome DevTools shows INP in the Performance panel under Web Vitals. The `web-vitals` library reports INP via its callback. For CI, use Lighthouse with `--only-categories=performance` and check the INP metric."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "INP measures worst-case interaction latency, not just first paint",
+          "Find long tasks in Chrome Performance panel; correlate with React Profiler",
+          "Virtualize long lists, debounce filters, and defer third-party scripts",
+          "Test on real hardware with CPU throttling—fast dev machines hide INP problems"
+        ],
+        "takeaway": "INP debugging is root-cause analysis: find the long task, find the React component, and break the work up."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Further reading"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "web.dev: [Interaction to Next Paint](https://web.dev/optimize-inp/)",
+          "Chrome DevTools: [Performance panel](https://developer.chrome.com/docs/devtools/performance/)",
+          "React DevTools: [Profiler](https://react.dev/reference/react/Profiler)"
+        ]
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "furtherReading": [
+    {
+      "title": "web.dev: Optimize INP",
+      "url": "https://web.dev/optimize-inp/",
+      "type": "article"
+    },
+    {
+      "title": "Chrome DevTools: Performance panel",
+      "url": "https://developer.chrome.com/docs/devtools/performance/",
+      "type": "article"
+    }
+  ],
+  "technology": "React"
 }

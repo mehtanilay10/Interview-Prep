@@ -4,33 +4,62 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "API returns intermittent 503 responses while CPU remains low",
-  "description": "Problem: API returns intermittent 503 responses while CPU remains low. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose intermittent 503 Service Unavailable responses with low CPU by investigating connection pools, thread pools, health checks, and upstream rate limiting.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["503", "service-unavailable", "connection-pool", "thread-pool", "health-check", "rate-limiting"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**API returns intermittent 503 responses while CPU remains low** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with api returns intermittent 503 responses while cpu remains low."
+        "text": "Your API returns 503 errors for about 2% of requests, but CPU and memory usage are well below capacity. The errors appear in bursts and then disappear. This pattern points away from resource exhaustion and toward transient infrastructure issues: connection pool exhaustion, thread pool starvation, health check failures, or upstream rate limiting."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Likely causes"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of api returns intermittent 503 responses while cpu remains low",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Database connection pool is exhausted during traffic spikes, and new requests wait until timeout",
+          "Thread pool is saturated by blocking I/O calls, causing request queueing and eventual timeouts",
+          "Load balancer health checks are failing intermittently, removing healthy instances from rotation",
+          "Upstream API gateway is rate limiting based on a burst threshold",
+          "DNS resolution is timing out for a dependency, and the fallback path is also failing",
+          "A background task is holding a shared lock, blocking request threads for seconds at a time"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "503 Service Unavailable",
+            "definition": "HTTP status code indicating the server is temporarily unable to handle the request, often due to overload or maintenance."
+          },
+          {
+            "term": "Connection pool exhaustion",
+            "definition": "All connections in a pool are in use, so new requests wait or fail until a connection is returned."
+          },
+          {
+            "term": "Thread pool starvation",
+            "definition": "All worker threads are blocked, so new requests queue indefinitely and time out."
+          },
+          {
+            "term": "Health check",
+            "definition": "An automated probe that verifies an instance is healthy before routing traffic to it."
+          },
+          {
+            "term": "Rate limiting",
+            "definition": "Restricting the number of requests a client can make in a given time window."
+          }
         ]
       }
     },
@@ -38,24 +67,116 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Diagnostic approach"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding api returns intermittent 503 responses while cpu remains low is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Check load balancer and API gateway metrics for 503 counts and upstream response codes",
+          "Correlate 503 timestamps with connection pool usage metrics from your APM tool",
+          "Inspect thread pool queue depth and active thread counts during the burst window",
+          "Review health check logs for intermittent failures on the affected instances",
+          "Check for upstream rate limit headers (X-RateLimit-Remaining) in failed request logs",
+          "Look for blocking calls in recent deployments using profiling or flame graphs"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Common causes of intermittent 503s",
+        "cards": [
+          {
+            "title": "Connection pool exhaustion",
+            "description": "All DB connections are in use; new requests timeout waiting.",
+            "pros": ["Predictable under load", "Easy to monitor with pool metrics"],
+            "cons": ["Can be caused by connection leaks", "Tuning pool size alone may not fix it"]
+          },
+          {
+            "title": "Thread pool starvation",
+            "description": "All threads blocked on I/O; request queue grows until timeout.",
+            "pros": ["Clear thread dump evidence", "Async/await fixes are straightforward"],
+            "cons": ["Hard to detect without profiling", "May require architectural changes"]
+          },
+          {
+            "title": "Health check flapping",
+            "description": "Instance is healthy but health check fails intermittently.",
+            "pros": ["Health checks are usually simple to fix", "Quick to validate"],
+            "cons": ["May mask deeper startup issues", "Can cause unnecessary instance churn"]
+          },
+          {
+            "title": "Upstream rate limiting",
+            "description": "Gateway or CDN rejects requests after a threshold.",
+            "pros": ["External cause is easy to confirm from headers", "Usually intentional"],
+            "cons": ["Requires coordination with upstream team", "May need burst capacity negotiation"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Thread pool saturation evidence",
+        "content": "A thread dump showing most threads blocked on a downstream call:",
+        "code": "\"pool-1-thread-3\" #12 waiting on condition\n    at java.lang.Object.wait(Native Method)\n    at com.example.PaymentClient.charge(PaymentClient.java:45)\n    - waiting on <0x1a2b3c4d> (a java.util.concurrent.FutureTask)\n\n\"pool-1-thread-4\" #13 waiting on condition\n    at java.lang.Object.wait(Native Method)\n    at com.example.PaymentClient.charge(PaymentClient.java:45)\n    - waiting on <0x1a2b3c4e> (a java.util.concurrent.FutureTask)\n\n... 48 of 50 threads in same blocked state",
+        "language": "text"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-503-diagnosis",
+        "caption": "Diagnostic flow for intermittent 503s with low CPU",
+        "definition": "graph TD\n    A[Intermittent 503s] --> B{Check CPU / Memory}\n    B -->|Low| C{Check connection pool}\n    C -->|Exhausted| D[Find connection leak]\n    C -->|Healthy| E{Check thread pool}\n    E -->|Stuck threads| F[Find blocking call]\n    E -->|Healthy| G{Check health checks}\n    G -->|Flapping| H[Fix health check endpoint]\n    G -->|Healthy| I{Check upstream}\n    I -->|Rate limited| J[Negotiate burst capacity]\n    I -->|Healthy| K[Check DNS / dependency timeouts]"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with api returns intermittent 503 responses while cpu remains low, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "503 is a symptom, not a root cause",
+        "text": "Do not assume the API itself is broken. In microservice architectures, 503s often originate from a downstream dependency. Follow the chain outward: load balancer, API gateway, service mesh, and finally the application."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Diagnose a 503 storm from metrics",
+        "description": "You are given a set of dashboards showing CPU, connection pool usage, thread pool queue depth, and 503 rate over a 30-minute window. Identify the root cause and write a remediation plan.",
+        "steps": [
+          "Plot 503 rate against connection pool utilization",
+          "Plot 503 rate against thread pool queue depth",
+          "Identify the metric that correlates most strongly with 503s",
+          "Trace the root cause to a specific code path or configuration",
+          "Write a remediation plan with immediate and long-term fixes"
+        ],
+        "expectedOutcome": "You should be able to distinguish between connection pool exhaustion, thread pool starvation, and upstream rate limiting using only metric correlations."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Low CPU with 503s points to I/O bottlenecks, not compute",
+          "Correlate 503s with connection pool and thread pool metrics",
+          "Check health checks and upstream rate limits before changing application code",
+          "Use thread dumps and APM profiling to find blocking calls"
+        ],
+        "takeaway": "The fastest fix is not always in the application layer. Look at the full request path, including load balancers and upstream services."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "HTTP Status Codes",
+      "url": "https://www.rfc-editor.org/rfc/rfc7231",
+      "type": "article",
+      "author": "IETF",
+      "description": "RFC 7231 defines the semantics of HTTP status codes, including 503 Service Unavailable."
+    }
+  ]
 }

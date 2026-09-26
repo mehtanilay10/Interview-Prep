@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose REST vs gRPC for internal service communication",
-  "description": "Problem: Choose REST vs gRPC for internal service communication. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Select the right inter-service communication protocol for internal microservices handling high-throughput, low-latency requests with strict contracts.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["grpc", "rest", "microservices", "protocol", "latency"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose REST vs gRPC for internal service communication** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose rest vs grpc for internal service communication."
+        "text": "Your team operates twenty internal microservices in a Kubernetes cluster. Some services exchange thousands of requests per second. Current REST/JSON communication is causing latency spikes under load, and serialization is consuming noticeable CPU. You need to decide whether to optimize REST or migrate to gRPC."
       }
     },
     {
@@ -24,13 +24,70 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose rest and grpc for internal service communication",
-          "Know when to choose choose rest over grpc for internal service communication",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "gRPC", "definition": "A high-performance RPC framework using HTTP/2 and Protocol Buffers." },
+          { "term": "Protocol Buffers", "definition": "Google's language-neutral, platform-neutral extensible mechanism for serializing structured data." },
+          { "term": "HTTP/2", "definition": "A major revision of HTTP supporting multiplexed streams, server push, and header compression." },
+          { "term": "Code-First vs Contract-First", "definition": "Whether you generate the schema from code or the code from a shared schema." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Common trap",
+        "text": "gRPC is not automatically faster. Without connection pooling, keep-alive tuning, and proper stream handling, you can end up with higher latency than a well-cached REST call."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "REST/JSON versus gRPC for internal traffic",
+        "cards": [
+          {
+            "title": "REST over HTTP/1.1",
+            "description": "Widely understood, text-based, with mature ecosystem tooling.",
+            "pros": [
+              "Human-readable for debugging with curl or browser",
+              "Works everywhere without client library installation",
+              "Simple to test with standard HTTP clients",
+              "API gateways and observability tools are REST-native"
+            ],
+            "cons": [
+              "JSON parsing is CPU-intensive at high QPS",
+              "No built-in streaming or bidirectional communication",
+              "No formal contract; schema drift is silent",
+              "Headers are verbose, increasing payload size"
+            ],
+            "tags": ["universal", "debuggable"]
+          },
+          {
+            "title": "gRPC over HTTP/2",
+            "description": "Binary, contract-first, with streaming and bi-directional support.",
+            "pros": [
+              "Protobuf serialization is 5-10x faster than JSON",
+              "Streaming enables server push and real-time data flows",
+              "Strict contracts via .proto files prevent schema drift",
+              "Multiplexing on a single TCP connection reduces connection overhead"
+            ],
+            "cons": [
+              "Requires code generation per language",
+              "Less transparent debugging; binary payloads need tools",
+              "Load balancers and API gateways need HTTP/2 awareness",
+              "Browser support requires gRPC-Web proxy"
+            ],
+            "tags": ["high-performance", "contract-driven"]
+          }
         ]
       }
     },
@@ -38,24 +95,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Contract definition"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose rest vs grpc for internal service communication is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "gRPC: Protobuf contract for an order service",
+        "content": "Contract-first definition shared across all services in the repo.",
+        "code": "syntax = \"proto3\";\n\npackage orders;\n\nservice OrderService {\n  rpc GetOrder(GetOrderRequest) returns (Order);\n  rpc StreamOrders(StreamRequest) returns (stream Order);\n}\n\nmessage Order {\n  string id = 1;\n  string customer_id = 2;\n  repeated LineItem items = 3;\n  double total = 4;\n  OrderStatus status = 5;\n}\n\nenum OrderStatus { PENDING = 0; PAID = 1; SHIPPED = 2; }",
+        "language": "protobuf"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "REST: Equivalent OpenAPI fragment",
+        "content": "No code generation contract; clients depend on documentation or SDKs.",
+        "code": "openapi: 3.0.0\npaths:\n  /orders/{orderId}:\n    get:\n      parameters:\n        - name: orderId\n          in: path\n          required: true\n          schema:\n            type: string\n      responses:\n        '200':\n          description: Order details\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Order'\ncomponents:\n  schemas:\n    Order:\n      type: object\n      properties:\n        id:\n          type: string\n        customer_id:\n          type: string\n        items:\n          type: array\n        total:\n          type: number",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Decision checklist",
+        "items": [
+          { "text": "Is internal traffic above 5,000 RPS between services?" },
+          { "text": "Do you need streaming or bidirectional communication?" },
+          { "text": "Is your observability stack compatible with HTTP/2?" },
+          { "text": "Can you enforce schema generation as part of CI/CD?" },
+          { "text": "Are all client languages supported by Protobuf code generation?" }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "grpc-latency",
+        "caption": "Serialization overhead increases with payload size",
+        "definition": "graph LR\n    A[Payload] -->|JSON| B[Parse: ~1.5 MB/s per core]\n    A -->|Protobuf| C[Parse: ~10 MB/s per core]\n    B --> D[Higher CPU]\n    C --> E[Lower CPU]\n    D --> F[More latency under load]\n    E --> G[More throughput per instance]"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: gRPC for service mesh, REST for edge",
+        "content": "Migrate high-throughput internal services to gRPC first: order processing, inventory, and pricing. These have stable contracts and benefit most from serialization speed. Keep REST at the edge for mobile and web clients.",
+        "code": "// C# gRPC client with channel pooling\nvar channel = GrpcChannel.ForAddress(\"https://orders.internal\");\nvar client = new OrderService.OrderServiceClient(channel);\n\nvar order = await client.GetOrderAsync(\n    new GetOrderRequest { OrderId = \"123\" },\n    deadline: DateTime.UtcNow.AddMilliseconds(200));\n\n// For REST consumers, use a facade or GraphQL gateway.",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose rest vs grpc for internal service communication, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Migration tip",
+        "text": "Use a sidecar or API gateway to translate REST to gRPC so you can migrate services independently. This avoids a big-bang rewrite."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Use gRPC when latency, throughput, and contract stability matter.",
+          "Use REST at the edge where human readability and broad client support matter.",
+          "Protocol choice is secondary to observability, error handling, and retry policy."
+        ],
+        "takeaway": "gRPC is an optimization, not a destination. Optimize the hot path first."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-rest-vs-graphql-for-a-multi-client-application",
+    "choose-synchronous-processing-vs-a-message-queue"
+  ],
+  "furtherReading": [
+    { "title": "gRPC Basics", "url": "https://grpc.io/docs/what-is-grpc/introduction/", "type": "article" },
+    { "title": "Protobuf Guide", "url": "https://protobuf.dev/", "type": "article" }
+  ]
 }

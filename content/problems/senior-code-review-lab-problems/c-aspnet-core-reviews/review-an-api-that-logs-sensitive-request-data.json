@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an API that logs sensitive request data** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an api that logs sensitive request data."
+        "text": "An API logs the entire request body, headers, and query string to aid debugging. The logs contain passwords, credit card numbers, social security numbers, and authentication tokens. These logs are shipped to a central logging platform where engineers, support staff, and third-party log analyzers can read them. A single compromised log stream exposes every user's secrets, and the breach is rarely detected because log access is considered routine."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an api that logs sensitive request data",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand what constitutes sensitive data under GDPR, CCPA, and PCI-DSS",
+          "Learn how structured logging frameworks capture request and response data by default",
+          "Identify common oversights: passwords in JSON bodies, auth tokens in headers, and PII in query strings",
+          "Apply data minimization: log events and metadata, not raw payloads"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "PII",
+            "definition": "Personally identifiable information: any data that can identify a specific individual, such as name, email, or government ID."
+          },
+          {
+            "term": "PCI-DSS",
+            "definition": "Payment Card Industry Data Security Standard: a set of security requirements for handling credit card data."
+          },
+          {
+            "term": "Structured logging",
+            "definition": "Logging in a machine-readable format such as JSON, which makes it easy to query but also easy to accidentally include sensitive fields."
+          },
+          {
+            "term": "Data minimization",
+            "definition": "The principle of collecting and retaining only the data necessary for a specific purpose."
+          }
         ]
       }
     },
@@ -44,15 +67,181 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an api that logs sensitive request data is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Logging sensitive data is a compliance violation and a security incident waiting to happen. Logs are stored for weeks or months, replicated across regions, and accessed by many people. A support engineer debugging a production issue can see a user's password in plain text. A log aggregation platform with a breach exposes thousands of credentials at once. Unlike a database breach, a log breach is rarely noticed because logs are not designed to be secret."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an api that logs sensitive request data, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Logs are a data store",
+        "text": "Anything you write to logs is persistent, searchable, and likely backed up. Treat logs with the same classification and access controls you apply to your primary database."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic API uses a middleware or filter that serializes the entire HttpRequest into a log entry. It logs the body, headers, and query parameters without redaction. The developer added this for debugging and forgot to remove it. In production, every login, password change, and payment request writes secrets to the log stream."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dangerous request logging middleware",
+        "content": "A middleware that logs the full request without redaction:",
+        "code": "public class RequestLoggingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger _logger;\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var body = await new StreamReader(context.Request.Body).ReadToEndAsync();\n        _logger.LogInformation(\"Request: {Method} {Path} Body: {Body}\",\n            context.Request.Method,\n            context.Request.Path,\n            body);\n\n        await _next(context);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct approach logs contextual metadata: the endpoint, user ID, request ID, duration, and status code. If you must log request data, redact sensitive fields before writing them. Use a centralized redaction library or middleware that knows which fields to mask. Never log authorization headers, cookies, or raw request bodies containing passwords or payment information."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redacted request logging",
+        "content": "Log request metadata and redact sensitive fields:",
+        "code": "public class RedactingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger _logger;\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var request = context.Request;\n        var sensitiveHeaders = new[] { \"Authorization\", \"Cookie\", \"X-Api-Key\" };\n\n        var headers = request.Headers\n            .Where(h => !sensitiveHeaders.Contains(h.Key))\n            .ToDictionary(h => h.Key, h => h.Value.ToString());\n\n        _logger.LogInformation(\"HTTP {Method} {Path} from {RemoteIp}\",\n            request.Method,\n            request.Path,\n            context.Connection.RemoteIpAddress);\n\n        await _next(context);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Logging strategies",
+        "cards": [
+          {
+            "title": "Log everything",
+            "description": "Capture full request and response bodies for debugging.",
+            "pros": ["Complete debugging context", "Easy to reproduce issues"],
+            "cons": ["Logs sensitive data", "High storage cost", "Compliance violations"]
+          },
+          {
+            "title": "Log metadata only",
+            "description": "Log method, path, user ID, status, and duration.",
+            "pros": ["Safe for production", "Low storage cost", "Compliant"],
+            "cons": ["Cannot reconstruct exact payload", "May miss edge cases"]
+          },
+          {
+            "title": "Log with redaction",
+            "description": "Log request data but replace sensitive values with masked tokens.",
+            "pros": ["Debugging context preserved", "Secrets are hidden"],
+            "cons": ["Redaction can be incomplete", "Maintenance burden to update sensitive field list"]
+          },
+          {
+            "title": "Conditional debug logging",
+            "description": "Log full details only when a debug flag is set for a specific user or request ID.",
+            "pros": ["Targeted debugging", "No sensitive data in normal logs"],
+            "cons": ["Debug data still captured temporarily", "Requires feature flag management"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "logging-data-flow",
+        "caption": "Request data flow and where sensitive data is exposed",
+        "definition": "graph LR\n    A[Client sends request] --> B[API receives request]\n    B --> C{Logging middleware?}\n    C -->|Yes| D[Extract headers and body]\n    D --> E{Redact sensitive fields?}\n    E -->|No| F[Sensitive data written to logs]\n    E -->|Yes| G[Masked data written to logs]\n    F --> H[Log aggregation platform]\n    G --> H\n    H --> I[Engineers and support staff can read logs]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sensitive Data Checklist"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Fields that must never appear in logs",
+        "items": [
+          "Passwords and password confirmations",
+          "Credit card numbers and CVV codes",
+          "Social security numbers and tax IDs",
+          "Authentication tokens, session IDs, and API keys",
+          "Bank account and routing numbers",
+          "Medical record numbers and health information",
+          "Raw request bodies containing any of the above"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Logs are forever",
+        "text": "Even if you delete a log entry from the primary store, backups, replicas, and third-party log shippers may retain it for months. Assume anything written to a log is recoverable indefinitely."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Is logging request IDs safe?",
+            "answer": "Yes. Request IDs are not sensitive and are essential for correlating logs across services. Log them at the start of every request."
+          },
+          {
+            "question": "What about logging exceptions?",
+            "answer": "Exception messages can contain sensitive data. Use a custom exception handler that redacts sensitive fields from exception messages before logging."
+          },
+          {
+            "question": "Should I log user agent and IP address?",
+            "answer": "User agent strings are generally safe. IP addresses may be considered PII under GDPR, so check your legal requirements. Consider hashing or truncating IPs if required."
+          },
+          {
+            "question": "How do I audit existing logs for sensitive data?",
+            "answer": "Use a log scanning tool or regular expression to search for patterns like credit card numbers, social security numbers, and password fields. Run it on production log archives."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement a redaction policy",
+        "description": "Add request logging to an ASP.NET Core API, but ensure sensitive fields are never written to logs.",
+        "steps": [
+          "Identify all fields in your API requests that contain sensitive data",
+          "Create a redaction filter or middleware that masks these fields",
+          "Log only metadata: method, path, user ID, status, and duration",
+          "Write a unit test that sends a request with a password and asserts it does not appear in the log output",
+          "Scan existing production logs for leaked data and document findings"
+        ],
+        "expectedOutcome": "Logs contain enough information to debug issues without exposing secrets. The unit test guarantees the redaction policy is enforced."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Logs are a data store with the same security requirements as your database",
+          "Never log passwords, tokens, payment details, or raw request bodies",
+          "Use metadata-only logging for production; reserve detailed logging for controlled debug environments",
+          "Audit existing logs for sensitive data as part of your security review"
+        ],
+        "takeaway": "If you would not put it in the database, do not put it in the logs."
       }
     }
   ],

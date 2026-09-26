@@ -4,33 +4,45 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Rollback strategy",
-  "description": "Learn about Rollback strategy. Master the concepts, patterns, and best practices.",
+  "description": "Build tested, automated rollback procedures so failed releases can be reversed faster than they were deployed.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "CI/CD",
+    "rollback",
+    "incident-response",
+    "reliability"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Rollback strategy** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rollback strategy."
+        "text": "Every deployment carries risk, and every production incident demands a fast response. A rollback strategy defines how to reverse a release when something goes wrong. The best rollback is the one you never need, but the second best is the one that runs automatically while you are still reading the alert."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers rollback triggers, artifact redeployment, database rollback considerations, and how to practice rollbacks so they work under pressure."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Types of rollback"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
+        "title": "Rollback options",
         "items": [
-          "Understand the fundamental principles of rollback strategy",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Redeploy the previous artifact: the fastest option when the new artifact is the problem.",
+          "Rollback configuration: revert environment variables, secrets, or feature flags without redeploying.",
+          "Database rollback: reverse a migration or restore from backup. This is the slowest and riskiest option.",
+          "Traffic shift: in blue-green or canary, redirect traffic back to the old version."
         ]
       }
     },
@@ -38,24 +50,136 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Automated rollback in CI/CD"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rollback strategy is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "CI/CD platforms can automatically redeploy the previous artifact when health checks fail. The key is to define clear success criteria and to keep the previous artifact and deployment script readily available. The following workflow shows a deployment with automatic rollback on failure."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deploy with automatic rollback",
+        "content": "If the post-deploy smoke test fails, the job redeploys the previous artifact.",
+        "code": "jobs:\n  deploy:\n    runs-on: ubuntu-latest\n    environment: production\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/download-artifact@v4\n        with:\n          name: app-${{ github.sha }}\n          path: deploy/\n      - run: ./deploy.sh production\n      - name: Smoke test\n        run: ./smoke-test.sh https://prod.example.com\n        continue-on-error: true\n\n  rollback:\n    needs: deploy\n    if: failure()\n    runs-on: ubuntu-latest\n    environment: production\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.before }}\n      - run: dotnet publish -c Release -o out\n      - uses: actions/upload-artifact@v4\n        with:\n          name: rollback-app\n          path: out/\n      - run: ./deploy.sh production --artifact rollback-app",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Database rollback is different"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redeploying an old application binary is fast and safe. Rolling back a database schema is not. Data written by the new version may be incompatible with the old schema. Before you consider a database rollback, verify whether the old application can read the current data. If it cannot, the only safe rollback is a full database restore from backup, which means data loss between the backup and the incident."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rollback strategy, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Never assume database rollback is free",
+        "text": "A schema change that takes five minutes can require hours of restore time. Always plan for the worst case and test restore procedures regularly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practice rollbacks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rollback plan that has never been tested is a hope, not a strategy. Run game days where you intentionally deploy a broken release and practice recovery. Measure how long it takes to detect the failure, trigger rollback, and verify the system is healthy. Use those metrics to improve your deployment pipeline and monitoring."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Rollback strategy checklist",
+        "items": [
+          {
+            "text": "The previous artifact is retained and accessible from the deployment pipeline.",
+            "hint": "Do not prune artifacts needed for rollback."
+          },
+          {
+            "text": "Rollback is triggered automatically by health checks or manually by one command.",
+            "hint": "Avoid multi-step runbooks under pressure."
+          },
+          {
+            "text": "Rollback does not depend on database restores unless absolutely necessary.",
+            "hint": "Prefer reversible schema changes."
+          },
+          {
+            "text": "Team practices rollbacks in game days at least quarterly.",
+            "hint": "Measure time-to-recovery and improve."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Redeploying the previous artifact is the safest and fastest rollback.",
+          "Database rollbacks are slow and may cause data loss; avoid them with reversible migrations.",
+          "Automate rollback triggers; do not rely on humans to act under pressure.",
+          "Practice rollbacks regularly so they work when you need them."
+        ],
+        "takeaway": "Your rollback strategy is only as good as your last successful test."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What if the new version has already written incompatible data?",
+            "answer": "You may need to fix the data before rolling back the application, or accept a partial rollback where the old code handles only compatible records. Plan for this scenario during design, not during the incident."
+          },
+          {
+            "question": "Should I use feature flags instead of rollback?",
+            "answer": "Feature flags are complementary. A flag can disable a broken feature instantly, which is faster than a full rollback. Use flags for gradual risk reduction and rollback for catastrophic failures."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "blue-green-deployments",
+    "canary-releases",
+    "database-migration-safety"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Site Recovery",
+      "url": "https://learn.microsoft.com/en-us/azure/site-recovery/",
+      "type": "article",
+      "description": "How Azure handles disaster recovery and workload failover."
+    },
+    {
+      "title": "Google SRE Book: Eliminating Toil",
+      "url": "https://sre.google/sre-book/eliminating-toil/",
+      "type": "article",
+      "description": "Automating repetitive work, including rollback procedures."
+    },
+    {
+      "title": "Chaos Engineering Principles",
+      "url": "https://principlesofchaos.org/",
+      "type": "article",
+      "description": "Using controlled experiments to improve system resilience."
+    }
+  ]
 }

@@ -3,34 +3,84 @@
   "slug": "react-queryserver-cache-architecture",
   "moduleSlug": "modern-state-application-architecture",
   "courseSlug": "react-advanced-patterns",
-  "title": "React Query/server cache architecture",
-  "description": "Learn about React Query/server cache architecture. Master the concepts, patterns, and best practices.",
+  "title": "React Query / server cache architecture",
+  "description": "Understand how server-state libraries such as TanStack Query manage caching, background refetching, and cache invalidation. Learn how to structure queries so that the cache reflects reality without unnecessary network requests.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "react-query",
+    "tanstack-query",
+    "caching",
+    "architecture"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**React Query/server cache architecture** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with react query/server cache architecture."
+        "text": "React Query and similar server-state libraries treat remote data as a cache of asynchronous operations, not as local state that must be manually synchronized. This shift changes how you reason about loading states, error handling, and the relationship between the UI and the backend."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In this lesson, you will learn the architecture of a query cache, how query keys define cache identity, and how to invalidate or update the cache after mutations so that the UI stays consistent."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Queries and cache keys"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A query is defined by a unique key and a function that returns a promise. The library stores the result in a cache keyed by that key. Any component that uses the same key receives the cached data immediately and runs the query function in the background if the cached value is stale or missing."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Rules for stable query keys",
         "items": [
-          "Understand the fundamental principles of react query/server cache architecture",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Include every parameter that changes the response, such as IDs, filters, and pagination offsets.",
+          "Use arrays instead of strings so that the library can match nested cache entries.",
+          "Keep keys predictable: the same logical query should always produce the same key."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Query keys that match cache entries",
+        "content": "Stable, array-based keys make it easy to invalidate related queries and avoid accidental cache misses.",
+        "language": "tsx",
+        "code": "function ProductList({ categoryId }: { categoryId: string }) {\n  const { data, isLoading } = useQuery({\n    queryKey: ['products', 'category', categoryId],\n    queryFn: () => fetchProductsByCategory(categoryId),\n    staleTime: 1000 * 60,\n  });\n\n  if (isLoading) return <p>Loading...</p>;\n  return (\n    <ul>\n      {data.map((product) => (\n        <li key={product.id}>{product.name}</li>\n      ))}\n    </ul>\n  );\n}\n\nfunction ProductDetail({ productId }: { productId: string }) {\n  const { data } = useQuery({\n    queryKey: ['products', productId],\n    queryFn: () => fetchProduct(productId),\n  });\n\n  return <div>{data?.name}</div>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Stale time and garbage collection"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every cached query is considered fresh for a configurable `staleTime`. While fresh, the library returns cached data without refetching. Once data becomes stale, the next subscriber triggers a background refetch. If no component subscribes to a query, the cache entry remains until `gcTime` expires."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "How to tune cache behavior",
+        "items": [
+          "Use a short `staleTime` for data that changes often, such as inventory counts.",
+          "Use a longer `staleTime` for data that changes rarely, such as product catalog names.",
+          "Use `gcTime` to keep data available in the cache after the last subscriber unmounts."
         ]
       }
     },
@@ -38,24 +88,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Mutations and cache updates"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding react query/server cache architecture is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Mutations change data on the server. After a mutation succeeds, the cache may contain outdated values. React Query provides several strategies for keeping the cache in sync: invalidating queries, updating specific cache entries, or optimistic updates."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Invalidating queries after a mutation",
+        "content": "A successful product update invalidates both the specific product query and the category list query.",
+        "language": "tsx",
+        "code": "function UpdateProductName({ productId }: { productId: string }) {\n  const queryClient = useQueryClient();\n\n  const updateMutation = useMutation({\n    mutationFn: (newName: string) =>\n      updateProductName(productId, newName),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['products', productId] });\n      queryClient.invalidateQueries({ queryKey: ['products'] });\n    },\n  });\n\n  return (\n    <button onClick={() => updateMutation.mutate('New Name')}>\n      Rename product\n    </button>\n  );\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with react query/server cache architecture, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Cache architecture tip",
+        "text": "Design your query keys hierarchically. Invalidate a parent key to refresh child lists, or update a single entry when you already know the new value. This keeps the cache consistent without refetching more data than necessary."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding common cache pitfalls"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Frequent mistakes",
+        "items": [
+          "Using object or array query keys that are not serializable or stable.",
+          "Relying on cached data after a mutation without invalidating or updating the cache.",
+          "Setting `staleTime` to `Infinity` and never refreshing data.",
+          "Storing authentication tokens in the query cache."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Query keys are the identity of cached data: design them carefully.",
+          "`staleTime` controls freshness, `gcTime` controls retention.",
+          "Mutations should update or invalidate the cache so that the UI reflects the latest server state.",
+          "Treat the query cache as a view of the server, not as the source of truth."
+        ],
+        "takeaway": "A well-structured cache reduces network requests, prevents stale data, and removes the need to manually synchronize server state with React components."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "local-state-vs-server-state-vs-url-state",
+    "optimistic-updates-and-rollback"
+  ],
+  "furtherReading": [
+    {
+      "title": "TanStack Query documentation",
+      "url": "https://tanstack.com/query/latest",
+      "type": "tool"
+    },
+    {
+      "title": "React Query Basics by Tanner Linsley",
+      "url": "https://tkdodo.eu/blog/react-query-data-caching",
+      "type": "article"
+    },
+    {
+      "title": "SWR - Stale-While-Revalidate",
+      "url": "https://swr.vercel.app",
+      "type": "tool"
+    }
+  ]
 }

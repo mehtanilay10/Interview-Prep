@@ -4,33 +4,104 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "Cartesian explosion and split queries",
-  "description": "Learn about Cartesian explosion and split queries. Master the concepts, patterns, and best practices.",
+  "description": "Learn why joining multiple collections in a single EF Core query causes row multiplication, and how split queries provide a safer alternative.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "split query", "cartesian explosion", "Include", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Cartesian explosion and split queries** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with cartesian explosion and split queries."
+        "text": "When you include multiple collection navigations in a single query, EF Core joins them all together in one SQL statement. The database multiplies rows for every combination of related rows, producing a cartesian explosion. Split queries solve this by running separate SQL queries for each collection and stitching the results together in memory."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is cartesian explosion?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A cartesian explosion happens when two or more one-to-many relationships are joined in the same query. If an order has 5 line items and 2 payments, joining both collections produces 5 x 2 = 10 rows — even though the real data has only 7 rows total. With three collections, the multiplication gets worse quickly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Query that causes cartesian explosion",
+        "code": "var orders = await dbContext.Orders\n    .Include(o => o.OrderItems)\n    .Include(o => o.Payments)\n    .Where(o => o.Id == orderId)\n    .FirstOrDefaultAsync();\n\n// SQL joins OrderItems and Payments.\n// If order has 10 items and 3 payments, you get 30 rows\n// but only 13 actual entities.",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Performance impact",
+        "text": "Cartesian explosion does not just inflate row counts — it can cause EF Core to allocate duplicate entity instances, leading to incorrect navigation property counts and wasted memory. For large data sets, the SQL result can be megabytes of repeated data."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Split queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Split queries execute one SQL query per collection navigation instead of joining them all together. EF Core loads the root entity first, then loads each collection in a separate query using a WHERE IN clause. The database does less work per query, and EF Core assembles the final object graph in memory without duplication."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enabling split queries",
+        "code": "var orders = await dbContext.Orders\n    .Include(o => o.OrderItems)\n    .Include(o => o.Payments)\n    .AsSplitQuery()\n    .Where(o => o.Id == orderId)\n    .FirstOrDefaultAsync();\n\n// Generates 3 SQL queries:\n// 1. SELECT * FROM Orders WHERE Id = @p0\n// 2. SELECT * FROM OrderItems WHERE OrderId = @p0\n// 3. SELECT * FROM Payments WHERE OrderId = @p0",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configuring split queries globally"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can configure split queries as the default behavior for your DbContext. This is useful if your domain model frequently includes multiple collection navigations and you want to avoid cartesian explosion without adding `AsSplitQuery()` everywhere."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global split query configuration",
+        "code": "protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)\n{\n    optionsBuilder.UseSqlServer(connectionString)\n        .UseSplitQuery();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use split queries"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of cartesian explosion and split queries",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Any query that includes two or more collection navigations on the same entity.",
+          "Large result sets where cartesian multiplication would produce thousands of duplicate rows.",
+          "API endpoints that return full entity graphs for detail pages.",
+          "Queries where duplicate rows cause incorrect aggregate counts in the application."
         ]
       }
     },
@@ -38,24 +109,60 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Trade-offs of split queries"
       }
     },
     {
-      "type": "paragraph",
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding cartesian explosion and split queries is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          {
+            "title": "Single query (default)",
+            "description": "One SQL query with JOINs for all collections.",
+            "pros": [
+              "Single round-trip to the database",
+              "Good for small, shallow object graphs",
+              "Simple to reason about"
+            ],
+            "cons": [
+              "Cartesian explosion with multiple collections",
+              "Duplicate rows waste bandwidth and memory",
+              "Can produce incorrect entity counts"
+            ]
+          },
+          {
+            "title": "Split query",
+            "description": "One query per collection, results merged in memory.",
+            "pros": [
+              "No cartesian explosion",
+              "Cleaner result sets per query",
+              "Predictable memory usage"
+            ],
+            "cons": [
+              "Multiple round-trips to the database",
+              "Slightly more complex query plan",
+              "May not always be faster for small data sets"
+            ]
+          }
+        ]
       }
     },
     {
-      "type": "callout",
+      "type": "summary-box",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with cartesian explosion and split queries, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Key takeaways",
+        "items": [
+          "Cartesian explosion multiplies rows when multiple collection navigations are joined.",
+          "Split queries eliminate duplication by loading each collection separately.",
+          "Use AsSplitQuery() or global UseSplitQuery() when including multiple collections.",
+          "For list endpoints, prefer projection over Include to avoid both explosion and tracking overhead."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["projection-vs-include", "n1-query-diagnosis"],
+  "furtherReading": [
+    { "title": "EF Core split queries", "url": "https://learn.microsoft.com/en-us/ef/core/querying/split-queries", "type": "article" },
+    { "title": "EF Core eager loading", "url": "https://learn.microsoft.com/en-us/ef/core/querying/include", "type": "article" }
+  ]
 }

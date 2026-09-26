@@ -8,54 +8,229 @@
   "order": 3,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["react", "ssr", "hydration", "next.js", "debugging"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Hydration mismatches occur only in production** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with hydration mismatches occur only in production."
+        "text": "A Next.js application renders perfectly in development, but in production the browser console shows hydration mismatch warnings and some interactive elements do not respond to clicks. The server HTML and client render do not agree on the markup or data. Because development uses more lenient hydration checks, the bug only surfaces when the production build runs strict diffing."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What causes a mismatch"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of hydration mismatches occur only in production",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Random IDs or non-deterministic values generated during render, such as crypto.randomUUID() or Date.now().",
+          "Browser-only APIs like window, localStorage, or matchMedia accessed during render without guarding for SSR.",
+          "Third-party scripts that inject markup or classes before React hydrates.",
+          "Content rendered from a database or API that differs between the server and the client because of time zones or user context.",
+          "Incorrect server time versus client time: the server renders data for UTC midnight, but the client re-renders in local time.",
+          "CSS or font loading changing layout after hydration, causing React to see different text metrics."
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Hydration",
+            "definition": "The process where React attaches event listeners to server-rendered HTML and makes it interactive without replacing the DOM."
+          },
+          {
+            "term": "Server component",
+            "definition": "A component that renders only on the server and sends serialized HTML to the client, reducing client-side JavaScript."
+          },
+          {
+            "term": "Client component",
+            "definition": "A component marked with 'use client' that ships JavaScript to the browser and hydrates on the client."
+          },
+          {
+            "term": "Suppress hydration warning",
+            "definition": "A React attribute that tells the reconciler to ignore a mismatch for a specific element, useful for timestamps or user-specific content."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reproduce the issue with a production build locally. Run yarn build and yarn start instead of yarn dev. Development mode skips some strict checks, so you may not see the warning until you serve the production output. Use the browser console and React DevTools to locate the exact element that mismatched."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Safe patterns for SSR-friendly components"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding hydration mismatches occur only in production is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Client-only value with useEffect guard",
+        "content": "A component that needs window but must not break SSR:",
+        "code": "'use client';\nimport { useEffect, useState } from 'react';\n\nfunction ViewportWidth() {\n  const [width, setWidth] = useState(0);\n\n  useEffect(() => {\n    setWidth(window.innerWidth);\n  }, []);\n\n  return <span>Viewport: {width}px</span>;\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Suppressing a known mismatch",
+        "content": "For a timestamp that legitimately differs between server and client:",
+        "code": "<time\n  dateTime={isoDate}\n  suppressHydrationWarning\n>\n  {new Date(isoDate).toLocaleTimeString()}\n</time>",
+        "language": "tsx"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with hydration mismatches occur only in production, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "suppressHydrationWarning is a bandage, not a cure",
+        "text": "Use suppressHydrationWarning only when the mismatch is intentional and unavoidable. Overusing it masks real bugs and makes the app harder to debug. Prefer deterministic rendering whenever possible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Diagnosis checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Hydration mismatch checklist",
+        "items": [
+          {
+            "text": "Are you using crypto.randomUUID() or Date.now() in render?",
+            "hint": "Move these to useEffect or pass deterministic values from the server."
+          },
+          {
+            "text": "Do you access window, document, or localStorage outside useEffect?",
+            "hint": "Wrap browser-only code in a client component or a lazy-loaded boundary."
+          },
+          {
+            "text": "Is third-party script content changing the DOM before React hydrates?",
+            "hint": "Load third-party scripts after hydration or use a client-only wrapper."
+          },
+          {
+            "text": "Does the server and client see the same data for the same user?",
+            "hint": "Avoid user-specific rendering in server components unless cookies are forwarded."
+          }
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Hydration strategies",
+        "cards": [
+          {
+            "title": "Static generation with client islands",
+            "description": "Render static HTML on the server and hydrate interactive parts as client components.",
+            "pros": ["Fast initial paint", "Predictable hydration boundaries"],
+            "cons": ["Requires explicit 'use client' boundaries", "May increase JS if overused"]
+          },
+          {
+            "title": "Dynamic import with ssr: false",
+            "description": "Skip SSR for components that cannot render on the server.",
+            "pros": ["Eliminates mismatches for browser-only widgets", "Reduces server workload"],
+            "cons": ["Content flashes after hydration", "Worse SEO for embedded content"]
+          },
+          {
+            "title": "Templates with slots",
+            "description": "Use React 19 templates and slots to define insertion points for client-only content.",
+            "pros": ["Explicit boundaries", "Works with server components"],
+            "cons": ["Newer API", "Requires React 19+"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-hydration-flow",
+        "caption": "Server-to-client hydration flow and mismatch sources",
+        "definition": "graph TD\n    A[Server renders HTML] --> B[HTML sent to browser]\n    B --> C[Browser parses HTML]\n    C --> D[React loads JS bundle]\n    D --> E[React walks server HTML]\n    E --> F[Compare server and client virtual DOM]\n    F --> G{Match?}\n    G -->|Yes| H[Attach event listeners]\n    G -->|No| I[Hydration mismatch warning]\n    I --> J[Reconcile or replace DOM]\n    J --> K[Possible flicker or lost state]\n    H --> L[Interactive page]\n    K --> L\n    F --> M{Source of mismatch?}\n    M -->|Random IDs| N[Use deterministic IDs]\n    M -->|Browser API| O[Move to useEffect]\n    M -->|Third-party DOM| P[Load after hydration]"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Why does development not show the warning?",
+            "answer": "React dev mode uses more lenient hydration checks and re-renders mismatched subtrees without warning. Production uses strict checks to help you catch bugs before users see them."
+          },
+          {
+            "question": "Can I disable hydration entirely?",
+            "answer": "You can disable it for specific subtrees with suppressive attributes, or for entire components by loading them client-only. Disabling hydration for the whole app defeats the purpose of SSR."
+          },
+          {
+            "question": "What is the cost of a hydration mismatch?",
+            "answer": "React must discard the server-rendered DOM for the mismatched subtree and rebuild it on the client. This causes a visual flash, lost scroll position, and slower Time to Interactive."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix a hydration mismatch in production",
+        "description": "Reproduce a production-only hydration mismatch and apply the correct fix.",
+        "steps": [
+          "Build a Next.js app with a component that uses Date.now() in render.",
+          "Run yarn build and yarn start, then open the page in production mode.",
+          "Confirm the hydration warning in the browser console.",
+          "Fix the component by moving the non-deterministic value to useEffect.",
+          "Rebuild and verify the warning is gone."
+        ],
+        "expectedOutcome": "You should be able to explain why the mismatch appeared only in production and why moving the value to useEffect resolved it without disabling hydration."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Build and serve the production bundle locally to reproduce hydration mismatches.",
+          "Use deterministic values in render; move random or browser-only values to useEffect.",
+          "Prefer client components or dynamic imports for browser-only content.",
+          "Use suppressHydrationWarning sparingly and only for intentional mismatches.",
+          "Add a production smoke test that checks for console warnings before release"
+        ],
+        "takeaway": "Hydration mismatches are not just console noise. They indicate that the server and client disagree about the UI, which can cause flicker, lost state, and slower interactions for real users."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "react-page-becomes-progressively-slower-after-navigation",
+    "authentication-works-locally-but-fails-behind-a-reverse-proxy"
+  ],
+  "furtherReading": [
+    {
+      "title": "React hydration",
+      "url": "https://react.dev/reference/react-dom/client/hydrateRoot",
+      "type": "article",
+      "author": "React Team",
+      "description": "Official documentation on hydration, mismatch handling, and SSR best practices."
+    },
+    {
+      "title": "Next.js Server and Client Components",
+      "url": "https://nextjs.org/docs/app/building-your-application/rendering/server-components",
+      "type": "article",
+      "author": "Vercel",
+      "description": "Guide to using server and client components in Next.js App Router."
+    }
+  ]
 }

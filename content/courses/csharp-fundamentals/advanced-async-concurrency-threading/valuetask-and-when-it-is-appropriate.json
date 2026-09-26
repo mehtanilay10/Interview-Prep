@@ -4,33 +4,53 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "ValueTask and when it is appropriate",
-  "description": "Learn about ValueTask and when it is appropriate. Master the concepts, patterns, and best practices.",
+  "description": "Understand ValueTask allocation semantics, when it improves performance, and when it hurts.",
   "order": 11,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**ValueTask and when it is appropriate** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with valuetask and when it is appropriate."
+        "text": "`Task<T>` is a reference type. Every time you create one, the heap allocates an object. In hot paths, these allocations add up and increase garbage collection pressure. `ValueTask<T>` offers a way to avoid allocations when the result is already available."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How ValueTask works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`ValueTask<T>` is a struct that can wrap either a `T` result or a `Task<T>`. When the result is already computed, it holds the value directly — no heap allocation. When the result is not ready, it wraps a `Task<T>` and allocates as needed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ValueTask with cached result",
+        "language": "csharp",
+        "code": "public ValueTask<int> GetCachedValueAsync(string key, CancellationToken ct)\n{\n    if (_cache.TryGetValue(key, out int value))\n    {\n        // Returned directly — no Task<T> allocation\n        return new ValueTask<int>(value);\n    }\n\n    // Must return a Task<T> because result is not ready yet\n    return new ValueTask<int>(LoadFromDatabaseAsync(key, ct));\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use ValueTask"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of valuetask and when it is appropriate",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**High-frequency methods** — APIs called thousands of times per second benefit most from allocation savings.",
+          "**Often-complete results** — Cached or already-computed values that complete synchronously.",
+          "**Performance-critical paths** — Inner loops, parsing, or custom async enumerables."
         ]
       }
     },
@@ -38,24 +58,54 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When ValueTask hurts"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding valuetask and when it is appropriate is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`ValueTask<T>` has important restrictions. It should not be awaited multiple times, and it should not be used with `Task.WhenAll` or `Task.WhenAny` unless you convert it to a `Task<T>` first. Using it incorrectly can cause subtle bugs or performance regressions."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Do not await a `ValueTask<T>` more than once.",
+          "Do not store a `ValueTask<T>` in a field or local for later use.",
+          "Convert to `Task<T>` with `.AsTask()` when mixing with `Task` combinators.",
+          "Measure before optimizing — `ValueTask<T>` adds complexity that is not always justified."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with valuetask and when it is appropriate, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "ValueTask is not a drop-in replacement",
+        "text": "Changing a public API from `Task<T>` to `ValueTask<T>` is a breaking change for consumers. Only use `ValueTask<T>` when benchmarks prove the allocation savings are significant."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "ValueTask avoids heap allocations when the result is already available.",
+          "Use it for high-frequency, often-synchronous operations.",
+          "Do not await it multiple times or store it for later.",
+          "Convert to Task when using Task combinators."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "async-io-vs-cpu-bound-work",
+    "task-scheduling-and-continuations",
+    "diagnosing-async-performance-problems"
+  ],
+  "furtherReading": [
+    { "title": "ValueTask<T> Struct (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.valuetask-1" },
+    { "title": "Should I expose ValueTask? (Stephen Toub)", "url": "https://devblogs.microsoft.com/dotnet/value-task-should-i-expose-value-task/" }
+  ]
 }

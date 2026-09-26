@@ -4,58 +4,152 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "Projection vs Include",
-  "description": "Learn about Projection vs Include. Master the concepts, patterns, and best practices.",
+  "description": "Learn when to use Select projection versus Include eager-loading in EF Core, and how each choice affects query performance and data transfer.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "projection", "Include", "eager loading", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Projection vs Include** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with projection vs include."
+        "text": "EF Core gives you two main ways to bring related data into your query results: `Include` for eager-loading full entity graphs, and `Select` projection for pulling only the columns you need. Choosing between them is one of the most impactful performance decisions you can make."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What is Include?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Include` tells EF Core to load related entities as part of the same SQL query using a JOIN. It is convenient because EF Core automatically reconstructs the object graph for you — navigation properties are populated without extra queries. However, Include loads entire related rows, even if you only need one or two columns from the related table."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using Include to eager-load related data",
+        "code": "var orders = await dbContext.Orders\n    .Include(o => o.Customer)\n    .Include(o => o.OrderItems)\n        .ThenInclude(oi => oi.Product)\n    .Where(o => o.OrderDate.Year == 2025)\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is projection?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Select` projection lets you specify exactly which columns to fetch. Instead of loading full entities, you shape the result into a lightweight DTO or anonymous type. Because EF Core only queries the columns you list, the SQL is leaner and the data transfer is smaller. This is especially valuable for API responses where you do not need the full entity."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Projecting into a DTO",
+        "code": "var orderDtos = await dbContext.Orders\n    .Where(o => o.OrderDate.Year == 2025)\n    .Select(o => new OrderSummaryDto\n    {\n        OrderId = o.Id,\n        CustomerName = o.Customer.FullName,\n        TotalItems = o.OrderItems.Count,\n        TotalAmount = o.OrderItems.Sum(oi => oi.Quantity * oi.UnitPrice)\n    })\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparing Include and projection"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "Include",
+            "description": "Eager-loads full related entities. Best when you need the complete entity graph for updates or when passing entities to the UI.",
+            "pros": [
+              "EF Core tracks all loaded entities automatically",
+              "Simple to write for simple object graphs",
+              "Works well with lazy-loading proxies"
+            ],
+            "cons": [
+              "Loads all columns from related tables",
+              "Can produce large JOIN result sets",
+              "Risk of cartesian explosion with multiple collections"
+            ]
+          },
+          {
+            "title": "Projection (Select)",
+            "description": "Fetches only the columns you specify. Best for read-only API responses, reports, and list views.",
+            "pros": [
+              "Minimal data transfer from the database",
+              "No change-tracking overhead for projected types",
+              "Avoids cartesian explosion on collection includes"
+            ],
+            "cons": [
+              "More verbose to write",
+              "Does not track projected DTOs",
+              "Requires manual mapping or AutoMapper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cartesian explosion warning",
+        "text": "Including multiple collection navigations (for example, Orders with OrderItems and Payments) in a single query multiplies the row count. A single order with 5 items and 2 payments produces 10 database rows. Projection is usually the safer choice for list endpoints."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use each approach"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the core differences between projection and include",
-          "Know when to choose projection over include",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Use projection for API responses, list views, and reporting where you only need a subset of columns.",
+          "Use Include when you need full entities for editing or when the object graph is shallow.",
+          "Prefer explicit loading for optional related data that is only needed in some code paths.",
+          "Combine projection with filtered Include when you need the entity tracked but only a subset of its children."
         ]
       }
     },
     {
-      "type": "heading",
+      "type": "example",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "title": "Filtered Include",
+        "code": "var orders = await dbContext.Orders\n    .Include(o => o.OrderItems.Where(oi => oi.Quantity > 1))\n    .Where(o => o.Id == orderId)\n    .FirstOrDefaultAsync();",
+        "language": "csharp"
       }
     },
     {
-      "type": "paragraph",
+      "type": "summary-box",
       "data": {
-        "text": "Understanding projection vs include is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with projection vs include, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Key takeaways",
+        "items": [
+          "Projection fetches only what you need and avoids tracking overhead.",
+          "Include is convenient but can fetch unnecessary columns and cause cartesian explosion.",
+          "For read-only API responses, project into DTOs rather than returning tracked entities.",
+          "Use filtered Include when you need tracked entities with limited related collections."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["linq-expression-trees-and-sql-translation", "cartesian-explosion-and-split-queries"],
+  "furtherReading": [
+    { "title": "EF Core eager loading with Include", "url": "https://learn.microsoft.com/en-us/ef/core/querying/include", "type": "article" },
+    { "title": "EF Core projection queries", "url": "https://learn.microsoft.com/en-us/ef/core/querying/projection", "type": "article" }
+  ]
 }

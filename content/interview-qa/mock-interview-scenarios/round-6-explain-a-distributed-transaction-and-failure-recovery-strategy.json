@@ -4,33 +4,84 @@
   "moduleSlug": "mock-interview-scenarios",
   "courseSlug": "interview-qa",
   "title": "Round 6: Explain a distributed transaction and failure recovery strategy",
-  "description": "Interview question: Round 6: Explain a distributed transaction and failure recovery strategy. Learn the answer with detailed explanation and examples.",
+  "description": "Explain how to keep data consistent across multiple services when a single database transaction is no longer an option.",
   "order": 6,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["distributed-systems", "transactions", "saga", "microservices", "consistency"],
+  "technology": "General",
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Round 6: Explain a distributed transaction and failure recovery strategy** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with round 6: explain a distributed transaction and failure recovery strategy."
+        "text": "When an operation spans multiple databases or services, a traditional ACID transaction no longer works. The interviewer wants to know whether you understand the trade-offs and can choose a pattern that matches the business risk."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why distributed transactions are hard"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of round 6: explain a distributed transaction and failure recovery strategy",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Two-phase commit coordinates a decision across systems, but it blocks during the prepare phase and creates availability problems. If the coordinator crashes after some systems have prepared, those systems remain locked until the coordinator recovers. In modern distributed systems, availability is often valued more than strict consistency."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "ACID",
+            "definition": "Atomicity, Consistency, Isolation, Durability: the guarantees a traditional database transaction provides."
+          },
+          {
+            "term": "Two-phase commit",
+            "definition": "A protocol where a coordinator first asks all participants to prepare, then instructs them to commit or roll back."
+          },
+          {
+            "term": "Saga",
+            "definition": "A sequence of local transactions where each step has a compensating action to undo its effect if a later step fails."
+          },
+          {
+            "term": "Idempotency",
+            "definition": "The property that applying the same operation multiple times has the same effect as applying it once."
+          },
+          {
+            "term": "Eventual consistency",
+            "definition": "A consistency model where updates propagate asynchronously and all replicas converge to the same state over time."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Saga pattern for an order",
+        "content": "A saga breaks a global transaction into local transactions with compensating actions:",
+        "code": "1. Order Service creates order in Pending state\n2. Saga sends ReserveInventory command\n3. Inventory Service reserves items, emits InventoryReserved\n4. Saga sends ChargePayment command\n5. Payment Service charges card, emits PaymentCharged\n6. Saga sends ConfirmOrder command\n7. Order Service marks order Confirmed\n\nIf step 5 fails:\n- Payment Service emits PaymentFailed\n- Saga sends CompensateInventory command\n- Inventory Service releases the reservation",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pattern comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Pattern", "Consistency", "Complexity", "Typical use"],
+        "rows": [
+          ["Two-phase commit", "Strong", "High", "Legacy systems with a single operator"],
+          ["Saga (choreography)", "Eventual", "Medium", "Independent services with event streams"],
+          ["Saga (orchestration)", "Eventual", "Medium-high", "Complex workflows needing a central tracker"],
+          ["Idempotent retries", "Eventual", "Low", "Transient failures with safe retry semantics"]
         ]
       }
     },
@@ -38,25 +89,126 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Failure recovery in practice"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding round 6: explain a distributed transaction and failure recovery strategy is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Store saga state in a durable table so you can resume after a crash.",
+          "Make every command idempotent by including a unique saga ID and step number.",
+          "Use a dead-letter queue for commands that fail after all retries.",
+          "Run a periodic reconciliation job that compares the saga state with downstream systems and fixes drift.",
+          "Alert on sagas that stay in a Pending or Compensating state for longer than the SLA.",
+          "Use circuit breakers to prevent cascading failures when a downstream service is down."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-saga-orchestration",
+        "caption": "Saga orchestration flow with compensating actions on failure",
+        "definition": "graph TD\n    A[Start Saga] --> B[Step 1: Create Order]\n    B --> C{Step 1 ok?}\n    C -->|No| X[Abort Saga]\n    C -->|Yes| D[Step 2: Reserve Inventory]\n    D --> E{Step 2 ok?}\n    E -->|No| Y[Compensate: Cancel Order]\n    E -->|Yes| F[Step 3: Charge Payment]\n    F --> G{Step 3 ok?}\n    G -->|No| Z[Compensate: Release Inventory]\n    G -->|Yes| H[Step 4: Confirm Order]\n    H --> I[Saga Complete]\n    Z --> Y\n    Y --> X"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with round 6: explain a distributed transaction and failure recovery strategy, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Design for failure, not for success",
+        "text": "When you explain a distributed transaction, spend more time on what happens when a service is down than on the happy path. Interviewers are testing whether you have seen failures in production and whether you built systems that can recover gracefully."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Event sourcing as an alternative"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Event sourcing stores every state change as an immutable event. Instead of compensating a failed transaction, you replay events to rebuild the current state. This eliminates the need for compensating transactions but requires a different mental model and tooling."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Choreography versus orchestration",
+        "cards": [
+          {
+            "title": "Choreography",
+            "description": "Services react to events from other services with no central coordinator.",
+            "pros": ["Loose coupling", "Simple for small workflows", "Scales well with event infrastructure"],
+            "cons": ["Hard to trace end-to-end", "Difficult to enforce global rules", "Can create cyclic dependencies"]
+          },
+          {
+            "title": "Orchestration",
+            "description": "A central saga orchestrator tells each service what to do and when.",
+            "pros": ["Clear workflow visibility", "Easier to enforce business rules", "Simpler compensation logic"],
+            "cons": ["Orchestrator can become a bottleneck", "Tighter coupling to orchestrator API"]
+          },
+          {
+            "title": "Event sourcing",
+            "description": "Store every state change as an immutable event; rebuild state by replaying.",
+            "pros": ["Complete audit log by default", "Temporal queries: what was the state at time T?", "No need for compensating transactions"],
+            "cons": ["Steep learning curve", "Event schema evolution is complex", "Requires snapshots for large event streams"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked interview questions",
+        "items": [
+          {
+            "question": "When should I use two-phase commit instead of a saga?",
+            "answer": "Only when you need strong consistency and can tolerate reduced availability, such as financial transfers within a single data center owned by one operator."
+          },
+          {
+            "question": "How do I handle duplicate messages in a saga?",
+            "answer": "Make every step idempotent by storing the saga ID and step number. Before processing, check whether the step has already completed."
+          },
+          {
+            "question": "What happens if the saga orchestrator crashes?",
+            "answer": "The orchestrator should store its state durably. On restart, it reads the saga state table, finds the last successful step, and resumes or compensates from there."
+          },
+          {
+            "question": "Can I use a saga for read operations?",
+            "answer": "Sagas are best for write workflows. For reads, use event sourcing or materialized views with eventual consistency instead."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Prefer eventual consistency with compensating actions over two-phase commit",
+          "Make every operation idempotent so retries are safe",
+          "Use orchestration when the workflow is complex, choreography when services are loosely coupled",
+          "Store the saga state so you can resume or compensate after a crash"
+        ],
+        "takeaway": "Consistency is a spectrum. The right pattern depends on your business tolerance for temporary inconsistency and your team's ability to operate the solution."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "round-3-design-a-scalable-order-processing-system",
+    "round-8-tell-the-story-of-a-production-incident-you-owned"
+  ],
+  "furtherReading": [
+    {
+      "title": "Saga Pattern",
+      "url": "https://microservices.io/patterns/data/saga.html",
+      "type": "article",
+      "author": "Chris Richardson",
+      "description": "An overview of saga patterns for managing distributed data consistency."
+    }
+  ]
 }

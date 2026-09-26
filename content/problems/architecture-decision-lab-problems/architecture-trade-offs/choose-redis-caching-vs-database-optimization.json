@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose Redis caching vs database optimization",
-  "description": "Problem: Choose Redis caching vs database optimization. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Decide whether to introduce Redis as a caching layer or invest in database indexing, query optimization, and read replicas for a read-heavy e-commerce product catalog.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["redis", "caching", "database", "performance", "read-replicas"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose Redis caching vs database optimization** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose redis caching vs database optimization."
+        "text": "Your product catalog page is timing out. Database CPU is pegged at 90 percent during traffic spikes. Your instinct is to add Redis. But your CTO wants to know whether a cache is treating a symptom or solving a root cause, and whether the operational complexity of cache invalidation is worth it."
       }
     },
     {
@@ -24,13 +24,71 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose redis caching and database optimization",
-          "Know when to choose choose redis caching over database optimization",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "Cache-Aside", "definition": "The application checks the cache first; on miss, it queries the database and writes the result back." },
+          { "term": "Write-Through", "definition": "The cache sits in front of the database and writes go to both cache and database simultaneously." },
+          { "term": "Cache Invalidation", "definition": "The process of removing or updating stale cache entries when underlying data changes." },
+          { "term": "Thundering Herd", "definition": "Many concurrent cache misses causing a flood of identical database queries." },
+          { "term": "Read Replica", "definition": "A database instance that replicates data from a primary to offload read traffic." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cache invalidation is one of the two hard problems in CS",
+        "text": "Phil Karlton famously said there are only two hard things in Computer Science: cache invalidation and naming things. A cache that returns stale data is worse than a slow database: users see outdated prices or inventory."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Redis cache versus database optimization",
+        "cards": [
+          {
+            "title": "Redis Cache-Aside",
+            "description": "Add Redis as an external caching tier to absorb read traffic.",
+            "pros": [
+              "Orders of magnitude faster reads for hot keys",
+              "Offloads database without schema changes",
+              "TTL provides a natural staleness ceiling",
+              "Useful for session state, feature flags, and rate limiting too"
+            ],
+            "cons": [
+              "Cache invalidation logic adds significant application complexity",
+              "Cold start thundering herd if Redis restarts",
+              "Another failure domain to monitor and operate",
+              "Stale reads until TTL expires or invalidation fires"
+            ],
+            "tags": ["fast", "operationally-complex"]
+          },
+          {
+            "title": "Database Optimization",
+            "description": "Index tuning, query optimization, and read replica promotion.",
+            "pros": [
+              "Single source of truth, no consistency concerns",
+              "No new infrastructure or client libraries",
+              "Read replicas scale horizontally without application changes",
+              "PostgreSQL query planner can optimize dynamically"
+            ],
+            "cons": [
+              "Indexes add write latency and storage cost",
+              "Replica lag means reads can be stale",
+              "Requires deep knowledge of query plans and statistics",
+              "Scaling reads requires adding and managing replicas"
+            ],
+            "tags": ["consistent", "requires-tuning"]
+          }
         ]
       }
     },
@@ -38,24 +96,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Cache-aside pattern"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose redis caching vs database optimization is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "C# cache-aside with Redis",
+        "content": "Application-controlled caching with explicit invalidation on write.",
+        "code": "public async Task<Product> GetProductAsync(string id)\n{\n    var cached = await _redis.StringGetAsync(id);\n    if (cached.HasValue)\n    {\n        return JsonSerializer.Deserialize<Product>(cached!);\n    }\n\n    var product = await _db.Products.FindAsync(id);\n    if (product is not null)\n    {\n        await _redis.StringSetAsync(id,\n            JsonSerializer.Serialize(product),\n            expiry: TimeSpan.FromMinutes(5));\n    }\n    return product;\n}\n\npublic async Task UpdateProductAsync(Product updated)\n{\n    await _db.SaveChangesAsync();\n    await _redis.KeyDeleteAsync(updated.Id.ToString());\n    // Force next read to repopulate from DB\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Database: Composite index for catalog queries",
+        "content": "If the bottleneck is a missing index, optimization is cheaper than a cache.",
+        "code": "-- Before: slow sequential scan on category + price\nSELECT * FROM products\nWHERE category_id = $1 AND price < $2\nORDER BY popularity DESC;\n\n-- After: covering index avoids table access\nCREATE INDEX idx_products_category_price_pop\nON products (category_id, price)\nINCLUDE (name, image_url, popularity);\n\n-- With partial index for in-stock items only:\nCREATE INDEX idx_products_in_stock\nON products (category_id, popularity)\nWHERE stock_count > 0;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation criteria",
+        "items": [
+          { "text": "Is the read pattern cacheable, or are writes invalidating entries too frequently?" },
+          { "text": "Can query optimization and indexing resolve the issue without new infrastructure?" },
+          { "text": "Does your team have Redis expertise for connection management and failover?" },
+          { "text": "Are reads skewed toward a small set of hot products?" },
+          { "text": "Can you tolerate serving slightly stale data?" }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cache-vs-db",
+        "caption": "Adding a cache introduces a new failure domain",
+        "definition": "graph TD\n    A[Client Request] --> B{Cache Hit?}\n    B -->|Yes| C[Return cached value]\n    B -->|No| D[Query Database]\n    D --> E[Write to Cache]\n    E --> F[Return value]\n    G[Write Request] --> H[Update Database]\n    H --> I[Invalidate Cache]\n    I --> J{Invalidation Works?}\n    J -->|Yes| K[Consistent]\n    J -->|No| L[Stale Data]"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Optimize the database first, add Redis selectively",
+        "content": "Add the missing composite index and a single read replica. Measure again. If p99 latency is still above target, add Redis only for the top 1 percent of hot products. Keep the cache small and the invalidation logic centralized.",
+        "code": "-- Step 1: Fix the index\nCREATE INDEX CONCURRENTLY idx_products_optimized\nON products (category_id, popularity)\nINCLUDE (name, price, image_url);\n\n-- Step 2: Add read replica for reporting and catalog browsing\n-- Application writes go to primary; reads route via connection pooler\n\n-- Step 3: Redis for hot products only\n-- Keys: product:hot:{id}\n-- TTL: 60 seconds\n-- Populated by background job, not lazy caching",
+        "language": "sql"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose redis caching vs database optimization, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Alternative for extreme scale",
+        "text": "If hot products represent more than 30 percent of reads, consider a CDN or edge cache. Redis is best for application-level caching, not full-page caching at scale."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Optimize the database before adding infrastructure.",
+          "Cache invalidation complexity grows faster than cache value.",
+          "Use Redis for hot keys and short TTLs, not as a primary data store."
+        ],
+        "takeaway": "The right cache is one you can delete without breaking correctness."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-sql-vs-nosql-for-a-high-write-workload",
+    "choose-synchronous-processing-vs-a-message-queue"
+  ],
+  "furtherReading": [
+    { "title": "Cache Invalidation Strategies", "url": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/BestPractices.html", "type": "article" },
+    { "title": "Designing Data-Intensive Applications", "url": "https://dataintensive.net/", "type": "book", "author": "Martin Kleppmann" }
+  ]
 }

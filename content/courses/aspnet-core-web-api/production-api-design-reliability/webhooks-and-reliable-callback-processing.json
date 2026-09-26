@@ -4,33 +4,44 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Webhooks and reliable callback processing",
-  "description": "Learn about Webhooks and reliable callback processing. Master the concepts, patterns, and best practices.",
+  "description": "Notify external systems without losing events. Learn webhook delivery patterns, retry strategies, signature verification, and how to make callbacks durable and verifiable.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Webhooks and reliable callback processing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with webhooks and reliable callback processing."
+        "text": "A webhook is your API's way of saying, 'something happened, and here is the data.' It looks simple: make an HTTP POST to the subscriber's URL. But in production, the subscriber can be down, slow, or outright unreachable. If you fire and forget, events disappear silently. Reliable webhook delivery turns an unreliable POST into a durable, verifiable, retryable pipeline."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson covers webhook payload design, delivery guarantees, retry strategies, signature verification, and dead-letter handling."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Delivery guarantees and what they mean"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most webhook systems promise at-least-once delivery. That means the subscriber may see the same event twice. Your contract must make that explicit in the documentation, and your payload must include an idempotency key so subscribers can deduplicate without harm."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of webhooks and reliable callback processing",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "At-most-once: easiest to implement, but events are lost if the subscriber is down. Rarely acceptable for payments or critical state changes.",
+          "At-least-once: the standard. Requires deduplication on the subscriber side and a retry queue on the sender side.",
+          "Exactly-once: impossible to guarantee over HTTP alone. You can approximate it with idempotency keys and persistent subscriber state, but the network layer always introduces retry risk."
         ]
       }
     },
@@ -38,24 +49,143 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Webhook payload shape"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding webhooks and reliable callback processing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Every webhook event should include a stable event ID, the event type, a timestamp, the resource that changed, and the payload. Keep the envelope stable so subscribers can parse one shape forever."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Webhook event envelope",
+        "code": "public class WebhookEvent\n{\n    public string Id { get; set; } = Guid.NewGuid().ToString();\n    public string Type { get; set; } = string.Empty;\n    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;\n    public Guid ResourceId { get; set; }\n    public JsonNode Data { get; set; } = JsonNode.Parse(\"{}\")!;\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `Id` is the idempotency key. The `Type` tells the subscriber which handler to run. The `ResourceId` lets subscribers correlate the event with their own records. The `Data` node keeps the schema flexible so you can add fields without breaking old handlers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Retry strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Retries should be progressive: quick at first, then slower, then stop. A common pattern is exponential backoff with a maximum of 24 to 72 hours. Every retry should include the original attempt timestamp so subscribers know whether the event is stale."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Retry schedule",
+        "code": "var schedule = new[]\n{\n    TimeSpan.FromSeconds(10),\n    TimeSpan.FromMinutes(1),\n    TimeSpan.FromMinutes(10),\n    TimeSpan.FromHours(1),\n    TimeSpan.FromHours(6),\n    TimeSpan.FromHours(24)\n};",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each delivery attempt should be logged with the HTTP status, response time, and any error body. When all retries fail, move the event to a dead-letter queue. Alert on dead-letter growth—it is your signal that a subscriber is down or misconfigured."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Signature verification"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Anyone who knows the subscriber URL can send a fake event. Sign every webhook payload with an HMAC of the body plus a shared secret. The subscriber recomputes the signature and rejects anything that does not match. This is the minimum security control every webhook system needs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Signing and verifying a webhook",
+        "code": "public static class WebhookSigner\n{\n    public static string Sign(WebhookEvent evt, string secret)\n    {\n        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));\n        var payload = JsonSerializer.Serialize(evt);\n        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));\n        return $\"sha256={Convert.ToBase64String(hash)}\";\n    }\n\n    public static bool Verify(WebhookEvent evt, string signature, string secret)\n    {\n        var expected = Sign(evt, secret);\n        return CryptographicOperations.FixedTimeEquals(\n            Encoding.UTF8.GetBytes(expected),\n            Encoding.UTF8.GetBytes(signature));\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Subscriber best practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Respond with 200 or 202 quickly. Do heavy processing after acknowledging the event.",
+          "Validate the signature before trusting the payload.",
+          "Check the event `Id` against a deduplication store and return 200 for repeats.",
+          "Return 429 if your own rate limit is hit; the sender should respect Retry-After.",
+          "Return 500 only for genuine server errors so the sender retries."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with webhooks and reliable callback processing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Security reminder",
+        "text": "Always verify signatures over HTTPS. Never log full webhook payloads that may contain PII or secrets. Rotate shared secrets periodically and support a grace period with both old and new secrets."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Webhooks are at-least-once by nature; design for idempotency on both sides.",
+          "Use exponential backoff with a capped retry schedule and move failed events to a dead-letter queue.",
+          "Sign every payload with HMAC-SHA256 and verify it server-side before processing.",
+          "Subscribers should acknowledge quickly and process asynchronously to avoid sender timeouts."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "idempotency-keys-and-duplicate-request-handling",
+    "streaming-apis-and-large-payloads"
+  ],
+  "furtherReading": [
+    {
+      "title": "GitHub Docs: Building webhooks",
+      "url": "https://docs.github.com/en/developers/webhooks-and-events/webhooks",
+      "type": "article"
+    },
+    {
+      "title": "Stripe Docs: Webhook best practices",
+      "url": "https://stripe.com/docs/webhooks/best-practices",
+      "type": "article"
+    },
+    {
+      "title": "Slack Docs: Securing webhooks",
+      "url": "https://api.slack.com/authentication/verifying-requests-from-slack",
+      "type": "article"
+    }
+  ]
 }

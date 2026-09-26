@@ -3,34 +3,57 @@
   "slug": "liveness-readiness-and-startup-probes",
   "moduleSlug": "production-kubernetes-day-2-operations",
   "courseSlug": "devops",
-  "title": "Liveness, readiness and startup probes",
-  "description": "Learn about Liveness, readiness and startup probes. Master the concepts, patterns, and best practices.",
+  "title": "Liveness, Readiness and Startup Probes",
+  "description": "Configure Kubernetes probes to monitor application health, control traffic routing during startup, and automatically restart unhealthy containers.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "kubernetes",
+    "probes",
+    "liveness",
+    "readiness",
+    "startup",
+    "health"
+  ],
   "blocks": [
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "**Liveness, readiness and startup probes** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with liveness, readiness and startup probes."
-      }
-    },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Kubernetes Needs Probes"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of liveness, readiness and startup probes",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Kubernetes assumes Pods are healthy until proven otherwise. But containers can silently fail — a web server might accept connections but return 500 errors, or a database might be running but not yet ready to accept queries. **Probes** let Kubernetes actively check the health of your application and take corrective action when something is wrong."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Liveness probe",
+            "definition": "Checks if the container is running; if it fails, Kubernetes kills and restarts the container."
+          },
+          {
+            "term": "Readiness probe",
+            "definition": "Checks if the container is ready to serve traffic; if it fails, Kubernetes removes the Pod from Service endpoints."
+          },
+          {
+            "term": "Startup probe",
+            "definition": "Checks if the application has started; disables liveness and readiness checks until it succeeds."
+          },
+          {
+            "term": "HTTP GET probe",
+            "definition": "A probe that sends an HTTP GET request to a specified path and port."
+          },
+          {
+            "term": "TCP socket probe",
+            "definition": "A probe that attempts a TCP connection on a specified port."
+          }
         ]
       }
     },
@@ -38,24 +61,170 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The Three Probe Types"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding liveness, readiness and startup probes is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Kubernetes provides three distinct probe types, each serving a different purpose. Using them correctly prevents traffic from reaching unready containers, avoids killing slow-starting apps, and ensures deadlocked processes are automatically restarted."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Probe",
+          "Purpose",
+          "Failure Action"
+        ],
+        "rows": [
+          [
+            "Liveness",
+            "Is the container alive?",
+            "Restart the container"
+          ],
+          [
+            "Readiness",
+            "Is the container ready for traffic?",
+            "Remove from Service endpoints"
+          ],
+          [
+            "Startup",
+            "Has the application finished starting?",
+            "Restart container if it takes too long"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Liveness Probes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **liveness probe** answers the question: \"Is this container still running correctly?\" If the probe fails repeatedly, Kubernetes kills the container and starts a new one. This is your safety net for deadlocked processes, memory leaks, or hung applications. The startup period should be long enough to avoid false positives."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HTTP liveness probe for a web API",
+        "content": "Restart the container if /healthz stops returning 200.",
+        "code": "livenessProbe:\n  httpGet:\n    path: /healthz\n    port: 8080\n  initialDelaySeconds: 15\n  periodSeconds: 20\n  failureThreshold: 3",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Readiness Probes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **readiness probe** answers: \"Is this container ready to receive traffic?\" Unlike liveness probes, a failing readiness probe does not restart the container — it simply removes the Pod from the Service's endpoint list. This is critical during startup, database migrations, or when the app is overloaded and should shed load."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Readiness probe for a database-backed API",
+        "content": "Keep the Pod out of Service endpoints until the database connection is ready.",
+        "code": "readinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080\n  initialDelaySeconds: 5\n  periodSeconds: 10\n  failureThreshold: 3",
+        "language": "yaml"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Startup Probes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **startup probe** exists specifically for legacy or slow-starting applications that need a long time before they can serve traffic. Without a startup probe, a slow app might fail its liveness probe during boot and get killed before it even finishes starting. The startup probe runs first; once it succeeds, liveness and readiness probes take over."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Startup probe for a slow-loading app",
+        "content": "Give a legacy app up to 5 minutes to start before enabling health checks.",
+        "code": "startupProbe:\n  httpGet:\n    path: /startup\n    port: 8080\n  failureThreshold: 30\n  periodSeconds: 10\n\nlivenessProbe:\n  httpGet:\n    path: /healthz\n    port: 8080\n  periodSeconds: 10\n\nreadinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080\n  periodSeconds: 10",
+        "language": "yaml"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with liveness, readiness and startup probes, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Startup probe vs initial delay",
+        "text": "Before startup probes existed, people used initialDelaySeconds on liveness probes to give apps time to start. Startup probes are better because they disable liveness checks entirely until the app signals it is ready, preventing accidental restarts of slow apps."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Configure probes for a web application",
+        "description": "Add liveness, readiness, and startup probes to a Deployment.",
+        "steps": [
+          "Create a Deployment for an nginx or custom web app.",
+          "Add a startup probe that checks /startup with a 30-second failure threshold.",
+          "Add a liveness probe that checks /healthz every 20 seconds.",
+          "Add a readiness probe that checks /ready every 10 seconds.",
+          "Deploy the application and inspect the Pod events to see probes in action.",
+          "Simulate a failure by changing the readiness probe path and observe the Pod being removed from endpoints."
+        ],
+        "expectedOutcome": "The application starts safely, Kubernetes restarts it only when truly unhealthy, and traffic only routes to ready Pods."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Liveness probes restart unhealthy containers automatically.",
+          "Readiness probes control whether a Pod receives traffic by toggling Service endpoints.",
+          "Startup probes prevent liveness checks from killing slow-starting containers.",
+          "Use HTTP probes for web apps and TCP probes for databases or raw TCP services.",
+          "Tune initialDelaySeconds, periodSeconds, and failureThreshold based on your app's real behavior."
+        ],
+        "takeaway": "Probes make your cluster self-healing and ensure users never hit a container that is not ready to serve them."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "pods-and-workload-controllers",
+    "services-and-service-discovery",
+    "day-2-troubleshooting-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article"
+    },
+    {
+      "title": "Configure Liveness, Readiness and Startup Probes",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes",
+      "type": "article"
+    }
+  ]
 }

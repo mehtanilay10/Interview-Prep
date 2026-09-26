@@ -3,59 +3,166 @@
   "slug": "health-checks-and-readiness-vs-liveness",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Health checks and readiness vs liveness",
-  "description": "Learn about Health checks and readiness vs liveness. Master the concepts, patterns, and best practices.",
+  "title": "Health Checks and Readiness vs Liveness",
+  "description": "Configure ASP.NET Core health checks, understand the difference between liveness and readiness probes, and implement production-grade health monitoring.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "health-checks",
+    "kubernetes",
+    "readiness",
+    "liveness"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Health checks and readiness vs liveness** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with health checks and readiness vs liveness."
+        "text": "Health checks are endpoints that report the status of your application and its dependencies. They answer a simple question: is this service healthy? In modern cloud-native environments, health checks are consumed by load balancers, orchestrators like Kubernetes, and monitoring systems to determine whether to route traffic to your application or restart it."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core provides built-in health check middleware that can report on database connectivity, external API availability, disk space, memory pressure, and custom business logic. The two most important probes are **liveness** (is the process running?) and **readiness** (is the process ready to handle traffic?)."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Liveness vs Readiness"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Liveness and readiness probes serve different purposes and should be implemented as separate endpoints. A liveness probe checks whether the application process is alive. If it fails, the orchestrator restarts the container. A readiness probe checks whether the application is ready to handle requests, such as whether the database connection is established or a cache is warm. If it fails, the orchestrator stops sending traffic but does not restart the container."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Probe comparison",
         "items": [
-          "Understand the core differences between health checks and readiness and liveness",
-          "Know when to choose health checks and readiness over liveness",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Liveness probe: Returns 200 if the application process is running. Failing it triggers a restart. Use it to detect deadlocks or unresponsive threads.",
+          "Readiness probe: Returns 200 only if the application can actually serve traffic. Failing it removes the pod from the load balancer but does not restart it. Use it to wait for database migrations or cache warm-up.",
+          "Startup probe: An optional third probe that gives the application extra time to start before liveness and readiness probes begin. Useful for slow-starting applications."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring health checks in Program.cs",
+        "content": "Register health checks and map separate liveness and readiness endpoints.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddHealthChecks()\n    .AddCheck(\"self\", () => HealthCheckResult.Healthy(), tags: new[] { \"live\" })\n    .AddDbContextCheck<AppDbContext>(tags: new[] { \"ready\" })\n    .AddUrlGroup(new Uri(\"https://downstream-api.example.com/health\"), name: \"downstream-api\", tags: new[] { \"ready\" });\n\nvar app = builder.Build();\n\napp.MapHealthChecks(\"/health/live\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"live\")\n});\n\napp.MapHealthChecks(\"/health/ready\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"ready\")\n});\n\napp.Run();"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Health Check Response Formats"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding health checks and readiness vs liveness is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "By default, health checks return a plain text status: Healthy, Degraded, or Unhealthy. You can return JSON by using a response writer. JSON responses are more useful for monitoring systems that need to parse individual check results or aggregate status across services."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom JSON health check response writer",
+        "content": "Write a custom response writer to return detailed JSON.",
+        "language": "csharp",
+        "code": "app.MapHealthChecks(\"/health\", new HealthCheckOptions\n{\n    ResponseWriter = async (context, report) =>\n    {\n        context.Response.ContentType = \"application/json\";\n        var result = new\n        {\n            status = report.Status.ToString(),\n            checks = report.Entries.Select(entry => new\n            {\n                name = entry.Key,\n                status = entry.Value.Status.ToString(),\n                description = entry.Value.Description\n            })\n        };\n        await context.Response.WriteAsJsonAsync(result);\n    }\n});"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with health checks and readiness vs liveness, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Keep Health Checks Fast",
+        "text": "Health checks run on a schedule and must complete quickly. A health check that takes ten seconds or makes expensive database queries can degrade performance or trigger false positives. Use cached metrics and lightweight queries whenever possible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Kubernetes Integration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In Kubernetes, probes are configured in the pod spec. The kubelet calls the liveness, readiness, and startup HTTP endpoints on a schedule. If the liveness endpoint returns a non-2xx status, Kubernetes kills and restarts the container. If readiness fails, Kubernetes removes the pod from service endpoints until it recovers."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Probe",
+          "Failure Action",
+          "Typical Check"
+        ],
+        "rows": [
+          [
+            "Liveness",
+            "Restart container",
+            "Process is running, memory is not exhausted"
+          ],
+          [
+            "Readiness",
+            "Stop routing traffic",
+            "Database connection, downstream API reachable"
+          ],
+          [
+            "Startup",
+            "Block other probes until success",
+            "Migrations complete, cache initialized"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Health Checks Summary",
+        "points": [
+          "Liveness probes detect dead or unresponsive processes and trigger restarts.",
+          "Readiness probes determine if the app can serve traffic without restarting.",
+          "Health checks should be fast, lightweight, and tag-based.",
+          "JSON responses enable monitoring systems to parse detailed check results.",
+          "Kubernetes uses health endpoints for automatic traffic management and recovery."
+        ],
+        "takeaway": "Health checks are the primary mechanism for orchestrators and load balancers to manage your application. Implementing liveness and readiness correctly ensures that traffic only reaches healthy instances and that failures are handled automatically."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "backgroundservice-and-hosted-workloads",
+    "request-cancellation-and-graceful-shutdown"
+  ],
+  "furtherReading": [
+    {
+      "title": "Health checks in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on built-in health checks, custom checks, and response writers."
+    },
+    {
+      "title": "Kubernetes Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article",
+      "author": "Kubernetes",
+      "description": "How Kubernetes liveness, readiness, and startup probes work and how to configure them."
+    }
+  ]
 }

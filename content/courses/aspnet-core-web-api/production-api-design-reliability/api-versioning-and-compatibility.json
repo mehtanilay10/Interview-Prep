@@ -4,33 +4,71 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "API versioning and compatibility",
-  "description": "Learn about API versioning and compatibility. Master the concepts, patterns, and best practices.",
+  "description": "Keep existing clients working while shipping new API versions. Learn versioning strategies, compatibility rules, and how to evolve a production API safely.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**API versioning and compatibility** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with api versioning and compatibility."
+        "text": "APIs are contracts. Once a mobile app, partner integration, or internal service depends on your endpoint shape, changing it carelessly breaks callers. API versioning gives you a controlled path to ship improvements without causing outages for consumers that are not ready to upgrade."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In this lesson, you will learn the practical versioning strategies used in ASP.NET Core Web API, how to apply them with minimal ceremony, and the compatibility discipline that prevents versioning from becoming a maintenance nightmare."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why version an API at all"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every public API eventually needs to change. A field name may become misleading, a payload may need extra data, or an endpoint may need to be split for clarity. If you change the contract in place, every existing caller breaks at once—often without warning until users report failures."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Real-world impact",
+        "text": "A single breaking change to a public API can cascade into dozens of dependent services, partner integrations, and mobile apps. Versioning isolates that blast radius."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Versioning creates a safe lane for new behavior while keeping the old lane intact. Old clients continue calling `/v1/orders` while new clients call `/v2/orders`. You can deprecate v1 gradually, monitor adoption, and remove it only when no one depends on it anymore."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common versioning strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There are three mainstream ways to expose the version to your API. Each has trade-offs in discoverability, caching, and client simplicity."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of api versioning and compatibility",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "URL path versioning: `/v1/orders`, `/v2/orders`. Simple to implement, easy to route, and obvious in logs. The downside is that the version becomes part of the resource identity, which can leak into database schemas if you are not careful.",
+          "Query string versioning: `/orders?api-version=2`. Keeps URLs clean and is cache-friendly when combined with proper cache keys. However, the version is less visible, and clients can easily omit it.",
+          "Header versioning: `Api-Version: 2.0`. Keeps URLs stable and follows REST purist principles. The downside is lower discoverability and the need for every client to remember to send the header."
         ]
       }
     },
@@ -38,24 +76,121 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Implementing URL path versioning in ASP.NET Core"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding api versioning and compatibility is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The most common production approach is URL path versioning with the `Microsoft.AspNetCore.Mvc.Versioning` package. It maps a version value to controller or action selection with minimal code."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering API versioning",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddControllers();\nbuilder.Services.AddApiVersioning(options =>\n{\n    options.DefaultApiVersion = new ApiVersion(1, 0);\n    options.AssumeDefaultVersionWhenUnspecified = true;\n    options.ReportApiVersions = true;\n    options.ApiVersionReader = new UrlSegmentApiVersionReader();\n});\n\nvar app = builder.Build();\napp.MapControllers();\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With `UrlSegmentApiVersionReader`, a request to `/v2/orders` automatically targets controllers decorated with `[ApiVersion(\"2.0\")]`. Unversioned requests fall back to the default version, which is helpful during rollout."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Versioning a controller",
+        "code": "[ApiController]\n[Route(\"v{version:apiVersion}/[controller]\")]\n[ApiVersion(\"1.0\")]\n[ApiVersion(\"2.0\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpGet]\n    public IActionResult GetV1() => Ok(new { Message = \"Version 1\" });\n\n    [HttpGet]\n    [MapToApiVersion(\"2.0\")]\n    public IActionResult GetV2() => Ok(new\n    {\n        Message = \"Version 2\",\n        Data = new[] { new { Id = 1, Name = \"Widget\" } }\n    });\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Backward compatibility rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Versioning only works if each version behaves like a stable contract. The safest rule is: never remove or rename fields from an existing version. Add new fields at the end, accept but ignore unknown fields in requests, and document what each version guarantees."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Additive changes only: new properties and new endpoints are safe.",
+          "Nullable or optional: new fields should be nullable or optional so older clients do not break.",
+          "Deprecate before removing: mark old fields or endpoints as deprecated and give clients a migration window.",
+          "Use DTOs, not entities: expose stable contracts in versions, independent of internal database changes."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deprecation and sunset strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Communicating deprecation early prevents surprise breakages. Return an `ApiVersion` header or a custom response header like `Sunset: Sat, 31 Oct 2026 23:59:59 GMT` so clients know when a version will stop working. Monitor traffic to the old version and only remove it once usage drops below your threshold."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with api versioning and compatibility, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Production tip",
+        "text": "Use the `ReportApiVersions = true` option. It adds `API-Version` and `Deprecated` headers to every response, making it easy for clients to detect deprecated versions programmatically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "URL path versioning (`/v1/`, `/v2/`) is the most common and practical strategy.",
+          "Use `Microsoft.AspNetCore.Mvc.Versioning` for low-friction controller-based versioning.",
+          "Never remove fields from an existing version—add new ones alongside them.",
+          "Deprecate with headers, give clients a migration window, and monitor usage before removal."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "problem-details-and-consistent-error-contracts",
+    "etags-and-conditional-requests"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs: API versioning in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/web-api/advanced/versioning",
+      "type": "article"
+    },
+    {
+      "title": "RFC 5829: Link Relation Types for Simple Version Negotiation",
+      "url": "https://tools.ietf.org/html/rfc5829",
+      "type": "article"
+    },
+    {
+      "title": "Sunset HTTP Header (RFC 8594)",
+      "url": "https://tools.ietf.org/html/rfc8594",
+      "type": "article"
+    }
+  ]
 }

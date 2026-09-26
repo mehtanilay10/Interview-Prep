@@ -3,34 +3,48 @@
   "slug": "long-running-transactions",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Long-running transactions",
-  "description": "Learn about Long-running transactions. Master the concepts, patterns, and best practices.",
+  "title": "Long-Running Transactions",
+  "description": "Learn why long-running transactions are dangerous in SQL Server, how they cause log growth, blocking, and replication lag, and how to detect and fix them.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "long-running",
+    "transactions",
+    "log-growth",
+    "blocking",
+    "sql-server"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Long-running transactions** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with long-running transactions."
+        "text": "A **long-running transaction** is any transaction that stays open for an extended period — from a few seconds to hours or even days. In SQL Server, an open transaction does more than hold locks. It prevents the transaction log from being truncated, blocks log backups, causes replication or Always On delays, and can fill the transaction log until the database runs out of space."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Long-running transactions are not always obvious. A transaction can be open because a developer forgot to commit it, because an application is waiting for user input inside a transaction, or because a batch job is processing millions of rows in a single transaction. In all cases, the consequences for the production database are the same: instability."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Long Transactions Are Dangerous"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
+        "title": "Consequences of Long-Running Transactions",
         "items": [
-          "Understand the fundamental principles of long-running transactions",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Transaction log cannot be truncated — the log must contain every change from the oldest open transaction (the Virtual Log Files containing that transaction's changes cannot be reused)",
+          "Log backups cannot truncate the log — if your recovery model is FULL or BULK_LOGGED, log backups fail to free space, and the log file grows until it fills the disk",
+          "Blocking cascades — locks held by the long transaction block other sessions, which may queue up behind it",
+          "Replication and Always On latency — the long transaction must complete before changes can be sent to replicas or Availability Group secondaries",
+          "Tempdb pressure — large rollback segments and version store growth from concurrent snapshot queries"
         ]
       }
     },
@@ -38,24 +52,126 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Detecting Long-Running Transactions"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding long-running transactions is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "SQL Server exposes open transaction information through Dynamic Management Views. The key view is `sys.dm_tran_active_transactions`, which shows all active transactions, their state, and how long they have been running. You can combine it with `sys.dm_tran_database_transactions` and `sys.dm_exec_sessions` to identify the exact session and SQL causing the problem."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Find Long-Running Transactions",
+        "content": "Query active transactions and calculate their age.",
+        "language": "sql",
+        "code": "SELECT \n    at.transaction_id,\n    at.name AS transaction_name,\n    at.transaction_begin_time,\n    DATEDIFF(SECOND, at.transaction_begin_time, GETDATE()) AS elapsed_seconds,\n    at.transaction_state,\n    at.transaction_status,\n    s.session_id,\n    s.login_name,\n    s.host_name,\n    s.program_name,\n    s.status AS session_status,\n    SUBSTRING(st.text, (r.statement_start_offset/2)+1,\n        ((CASE r.statement_end_offset\n            WHEN -1 THEN DATALENGTH(st.text)\n            ELSE r.statement_end_offset END\n          - r.statement_start_offset)/2)+1) AS current_sql\nFROM sys.dm_tran_active_transactions AS at\nINNER JOIN sys.dm_tran_database_transactions AS dt ON at.transaction_id = dt.transaction_id\nINNER JOIN sys.dm_tran_session_transactions AS st ON dt.transaction_id = st.transaction_id\nINNER JOIN sys.dm_exec_sessions AS s ON st.session_id = s.session_id\nLEFT OUTER JOIN sys.dm_exec_requests AS r ON s.session_id = r.session_id\nOUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS st_text\nWHERE at.transaction_type = 1  -- user-initiated transaction\nORDER BY elapsed_seconds DESC;"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with long-running transactions, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Transaction State Codes",
+        "text": "In sys.dm_tran_active_transactions, transaction_state = 1 means the transaction has not started, 2 means it is active, 3 means it is ending, and 4 means the commit has been initiated. A transaction stuck in state 2 for a long time is the one to investigate."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Causes and Fixes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Long-running transactions usually have one of a few root causes. Identifying the cause is more important than killing the transaction — killing it causes a rollback that takes as long as the transaction took to run, and during that rollback the database remains blocked."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Root Causes and Remedies",
+        "items": [
+          "Application waits inside a transaction — fix by moving user input, API calls, and computations outside the transaction; use the Unit of Work pattern",
+          "Batch jobs processing millions of rows — fix by breaking the batch into smaller chunks (e.g., 10,000 rows per transaction) and committing between chunks",
+          "Forgotten transactions — fix by adding transaction timeout logic or using SET LOCK_TIMEOUT to prevent indefinite waits",
+          "Blocking preventing commit — fix by resolving the blocking chain first; do not kill the long transaction if it is blocked by someone else",
+          "Snapshot isolation write conflicts — fix by retrying the transaction with exponential backoff"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Never Kill Without a Plan",
+        "text": "Killing a long-running transaction with KILL forces a rollback. The rollback runs at the same speed as the original transaction (sometimes slower), and during rollback the database holds locks and blocks other sessions. Use KILL only as a last resort, and warn stakeholders that the database will remain busy during rollback."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "How long is too long for a transaction?",
+            "answer": "For OLTP systems, aim for sub-second transactions. For batch workloads, keep individual transactions under a few minutes. Any transaction that runs longer than your log backup interval risks filling the transaction log."
+          },
+          {
+            "question": "Can I see who started a transaction?",
+            "answer": "Yes. The DMV query above joins sys.dm_exec_sessions to show the login name, host name, program name, and current SQL for every active transaction. This usually points directly to the offending application or batch job."
+          },
+          {
+            "question": "Does READ COMMITTED SNAPSHOT help with long transactions?",
+            "answer": "RCSI eliminates reader-writer blocking, which can reduce the side effects of long transactions. However, it does not fix the root problem: the open transaction still prevents log truncation and causes replication latency."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Long-running transactions prevent log truncation, cause log growth, block log backups, and delay replication",
+          "Detect them with sys.dm_tran_active_transactions joined to session and request DMVs",
+          "Killing a long transaction causes a rollback of equal duration — do not treat KILL as a quick fix",
+          "The real fix is architectural: move work outside transactions, batch in smaller chunks, and add timeouts",
+          "Transaction log size should be monitored alongside active transaction age as a pair of leading indicators"
+        ],
+        "takeaway": "The best long-running transaction is the one that never opens. Design your data access layer to keep transactions short, bounded, and explicit."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "locks-and-blocking",
+    "deadlocks-and-deadlock-graphs"
+  ],
+  "furtherReading": [
+    {
+      "title": "Monitoring Long-Running Transactions (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/monitor/long-running-transactions",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Transaction Log Architecture and Management (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-log-architecture-and-management",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Why You Should Not Use Implicit Transactions (Brent Ozar)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

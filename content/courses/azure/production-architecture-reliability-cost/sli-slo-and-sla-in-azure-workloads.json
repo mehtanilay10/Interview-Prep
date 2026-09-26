@@ -4,33 +4,47 @@
   "moduleSlug": "production-architecture-reliability-cost",
   "courseSlug": "microsoft-azure-for-developers",
   "title": "SLI, SLO and SLA in Azure workloads",
-  "description": "Learn about SLI, SLO and SLA in Azure workloads. Master the concepts, patterns, and best practices.",
+  "description": "Define service indicators, objectives, and agreements for Azure workloads. Learn how to measure reliability, set meaningful targets, and negotiate realistic SLAs with Azure services.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**SLI, SLO and SLA in Azure workloads** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with sli, slo and sla in azure workloads."
+        "text": "When you move a workload to Azure, you are no longer fully responsible for every layer of the stack. Azure publishes service-level agreements (SLAs) for its managed services, but the overall SLA for your application depends on how you combine those services. To design reliably, you need three related but distinct concepts: SLI, SLO, and SLA."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What are SLI, SLO, and SLA?"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of sli, slo and sla in azure workloads",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "An SLI (Service Level Indicator) is a quantitative measure of some aspect of your service. Common examples are latency, error rate, or throughput. An SLO (Service Level Objective) is the target value or range for an SLI, usually expressed as a percentage over a time window. An SLA (Service Level Agreement) is a formal commitment—often contractual—about the expected availability or performance of a service."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SLI",
+            "definition": "A quantitative measure of a service aspect, such as availability or latency."
+          },
+          {
+            "term": "SLO",
+            "definition": "The target value or range for an SLI over a specific time window."
+          },
+          {
+            "term": "SLA",
+            "definition": "A formal agreement, often with financial consequences, that defines the level of service a provider commits to deliver."
+          }
         ]
       }
     },
@@ -38,24 +52,134 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Azure service SLAs"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding sli, slo and sla in azure workloads is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Azure publishes SLAs for individual services. For example, Azure App Service offers 99.95% availability for a single region deployment, while Azure SQL Database offers 99.99% for a single server. When you combine services, your composite SLA is the product of their individual availability figures. Two App Service environments in a single region give you 99.95%, but two environments in two different regions with Traffic Manager routing can push you toward 99.99%."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Azure Service",
+          "Typical SLA",
+          "Recovery objective context"
+        ],
+        "rows": [
+          [
+            "Azure App Service (single region)",
+            "99.95%",
+            "~4.38 hours downtime per year"
+          ],
+          [
+            "Azure SQL Database (single server)",
+            "99.99%",
+            "~52.56 minutes downtime per year"
+          ],
+          [
+            "Azure Storage (LRS)",
+            "99.9%",
+            "~8.76 hours downtime per year"
+          ],
+          [
+            "Azure Storage (GRS)",
+            "99.99%",
+            "~52.56 minutes downtime per year"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with sli, slo and sla in azure workloads, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "SLA is not the same as reality",
+        "text": "Azure SLA figures assume the service is configured correctly and your application behaves well. If you exceed quota, misconfigure networking, or introduce dependency failures, the actual availability can be far worse than the published SLA."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Setting application-level SLOs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your application SLO should reflect what matters to users, not just what Azure guarantees. If users care about end-to-end checkout latency, your SLO might be '95% of requests complete in under 2 seconds.' You can measure this with Application Insights availability tests and track it as a burn rate alert in Azure Monitor."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Azure Monitor metric alert for SLO burn rate",
+        "content": "An alert rule that fires when the error budget is consumed too quickly.",
+        "language": "json",
+        "code": "{\n  \"location\": \"global\",\n  \"properties\": {\n    \"description\": \"Alert when error budget is consumed too fast\",\n    \"severity\": 2,\n    \"windowSize\": \"PT5M\",\n    \"evaluationFrequency\": \"PT1M\",\n    \"criteria\": {\n      \"allOf\": [\n        {\n          \"name\": \"HighErrorRate\",\n          \"metricTrigger\": {\n            \"metricName\": \"availabilityResults/availabilityPercentage\",\n            \"metricNamespace\": \"microsoft.insights/components\",\n            \"threshold\": 99.5,\n            \"operator\": \"LessThan\",\n            \"timeAggregation\": \"Average\"\n          }\n        }\n      ]\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error budgets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An error budget is simply 100% minus your SLO. If your SLO is 99.9%, your error budget is 0.1%. You can spend that budget on risky changes, or you can keep it in reserve for incidents. Error budgets align engineering incentives: when the budget is healthy, teams can ship faster; when the budget is exhausted, the focus shifts to stability."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Practical steps",
+        "items": [
+          "Choose SLIs that reflect real user experience, not just infrastructure health.",
+          "Set SLOs slightly tighter than your SLA so you catch problems before users do.",
+          "Use Azure Monitor alerts to track burn rate against your error budget.",
+          "Document your SLA assumptions and review them quarterly."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "An SLI is a metric, an SLO is a target, and an SLA is a contractual promise.",
+          "Azure service SLAs multiply when services are combined, so architecture decisions directly affect availability.",
+          "Error budgets help balance reliability work against feature delivery.",
+          "Always measure what matters to users, not just what Azure reports."
+        ],
+        "takeaway": "Design from the user's expectation inward, not from the Azure SLA outward."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "high-availability-and-zone-aware-architecture",
+    "rto-and-rpo-for-azure-applications"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure SLA details",
+      "url": "https://azure.microsoft.com/en-us/support/legal/sla/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official SLA tables for all Azure services, including calculations for composite SLAs."
+    },
+    {
+      "title": "Site Reliability Engineering: How Google Runs Production Systems",
+      "url": "https://sre.google/books/",
+      "type": "book",
+      "author": "Google",
+      "description": "The foundational text on SLOs, error budgets, and reliability engineering practices."
+    }
+  ]
 }

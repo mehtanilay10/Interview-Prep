@@ -3,59 +3,208 @@
   "slug": "request-pipeline-and-middleware-execution",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Request pipeline and middleware execution",
-  "description": "Learn about Request pipeline and middleware execution. Master the concepts, patterns, and best practices.",
+  "title": "Request Pipeline and Middleware Execution",
+  "description": "Understand how the ASP.NET Core middleware pipeline processes every request, how ordering affects behavior, and how to compose custom middleware for cross-cutting concerns.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "middleware",
+    "pipeline",
+    "delegates",
+    "request-processing"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Request pipeline and middleware execution** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with request pipeline and middleware execution."
+        "text": "Every HTTP request that reaches your ASP.NET Core application passes through a series of components called **middleware**. Each middleware can inspect the request, modify it, handle it entirely, or pass it to the next component. The sequence in which you register middleware determines the order of execution and is one of the most important concepts in the framework."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pipeline is built in Program.cs using methods like `Use`, `UseRouting`, `UseAuthentication`, and `Map`. Under the hood, these methods build a chain of `RequestDelegate` functions. When a request arrives, the first middleware runs, then the second, and so on, until an endpoint handles the request. The response then flows back through the same chain in reverse."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How Middleware Works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Middleware is usually written as a class with a constructor that accepts dependencies and an `Invoke` or `InvokeAsync` method. The framework injects the next `RequestDelegate` into your middleware, and you call it to continue the pipeline. If you never call the next delegate, the pipeline stops — this is called **short-circuiting**."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom middleware class",
+        "content": "A simple middleware that logs request details and short-circuits for a specific path.",
+        "language": "csharp",
+        "code": "public class RequestLoggingMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly ILogger<RequestLoggingMiddleware> _logger;\n\n    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)\n    {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context)\n    {\n        var path = context.Request.Path;\n        _logger.LogInformation(\"Request: {Method} {Path}\", context.Request.Method, path);\n\n        if (path.StartsWithSegments(\"/skip-logging\"))\n        {\n            context.Response.StatusCode = StatusCodes.Status200OK;\n            await context.Response.WriteAsync(\"Skipped\");\n            return; // short-circuit\n        }\n\n        await _next(context);\n\n        _logger.LogInformation(\"Response: {StatusCode}\", context.Response.StatusCode);\n    }\n}\n\n// Registration\napp.UseMiddleware<RequestLoggingMiddleware>();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Middleware Ordering Rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The order in which middleware is added to the pipeline matters. A middleware that runs early sees the raw request and the final response. A middleware that runs late sees only what earlier middleware allows through. Certain middleware has strict ordering requirements."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common ordering guidelines",
         "items": [
-          "Understand the fundamental principles of request pipeline and middleware execution",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Exception handling middleware should be registered first so it can catch errors from all downstream components.",
+          "HTTPS redirection should come early to ensure non-secure requests are upgraded before any sensitive processing.",
+          "Static file middleware should be early if you want files served without hitting the routing system.",
+          "Routing must come before any middleware that uses endpoint metadata, such as authentication or authorization.",
+          "CORS should be placed early so it handles preflight requests before routing or authentication.",
+          "Authentication should come before authorization because authorization depends on the authenticated user."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Classic Mistake: Swapping Auth and AuthZ",
+        "text": "Calling UseAuthorization before UseAuthentication is a very common mistake. Authentication establishes who the user is. Authorization decides what that user can do. If you swap them, authorization runs with no identity and will reject every request with a 401 or 403."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Inline vs Class-Based Middleware"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding request pipeline and middleware execution is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "You can write middleware as an inline lambda or as a reusable class. Inline middleware is quick for one-off logic. Class-based middleware is better for reusable logic, testability, and dependency injection. Both approaches receive the same `HttpContext` and `RequestDelegate`."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with request pipeline and middleware execution, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Inline middleware lambda",
+        "content": "Inline middleware is concise but harder to test and reuse.",
+        "language": "csharp",
+        "code": "app.Use(async (context, next) =>\n{\n    var stopwatch = Stopwatch.StartNew();\n\n    await next();\n\n    stopwatch.Stop();\n    context.Response.Headers[\"X-Response-Time-ms\"] = stopwatch.ElapsedMilliseconds.ToString();\n});"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Inline Lambda",
+          "Class-Based"
+        ],
+        "rows": [
+          [
+            "Reusability",
+            "Low: tied to one app builder",
+            "High: can be shared across projects"
+          ],
+          [
+            "Testability",
+            "Difficult to unit test",
+            "Easy: inject mocks via constructor"
+          ],
+          [
+            "Readability",
+            "Compact but can clutter Program.cs",
+            "Cleaner separation of concerns"
+          ],
+          [
+            "DI Support",
+            "Limited to captured variables",
+            "Full constructor injection"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "RequestDelegate",
+            "definition": "A delegate that represents the next middleware in the pipeline. Calling it passes control downstream."
+          },
+          {
+            "term": "Short-circuiting",
+            "definition": "When middleware handles a request without calling the next delegate, ending the pipeline early."
+          },
+          {
+            "term": "Terminal middleware",
+            "definition": "A middleware that does not call next(), effectively ending the pipeline and returning a response."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Response Time Middleware",
+        "description": "Create a reusable class-based middleware that measures request processing time and adds it as a response header.",
+        "steps": [
+          "Create a new class called ResponseTimeMiddleware with the standard constructor pattern.",
+          "In InvokeAsync, start a Stopwatch before calling next().",
+          "After next() returns, stop the Stopwatch and write the elapsed milliseconds into the X-Response-Time-ms response header.",
+          "Register the middleware in Program.cs using app.UseMiddleware<ResponseTimeMiddleware>().",
+          "Run the app and verify the header appears on responses."
+        ],
+        "expectedOutcome": "A reusable middleware component that adds X-Response-Time-ms to every response, demonstrating correct pipeline flow and header manipulation."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Middleware Pipeline Summary",
+        "points": [
+          "Every request flows through middleware in registration order, and responses flow back in reverse.",
+          "The next delegate passes control downstream; not calling it short-circuits the pipeline.",
+          "Ordering is critical: auth before authz, routing before auth, error handling first.",
+          "Class-based middleware supports DI and is preferred for reusable logic.",
+          "Inline middleware is useful for simple, app-specific behavior."
+        ],
+        "takeaway": "The middleware pipeline is the request-processing backbone of ASP.NET Core. Understanding ordering, short-circuiting, and the next delegate is essential for building correct, performant web applications."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "endpoint-routing-internals",
+    "request-cancellation-and-graceful-shutdown"
+  ],
+  "furtherReading": [
+    {
+      "title": "ASP.NET Core Middleware",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official middleware documentation covering concepts, writing custom middleware, and ordering rules."
+    },
+    {
+      "title": "Write custom ASP.NET Core middleware",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/write",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Step-by-step guide to creating class-based and inline middleware."
+    }
+  ]
 }

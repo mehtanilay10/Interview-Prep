@@ -4,58 +4,132 @@
   "moduleSlug": "database-internals-query-optimization",
   "courseSlug": "sql-server",
   "title": "B-tree indexes and page structure",
-  "description": "Learn about B-tree indexes and page structure. Master the concepts, patterns, and best practices.",
+  "description": "Understand how SQL Server physically stores data using 8 KB pages and B-tree index structures.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**B-tree indexes and page structure** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with b-tree indexes and page structure."
+        "text": "Every table and index in SQL Server is stored as a collection of 8 KB pages arranged in a B-tree structure. Understanding this physical layout explains why indexes speed up queries and why bad index design hurts performance."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of b-tree indexes and page structure",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "The 8 KB page"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding b-tree indexes and page structure is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "SQL Server stores data in fixed-size units called pages. Each page is exactly 8 KB. A page contains row data, a slot array, and a small header. When a row is wider than 8 KB, SQL Server moves large columns to Row-Overflow pages and leaves a 24-byte pointer behind."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "View page counts for a table",
+        "content": "Use this query to see how many pages a table or index is using.",
+        "code": "SELECT\n    t.name AS TableName,\n    i.name AS IndexName,\n    p.page_count,\n    p.used_page_count,\n    p.data_page_count\nFROM sys.dm_db_partition_stats AS p\nJOIN sys.tables AS t ON t.object_id = p.object_id\nJOIN sys.indexes AS i ON i.object_id = p.object_id\n    AND i.index_id = p.index_id\nWHERE t.name = 'Orders';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "B-tree levels"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A B-tree index is a balanced tree with three main parts: the root page at the top, intermediate index pages in the middle, and leaf pages at the bottom. The leaf level holds the actual data for clustered indexes, or index keys plus row locators for nonclustered indexes."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Key points about B-tree levels",
+        "items": [
+          "Root page: one page only; contains pointers to intermediate pages",
+          "Intermediate pages: navigate the tree to the right leaf page",
+          "Leaf pages: contain the final key values and either the data row or a row locator"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "b-tree-simple",
+        "caption": "Simplified B-tree structure with root, intermediate, and leaf levels",
+        "definition": "graph BT\n    subgraph Root\n        R[Root Page]\n    end\n    subgraph Intermediate\n        M1[Intermediate 1]\n        M2[Intermediate 2]\n    end\n    subgraph Leaf\n        L1[Leaf 1]\n        L2[Leaf 2]\n        L3[Leaf 3]\n        L4[Leaf 4]\n    end\n    R --> M1\n    R --> M2\n    M1 --> L1\n    M1 --> L2\n    M2 --> L3\n    M2 --> L4"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with b-tree indexes and page structure, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Page density matters",
+        "text": "If pages are full, the tree is shorter and queries are faster. If pages are sparse, the same data needs more pages and more I/O. Fill factor lets you control how full pages are when indexes are rebuilt."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Forwarded records and page splits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a row grows beyond the space available on its current page, SQL Server may move the entire row to a new page and leave a forwarding pointer behind. This is called a forwarded record. It is common in tables with varchar(max) columns that change size frequently. Page splits happen when a new row is inserted into a full page and the page is divided into two."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Check for forwarded records",
+        "content": "Forwarded records force extra I/O during scans. This query shows how many exist on a heap.",
+        "code": "SELECT\n    OBJECT_NAME(ps.object_id) AS table_name,\n    ps.forwarded_record_count\nFROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') AS ps\nWHERE ps.forwarded_record_count > 0;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Takeaway",
+        "points": [
+          "SQL Server stores everything in 8 KB pages arranged in a B-tree",
+          "The B-tree has root, intermediate, and leaf levels",
+          "Page splits and forwarded records degrade read performance",
+          "Fill factor and index design directly affect page density"
+        ],
+        "takeaway": "Good index design starts with understanding how pages and B-trees map physical reads to logical results."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "clustered-vs-nonclustered-indexes",
+    "seek-vs-scan"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs - Pages and Extents",
+      "url": "https://learn.microsoft.com/sql/relational-databases/pages-and-extents-architecture-guide",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Paul Randal - Inside the Storage Engine",
+      "url": "https://www.sqlskills.com/blogs/paul/category/storage-engine/",
+      "type": "article",
+      "author": "Paul Randal"
+    }
+  ]
 }

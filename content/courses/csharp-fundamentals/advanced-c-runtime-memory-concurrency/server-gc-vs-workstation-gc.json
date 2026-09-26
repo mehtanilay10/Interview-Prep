@@ -4,33 +4,46 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "Server GC vs workstation GC",
-  "description": "Learn about Server GC vs workstation GC. Master the concepts, patterns, and best practices.",
+  "description": "Compare the two GC modes, understand concurrent and background GC, and choose the right mode for your workload.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["GC", "server-GC", "workstation-GC", "latency", "throughput"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Server GC vs workstation GC** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with server gc vs workstation gc."
+        "text": "The .NET garbage collector can operate in two modes: workstation GC and server GC. Workstation GC is the default for desktop and console applications. It is optimized for responsiveness — it uses a single heap and runs concurrent collections in a background thread so the foreground application keeps running while the GC cleans up. Server GC is the default for ASP.NET Core and other server applications. It uses one heap per logical CPU, each on its own thread, to parallelize collection work across all cores."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choosing the wrong GC mode for your workload can mean the difference between a responsive application and one that stutters under load. Workstation GC gives you lower pause times for interactive applications. Server GC gives you higher throughput for applications that process many requests in parallel. In .NET 6 and later, a third option — dynamic GC — lets the runtime switch between workstation and server mode based on available CPU cores and process state."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Workstation GC: responsiveness first"
+      }
+ },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Workstation GC uses a single managed heap with a single ephemeral segment. When a background GC runs, it executes concurrently with your application code. The foreground threads continue allocating and executing while the background thread marks unreachable objects and builds free lists. This means the application is never fully stopped during a collection — it only pauses briefly at the beginning and end of each collection for synchronization."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the core differences between server gc and workstation gc",
-          "Know when to choose server gc over workstation gc",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Single heap shared across all application threads.",
+          "Background GC runs concurrently with foreground threads.",
+          "Pause times are typically under 1 millisecond for gen 0/1 collections.",
+          "Ideal for desktop apps, WPF, MAUI, and console tools.",
+          "Default for `dotnet run` and console project templates."
         ]
       }
     },
@@ -38,24 +51,93 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Server GC: throughput first"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding server gc vs workstation gc is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Server GC creates one heap and one GC thread per logical processor. Each heap has its own ephemeral segment and generation 2 segment. When a background GC runs, all GC threads cooperate to mark and sweep their respective heaps in parallel. Because the work is divided across all CPU cores, a server GC full collection can be faster than a workstation GC full collection on the same machine — even though each individual collection takes longer."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "One heap and one GC thread per logical CPU core.",
+          "All heaps share the same virtual address space but operate independently.",
+          "Background GC still runs concurrently, but work is parallelized across all heaps.",
+          "Higher throughput under concurrent load because collections scale with CPU count.",
+          "Default for ASP.NET Core, Worker Service, and cloud-native applications."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring GC mode in runtimeconfig.json",
+        "code": "{\n  \"runtimeOptions\": {\n    \"tfm\": \"net8.0\",\n    \"configProperties\": {\n      \"System.GC.Server\": true,\n      \"System.GC.Concurrent\": true,\n      \"System.GC.RetainVM\": false,\n      \"System.GC.LatencyMode\": \"Interactive\"\n    }\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "GC latency modes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `GCLatencyMode` setting controls how aggressively the GC runs. `Batched` is the default for most applications — the GC runs normally with background collections. `Interactive` reduces the aggressiveness of background GC, giving foreground threads more CPU time at the cost of slightly higher memory usage. `LowLatency` suspends background GC entirely for the duration of a critical section. `NoGCRegion` is the most extreme: it disables GC completely within a region, which is useful for frame-rate-critical game loops or real-time processing."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using NoGCRegion for a critical operation",
+        "code": "if (GC.TryStartNoGCRegion(10_000_000)) // 10 MB budget\n{\n    try\n    {\n        // This block runs without any GC pauses.\n        // All allocations must stay within the 10 MB budget.\n        for (int i = 0; i < batchSize; i++)\n        {\n            ProcessItem(items[i]);\n        }\n    }\n    finally\n    {\n        GC.EndNoGCRegion();\n    }\n}\nelse\n{\n    // Not enough memory available for NoGCRegion\n    // Fall back to normal GC mode\n    ProcessItemsNormally();\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with server gc vs workstation gc, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Server GC in containers needs explicit configuration",
+        "text": "Inside a container, the runtime cannot detect the available CPU cores by default. It assumes the host machine's core count, which leads to over-provisioning. Set `DOTNET_GC_SERVER=1` and `DOTNET_GC_CPU_COUNT` to the actual container core count. Also set `DOTNET_GCHeapHardLimit` and `DOTNET_GCHeapHardLimitPercent` so the GC respects container memory limits."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Workstation GC uses a single heap with concurrent background collection — ideal for interactive apps.",
+          "Server GC uses one heap per CPU core for parallel collection — ideal for server workloads with high throughput.",
+          "Dynamic GC lets the runtime switch modes automatically based on process state.",
+          "Always configure GC settings explicitly when running inside a container to match the actual resource limits."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["gc-generations-and-collection-behavior", "allocation-pressure-and-latency"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Workstation vs server GC",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/workstation-server-gc"
+    },
+    {
+      "type": "article",
+      "title": "GC latency modes",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/latency"
+    },
+    {
+      "type": "article",
+      "title": "GC in containers",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/extensions/garbage-collection-container"
+    }
+  ]
 }

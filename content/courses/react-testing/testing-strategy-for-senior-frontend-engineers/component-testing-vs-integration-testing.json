@@ -4,33 +4,120 @@
   "moduleSlug": "testing-strategy-for-senior-frontend-engineers",
   "courseSlug": "react-testing",
   "title": "Component testing vs integration testing",
-  "description": "Learn about Component testing vs integration testing. Master the concepts, patterns, and best practices.",
+  "description": "Learn the trade-offs between component testing and integration testing in React, when to use each, and how to build a balanced test pyramid for senior frontend engineers.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "testing",
+    "react",
+    "vitest",
+    "testing-library"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Component testing vs integration testing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with component testing vs integration testing."
+        "text": "As a senior frontend engineer, you will constantly make decisions about where to place testing effort. Component tests and integration tests sit at different levels of the testing pyramid, and understanding their distinct roles is one of the most important strategic choices you can make for a React codebase."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A component test isolates a single React component and renders it in a near-empty DOM. It verifies that the component behaves correctly given a set of props and user interactions. An integration test renders a small group of real components together — a form, a data table with a filter bar, or a modal and its trigger — and asserts on the behavior of the combined unit."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What component testing looks like in practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With React Testing Library, a component test renders one component and interacts with it as a user would. Here is a simple example that tests a user profile card in isolation:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Component test for a UserProfileCard using React Testing Library",
+        "code": "import { render, screen, fireEvent } from '@testing-library/react'\nimport { describe, it, expect } from 'vitest'\nimport UserProfileCard from './UserProfileCard'\n\ndescribe('UserProfileCard', () => {\n  it('displays the user name and toggles follow status', async () => {\n    const user = { id: '1', name: 'Ada Lovelace', isFollowing: false }\n    render(<UserProfileCard user={user} onToggleFollow={vi.fn()} />)\n\n    expect(screen.getByText('Ada Lovelace')).toBeDefined()\n    expect(screen.getByRole('button', { name: /follow/i })).toBeDefined()\n\n    fireEvent.click(screen.getByRole('button', { name: /follow/i }))\n    expect(screen.getByRole('button', { name: /following/i })).toBeDefined()\n  })\n})"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Component tests are fast, focused, and give you confidence that individual pieces work. But they cannot tell you whether those pieces wire together correctly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What integration testing looks like in practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An integration test brings real components together and lets them interact. Instead of mocking the child, you let the real child render and respond. Here is an integration test for a search form that includes a debounced input, a results list, and a loading skeleton:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Integration test for a search form with real child components",
+        "code": "import { render, screen, waitFor } from '@testing-library/react'\nimport { describe, it, expect, vi } from 'vitest'\nimport SearchPage from './SearchPage'\n\n// The API client is a real module, not a mock.\nvi.mock('./api', async () => {\n  const actual = await vi.importActual<typeof import('./api')>('./api')\n  return { ...actual, searchUsers: vi.fn() }\n})\n\ndescribe('SearchPage integration', () => {\n  it('shows results after typing and loading completes', async () => {\n    const { searchUsers } = await import('./api')\n    vi.mocked(searchUsers).mockResolvedValue([\n      { id: '1', name: 'Alan Turing' },\n    ])\n\n    render(<SearchPage />)\n\n    const input = screen.getByPlaceholderText('Search users...')\n    fireEvent.change(input, { target: { value: 'alan' } })\n\n    expect(screen.getByText(/loading/i)).toBeDefined()\n\n    await waitFor(() =>\n      expect(screen.getByText('Alan Turing')).toBeDefined()\n    )\n  })\n})"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Notice that the search list and loading state are real components. If the child forgets to expose a loading prop, this test breaks immediately — which is exactly what you want from integration coverage."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The testing pyramid applied to React"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the core differences between component testing and integration testing",
-          "Know when to choose component testing over integration testing",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Unit (component) tests: Fast, isolated, cheap to write. Target pure or near-pure components: buttons, cards, form fields.",
+          "Integration tests: Slower than unit tests, but catch wiring bugs. Target feature boundaries: forms with validation, data grids with filters, dashboards with multiple widgets.",
+          "End-to-end (E2E) tests: Slowest and most brittle, but simulate real user journeys. Reserve these for critical paths like login, checkout, and onboarding."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Common anti-pattern",
+        "text": "Teams that write only component tests discover integration bugs only in production. A component test that mocks every child cannot catch prop-drilling mismatches, missing context providers, or incorrect event payloads between real components."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "Component test",
+            "description": "One component, mocked children, fast execution, good for isolated business logic and edge cases."
+          },
+          {
+            "title": "Integration test",
+            "description": "Multiple real components, moderate execution time, catches wiring, prop, and context mismatches."
+          }
         ]
       }
     },
@@ -38,24 +125,55 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "How to decide which to write"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding component testing vs integration testing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Start with component tests for reusable, pure UI components.",
+          "Add integration tests at every feature boundary — wherever two or more real components must cooperate.",
+          "If a component test grows beyond ten assertions, it is probably hiding an integration test.",
+          "If an integration test is failing because of a child component, split it: keep the child's assertions in a component test, keep the wiring assertions in the integration test."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with component testing vs integration testing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Senior engineer signal",
+        "text": "The ratio of component to integration tests is not fixed. A design-system library needs more component tests. A dashboard with many interacting widgets needs more integration tests. Adjust the balance to the risk profile of the feature, not to an arbitrary percentage."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Component tests verify one component in isolation; integration tests verify how real components cooperate.",
+          "Use component tests for reusable, pure UI pieces.",
+          "Use integration tests at feature boundaries where props, context, and events cross component boundaries.",
+          "A healthy test suite needs both — neither level alone gives you enough confidence for a senior-level codebase."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "test-doubles-mocks-stubs-and-fakes",
+    "when-not-to-mock"
+  ],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "The Testing Trophy and Testing Library",
+      "url": "https://kentcdodds.com/blog/the-testing-trophy-and-testing-library"
+    },
+    {
+      "type": "article",
+      "title": "Common mistakes with React Testing Library",
+      "url": "https://kentcdodds.com/blog/common-mistakes-with-react-testing-library"
+    }
+  ]
 }

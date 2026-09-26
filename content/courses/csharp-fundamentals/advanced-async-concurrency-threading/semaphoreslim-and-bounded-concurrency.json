@@ -4,58 +4,83 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "SemaphoreSlim and bounded concurrency",
-  "description": "Learn about SemaphoreSlim and bounded concurrency. Master the concepts, patterns, and best practices.",
+  "description": "Limit concurrent operations with SemaphoreSlim to protect shared resources and improve throughput.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**SemaphoreSlim and bounded concurrency** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with semaphoreslim and bounded concurrency."
+        "text": "Sometimes you want to allow some parallelism, but not unlimited parallelism. `SemaphoreSlim` acts like a gate: only a fixed number of threads can pass through at once. This is essential when calling external services with rate limits or when saturating a database connection pool."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "SemaphoreSlim basics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A `SemaphoreSlim` is initialized with a count representing available slots. Threads call `Wait` (or `WaitAsync`) to acquire a slot. When they finish, they call `Release` to return the slot. If no slots are available, callers wait until another thread releases one."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bounding concurrent HTTP calls",
+        "language": "csharp",
+        "code": "private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(5);\nprivate readonly HttpClient _httpClient = new HttpClient();\n\npublic async Task<string[]> FetchUrlsAsync(string[] urls)\n{\n    var tasks = urls.Select(async url =>\n    {\n        await _semaphore.WaitAsync();\n        try\n        {\n            return await _httpClient.GetStringAsync(url);\n        }\n        finally\n        {\n            _semaphore.Release();\n        }\n    }).ToArray();\n\n    return await Task.WhenAll(tasks);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to use bounded concurrency"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of semaphoreslim and bounded concurrency",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**External rate limits** — APIs often cap requests per second. A semaphore enforces the limit without manual throttling.",
+          "**Database connection pools** — Connection pools have a fixed size. Bounding prevents exhaustion and connection timeouts.",
+          "**File or network I/O** — Opening too many files or sockets at once can overwhelm the OS."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding semaphoreslim and bounded concurrency is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with semaphoreslim and bounded concurrency, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Always release in a finally block",
+        "text": "If an exception occurs between `WaitAsync` and `Release`, the semaphore slot is lost permanently unless you release in `finally`. This silently reduces the maximum concurrency and can cause starvation."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "SemaphoreSlim limits the number of concurrent operations.",
+          "Use it to respect external rate limits and protect finite resources.",
+          "Always release the semaphore in a `finally` block."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "lock-and-monitor",
+    "concurrent-collections",
+    "channels-and-producer-consumer-pipelines"
+  ],
+  "furtherReading": [
+    { "title": "SemaphoreSlim Class (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.semaphoreslim" },
+    { "title": "Bounded concurrency with SemaphoreSlim (Stephen Cleary)", "url": "https://blog.stephencleary.com/2012/11/async-overnight/part-5-bounded-concurrency.html" }
+  ]
 }

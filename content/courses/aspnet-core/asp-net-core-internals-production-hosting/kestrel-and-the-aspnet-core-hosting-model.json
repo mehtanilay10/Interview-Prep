@@ -3,59 +3,178 @@
   "slug": "kestrel-and-the-aspnet-core-hosting-model",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Kestrel and the ASP.NET Core hosting model",
-  "description": "Learn about Kestrel and the ASP.NET Core hosting model. Master the concepts, patterns, and best practices.",
+  "title": "Kestrel and the ASP.NET Core Hosting Model",
+  "description": "Understand Kestrel's cross-platform server architecture, how it compares to IIS and Nginx, and how to configure it securely for production workloads.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "kestrel",
+    "hosting",
+    "servers",
+    "http"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Kestrel and the ASP.NET Core hosting model** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with kestrel and the asp.net core hosting model."
+        "text": "When you run a .NET web application, something has to listen for HTTP requests, accept network connections, and pass them into your code. In ASP.NET Core, that listener is a server. The default and most important server is **Kestrel**, a lightweight, cross-platform, event-driven HTTP server built into the framework."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kestrel is not just a wrapper around an existing web server. It is an independent server written in C# that can run directly on Linux, Windows, and macOS. It handles raw TCP connections, parses HTTP/1.1 and HTTP/2, and pushes requests into the ASP.NET Core pipeline. Because it is built into the framework, it has first-class access to middleware, DI, and configuration."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Hosting Models: In-Process vs Out-of-Process"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core supports two primary hosting models when running behind IIS or IIS Express. Understanding the difference is essential for diagnosing performance and memory issues in production."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Hosting model comparison",
         "items": [
-          "Understand the fundamental principles of kestrel and the asp.net core hosting model",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "In-Process: The application runs inside the IIS worker process (w3wp.exe or iisexpress.exe). Requests bypass the ASP.NET Core Module (ANCM) proxy and go directly to Kestrel's internal components. This offers the best performance and lowest latency.",
+          "Out-of-Process: The application runs in its own dotnet.exe process, and ANCM acts as a reverse proxy forwarding requests from IIS to Kestrel over HTTP. This model was the default in ASP.NET Core 2.x and is still supported for compatibility.",
+          "Modern default: ASP.NET Core 3.0+ defaults to In-Process hosting on Windows. Out-of-Process is still available but rarely needed unless you encounter specific compatibility issues."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Why In-Process is the Default",
+        "text": "In-Process hosting removes an extra network hop between IIS and your application. Benchmarks show meaningful throughput improvements, especially for high-latency payloads. The trade-off is that your code runs inside IIS's memory space, so crashes can bring down the worker process just like a classic ASP.NET application."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Configuring Kestrel for Production"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding kestrel and the asp.net core hosting model is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Kestrel is configured in Program.cs via WebApplicationBuilder.WebHost.ConfigureKestrel or by binding endpoints in appsettings.json. For production, you typically want to bind to specific ports or Unix sockets, set request size limits, enable HTTPS, and tune the thread pool."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with kestrel and the asp.net core hosting model, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Programmatic Kestrel configuration",
+        "content": "This example shows how to configure Kestrel limits and HTTPS directly in code.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.WebHost.ConfigureKestrel(options =>\n{\n    // Listen on port 5000 without HTTPS\n    options.ListenAnyIP(5000, listenOptions =>\n    {\n        listenOptions.Protocols = HttpProtocols.Http1AndHttp2;\n    });\n\n    // Listen on HTTPS port 5001 with a certificate\n    options.ListenAnyIP(5001, listenOptions =>\n    {\n        listenOptions.UseHttps(\"cert.pfx\", \"password\");\n    });\n\n    // Set request limits\n    options.Limits.MaxRequestBodySize = 50 * 1024 * 1024; // 50 MB\n    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);\n});;\n\nvar app = builder.Build();\napp.MapGet(\"/\", () => \"Hello from Kestrel!\");\napp.Run();"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you use Kestrel behind a reverse proxy like Nginx or IIS, the proxy handles TLS termination. In that scenario, Kestrel listens on HTTP internally, and you should enable Forwarded Headers so your application sees the correct client IP and scheme instead of the proxy's internal values."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Terminology"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Kestrel",
+            "definition": "A cross-platform, event-driven HTTP server built into ASP.NET Core that handles raw TCP connections and HTTP protocol parsing."
+          },
+          {
+            "term": "ANCM",
+            "definition": "ASP.NET Core Module, an IIS native module that proxies requests to the Kestrel process in Out-of-Process hosting."
+          },
+          {
+            "term": "In-Process Hosting",
+            "definition": "A hosting model where the ASP.NET Core app runs inside the IIS worker process, removing the network hop to Kestrel."
+          },
+          {
+            "term": "Out-of-Process Hosting",
+            "definition": "A hosting model where the app runs in a separate process and IIS proxies requests to it over HTTP."
+          },
+          {
+            "term": "Reverse Proxy",
+            "definition": "A server such as Nginx, IIS, or Apache that forwards client requests to Kestrel, often handling TLS termination and load balancing."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Compare Hosting Models",
+        "description": "Document the hosting model used by your current ASP.NET Core project and identify the Kestrel configuration.",
+        "steps": [
+          "Open the project's .csproj file and look for the AspNetCoreHostingModel property under a PropertyGroup for the IISExpress or IIS target.",
+          "If it is not set, determine which hosting model the project uses.",
+          "Locate where Kestrel is configured in Program.cs or appsettings.json.",
+          "Identify whether the app listens directly on ports or uses HTTPS with a certificate.",
+          "Write a short summary of how requests reach your application from the client to the endpoint."
+        ],
+        "expectedOutcome": "You will be able to explain the full request path from client to endpoint and identify whether your app uses In-Process or Out-of-Process hosting."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Kestrel and Hosting Summary",
+        "points": [
+          "Kestrel is the built-in, cross-platform HTTP server for ASP.NET Core.",
+          "In-Process hosting runs your app inside IIS, removing the ANCM proxy hop for better performance.",
+          "Out-of-Process hosting proxies requests from IIS to a separate dotnet.exe process.",
+          "Kestrel can be configured programmatically to control ports, HTTPS, request limits, and protocols.",
+          "Behind a reverse proxy, use Forwarded Headers to preserve the original client IP and HTTPS scheme."
+        ],
+        "takeaway": "Kestrel is the engine of your ASP.NET Core application. Understanding its hosting model and configuration is the first step to running production-grade web services."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "request-cancellation-and-graceful-shutdown"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kestrel Web Server in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation covering Kestrel configuration, HTTPS, limits, and performance tuning."
+    },
+    {
+      "title": "ASP.NET Core Hosting Model",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/hosting/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Overview of hosting models, generic host, and IIS integration."
+    },
+    {
+      "title": "Kestrel Endpoint Configuration",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Detailed guide to configuring HTTP, HTTPS, and Unix socket endpoints."
+    }
+  ]
 }

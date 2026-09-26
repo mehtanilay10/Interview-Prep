@@ -3,34 +3,48 @@
   "slug": "query-regression-after-deployment",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Query regression after deployment",
-  "description": "Learn about Query regression after deployment. Master the concepts, patterns, and best practices.",
+  "title": "Query Regression After Deployment",
+  "description": "Learn why query plans regress after deployments, how Query Store helps detect them, and how to force good plans while investigating root causes.",
   "order": 7,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "query-regression",
+    "plan-regression",
+    "query-store",
+    "deployment",
+    "sql-server"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Query regression after deployment** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with query regression after deployment."
+        "text": "One of the most common post-deployment problems in SQL Server is a **query plan regression**: a query that ran fast in testing suddenly runs slow in production. The database schema has not changed, the data has not changed, but the query is now using a slower execution plan. Understanding why this happens — and how to recover quickly — is essential for any team that deploys database changes."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Query plan regressions are not bugs in SQL Server. They are a natural consequence of the query optimizer's job: it chooses the best plan it can based on the statistics and environment available at compile time. When those inputs change — new statistics, new indexes, different parameter values, or a server with different memory or CPU — the optimizer may choose a different plan that is worse for your specific workload."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Plans Change After Deployment"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common Causes of Plan Regression",
         "items": [
-          "Understand the fundamental principles of query regression after deployment",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Statistics updates — a deployment may trigger automatic statistics updates, changing cardinality estimates",
+          "Schema changes — adding, dropping, or modifying indexes changes the set of plans the optimizer considers",
+          "Parameter sniffing — the first execution of a parameterized query gets a plan optimized for that specific parameter value; later executions with different values suffer",
+          "Server resource changes — deployments to a server with different memory, CPU, or max degree of parallelism settings",
+          "Plan cache eviction — a deployment or memory pressure event clears the plan cache, forcing recompilation under different conditions"
         ]
       }
     },
@@ -38,24 +52,155 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Detecting Regressions with Query Store"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding query regression after deployment is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Query Store is the primary tool for detecting plan regressions. It captures every plan for every query and tracks performance metrics over time. When a query's average duration or CPU spikes after a deployment, Query Store makes the regression visible. You can compare the old plan and the new plan side by side to understand what changed."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "query-store-regression",
+        "caption": "How Query Store detects a plan regression after deployment and enables forced plan recovery.",
+        "definition": "flowchart TB\n    A[Deployment completes] --> B[Query recompiles]\n    B --> C[New plan generated]\n    C --> D[Query Store records plan]\n    D --> E[Compare to previous plans]\n    E -->|Performance degraded| F[Regression detected]\n    F --> G[Force previous good plan]\n    G --> H[Performance restored]\n    E -->|Performance OK| I[Continue]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Query Store Must Be On Before the Deployment",
+        "text": "Query Store only detects regressions if it was capturing data before the deployment. If Query Store was off or in READ_ONLY mode, you will have no history to compare. Always verify Query Store is ON and in READ_WRITE mode before deploying."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Forcing a Plan"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a regression is detected, the fastest way to restore performance is to force the previous good plan using `sp_query_store_force_plan`. This tells the optimizer to skip recompilation for that query and always use the specified plan. Forcing a plan is a temporary fix — it buys you time to investigate and resolve the root cause without impacting users."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Force a Plan After a Regression",
+        "content": "Use Query Store catalog views to find the query and plan IDs, then force the good plan.",
+        "language": "sql",
+        "code": "-- Find the query and its plans\nSELECT \n    q.query_id,\n    p.plan_id,\n    rs.avg_duration / 1000.0 AS avg_duration_ms,\n    rs.avg_cpu_time / 1000.0 AS avg_cpu_ms,\n    rs.execution_type_desc,\n    qt.query_sql_text\nFROM sys.query_store_query AS q\nINNER JOIN sys.query_store_query_text AS qt ON q.query_text_id = qt.query_text_id\nINNER JOIN sys.query_store_plan AS p ON q.query_id = p.query_id\nINNER JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id\nWHERE qt.query_sql_text LIKE '%SELECT%FROM%Orders%WHERE%Status%'\nORDER BY rs.avg_duration DESC;\n\n-- Force the good plan (plan_id = 1 in this example)\nEXEC sp_query_store_force_plan @query_id = 42, @plan_id = 1;\n\n-- Later, when the root cause is resolved, unforce\nEXEC sp_query_store_unforce_plan @query_id = 42;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Forced Plans Are a Band-Aid",
+        "text": "Forcing a plan restores performance but does not fix the root cause. If the underlying issue is stale statistics or a missing index, forcing a plan may hide the problem until data volume changes enough to make the forced plan worse. Always create a ticket to investigate and resolve the root cause."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Root Cause Investigation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Once the forced plan is in place and users are no longer impacted, investigate why the optimizer chose a different plan. Compare the two execution plans in SSMS: look at estimated vs actual row counts, missing index warnings, join types, and parallelism differences. Common root causes include stale statistics, missing indexes, or parameter sniffing issues."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Root Cause Checklist",
+        "items": [
+          "Compare the old and new execution plans in SSMS — look for scans vs seeks, join order changes, and parallel vs serial execution",
+          "Check statistics age on the tables involved — outdated statistics are the most common cause of bad cardinality estimates",
+          "Look for missing index warnings in the new plan — the deployment may have changed which indexes are available",
+          "Test the query with representative parameter values to see if parameter sniffing is the culprit",
+          "If statistics are stale, update them with FULLSCAN and monitor if the optimizer returns to the good plan naturally"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with query regression after deployment, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Pre-Deployment Checklist",
+        "text": "Before deploying schema or index changes to production: verify Query Store is on, take a baseline of top resource-consuming queries, and test the deployment in staging with production-like data volume. The best regression is the one that never happens."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I automate regression detection?",
+            "answer": "Yes. Query Store data can be queried programmatically to detect regressions. Many teams build alerts that fire when a query's average duration increases by a threshold (e.g., 2x) compared to its 7-day baseline."
+          },
+          {
+            "question": "What if Query Store is not enabled?",
+            "answer": "If Query Store is off, your options are limited. You can use Extended Events or the plan cache to find recent slow queries, but you will not have historical comparison data. Enable Query Store immediately after recovering from the regression."
+          },
+          {
+            "question": "Does Azure SQL Database handle regressions differently?",
+            "answer": "Azure SQL Database has automatic plan correction (automatic forced plans) that can detect and force good plans without manual intervention. It is a useful safety net, but you should still review forced plans and investigate root causes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Query plan regressions happen when the optimizer chooses a slower plan after deployment due to changed statistics, schema, or environment",
+          "Query Store is essential for detecting regressions — it must be on before the deployment to capture the baseline",
+          "Forcing a previous good plan with sp_query_store_force_plan restores performance immediately while you investigate",
+          "Root causes are typically stale statistics, missing indexes, or parameter sniffing — fix these rather than relying on forced plans",
+          "Pre-deployment checks (Query Store on, baseline captured, staging tested) prevent most regressions from reaching production"
+        ],
+        "takeaway": "Plan regressions are not a sign that SQL Server is broken — they are a sign that the optimizer's inputs changed. Treat Query Store as your safety net and forced plans as your first response."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "index-maintenance-vs-actual-query-performance",
+    "snapshot-isolation-and-row-versioning"
+  ],
+  "furtherReading": [
+    {
+      "title": "Query Store (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Automatic Plan Correction (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/automatic-tuning",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Parameter Sniffing and Plan Caching (Brent Ozar)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/parameter-sensitive-plan-optimization",
+      "type": "article",
+      "author": "Brent Ozar"
+    }
+  ]
 }

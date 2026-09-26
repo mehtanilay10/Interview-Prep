@@ -4,58 +4,174 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Problem Details and consistent error contracts",
-  "description": "Learn about Problem Details and consistent error contracts. Master the concepts, patterns, and best practices.",
+  "description": "Return errors that clients can rely on. Learn RFC 7807 ProblemDetails, envelope patterns, and how to build a consistent error contract across your entire API.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Problem Details and consistent error contracts** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with problem details and consistent error contracts."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of problem details and consistent error contracts",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Error responses are part of your API contract. When every endpoint returns errors in a slightly different shape, clients spend extra code handling exceptions instead of focusing on business logic. A consistent error contract makes your API feel predictable and professional."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding problem details and consistent error contracts is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "This lesson covers the industry-standard RFC 7807 ProblemDetails format, how ASP.NET Core adopts it natively, and how to extend it into a custom envelope that your frontend, mobile apps, and integrations can rely on."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is RFC 7807 ProblemDetails"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RFC 7807 defines a standard JSON structure for describing errors in HTTP APIs. Instead of inventing a new shape for every endpoint, you return a `ProblemDetails` object that includes a type URI, a title, a status code, a detail string, and an optional instance URI. Clients learn one format and can parse every error the same way."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Standard ProblemDetails response",
+        "code": "HTTP/1.1 400 Bad Request\nContent-Type: application/problem+json\n\n{\n  \"type\": \"https://http.codes/400\",\n  \"title\": \"One or more validation errors occurred.\",\n  \"status\": 400,\n  \"traceId\": \"|abc123.def456|\",\n  \"errors\": {\n    \"Email\": [\"The Email field is required.\"],\n    \"Age\": [\"The field Age must be between 18 and 120.\"]\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ASP.NET Core built-in support"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core 8+ returns `ProblemDetails` automatically for 400 and 500 responses when you call `AddProblemDetails()`. You do not need to manually construct error objects for validation failures or unhandled exceptions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enabling ProblemDetails in Program.cs",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddControllers();\nbuilder.Services.AddProblemDetails(options =>\n{\n    options.CustomizeProblemDetails = ctx =>\n    {\n        ctx.ProblemDetails.Extensions[\"traceId\"] = ctx.HttpContext.TraceIdentifier;\n        ctx.ProblemDetails.Extensions[\"instance\"] = ctx.HttpContext.Request.Path;\n    };\n});\n\nvar app = builder.Build();\napp.UseExceptionHandler();\napp.UseStatusCodePages();\napp.MapControllers();\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Building a consistent envelope"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "While `ProblemDetails` is excellent for HTTP semantics, many teams prefer an application-level envelope that adds a correlation ID, timestamp, and a machine-readable error code. This envelope is what your frontend and mobile apps actually consume."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom error envelope",
+        "code": "public class ApiErrorResponse\n{\n    public string CorrelationId { get; set; } = string.Empty;\n    public int Status { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string Detail { get; set; } = string.Empty;\n    public string? Code { get; set; }\n    public Dictionary<string, string[]> Errors { get; set; } = new();\n    public DateTime Timestamp { get; set; } = DateTime.UtcNow;\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A global exception filter or middleware transforms any exception into this envelope. The client always receives `200` for the envelope structure plus the real status in the body, or you can let the status code pass through and wrap only the body."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation and model-state errors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Model validation failures are the most common error type. Normalize them into the same envelope your exceptions use. Flatten the `ModelState` dictionary into the `Errors` property so clients receive a predictable structure whether the error came from validation, a business rule, or a database failure."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Normalizing ModelState into the envelope",
+        "code": "public static ApiErrorResponse FromModelState(ActionContext context)\n{\n    var errors = context.ModelState\n        .Where(kvp => kvp.Value?.Errors.Count > 0)\n        .ToDictionary(\n            kvp => kvp.Key,\n            kvp => kvp.Value!.Errors\n                .Select(e => e.ErrorMessage)\n                .ToArray()\n        );\n\n    return new ApiErrorResponse\n    {\n        Status = StatusCodes.Status400BadRequest,\n        Title = \"Validation failed\",\n        Detail = \"One or more fields contain invalid values.\",\n        Errors = errors,\n        CorrelationId = context.HttpContext.TraceIdentifier\n    };\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error codes clients can rely on"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Status codes are coarse. Two different validation failures can both return 400, but the client may need to distinguish them. Add a stable, machine-readable `code` field to your envelope—for example, `VALIDATION_FAILED`, `ORDER_NOT_FOUND`, or `PAYMENT_DECLINED`. Codes should never change once published; treat them like a public API."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with problem details and consistent error contracts, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Consistency rule",
+        "text": "Every error in your API should follow the same envelope shape. If one endpoint returns `{ message: string }` and another returns `{ errors: [...] }`, client code becomes fragile and hard to test."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Use RFC 7807 ProblemDetails as the HTTP-level standard and extend it for your application.",
+          "Normalize all errors—validation, business rules, exceptions—into one envelope shape.",
+          "Add stable error codes so clients can react programmatically without parsing human text.",
+          "Include a correlation ID and timestamp on every error for support and debugging."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "api-versioning-and-compatibility",
+    "pagination-filtering-and-sorting-design"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 7807: Problem Details for HTTP APIs",
+      "url": "https://tools.ietf.org/html/rfc7807",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs: ProblemDetails in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/fundamentals/error-handling",
+      "type": "article"
+    },
+    {
+      "title": "Google AIP: Standard Error Response",
+      "url": "https://google.aip.dev/193",
+      "type": "article"
+    }
+  ]
 }

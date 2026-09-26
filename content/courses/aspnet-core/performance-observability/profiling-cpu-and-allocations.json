@@ -3,59 +3,167 @@
   "slug": "profiling-cpu-and-allocations",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Profiling CPU and allocations",
-  "description": "Learn about Profiling CPU and allocations. Master the concepts, patterns, and best practices.",
+  "title": "Profiling CPU and Allocations",
+  "description": "Use dotnet-trace, dotnet-counters, and Visual Studio diagnostics to profile CPU usage and garbage collection allocations in ASP.NET Core applications.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Profiling CPU and allocations** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with profiling cpu and allocations."
+        "text": "CPU profiling tells you which methods consume the most processor time. Allocation profiling shows where objects are created and how often the garbage collector runs. In ASP.NET Core, high allocation rates increase GC pause times, which directly hurts request latency and throughput."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of profiling cpu and allocations",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "CPU Profiling with dotnet-trace"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding profiling cpu and allocations is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`dotnet-trace` collects CPU samples from a running .NET process with minimal overhead. You can analyze the trace with Visual Studio, `dotnet-gcdump`, or PerfView to see which methods are hot. Look for tight loops, LINQ queries over large collections, and recursive algorithms."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Collecting a CPU Trace",
+        "content": "Run these commands in a terminal to collect a 30-second CPU profile from a production-like environment.",
+        "code": "# Collect a CPU trace for 30 seconds\ndotnet-trace collect \\\n  --process-id 1234 \\\n  --providers Microsoft-DotNETCore-SampleProfiler \\\n  --duration 00:00:30 \\\n  -o cpu.nettrace\n\n# Convert to a speed scope format for browser viewing\ndotnet-trace convert cpu.nettrace --format speedscope",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Allocation Analysis with dotnet-counters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`dotnet-counters` monitors live processes for GC heap size, allocation rate, and time in GC. A high allocation rate means the GC is working harder and may pause threads. Focus on Gen 0 and Gen 1 collections; Gen 2 collections indicate long-lived objects or large object heap fragmentation."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "GC Allocation Rate",
+            "definition": "The number of bytes allocated per second. High rates increase GC frequency and pause times."
+          },
+          {
+            "term": "Gen 2 GC",
+            "definition": "A full garbage collection that examines all managed objects and is the most expensive pause type."
+          },
+          {
+            "term": "Large Object Heap (LOH)",
+            "definition": "Memory allocated for objects larger than 85,000 bytes. LOH is only collected during Gen 2 GCs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monitoring GC and Allocations",
+        "content": "Use dotnet-counters to watch GC metrics in real time while generating load against your API.",
+        "code": "dotnet-counters monitor \\\n  --process-id 1234 \\\n  System.Runtime \\\n    GC Heap Size \\\n    Gen 0 GC Count \\\n    Gen 1 GC Count \\\n    Gen 2 GC Count \\\n    Allocation Rate",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Tool",
+          "Best For",
+          "Overhead",
+          "Environment"
+        ],
+        "rows": [
+          [
+            "dotnet-trace",
+            "CPU hot paths, method-level samples",
+            "Low",
+            "Production-like"
+          ],
+          [
+            "dotnet-counters",
+            "Live GC, memory, thread pool metrics",
+            "Very low",
+            "Production"
+          ],
+          [
+            "Visual Studio Diagnostic Tools",
+            "Deep inspection, line-level timings",
+            "High",
+            "Local only"
+          ],
+          [
+            "PerfView",
+            "ETW traces, allocation stacks",
+            "Low",
+            "Windows production-like"
+          ]
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with profiling cpu and allocations, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Avoid Debug Builds",
+        "text": "Always profile Release builds with optimizations enabled. Debug builds allocate more, inline fewer methods, and produce misleading CPU profiles. Enable ReadyToRun and tiered compilation for the most accurate picture."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Common allocation culprits in ASP.NET Core include string concatenation in loops, boxing value types, capturing variables in LINQ closures, and returning large anonymous objects from API endpoints. Use `ArrayPool<T>` and `Memory<T>` to reduce allocations in high-throughput paths."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Use dotnet-trace for CPU hot paths and PerfView or Visual Studio for deep dives.",
+          "Use dotnet-counters to watch allocation rate and GC pause times in real time.",
+          "Profile Release builds with optimizations enabled for realistic data.",
+          "Focus on Gen 2 collections and high allocation rates before micro-optimizing individual lines."
+        ],
+        "takeaway": "If you cannot measure it, you cannot improve it. Start with the lowest-overhead tool that answers your question."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "request-latency-decomposition",
+    "connection-pool-exhaustion",
+    "slow-api-investigation-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Diagnostic tools for .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/",
+      "type": "article"
+    },
+    {
+      "title": "dotnet-trace tool guide",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace",
+      "type": "article"
+    },
+    {
+      "title": "PerfView tutorial",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debugvc6/perfview",
+      "type": "article"
+    }
+  ]
 }

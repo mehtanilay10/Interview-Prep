@@ -4,33 +4,56 @@
   "moduleSlug": "react-frontend-follow-ups",
   "courseSlug": "interview-qa",
   "title": "How would you implement optimistic updates with rollback?",
-  "description": "Interview question: How would you implement optimistic updates with rollback?. Learn the answer with detailed explanation and examples.",
+  "description": "Build resilient optimistic UI: update state immediately, rollback on failure, and handle edge cases like retries, deduplication, and concurrent mutations.",
   "order": 7,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["React", "React Query", "UX", "Optimistic Updates", "Error Handling"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**How would you implement optimistic updates with rollback?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with how would you implement optimistic updates with rollback?."
+        "text": "Optimistic updates make the UI feel instant by assuming the mutation will succeed and updating the cache immediately. If the server rejects the change—network error, validation failure, conflict—you must roll back to the previous state and surface the error. The implementation needs to handle concurrent mutations, race conditions, and the user clicking twice."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The three phases"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
+        "title": "Optimistic mutation lifecycle",
         "items": [
-          "Understand the step-by-step process of would you implement optimistic updates with rollback?",
-          "Identify the key components and their interactions",
-          "Recognize common failure points and how to avoid them",
-          "Apply best practices for reliable implementation"
+          "**Optimistic apply**: snapshot the current cache, apply the expected change, and render the new state immediately",
+          "**Server mutation**: fire the actual API call in the background",
+          "**Success or rollback**: on success, replace the snapshot with the server-confirmed data; on failure, restore the snapshot and notify the user"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Optimistic update",
+            "definition": "A UI change applied before the server confirms it, based on the assumption that the mutation will succeed."
+          },
+          {
+            "term": "Rollback",
+            "definition": "Restoring the previous state when an optimistic update fails. Requires a snapshot of the pre-mutation state."
+          },
+          {
+            "term": "Mutation",
+            "definition": "A state-changing operation: create, update, or delete. In React Query, mutations are created with `useMutation`."
+          },
+          {
+            "term": "Idempotency key",
+            "definition": "A unique token sent with a mutation so the server can deduplicate retries. Prevents duplicate creates on retry."
+          }
         ]
       }
     },
@@ -38,25 +61,149 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Implementation with React Query"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding how would you implement optimistic updates with rollback? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "React Query's `useMutation` provides `onMutate`, `onError`, and `onSettled` callbacks that make optimistic updates straightforward. `onMutate` is the right place to snapshot and apply the optimistic change because it fires before the async mutation starts."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Optimistic toggle with rollback",
+        "content": "Toggling a todo's completed status. The cache is updated immediately and restored if the API call fails.",
+        "code": "function TodoItem({ todo }: { todo: Todo }) {\n  const queryClient = useQueryClient();\n\n  const toggleMutation = useMutation({\n    mutationFn: (completed: boolean) =>\n      api.patch(`/todos/${todo.id}`, { completed }),\n\n    onMutate: async (completed) => {\n      await queryClient.cancelQueries({ queryKey: ['todos'] });\n      const previous = queryClient.getQueryData<Todo[]>(['todos']);\n\n      queryClient.setQueryData<Todo[]>(['todos'], old =>\n        old!.map(t => t.id === todo.id ? { ...t, completed } : t)\n      );\n\n      return { previous };\n    },\n\n    onError: (_err, _completed, context) => {\n      queryClient.setQueryData(['todos'], context!.previous);\n    },\n\n    onSettled: () => {\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n\n  return (\n    <li>\n      <input\n        type=\"checkbox\"\n        checked={todo.completed}\n        onChange={e => toggleMutation.mutate(e.target.checked)}\n      />\n      {todo.title}\n      {toggleMutation.isError && (\n        <span className=\"error\">Failed to update — reverted</span>\n      )}\n    </li>\n  );\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with how would you implement optimistic updates with rollback?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Cancel before you mutate",
+        "text": "Always `cancelQueries` at the start of `onMutate`. If another query refetch is in flight, you want it to complete after your optimistic update, not overwrite it with stale data."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling edge cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "What can go wrong",
+        "items": [
+          "**Double-click**: the user clicks the button twice, firing two mutations. Use `isPending` to disable the button during the mutation",
+          "**Out-of-order response**: mutation B finishes before mutation A, leaving the cache in the wrong state. Use sequential mutations or cancel in-flight ones",
+          " **Partial failure**: one item in a batch fails. Decide whether to roll back the whole batch or keep the successful updates",
+          "**Stale snapshot**: if another component modifies the same query between `onMutate` and `onError`, restoring the snapshot may undo unrelated changes"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Disable button during mutation",
+        "content": "Prevent double-clicks by disabling the trigger while the mutation is pending.",
+        "code": "<button\n  onClick={() => toggleMutation.mutate(!todo.completed)}\n  disabled={toggleMutation.isPending}\n>\n  {toggleMutation.isPending ? 'Saving...' : 'Toggle'}\n</button>",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic update flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "optimistic-flow",
+        "caption": "The optimistic update lifecycle with rollback path",
+        "definition": "flowchart TD\n    A[\"User action\"] --> B[\"onMutate: snapshot cache\"]\n    B --> C[\"Apply optimistic change\"]\n    C --> D[\"Render updated UI immediately\"]\n    D --> E[\"Fire mutation to server\"]\n    E --> F{\"Server responds?\"}\n    F -->|Success| G[\"onSettled: invalidate / refetch\"]\n    F -->|Error| H[\"onError: restore snapshot\"]\n    H --> I[\"Show error message to user\"]\n    G --> J[\"UI reflects confirmed state\"]\n    I --> K[\"User can retry\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FAQ"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-up questions",
+        "items": [
+          {
+            "question": "When should you NOT use optimistic updates?",
+            "answer": "When the failure rate is high (e.g., payment processing), when the change is irreversible, or when the user needs to see server-side validation errors before the change applies. Optimistic updates feel magical but only when they almost always succeed."
+          },
+          {
+            "question": "How do you handle optimistic updates with Server Actions?",
+            "answer": "Server Actions in Next.js can be used with `useOptimistic` from React. `useOptimistic` wraps your state and shows the optimistic value during the pending action, automatically reverting on error. It's lighter than React Query for simple cases."
+          },
+          {
+            "question": "What about Redux? Can you do optimistic updates there?",
+            "answer": "Yes—dispatch the optimistic action immediately, then dispatch a success or failure action. The reducer handles the rollback. The pattern is the same: snapshot, apply, commit or revert. Redux just requires more boilerplate than React Query's built-in mutation callbacks."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Optimistic updates feel fast but require careful rollback logic",
+          "Always snapshot the cache before applying the optimistic change",
+          "Cancel in-flight queries before mutating to prevent stale overwrites",
+          "Disable triggers during `isPending` to prevent double mutations",
+          "Restore the snapshot in `onError` and surface the error to the user"
+        ],
+        "takeaway": "Optimistic UI is a UX pattern, not just a technical trick. Handle failure gracefully because users will notice when things silently revert."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Further reading"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "TanStack Query: [Optimistic Updates](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates)",
+          "React Docs: [useOptimistic](https://react.dev/reference/react/useOptimistic)",
+          "Kent C. Dodds: [Optimistic UI](https://kentcdodds.com/blog/optimistic-ui)"
+        ]
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "furtherReading": [
+    {
+      "title": "TanStack Query: Optimistic Updates",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates",
+      "type": "article"
+    },
+    {
+      "title": "React Docs: useOptimistic",
+      "url": "https://react.dev/reference/react/useOptimistic",
+      "type": "article"
+    }
+  ],
+  "technology": "React"
 }

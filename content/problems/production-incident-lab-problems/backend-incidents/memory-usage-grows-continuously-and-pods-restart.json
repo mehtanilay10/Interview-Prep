@@ -4,33 +4,62 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Memory usage grows continuously and pods restart",
-  "description": "Problem: Memory usage grows continuously and pods restart. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose a memory leak that causes Kubernetes pods to restart by collecting heap dumps, analyzing GC patterns, and fixing the root cause in application code.",
   "order": 5,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["memory-leak", "kubernetes", "oomkill", "garbage-collection", "heap-dump", "pod-restart"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Memory usage grows continuously and pods restart** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with memory usage grows continuously and pods restart."
+        "text": "Your Kubernetes pods restart every few hours. The container memory limit is 512Mi, and the usage graph shows a steady climb from 200Mi to 490Mi before the OOMKill. CPU is normal, and there are no obvious traffic spikes. You need to find the memory leak, capture evidence, and fix it without increasing the memory limit."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Symptoms and evidence"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of memory usage grows continuously and pods restart",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Memory usage in Grafana or Prometheus climbs linearly and never drops after traffic decreases",
+          "Pods receive SIGKILL with reason OOMKilled in their status",
+          "Application logs show no errors before the kill",
+          "GC logs show decreasing time between full garbage collections",
+          "Heap size after GC is larger after each collection cycle",
+          "Restart count in Kubernetes increases steadily"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Memory leak",
+            "definition": "Memory that is allocated but never released, often due to references that are never garbage collected."
+          },
+          {
+            "term": "OOMKill",
+            "definition": "Linux Out of Memory Killer terminates a process when the system or cgroup runs out of memory."
+          },
+          {
+            "term": "Garbage collection",
+            "definition": "Automatic memory management that reclaims memory occupied by objects no longer in use."
+          },
+          {
+            "term": "Heap dump",
+            "definition": "A snapshot of the Java or .NET heap that shows which objects are consuming memory and what references them."
+          },
+          {
+            "term": "Memory pressure",
+            "definition": "The state where available memory is low and the system is actively trying to free memory."
+          }
         ]
       }
     },
@@ -38,24 +67,116 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Diagnostic workflow"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding memory usage grows continuously and pods restart is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Confirm the leak: observe memory over time and verify it does not plateau",
+          "Check GC logs for shrinking free heap after each collection",
+          "Enable heap dump on OOM in your container runtime or application config",
+          "Analyze the heap dump with a profiler (dotMemory, Visual Studio Diagnostic Tools, or Eclipse MAT)",
+          "Identify the dominant object type and trace its references to find the root",
+          "Check for common leak patterns: event handlers, caches without eviction, static references"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Memory profiling tools",
+        "cards": [
+          {
+            "title": "dotMemory / dotTrace",
+            "description": "JetBrains .NET memory and performance profiler.",
+            "pros": ["Great .NET support", "Visual retention graphs", "Easy to compare snapshots"],
+            "cons": ["Paid product", "Requires attaching to process"]
+          },
+          {
+            "title": "Visual Studio Diagnostic Tools",
+            "description": "Built-in memory usage and snapshot tooling in Visual Studio.",
+            "pros": ["No extra installation", "Integrated with debugging", "Good for .NET Framework and Core"],
+            "cons": ["Windows-only", "Less powerful than dedicated profilers"]
+          },
+          {
+            "title": "PerfView",
+            "description": "Free ETW-based performance and memory profiler from Microsoft.",
+            "pros": ["Free", "Detailed GC and allocation stacks", "Low overhead"],
+            "cons": ["Steep learning curve", "Windows-centric UI"]
+          },
+          {
+            "title": "Eclipse MAT",
+            "description": "Memory Analyzer Tool for Java heap dumps.",
+            "pros": ["Free", "Dominator tree and leak suspects", "Large heap support"],
+            "cons": ["Java-only", "Requires heap dump generation"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Event handler memory leak in .NET",
+        "content": "Subscribing to events without unsubscribing prevents garbage collection of the subscriber:",
+        "code": "// Leak: event handler keeps OrderService alive\npublic class OrderProcessor\n{\n    public OrderProcessor(IEventBus bus)\n    {\n        bus.OrderCreated += OnOrderCreated; // Never unsubscribed\n    }\n    \n    private void OnOrderCreated(object sender, OrderEventArgs e)\n    {\n        // Process order...\n    }\n}\n\n// Fix: unsubscribe or use weak events\npublic class OrderProcessor : IAsyncDisposable\n{\n    private readonly IEventBus _bus;\n    \n    public OrderProcessor(IEventBus bus)\n    {\n        _bus = bus;\n        _bus.OrderCreated += OnOrderCreated;\n    }\n    \n    public async ValueTask DisposeAsync()\n    {\n        _bus.OrderCreated -= OnOrderCreated;\n        await Task.CompletedTask;\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-memory-leak-lifecycle",
+        "caption": "Memory leak lifecycle from allocation to OOMKill in Kubernetes",
+        "definition": "graph TD\n    A[Request allocates object] --> B[Object referenced by static cache]\n    B --> C[GC runs but object survives]\n    C --> D[Heap usage increases]\n    D --> E[GC runs more frequently]\n    E --> F[Heap after GC grows]\n    F --> G[Memory approaches limit]\n    G --> H[OOMKilled by Linux kernel]\n    H --> I[Kubernetes restarts pod]\n    I --> A"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with memory usage grows continuously and pods restart, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Heaps do not shrink automatically",
+        "text": "In .NET and Java, the heap can grow to accommodate allocations but does not return memory to the OS eagerly. A plateau near the memory limit is a strong signal of a leak, not normal behavior."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Find a memory leak using a heap dump",
+        "description": "Take a small application with an intentional memory leak. Generate a heap dump and analyze it to find the root cause.",
+        "steps": [
+          "Create or clone a small API that leaks memory (e.g., by caching objects in a static list)",
+          "Run the app and generate load until memory usage climbs",
+          "Capture a heap dump using dotnet-dump or ProcDump",
+          "Analyze the dump with dotMemory or Visual Studio to find the leaking object type",
+          "Fix the leak and verify memory usage stabilizes"
+        ],
+        "expectedOutcome": "You should be able to identify the exact object type and reference chain that is preventing garbage collection."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Verify the leak by observing memory growth over time",
+          "Collect a heap dump during the spike, not after the restart",
+          "Use a profiler to find the object type and reference chain causing the leak",
+          "Fix the root cause; do not just increase the memory limit"
+        ],
+        "takeaway": "Memory limits in Kubernetes are a safety net, not a target. If your app needs increasing memory over time, it has a leak."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Memory Management in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How garbage collection works in .NET and how to diagnose memory issues."
+    }
+  ]
 }

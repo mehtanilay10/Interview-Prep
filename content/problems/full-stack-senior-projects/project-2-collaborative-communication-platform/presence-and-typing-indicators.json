@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Presence and typing indicators** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with presence and typing indicators."
+        "text": "Presence and typing indicators are among the most visible real-time features in a communication platform. They require low latency, efficient broadcasting, and careful throttling to avoid overwhelming the server and distracting users. Senior engineers treat these ephemeral signals as a system design challenge, not just a UI detail."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of presence and typing indicators",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Presence signals online, offline, away, and busy states with low latency and eventual consistency",
+          "Typing indicators are transient events that should expire automatically if not refreshed",
+          "Throttle typing events on the client to reduce message bus load and network overhead",
+          "Broadcast presence changes only to users who care: room members, conversation participants, or team members",
+          "Use presence leases: a heartbeat that expires after a timeout, avoiding stale presence when a client crashes",
+          "Design the data model for presence to support queries like who is online in this room",
+          "Handle the long tail of slow clients that miss heartbeats and need graceful degradation"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Presence lease",
+            "definition": "A time-bounded claim that a user is online, refreshed periodically by a heartbeat and automatically expired if not renewed."
+          },
+          {
+            "term": "Throttle",
+            "definition": "Limiting the rate at which events are sent, typically to the minimum rate that preserves UX."
+          },
+          {
+            "term": "Debounce",
+            "definition": "Delaying an event until the user stops performing an action, used for typing indicators to avoid signaling every keystroke."
+          },
+          {
+            "term": "Ephemeral state",
+            "definition": "Data that is intentionally short-lived and can be safely discarded without persistence."
+          },
+          {
+            "term": "Fan-out",
+            "definition": "Sending a message to all subscribers in a channel, which can create a hot-spot if the channel has many members."
+          }
         ]
       }
     },
@@ -44,18 +74,143 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding presence and typing indicators is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Poorly implemented presence and typing indicators can degrade the entire system. Unthrottled typing events from two hundred users in a channel can generate more messages per second than the chat itself. Stale presence that never expires makes users trust the system less. Getting these features right requires designing for scale from the start."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with presence and typing indicators, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use the smallest useful interval",
+        "text": "A typing indicator should be sent at most once every two to three seconds and expire after five seconds of inactivity. A presence heartbeat every thirty seconds with a ninety-second lease is usually sufficient. Smaller values look better but multiply the load on the message bus."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Presence data model"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "User presence record: userId, status enum, lastSeen timestamp, currentRoomId optional",
+          "Room presence set: a Redis sorted set keyed by room ID with scores of lastSeen timestamps",
+          "Lease renewal: update lastSeen on each heartbeat; remove entries older than the lease timeout",
+          "Status transitions: online to away after thirty seconds of no heartbeat; away to offline after ninety seconds"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-presence-flow",
+        "caption": "Presence and typing indicator event flow",
+        "definition": "graph TD\n    A[Client] -->|Heartbeat 30s| B[Server]\n    B --> C[Update Redis Sorted Set]\n    C --> D[Expire old entries 90s]\n    A -->|Typing start| E[Server]\n    E -->|Throttle 3s| F[Publish to room channel]\n    F --> G[Broadcast to room members]\n    G --> H[Client updates UI]\n    I[Client disconnect] --> J[Remove from presence set]\n    J --> K[Broadcast offline event]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: polling versus event-driven presence"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Approaches to presence",
+        "cards": [
+          {
+            "title": "Client polling",
+            "description": "Clients periodically ask the server who is online.",
+            "pros": ["Simple to implement", "Works without WebSocket"],
+            "cons": ["Wastes bandwidth", "Stale between polls", "Does not scale"]
+          },
+          {
+            "title": "Server push via WebSocket",
+            "description": "Server pushes presence updates when they happen.",
+            "pros": ["Low latency", "Efficient bandwidth", "Accurate state"],
+            "cons": ["Requires persistent connections", "More complex server logic"]
+          },
+          {
+            "title": "Redis sorted set with lease",
+            "description": "Server stores presence in Redis with an expiration score and queries by range.",
+            "pros": ["Fast room queries", "Automatic expiry", "Scales to many rooms"],
+            "cons": ["Requires Redis", "Clock skew across servers"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement presence with Redis sorted sets",
+        "description": "Build a presence system using a Redis sorted set where the score is a Unix timestamp and the member is the user ID. Implement heartbeat renewal, expiry cleanup, and a room membership query.",
+        "steps": [
+          "Create a Redis sorted set per room with key pattern presence:room:{roomId}",
+          "On heartbeat, add or update the user ID with the current timestamp as the score",
+          "Set a key expiration on the sorted set to ninety seconds to handle abandoned rooms",
+          "Query online users with ZRANGEBYSCORE using the current timestamp minus the lease timeout",
+          "Implement a cleanup job that removes stale entries every ten seconds"
+        ],
+        "expectedOutcome": "You should be able to query who is currently online in any room with a single Redis command and no stale entries."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How do I handle timezone differences in presence timestamps?",
+            "answer": "Use UTC timestamps everywhere. Store and compare timestamps as Unix epoch integers. Do not rely on client-local clocks for expiry logic."
+          },
+          {
+            "question": "What if a user has multiple tabs open?",
+            "answer": "Track connection count per user. Only broadcast offline when the last connection closes. Use a reference count in Redis: increment on connect, decrement on close, and remove only when the count reaches zero."
+          },
+          {
+            "question": "Should I persist presence to PostgreSQL?",
+            "answer": "Persist only if you need historical presence analytics. For real-time queries, Redis is sufficient and far faster. Write to PostgreSQL asynchronously if you need audit logs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Presence is ephemeral state; treat it as such in your data model",
+          "Throttle typing events to reduce message bus load",
+          "Use Redis sorted sets for efficient room-based presence queries",
+          "Handle multi-tab presence by tracking connection counts per user"
+        ],
+        "takeaway": "Presence and typing indicators look simple on the surface, but they require careful rate limiting, expiry, and broadcast design to work at scale."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "websocket-connection-lifecycle",
+    "message-persistence-and-ordering"
+  ],
+  "furtherReading": [
+    {
+      "title": "Redis Sorted Sets for Presence",
+      "url": "https://redis.io/docs/latest/data-types/sorted-sets/",
+      "type": "article",
+      "author": "Redis",
+      "description": "How to use sorted sets for time-based presence queries with automatic expiry."
+    }
+  ]
 }

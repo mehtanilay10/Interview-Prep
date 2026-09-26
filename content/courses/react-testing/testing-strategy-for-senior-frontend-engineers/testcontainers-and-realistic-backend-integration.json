@@ -4,58 +4,151 @@
   "moduleSlug": "testing-strategy-for-senior-frontend-engineers",
   "courseSlug": "react-testing",
   "title": "Testcontainers and realistic backend integration",
-  "description": "Learn about Testcontainers and realistic backend integration. Master the concepts, patterns, and best practices.",
+  "description": "Use Testcontainers to spin up real databases and services in integration tests, catching schema and query bugs that in-memory fakes miss.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "testing",
+    "testcontainers",
+    "postgres",
+    "integration"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Testcontainers and realistic backend integration** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with testcontainers and realistic backend integration."
+        "text": "In-memory databases are convenient, but they lie. SQLite behaves differently from PostgreSQL. Prisma's SQLite generator skips features like JSON columns, enums, and certain constraints that your production database supports. Testcontainers solves this by starting a real Docker container — PostgreSQL, MySQL, Redis — during your test run, so your tests execute against a database that matches production."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For a senior frontend engineer, Testcontainers is most useful in API integration and end-to-end tests where the frontend talks to a real backend. It is not a replacement for unit tests, but it fills the gap between mocked unit tests and full-stack E2E tests."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Setting up Testcontainers with PostgreSQL"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The workflow is straightforward: start a container before the test suite runs, apply migrations, run the tests, then stop the container. Here is a minimal Vitest setup:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "ts",
+        "caption": "Testcontainers setup for PostgreSQL in a Vitest global setup file",
+        "code": "import { GenericContainer, Wait } from 'testcontainers'\nimport { exec } from 'child_process'\nimport { promisify } from 'events'\n\nexec = promisify(exec)\n\nlet container: GenericContainer\n\nexport async function startPostgres() {\n  container = new GenericContainer('postgres:16-alpine')\n    .withEnvironment({\n      POSTGRES_USER: 'test',\n      POSTGRES_PASSWORD: 'test',\n      POSTGRES_DB: 'app_test',\n    })\n    .withExposedPorts(5432)\n    .withWaitStrategy(Wait.forListeningPorts())\n\n  const started = await container.start()\n  const host = started.getHost()\n  const port = started.getMappedPort(5432)\n\n  process.env.DATABASE_URL =\n    `postgresql://test:test@${host}:${port}/app_test`\n\n  await exec('npx prisma migrate deploy')\n}\n\nexport async function stopPostgres() {\n  await container?.stop()\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In your vitest.config.ts, hook these into the global setup and teardown:"
+      }
+    },
+    {
+      "type": "example",
+      "language": "ts",
+      "caption": "Vitest config wiring Testcontainers into global setup",
+      "code": "import { defineConfig } from 'vitest/config'\nimport { startPostgres, stopPostgres } from './test-setup'\n\nexport default defineConfig({\n  test: {\n    globalSetup: [startPostgres],\n    globalTeardown: [stopPostgres],\n    pool: 'forks',\n  },\n})"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Integration test against the real database"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With the container running, your test can call the real Prisma client and exercise actual SQL behavior. Here is a test for an API route that creates and fetches a bookmark:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "ts",
+        "caption": "Integration test using Testcontainers and the real Prisma client",
+        "code": "import { describe, it, expect, beforeAll, afterAll } from 'vitest'\nimport prisma from '@/lib/prisma'\n\ndescribe('POST /api/bookmarks', () => {\n  it('creates and returns a bookmark', async () => {\n    const response = await fetch('http://localhost:3000/api/bookmarks', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({\n        lessonSlug: 'component-testing-vs-integration-testing',\n        courseSlug: 'react-testing',\n      }),\n    })\n\n    const bookmark = await response.json()\n    expect(response.status).toBe(201)\n    expect(bookmark.lessonSlug).toBe('component-testing-vs-integration-testing')\n\n    const inDb = await prisma.bookmark.findUnique({\n      where: { id: bookmark.id },\n    })\n    expect(inDb).toBeDefined()\n  })\n})"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to reach for Testcontainers"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of testcontainers and realistic backend integration",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Your schema uses production-only features (JSON columns, PostGIS, enums) that SQLite does not support.",
+          "You have experienced bugs from ORM dialect differences between dev and production.",
+          "Your team owns the backend API and can run it in a container alongside the database.",
+          "You want CI to catch migration failures before they reach production."
         ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Understanding testcontainers and realistic backend integration is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with testcontainers and realistic backend integration, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Performance and CI considerations",
+        "text": "Starting Docker containers is slower than in-memory tests. Use Testcontainers for a focused integration suite, not for hundreds of unit-style tests. In CI, reuse the Docker layer cache and run container tests in a dedicated job so they do not block faster unit test runs."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "In-memory database",
+            "description": "Fast, but dialect differences hide bugs. Good for unit-style logic tests."
+          },
+          {
+            "title": "Testcontainers",
+            "description": "Slower, but production-accurate. Good for migration, schema, and query integration tests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Testcontainers starts real services in Docker during tests, eliminating dialect and schema mismatches.",
+          "Use it for integration tests that verify Prisma queries, migrations, and API routes against PostgreSQL.",
+          "Combine it with a smaller in-memory suite for fast feedback loops.",
+          "Keep container tests in a separate CI job to protect overall pipeline speed."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "component-testing-vs-integration-testing",
+    "playwright-based-e2e-testing"
+  ],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Testcontainers Node.js documentation",
+      "url": "https://node.testcontainers.org/"
+    },
+    {
+      "type": "article",
+      "title": "Prisma testing best practices",
+      "url": "https://www.prisma.io/docs/orm/prisma-client/testing"
+    }
+  ]
 }

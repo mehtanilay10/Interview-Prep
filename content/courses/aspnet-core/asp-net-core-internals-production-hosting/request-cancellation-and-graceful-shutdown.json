@@ -3,59 +3,144 @@
   "slug": "request-cancellation-and-graceful-shutdown",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Request cancellation and graceful shutdown",
-  "description": "Learn about Request cancellation and graceful shutdown. Master the concepts, patterns, and best practices.",
+  "title": "Request Cancellation and Graceful Shutdown",
+  "description": "Use CancellationToken to propagate request cancellation, implement graceful shutdown patterns, and ensure in-flight work completes safely before the application stops.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "cancellation",
+    "shutdown",
+    "graceful",
+    "cancellationtoken"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Request cancellation and graceful shutdown** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with request cancellation and graceful shutdown."
+        "text": "In production, requests do not always run to completion. A user may close a browser tab, a load balancer may drop an idle connection, or an orchestrator may signal that the application is shutting down. **Request cancellation** in ASP.NET Core uses `CancellationToken` to propagate these signals through your code so you can stop work early and release resources cleanly."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Graceful shutdown is the companion concept. When the host receives a stop signal, it stops accepting new requests and gives in-flight requests a limited window to finish. If your code respects cancellation tokens, the application can drain active work and shut down without losing data or corrupting state."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "CancellationToken Sources in ASP.NET Core"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core binds several `CancellationToken` sources to each request. The most important is `HttpContext.RequestAborted`, which is triggered when the client disconnects. Additional tokens come from the host lifetime during shutdown. You should pass these tokens all the way down to `async` APIs like EF Core queries, HTTP calls, and `Task.Delay`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Propagating cancellation to database and HTTP calls",
+        "content": "A controller action that respects client disconnects.",
+        "language": "csharp",
+        "code": "[HttpGet(\"products/{id}\")]\npublic async Task<IActionResult> Get(int id, CancellationToken ct)\n{\n    var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id, ct);\n    if (product == null) return NotFound();\n\n    var reviews = await _httpClient.GetFromJsonAsync<List<Review>>(\n        $\"https://reviews.example.com/api/products/{id}\", ct);\n\n    var result = new ProductDetail(product, reviews);\n    return Ok(result);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Graceful Shutdown Flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a stop signal arrives, the host begins a coordinated shutdown. It stops accepting new requests, triggers the `IApplicationLifetime.ApplicationStopping` event, waits for the shutdown timeout, and then exits. Your middleware, controllers, and hosted services must observe cancellation to participate in this graceful flow."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Graceful shutdown sequence",
         "items": [
-          "Understand the fundamental principles of request cancellation and graceful shutdown",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Host receives SIGTERM, Ctrl+C, or IIS stop signal.",
+          "Kestrel stops accepting new TCP connections.",
+          "ApplicationStopping event is raised.",
+          "In-flight requests receive cancellation tokens.",
+          "IHostedService.StopAsync is called with a timeout token.",
+          "If work completes within ShutdownTimeout, the process exits cleanly.",
+          "If the timeout expires, the host logs a warning and forces exit."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Do Not Block Shutdown Indefinitely",
+        "text": "StopAsync should complete quickly. If you perform long cleanup work, such as draining a large queue, use the cancellation token to stop accepting new work and finish only the items already in progress. The default ShutdownTimeout is five seconds."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Cancellation in Background Services"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding request cancellation and graceful shutdown is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`BackgroundService` automatically passes a cancellation token to `ExecuteAsync`. Use this token to break out of loops, cancel pending async operations, and dispose resources. Never ignore this token — if you do, the host may wait indefinitely and then force-kill your process, which can lead to data loss."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with request cancellation and graceful shutdown, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "BackgroundService with cancellation-aware loop",
+        "content": "A polling loop that exits cleanly on shutdown.",
+        "language": "csharp",
+        "code": "public class QueueProcessor : BackgroundService\n{\n    private readonly ILogger<QueueProcessor> _logger;\n\n    public QueueProcessor(ILogger<QueueProcessor> logger) => _logger = logger;\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        _logger.LogInformation(\"Queue processor started\");\n\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                await ProcessNextMessageAsync(stoppingToken);\n            }\n            catch (OperationCanceledException)\n            {\n                // Expected during shutdown; exit gracefully\n                break;\n            }\n            catch (Exception ex)\n            {\n                _logger.LogError(ex, \"Error processing message\");\n            }\n        }\n\n        _logger.LogInformation(\"Queue processor stopped\");\n    }\n\n    private async Task ProcessNextMessageAsync(CancellationToken ct)\n    {\n        var message = await _queue.ReceiveAsync(ct);\n        // Process message...\n    }\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Cancellation and Shutdown Summary",
+        "points": [
+          "CancellationToken propagates client disconnects and host shutdown signals.",
+          "Pass HttpContext.RequestAborted to async APIs like EF Core and HttpClient.",
+          "Graceful shutdown stops new requests and lets in-flight work finish.",
+          "IHostedService.StopAsync receives a timeout token for cleanup.",
+          "BackgroundService provides ExecuteAsync with automatic cancellation support.",
+          "Always handle OperationCanceledException to exit loops cleanly."
+        ],
+        "takeaway": "Cancellation and graceful shutdown are the safety nets of production ASP.NET Core applications. By respecting tokens throughout your codebase, you ensure that requests can be abandoned safely and applications can shut down without data loss or corruption."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "backgroundservice-and-hosted-workloads",
+    "health-checks-and-readiness-vs-liveness"
+  ],
+  "furtherReading": [
+    {
+      "title": "Request cancellation in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/http-requests#cancellation",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on HttpContext.RequestAborted and propagating cancellation tokens."
+    },
+    {
+      "title": "Graceful shutdown in .NET Generic Host",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/extensions/generic-host#shutdown",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Details on host shutdown, IHostLifetime, and graceful stop behavior."
+    }
+  ]
 }

@@ -3,59 +3,188 @@
   "slug": "dependency-injection-lifetimes-and-scope-validation",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Dependency injection lifetimes and scope validation",
-  "description": "Learn about Dependency injection lifetimes and scope validation. Master the concepts, patterns, and best practices.",
+  "title": "Dependency Injection Lifetimes and Scope Validation",
+  "description": "Master Transient, Scoped, and Singleton lifetimes, understand scope validation rules, and learn to diagnose and fix lifetime-related bugs in production.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "dependency-injection",
+    "lifetimes",
+    "scoped",
+    "singleton",
+    "transient"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Dependency injection lifetimes and scope validation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with dependency injection lifetimes and scope validation."
+        "text": "ASP.NET Core includes a built-in dependency injection (DI) container that manages object creation and lifetime. Every service you register — from database contexts to email senders — has a **lifetime** that determines when a new instance is created and how long it is kept. Choosing the wrong lifetime is one of the most common sources of subtle, production-only bugs."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The container supports three lifetimes: **Transient**, **Scoped**, and **Singleton**. Transient creates a new instance every time. Scoped creates one instance per HTTP request. Singleton creates one instance for the entire application. Each lifetime has clear use cases, and mixing them incorrectly causes cross-request data leakage, thread-safety issues, and memory leaks."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Three Lifetimes"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Service lifetime definitions",
         "items": [
-          "Understand the fundamental principles of dependency injection lifetimes and scope validation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Transient: A new instance is created every time the service is requested from the container. Use this for lightweight, stateless services such as validators or formatters.",
+          "Scoped: One instance is created per HTTP request. All services within the same request share the same scoped instance. DbContext is the most common scoped service.",
+          "Singleton: One instance is created the first time it is requested, and the same instance is reused for every request until the application shuts down. Use this for stateless caches, configuration, or logging services."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering services with different lifetimes",
+        "content": "Show how the same interface can be registered with different lifetimes in Program.cs.",
+        "language": "csharp",
+        "code": "public interface IReportGenerator { Task GenerateAsync(); }\n\npublic class TransientReportGenerator : IReportGenerator\n{\n    private int _counter = 0;\n    public Task GenerateAsync()\n    {\n        _counter++;\n        Console.WriteLine($\"Transient call #{_counter}\");\n        return Task.CompletedTask;\n    }\n}\n\n// Registrations\nbuilder.Services.AddTransient<IReportGenerator, TransientReportGenerator>();\nbuilder.Services.AddScoped<IOrderRepository, OrderRepository>();\nbuilder.Services.AddSingleton<ICacheService, InMemoryCacheService>();"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Scope Validation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding dependency injection lifetimes and scope validation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "ASP.NET Core 6.0+ enables scope validation by default in development. The container detects when a service with a shorter lifetime is injected into a service with a longer lifetime. For example, injecting a Scoped service into a Singleton is an error because the Singleton would capture a request-specific instance and reuse it across all requests, potentially leaking data between users."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with dependency injection lifetimes and scope validation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Scope Validation Exception",
+        "text": "If you see Cannot resolve scoped service from root provider, it means a Singleton or transient consumer is trying to consume a Scoped service. The fix is usually to change the consumer to Scoped or inject an IServiceProvider and create a scope manually."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Capturing a scoped service in a singleton (bug)",
+        "content": "This code compiles but fails at runtime when scope validation is enabled.",
+        "language": "csharp",
+        "code": "public class BadSingletonCache\n{\n    private readonly AppDbContext _db;\n\n    public BadSingletonCache(AppDbContext db)\n    {\n        // _db is captured from the first request that resolved the singleton\n        _db = db;\n    }\n}\n\nbuilder.Services.AddSingleton<BadSingletonCache>(); // throws at runtime\nbuilder.Services.AddDbContext<AppDbContext>(...);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Thread Safety and Singletons"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Singleton services are shared across all concurrent requests. If your Singleton stores mutable state, it must be thread-safe. Use locks, concurrent collections, or immutable data structures. A common mistake is using `HttpContext` inside a Singleton — `HttpContext` is scoped to a single request and is not thread-safe."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "IServiceScope",
+            "definition": "A scope created by the DI container for a single request. All scoped services are tied to this scope."
+          },
+          {
+            "term": "Scope Validation",
+            "definition": "A runtime check that prevents services with shorter lifetimes from being injected into services with longer lifetimes."
+          },
+          {
+            "term": "Service Provider",
+            "definition": "The object that resolves services from the container. Root providers are application-wide; scoped providers are per-request."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Why is DbContext scoped and not transient?",
+            "answer": "DbContext tracks entity changes and caches data during a single request. If it were transient, every injection point would create a new instance, breaking change tracking. If it were singleton, multiple requests would share the same tracker, causing race conditions and memory leaks."
+          },
+          {
+            "question": "Should I inject ILogger into a Singleton?",
+            "answer": "Yes. ILogger<T> is effectively a singleton-like service. The logging framework is designed to be thread-safe and shared across all requests."
+          },
+          {
+            "question": "What if I really need a scoped service inside a singleton?",
+            "answer": "Inject IServiceProvider into the singleton, create a new scope with CreateScope(), resolve the scoped service from that scope, and dispose the scope when done. This is an advanced pattern and should be used sparingly."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Audit Service Lifetimes",
+        "description": "Review an existing codebase and identify incorrect lifetime registrations.",
+        "steps": [
+          "Open a project with multiple registered services.",
+          "For each registration, note its intended lifetime and whether it holds state.",
+          "Check if any Singleton depends on a Scoped or Transient service.",
+          "Enable scope validation warnings in the .csproj and run the app to catch mismatches.",
+          "Fix any mismatches by changing the consuming service lifetime or introducing a factory pattern."
+        ],
+        "expectedOutcome": "You will understand how lifetime mismatches manifest and how to correct them using scope validation and proper lifetime choices."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Dependency Injection Summary",
+        "points": [
+          "Transient: new instance per resolution. Use for lightweight, stateless services.",
+          "Scoped: one instance per request. Use for DbContext and request-specific services.",
+          "Singleton: one instance per app. Use for caches and stateless shared services.",
+          "Scope validation catches lifetime mismatches at startup in development.",
+          "Singletons must be thread-safe because they are shared across all requests."
+        ],
+        "takeaway": "Service lifetimes are the contract between your code and the DI container. Choosing the right lifetime prevents cross-request leaks, race conditions, and memory issues that are notoriously difficult to debug in production."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "options-pattern-and-configuration-providers",
+    "ihttpclientfactory-and-handler-lifetimes"
+  ],
+  "furtherReading": [
+    {
+      "title": "Dependency injection in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on service lifetimes, registration, and scope validation."
+    },
+    {
+      "title": "Scope validation in .NET dependency injection",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection#scope-validation",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Details on the scope validation feature and how to resolve common errors."
+    }
+  ]
 }

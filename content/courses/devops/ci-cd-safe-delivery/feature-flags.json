@@ -4,33 +4,45 @@
   "moduleSlug": "ci-cd-safe-delivery",
   "courseSlug": "devops",
   "title": "Feature flags",
-  "description": "Learn about Feature flags. Master the concepts, patterns, and best practices.",
+  "description": "Decouple deployment from release using feature flags to enable, disable, or target functionality without changing code.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "CI/CD",
+    "feature-flags",
+    "trunk-based-development",
+    "release"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Feature flags** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with feature flags."
+        "text": "Feature flags let you ship code to production while keeping the new functionality hidden. A simple boolean in configuration determines whether a feature is active. This decouples deployment from release: you can merge code on Monday, turn it on for internal users on Tuesday, and roll it out to everyone on Friday. If something breaks, you turn it off in seconds instead of rolling back an entire release."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson explains the difference between release flags and experiment flags, how to manage flag lifecycle, and why trunk-based development makes feature flags practical."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Types of feature flags"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common flag categories",
         "items": [
-          "Understand the fundamental principles of feature flags",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Release flags: hide incomplete features until they are ready for users.",
+          "Permission flags: enable features for specific roles, tenants, or regions.",
+          "Experiment flags: run A/B tests or multivariate experiments.",
+          "Operational flags: kill switches for high-traffic paths during incidents."
         ]
       }
     },
@@ -38,24 +50,174 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Flag implementation example"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding feature flags is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Flags should be evaluated in one place and applied consistently. The following C# example shows a feature flag provider reading from configuration and a service checking the flag before executing new logic."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Feature flag service in C#",
+        "content": "A centralized flag provider keeps feature checks consistent across the application.",
+        "code": "public interface IFeatureFlagService\n{\n    bool IsEnabled(string featureName);\n}\n\npublic class ConfigurationFeatureFlagService : IFeatureFlagService\n{\n    private readonly IConfiguration _configuration;\n\n    public ConfigurationFeatureFlagService(IConfiguration configuration)\n    {\n        _configuration = configuration;\n    }\n\n    public bool IsEnabled(string featureName)\n    {\n        return _configuration.GetValue<bool>($\"Features:{featureName}\");\n    }\n}\n\n// Usage in a controller\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class CheckoutController : ControllerBase\n{\n    private readonly IFeatureFlagService _flags;\n\n    public CheckoutController(IFeatureFlagService flags)\n    {\n        _flags = flags;\n    }\n\n    [HttpPost]\n    public IActionResult Complete(Order order)\n    {\n        if (_flags.IsEnabled(\"ExpressCheckoutV2\"))\n        {\n            return CompleteWithExpressV2(order);\n        }\n        return CompleteWithLegacy(order);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Trunk-based development and flags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Feature flags work best with trunk-based development, where everyone merges small changes to the main branch frequently. Long-lived branches with hidden features become merge nightmares. With flags, incomplete features are merged behind a disabled flag, so the main branch always contains deployable code."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with feature flags, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Remove flags after release",
+        "text": "Every flag has a cost: code complexity, testing surface area, and cognitive load. Assign an owner and a removal date when you create a flag. Treat leftover flags as technical debt."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Flag lifecycle management"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Lifecycle stages",
+        "items": [
+          "Create: define the flag, its default state, and its target audience.",
+          "Validate: test both branches in staging with the flag on and off.",
+          "Release: enable for a small audience and observe metrics.",
+          "Ramp: gradually increase exposure while monitoring.",
+          "Remove: delete the flag and dead code once the feature is permanent."
+        ]
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Flag state",
+          "Meaning",
+          "Typical audience"
+        ],
+        "rows": [
+          [
+            "Off",
+            "Feature is hidden for everyone.",
+            "All users"
+          ],
+          [
+            "On",
+            "Feature is visible to everyone.",
+            "All users"
+          ],
+          [
+            "Percentage",
+            "Feature is visible to a fraction of users.",
+            "Gradual rollout"
+          ],
+          [
+            "Allow list",
+            "Feature is visible to specific users or tenants.",
+            "Internal, beta testers"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Feature flag checklist",
+        "items": [
+          {
+            "text": "Flags have a single source of truth and consistent evaluation.",
+            "hint": "Avoid scattered boolean checks in controllers and views."
+          },
+          {
+            "text": "Every flag has a defined owner and removal date.",
+            "hint": "Track this in your feature management dashboard."
+          },
+          {
+            "text": "Both branches are tested in CI when the flag is created.",
+            "hint": "Run tests with the flag on and off."
+          },
+          {
+            "text": "Flags do not contain business logic that outlives the feature.",
+            "hint": "If the flag has complex conditions, it may be doing too much."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Feature flags decouple deployment from release, enabling safer and faster shipping.",
+          "Use trunk-based development to keep the main branch always deployable.",
+          "Treat flags as temporary infrastructure: create, validate, release, then remove.",
+          "Automated rollback is faster and safer than manual code rollbacks."
+        ],
+        "takeaway": "Feature flags are powerful, but only if you have the discipline to remove them."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How many feature flags is too many?",
+            "answer": "There is no fixed limit, but if you cannot name every flag, explain its purpose, and know when it will be removed, you have too many."
+          },
+          {
+            "question": "Should feature flags be in code or external configuration?",
+            "answer": "Simple boolean flags can live in configuration. Complex targeting rules, percentage rollouts, and experiments benefit from a dedicated feature management platform."
+          }
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "build-test-package-deploy-pipeline-design",
+    "canary-releases",
+    "backward-compatible-deployments"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure App Configuration: Feature Management",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-app-configuration/",
+      "type": "article",
+      "description": "Microsoft's managed feature flag service with targeting rules."
+    },
+    {
+      "title": "Trunk-Based Development",
+      "url": "https://trunkbaseddevelopment.com/",
+      "type": "article",
+      "description": "Why short-lived branches and feature flags work well together."
+    },
+    {
+      "title": "LaunchDarkly Blog",
+      "url": "https://launchdarkly.com/blog/",
+      "type": "article",
+      "description": "Best practices for feature flagging at scale."
+    }
+  ]
 }

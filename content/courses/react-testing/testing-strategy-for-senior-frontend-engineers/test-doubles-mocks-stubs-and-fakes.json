@@ -4,33 +4,45 @@
   "moduleSlug": "testing-strategy-for-senior-frontend-engineers",
   "courseSlug": "react-testing",
   "title": "Test doubles: mocks, stubs and fakes",
-  "description": "Learn about Test doubles: mocks, stubs and fakes. Master the concepts, patterns, and best practices.",
+  "description": "Understand the different types of test doubles in React testing, when to use each one, and how to avoid the most common mocking mistakes.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "testing",
+    "vitest",
+    "mocking",
+    "test-doubles"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Test doubles: mocks, stubs and fakes** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with test doubles: mocks, stubs and fakes."
+        "text": "Test doubles are stand-in objects that replace real collaborators in a test. The term comes from the movie stunt industry: a double does the job of the real actor for a specific scene. In testing, using the right double for the right job keeps tests fast and focused while still giving you useful feedback."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The four most common types are dummies, stubs, spies, mocks, and fakes. Each serves a different purpose, and mixing them up — especially using a mock where a stub would do — is one of the most common sources of brittle test suites."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The five test double types"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of test doubles: mocks, stubs and fakes",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Dummy: Passed around but never used. Fills a parameter list so the test compiles.",
+          "Stub: Provides canned answers to calls made during the test. Does not record or fail on unexpected calls.",
+          "Spy: Records how it was called — arguments, call count, order — without changing behavior.",
+          "Mock: Pre-programmed with expectations. It fails the test if a call was not made or was made with wrong arguments.",
+          "Fake: A working implementation with shortcuts, like an in-memory database instead of a real one."
         ]
       }
     },
@@ -38,24 +50,107 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Stubs in practice"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding test doubles: mocks, stubs and fakes is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A stub is the most commonly needed double. It simply returns a value so the component under test can keep running. Here is a stub that provides a fixed user object to a profile widget:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Using a stub for a useCurrentUser hook in a component test",
+        "code": "import { render, screen } from '@testing-library/react'\nimport { describe, it, expect, vi } from 'vitest'\nimport { useCurrentUser } from './useCurrentUser'\nimport Dashboard from './Dashboard'\n\nvi.mock('./useCurrentUser', () => ({\n  useCurrentUser: vi.fn(),\n}))\n\ndescribe('Dashboard', () => {\n  it('greets the logged-in user', () => {\n    vi.mocked(useCurrentUser).mockReturnValue({\n      name: 'Grace Hopper',\n      role: 'admin',\n    })\n\n    render(<Dashboard />)\n    expect(screen.getByText('Welcome, Grace Hopper')).toBeDefined()\n  })\n})"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The stub here only controls the return value. It does not care how many times the hook was called or with what arguments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Mocks and spies in practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A mock asserts behavior. Vitest mocks also spy by default, so you can inspect them after the test. Here is a test that uses both capabilities on an API call:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Mock that asserts it was called exactly once with the correct search term",
+        "code": "import { render, screen, fireEvent, waitFor } from '@testing-library/react'\nimport { describe, it, expect, vi } from 'vitest'\nimport ResultsPage from './ResultsPage'\n\nvi.mock('./api')\n\nconst { searchPosts } = await import('./api')\n\ndescribe('ResultsPage', () => {\n  it('calls the search API with the typed term', async () => {\n    render(<ResultsPage />)\n\n    fireEvent.change(screen.getByRole('searchbox'), {\n      target: { value: 'react testing' },\n    })\n\n    await waitFor(() =>\n      expect(searchPosts).toHaveBeenCalledTimes(1)\n    )\n    expect(searchPosts).toHaveBeenCalledWith('react testing')\n  })\n})"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fakes in practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A fake is a lightweight but real implementation. In-memory databases, fake timers, or a fake auth service are all fakes. They are heavier than stubs but more trustworthy than mocks because they execute real logic."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "tsx",
+        "caption": "Using MSW as a fake network layer for integration-style tests",
+        "code": "import { http, HttpResponse } from 'msw'\nimport { setupServer } from 'msw/node'\n\nexport const server = setupServer(\n  http.get('/api/users', () => {\n    return HttpResponse.json([\n      { id: '1', name: 'Linus Torvalds' },\n    ])\n  })\n)\n\nserver.listen()\n\n// In your test file\nserver.resetHandlers(\n  http.get('/api/users', () => {\n    return HttpResponse.json([\n      { id: '1', name: 'Linus Torvalds' },\n    ])\n  })\n)\n\n// After all tests\nserver.close()"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with test doubles: mocks, stubs and fakes, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "The mock-everything trap",
+        "text": "Mocking every child component turns your tests into a tautology: you assert that the parent renders the mocks you wrote. The moment a real child changes its API, your test still passes because the mock never changed. Prefer stubs and real components over mocks whenever the real implementation is cheap to run."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Quick reference",
+        "items": [
+          "Use a dummy to satisfy a parameter list the component does not use.",
+          "Use a stub when you need a predictable return value and nothing else.",
+          "Use a spy when you need to verify a call happened after the fact.",
+          "Use a mock when the contract itself (call count, arguments, order) is what you are testing.",
+          "Use a fake when you want real logic without external side effects, such as MSW or an in-memory store."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "component-testing-vs-integration-testing",
+    "when-not-to-mock"
+  ],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "Test Double Patterns (xUnit Patterns)",
+      "url": "https://xunitpatterns.com/TestDouble.html"
+    },
+    {
+      "type": "article",
+      "title": "Mocking is not testing (Dan Manges)",
+      "url": "https://www.drmaciver.com/blog/2017/04/mocking-is-not-testing/"
+    }
+  ]
 }

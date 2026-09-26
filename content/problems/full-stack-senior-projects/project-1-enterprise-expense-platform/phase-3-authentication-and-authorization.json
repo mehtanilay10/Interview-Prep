@@ -4,58 +4,222 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 3: Authentication and authorization",
-  "description": "Project: Phase 3: Authentication and authorization. Build and understand this project with step-by-step guidance.",
+  "description": "Implement NextAuth v5 with Google OAuth for the React frontend and cookie-based session validation in ASP.NET Core. Enforce organization-scoped RBAC, policy-based route authorization, and resource-level ownership checks.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "nextauth",
+    "oauth",
+    "rbac",
+    "authorization",
+    "jwt",
+    "react-19",
+    "asp.net-core"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 3: Authentication and authorization** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 3: authentication and authorization."
+        "text": "Authentication answers \"who are you?\" Authorization answers \"what can you do?\" In an enterprise expense platform, both questions are nuanced: a user may authenticate via Google but must be mapped to an internal Organization, Department, and set of Roles before the system can make authorization decisions."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Authentication architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "We use NextAuth v5 on the API side (under /api/auth) with Google OAuth. The React app delegates entirely to NextAuth for the OAuth flow. After successful sign-in, NextAuth issues a session cookie; the React app also stores a JWT in memory for API calls."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-auth-flow",
+        "caption": "End-to-end authentication flow",
+        "definition": "sequenceDiagram\n    participant U as User (Browser)\n    participant R as React App\n    participant N as NextAuth v5 (/api/auth)\n    participant G as Google OAuth\n    participant A as ASP.NET Core API\n    participant D as Database (Users)\n\n    U->>R: Click Sign In\n    R->>N: GET /api/auth/signin/google\n    N->>G: Redirect to Google consent\n    G->>U: Show Google login\n    U->>G: Enter credentials\n    G->>N: Redirect with auth code\n    N->>G: Exchange code for tokens\n    G->>N: Return tokens\n    N->>D: Upsert user profile\n    N->>R: Set session cookie + JWT\n    R->>A: GET /api/expense-reports (Bearer JWT)\n    A->>A: Validate JWT + load OrganizationId\n    A->>D: Query scoped by OrganizationId\n    D->>A: Return reports\n    A->>R: 200 OK + JSON"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authorization model"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Roles and permissions",
+        "items": [
+          "**Employee**: submit own reports, view own history, upload receipts.",
+          "**Manager**: view team reports, approve or reject within approval chain.",
+          "**Finance**: view all reports in organization, mark as paid, export.",
+          "**Admin**: manage users, departments, policy rules, organization settings."
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "RBAC (Role-Based Access Control)",
+            "definition": "Permissions assigned to roles, and users assigned to roles. Simple to reason about, but coarse-grained for complex scenarios."
+          },
+          {
+            "term": "ABAC (Attribute-Based Access Control)",
+            "definition": "Access decisions based on attributes of the user, resource, and environment. More flexible than RBAC but harder to audit."
+          },
+          {
+            "term": "Claims-based identity",
+            "definition": "A statement about a user (e.g., role=Manager, org=acme-corp) carried in a JWT or session cookie."
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always scope by OrganizationId",
+        "text": "In a multi-tenant system, never trust the client to supply an OrganizationId from the URL. Extract it from the authenticated user's claims or JWT payload. A user from org A must never see org B's data — even if they guess a valid GUID in the route."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Custom authorization handler for ExpenseReport ownership",
+        "content": "A policy requirement handler enforces that a user can only approve reports where they are the next approver in the chain.",
+        "language": "csharp",
+        "code": "public class ExpenseReportApproverRequirement : IAuthorizationRequirement\n{\n}\n\npublic class ExpenseReportApproverHandler : AuthorizationHandler<ExpenseReportApproverRequirement, ExpenseReport>\n{\n    private readonly IExpenseReportRepository _reports;\n\n    public ExpenseReportApproverHandler(IExpenseReportRepository reports)\n    {\n        _reports = reports;\n    }\n\n    protected override async Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        ExpenseReportApproverRequirement requirement,\n        ExpenseReport resource)\n    {\n        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);\n        if (userId == null) return;\n\n        var nextApproverId = await _reports.GetNextApproverIdAsync(resource.Id);\n        if (nextApproverId == Guid.Parse(userId))\n        {\n            context.Succeed(requirement);\n        }\n    }\n}\n\n// Registration in Program.cs:\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"CanApproveReport\", policy =>\n        policy.Requirements.Add(new ExpenseReportApproverRequirement()));\n});\nbuilder.Services.AddScoped<IAuthorizationHandler, ExpenseReportApproverHandler>();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "NextAuth v5 configuration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TypeScript: NextAuth v5 route handler with Google OAuth",
+        "content": "The route handler creates or updates the user profile on sign-in and issues a session with claims needed by the API.",
+        "language": "typescript",
+        "code": "// app/api/auth/[...nextauth]/route.ts\nimport NextAuth from 'next-auth';\nimport Google from 'next-auth/providers/google';\nimport { prismaAdapter } from '@/lib/auth-adapter';\nimport { cookies } from 'next/headers';\n\nconst handler = NextAuth({\n  providers: [\n    Google({\n      clientId: process.env.AUTH_GOOGLE_ID!,\n      clientSecret: process.env.AUTH_GOOGLE_SECRET!,\n    }),\n  ],\n  adapter: prismaAdapter,\n  session: { strategy: 'jwt' },\n  callbacks: {\n    async jwt({ token, user, account, profile }) {\n      if (user) {\n        token.sub = user.id;\n        token.email = user.email!;\n        token.name = user.name!;\n        token.picture = profile?.image;\n      }\n      return token;\n    },\n    async session({ session, token }) {\n      session.user.id = token.sub;\n      session.user.email = token.email;\n      session.user.name = token.name;\n      session.user.image = token.picture;\n      return session;\n    },\n  },\n  pages: { signIn: '/login' },\n});\n\nexport { handler as GET, handler as POST };"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "React auth integration"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React: SessionProvider and role-based navigation",
+        "content": "Wrap the app in SessionProvider and derive navigation links from the user's role.",
+        "language": "tsx",
+        "code": "// app/providers.tsx\n'use client';\nimport { SessionProvider } from 'next-auth/react';\n\nexport function Providers({ children }: { children: React.ReactNode }) {\n  return <SessionProvider>{children}</SessionProvider>;\n}\n\n// components/layout/AppNavbar.tsx\n'use client';\nimport { useSession } from 'next-auth/react';\nimport Link from 'next/link';\n\nconst roleLinks: Record<string, { href: string; label: string }[]> = {\n  Employee: [\n    { href: '/reports/new', label: 'New Report' },\n    { href: '/my-reports', label: 'My Reports' },\n  ],\n  Manager: [\n    { href: '/approvals', label: 'Approvals' },\n  ],\n  Finance: [\n    { href: '/reports', label: 'All Reports' },\n    { href: '/export', label: 'Export' },\n  ],\n  Admin: [\n    { href: '/admin/users', label: 'Users' },\n    { href: '/admin/policies', label: 'Policies' },\n  ],\n};\n\nexport function AppNavbar() {\n  const { data: session } = useSession();\n  const role = session?.user?.role ?? 'Employee';\n  const links = roleLinks[role] ?? [];\n\n  return (\n    <nav>\n      {links.map((l) => (\n        <Link key={l.href} href={l.href}>{l.label}</Link>\n      ))}\n    </nav>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Security: never trust client-supplied roles",
+        "text": "The React UI hides links based on role, but the backend must independently verify authorization on every request. A user can modify JavaScript in DevTools and submit any request. All endpoints must validate claims server-side."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Password and secret management"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of phase 3: authentication and authorization",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "AUTH_SECRET: 32-byte base64 random string for NextAuth JWT encryption. Store in environment.",
+          "AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET: Google OAuth credentials.",
+          "Database credentials in connection strings; never commit .env.",
+          "Cookie settings: HttpOnly, Secure, SameSite=Lax in production."
         ]
       }
     },
     {
-      "type": "heading",
+      "type": "checklist",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "title": "Phase 3 deliverables",
+        "items": [
+          {
+            "text": "NextAuth v5 Google OAuth configured with session strategy = 'jwt'."
+          },
+          {
+            "text": "ASP.NET Core API validates JWT issued by NextAuth on every protected endpoint."
+          },
+          {
+            "text": "OrganizationId is injected from JWT claims; no client-supplied orgId trusted."
+          },
+          {
+            "text": "Authorization handlers enforce CanApproveReport, CanManagePolicies, etc."
+          },
+          {
+            "text": "React app conditionally renders nav links and protects routes via role guards."
+          },
+          {
+            "text": "Integration test proves user from org A cannot access org B's reports."
+          }
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "summary-box",
       "data": {
-        "text": "Understanding phase 3: authentication and authorization is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 3: authentication and authorization, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Phase 3 summary",
+        "points": [
+          "NextAuth v5 handles OAuth and issues signed JWTs.",
+          "Backend validates the JWT signature and extracts OrganizationId + role from claims.",
+          "Policy-based authorization (not just [Authorize]) handles resource-level checks.",
+          "Frontend navigation is cosmetic only — backend enforces all access rules."
+        ],
+        "takeaway": "Authorization is a backend concern, not a UI concern. If you skip server-side checks now, you will pay for it in Phase 4 when you expose sensitive financial data."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "NextAuth.js v5 Documentation",
+      "url": "https://authjs.dev/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft: Authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "OWASP: Authentication Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+      "type": "article"
+    },
+    {
+      "title": "React 19: useSession hook",
+      "url": "https://react.dev/learn",
+      "type": "article"
+    }
+  ]
 }

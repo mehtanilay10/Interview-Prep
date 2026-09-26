@@ -3,17 +3,17 @@
   "slug": "choose-sql-vs-nosql-for-a-high-write-workload",
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
-  "title": "Choose SQL vs NoSQL for a high-write workload",
-  "description": "Problem: Choose SQL vs NoSQL for a high-write workload. Solve this problem with multiple approaches and detailed explanations.",
+  "title": "Choose SQL vs NoSQL for a high write workload",
+  "description": "Decide between PostgreSQL and Cassandra for an event ingestion pipeline processing 50,000 writes per second with strict latency requirements.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": ["sql", "nosql", "cap-theorem", "database", "write-throughput", "cassandra"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose SQL vs NoSQL for a high-write workload** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose sql vs nosql for a high-write workload."
+        "text": "Your analytics platform needs to ingest 50,000 user events per second from 200K concurrent mobile clients. Queries must return results within 200ms. The events are append-only and immutable once written. Your team knows PostgreSQL extremely well. Do you use it, or do you reach for Cassandra?"
       }
     },
     {
@@ -24,13 +24,71 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose sql and nosql for a high-write workload",
-          "Know when to choose choose sql over nosql for a high-write workload",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "CAP Theorem", "definition": "A distributed system can guarantee at most two of: Consistency, Availability, and Partition tolerance." },
+          { "term": "ACID", "definition": "Atomicity, Consistency, Isolation, Durability: the guarantees provided by traditional relational databases." },
+          { "term": "BASE", "definition": "Basically Available, Soft state, Eventual consistency: the typical NoSQL availability model." },
+          { "term": "Write Path", "definition": "The sequence of components an event passes through from client to persistent storage." },
+          { "term": "Partition Tolerance", "definition": "The system continues operating despite arbitrary message loss or delay between nodes." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "CAP reality check",
+        "text": "In the presence of network partitions (which will happen), you must choose between Consistency and Availability. No real-world system gives you both. PostgreSQL chooses CP; Cassandra chooses AP with tunable consistency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "SQL (PostgreSQL) vs NoSQL (Cassandra)",
+        "cards": [
+          {
+            "title": "PostgreSQL",
+            "description": "ACID-compliant relational database with rich query capabilities.",
+            "pros": [
+              "Strong consistency and ACID transactions out of the box",
+              "Rich query language with joins, aggregations, and window functions",
+              "Single-node write performance is extremely high with WAL optimization",
+              "Your team already knows it well"
+            ],
+            "cons": [
+              "Horizontal scaling requires Citus or sharding logic",
+              "Sustained 50K writes per second requires careful partitioning",
+              "Replication lag under heavy write load can break consistency assumptions",
+              "Adding nodes is not as seamless as Cassandra"
+            ],
+            "tags": ["consistent", "relational", "transactional"]
+          },
+          {
+            "title": "Cassandra",
+            "description": "Wide-column NoSQL store designed for linear scalability and high write throughput.",
+            "pros": [
+              "Linear write scalability: add nodes, gain capacity",
+              "No single point of failure; masterless ring architecture",
+              "Optimized for append-only, time-series workloads",
+              "Tunable consistency: QUORUM reads and writes"
+            ],
+            "cons": [
+              "No joins; denormalization is mandatory",
+              "Eventual consistency means stale reads are possible",
+              "Compaction storms and tombstones require operational expertise",
+              "Schema changes require cluster-wide coordination"
+            ],
+            "tags": ["scalable", "write-optimized", "eventual"]
+          }
         ]
       }
     },
@@ -38,24 +96,84 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Data model comparison"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose sql vs nosql for a high-write workload is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "PostgreSQL: Relational event schema",
+        "content": "Normalized schema with foreign keys and constraints.",
+        "code": "CREATE TABLE events (\n  event_id      UUID PRIMARY KEY,\n  user_id       UUID NOT NULL,\n  event_type    TEXT NOT NULL,\n  payload       JSONB NOT NULL,\n  occurred_at   TIMESTAMPTZ NOT NULL,\n  received_at   TIMESTAMPTZ DEFAULT NOW(),\n  device        TEXT\n);\n\nCREATE INDEX idx_events_user_time ON events (user_id, occurred_at);\n\n-- Query with aggregation:\nSELECT date_trunc('hour', occurred_at) AS hour,\n       count(*) AS event_count\nFROM events\nWHERE user_id = $1\nGROUP BY hour\nORDER BY hour DESC\nLIMIT 24;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cassandra: Partitioned, denormalized table",
+        "content": "Primary key designed for time-range queries on a partition.",
+        "code": "CREATE TABLE events (\n  user_id    UUID,\n  occurred_at TIMESTAMP,\n  event_type TEXT,\n  payload    BLOB,\n  device     TEXT,\n  PRIMARY KEY (user_id, occurred_at)\n) WITH CLUSTERING ORDER BY (occurred_at DESC);\n\n-- Query all events for a user:\nSELECT * FROM events WHERE user_id = ? LIMIT 100;\n\n-- No joins. If you need event_type counts, pre-aggregate into a summary table.",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cap-triangle",
+        "caption": "CAP theorem: choose two, sacrifice one",
+        "definition": "graph TD\n    A[CAP Theorem] --> B[Consistency]\n    A --> C[Availability]\n    A --> D[Partition Tolerance]\n    B -->|Must choose| E[One of C or A]\n    C -->|Must choose| E\n    D -->|Always required in distributed systems| F[Network failures happen]\n    E --> G[SQL: Consistency + Partition Tolerance]\n    E --> H[NoSQL: Availability + Partition Tolerance]"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation checklist",
+        "items": [
+          { "text": "Can you tolerate eventual consistency for read-after-write scenarios?" },
+          { "text": "Is your query pattern fixed, or do you need ad-hoc analytics?" },
+          { "text": "Do you have operational expertise to manage a Cassandra ring?" },
+          { "text": "Will write volume grow beyond a single PostgreSQL node's IOPS ceiling?" },
+          { "text": "Are your access patterns predictable enough for denormalization?" }
+        ]
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: PostgreSQL with Citus for this workload",
+        "content": "50K writes per second is achievable on PostgreSQL with proper partitioning, connection pooling, and WAL tuning. Your team's existing expertise reduces operational risk. If you later need to scale reads, add read replicas. If writes outgrow a single node, Citus distributes the table without requiring a data model rewrite.",
+        "code": "-- Enable Citus extension for distributed SQL\nCREATE EXTENSION IF NOT EXISTS citus;\n\n-- Distribute the events table by user_id\nSELECT create_distributed_table('events', 'user_id');\n\n-- Now writes are distributed across worker nodes automatically,\n-- but you keep full SQL and ACID semantics.",
+        "language": "sql"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose sql vs nosql for a high-write workload, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "When to choose Cassandra instead",
+        "text": "Cassandra is the right choice when writes exceed 200K per second, your access patterns are strictly time-series and never require ad-hoc joins, and you have dedicated SRE expertise. For 50K writes with complex query needs, PostgreSQL is the safer bet."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "CAP is not a menu: network partitions happen, so you choose between CP and AP.",
+          "PostgreSQL with Citus or read replicas handles most 'high write' workloads.",
+          "Cassandra's complexity is justified only at massive scale with a dedicated team."
+        ],
+        "takeaway": "Choose the database your team can operate correctly under pressure."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-synchronous-processing-vs-a-message-queue",
+    "choose-redis-caching-vs-database-optimization"
+  ],
+  "furtherReading": [
+    { "title": "CAP Theorem", "url": "https://en.wikipedia.org/wiki/CAP_theorem", "type": "article" },
+    { "title": "Cassandra: The Definitive Guide", "url": "https://www.datastax.com/resources/ebook/cassandra-the-definitive-guide", "type": "book" }
+  ]
 }

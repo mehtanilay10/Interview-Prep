@@ -3,34 +3,47 @@
   "slug": "application-insights-distributed-tracing",
   "moduleSlug": "production-architecture-reliability-cost",
   "courseSlug": "microsoft-azure-for-developers",
-  "title": "Application Insights distributed tracing",
-  "description": "Learn about Application Insights distributed tracing. Master the concepts, patterns, and best practices.",
+  "title": "Application Insights Distributed Tracing",
+  "description": "Use Azure Application Insights to collect distributed traces across services, correlate requests with dependency calls, and diagnose slow operations in production.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "azure",
+    "application-insights",
+    "distributed-tracing",
+    "monitoring"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Application Insights distributed tracing** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with application insights distributed tracing."
+        "text": "When your application spans multiple services, databases, and third-party APIs, debugging a slow request can feel like solving a puzzle with missing pieces. **Azure Application Insights** collects telemetry from each component and stitches it together using distributed tracing. The result is an end-to-end view of a single request, showing exactly where time was spent and which dependency failed."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Distributed tracing in Application Insights is built on the W3C Trace Context standard. Each incoming request receives a unique trace ID, and every outgoing call carries that ID forward in HTTP headers. Application Insights automatically captures this data for ASP.NET Core, Azure Functions, Service Bus, and many common dependencies."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Core Concepts"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Key tracing concepts in Application Insights",
         "items": [
-          "Understand the fundamental principles of application insights distributed tracing",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Trace ID: A unique identifier for the entire end-to-end request flow across services.",
+          "Span: A single unit of work within a trace, such as an HTTP call, database query, or dependency request.",
+          "Operation ID: In Application Insights, this maps to the trace ID and links all telemetry items for one request.",
+          "Parent ID: Identifies the span that initiated the current span, enabling hierarchical visualization.",
+          "Sampling: A strategy to reduce telemetry volume by recording only a percentage of requests while still preserving accurate latency data."
         ]
       }
     },
@@ -38,24 +51,166 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Enabling Distributed Tracing in ASP.NET Core"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding application insights distributed tracing is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The easiest way to enable distributed tracing is through the Application Insights SDK. Once installed, it automatically collects requests, dependencies, exceptions, and traces. You can also enable it through Azure Monitor Application Insights without code changes using the Azure Monitor OpenTelemetry-based distribution."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs setup with Application Insights",
+        "content": "Register the Application Insights SDK and enable correlation for outgoing HTTP calls.",
+        "language": "csharp",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddApplicationInsightsTelemetry();\n\n// Enable correlation for outgoing HTTP requests\nbuilder.Services.AddHttpClient(\"orders\")\n    .AddApplicationInsightsTelemetry();\n\nvar app = builder.Build();\napp.MapGet(\"/orders/{id}\", async (int id, IHttpClientFactory factory) =>\n{\n    var client = factory.CreateClient(\"orders\");\n    var response = await client.GetAsync($\"https://api.example.com/orders/{id}\");\n    response.EnsureSuccessStatusCode();\n    return await response.Content.ReadAsStringAsync();\n});\n\napp.Run();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Viewing Traces in the Azure Portal"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Once telemetry is flowing, you can view distributed traces in the Azure portal under Application Insights. The **end-to-end transaction view** shows each request, its dependencies, and their durations in a flame graph. You can filter by operation name, duration, or failure status to find slow or failing requests quickly."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with application insights distributed tracing, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Application Map",
+        "text": "The Application Map visualizes the relationships between your services. Nodes represent components, and edges represent dependency calls. The thickness and color of edges indicate call volume and failure rate, making it easy to spot problematic dependencies at a glance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sampling and Cost Management"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Application Insights charges by data volume, so sampling is essential for cost control. Adaptive sampling automatically adjusts the sampling percentage based on traffic volume, keeping data within your target while preserving representative traces. For high-traffic APIs, you can also configure fixed-rate sampling or exclude low-value endpoints like health checks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring adaptive sampling",
+        "content": "Adjust sampling settings in Program.cs or appsettings.json to control telemetry volume.",
+        "language": "csharp",
+        "code": "builder.Services.Configure<TelemetryConfiguration>((config) =>\n{\n    var sampling = new AdaptiveSamplingProcessor\n    {\n        MaxTelemetryItemsPerSecond = 20,\n        MinSamplingPercentage = 5,\n        MaxSamplingPercentage = 100,\n        ExcludedTypes = \"Event;Exception\" // always keep exceptions\n    };\n    config.DefaultTelemetrySink.TelemetryProcessorChainBuilder.Use(sampling);\n});\n\n// appsettings.json alternative\n// ApplicationInsights:\n//   SamplingPercentage: 50\n//   EnableAdaptiveSampling: true"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Application Insights",
+            "definition": "An Azure service that collects application telemetry including requests, dependencies, exceptions, and traces for monitoring and diagnostics."
+          },
+          {
+            "term": "W3C Trace Context",
+            "definition": "A standard for propagating trace IDs across service boundaries using HTTP headers, enabling end-to-end distributed tracing."
+          },
+          {
+            "term": "Adaptive Sampling",
+            "definition": "A telemetry sampling technique that automatically adjusts the percentage of requests recorded based on traffic volume to stay within data limits."
+          },
+          {
+            "term": "Correlation",
+            "definition": "Linking telemetry items together using shared identifiers so you can reconstruct the full request path across services."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Distributed tracing best practices in Azure",
+        "items": [
+          "Enable W3C Trace Context propagation to ensure compatibility with other tools and languages.",
+          "Instrument all outgoing HTTP, SQL, and Service Bus calls so dependencies appear in traces automatically.",
+          "Configure sampling before you reach your data cap; it is easier to reduce volume than to recover from overages.",
+          "Always keep exceptions and failed requests unsampled so you can diagnose errors.",
+          "Use the Application Map and end-to-end views during incidents, not just for routine monitoring."
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What is the difference between Application Insights traces and logs?",
+            "answer": "Application Insights traces are structured request and dependency telemetry automatically collected by the SDK. Logs are free-form messages you emit with ILogger. Traces are best for understanding request flow and latency; logs are best for detailed debugging and audit trails. Both appear in the same Application Insights resource."
+          },
+          {
+            "question": "Does Application Insights support OpenTelemetry?",
+            "answer": "Yes. Azure Monitor provides an OpenTelemetry-based distribution that exports traces, metrics, and logs to Application Insights using the OpenTelemetry Protocol (OTLP). This lets you use one instrumentation layer across Azure and non-Azure services."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Lesson Summary",
+        "points": [
+          "Application Insights collects distributed traces by correlating telemetry with trace IDs across services.",
+          "The SDK automatically instruments ASP.NET Core requests, HTTP dependencies, SQL calls, and more.",
+          "The end-to-end transaction view and Application Map help you find slow or failing dependencies quickly.",
+          "Adaptive sampling controls data volume and cost while preserving statistically representative traces.",
+          "W3C Trace Context ensures your traces work across languages, frameworks, and Azure services."
+        ],
+        "takeaway": "Application Insights turns a scattered set of logs and metrics into a coherent story of how a request flows through your system. The faster you can read that story, the faster you can fix production issues."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "azure-monitoring-strategy-logs-metrics-and-traces",
+    "high-availability-and-zone-aware-architecture"
+  ],
+  "furtherReading": [
+    {
+      "title": "Application Insights distributed tracing",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-monitor/app/distributed-tracing",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on enabling and analyzing distributed traces in Application Insights."
+    },
+    {
+      "title": "Azure Monitor OpenTelemetry distribution",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable?tabs=aspnetcore",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to using OpenTelemetry with ASP.NET Core and Azure Monitor."
+    },
+    {
+      "title": "Application Insights sampling",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How adaptive and fixed-rate sampling work in Application Insights."
+    }
+  ]
 }

@@ -4,58 +4,123 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "ThreadPool internals and thread starvation",
-  "description": "Learn about ThreadPool internals and thread starvation. Master the concepts, patterns, and best practices.",
+  "description": "Explore how the .NET ThreadPool manages worker threads, how it grows under load, and what thread starvation looks like in production applications.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**ThreadPool internals and thread starvation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with threadpool internals and thread starvation."
+        "text": "Every time you call `Task.Run` or use `async`/`await` under the hood, the .NET ThreadPool is involved. Understanding how it works helps you avoid performance surprises in high-traffic applications."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What the ThreadPool does"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The ThreadPool is a shared pool of worker threads maintained by the .NET runtime. Instead of creating a new thread for every small task, the runtime reuses existing threads. This reduces the overhead of thread creation and keeps memory usage predictable."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you queue a work item, the ThreadPool assigns it to an available worker thread. If all threads are busy, the work waits in a queue until a thread becomes free. For most applications, this works seamlessly. Problems appear when the demand for threads exceeds the supply."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ThreadPool vs manual thread creation",
+        "language": "csharp",
+        "code": "// ThreadPool: reuse existing threads (preferred)\nThreadPool.QueueUserWorkItem(_ =>\n{\n    DoBackgroundWork();\n});\n\n// New Thread: creates a dedicated OS thread every time\nnew Thread(() => DoBackgroundWork()).Start();\n\n// Task.Run: schedules on the ThreadPool by default\nTask.Run(() => DoBackgroundWork());"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How the ThreadPool grows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The ThreadPool does not start with hundreds of threads. It starts small and adds threads when the queue grows. This process, called *hill climbing*, tries to find the right number of threads for the workload."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of threadpool internals and thread starvation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**Phase 1** — The ThreadPool starts with a small number of threads (typically one per CPU core).",
+          "**Phase 2** — If the queue stays busy, the ThreadPool injects new threads at a measured rate, usually one every 500 milliseconds.",
+          "**Phase 3** — If threads go idle, the ThreadPool slowly removes them to free resources."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Thread injection is not instant",
+        "text": "The ThreadPool adds new threads gradually. If your application suddenly receives a burst of requests, threads may not appear fast enough. Requests pile up in the queue, latency spikes, and users experience slowdowns."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Thread starvation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding threadpool internals and thread starvation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Thread starvation happens when all ThreadPool threads are busy and new work cannot make progress. In web applications, this often means HTTP requests stall because no thread is available to process them."
       }
     },
     {
-      "type": "callout",
+      "type": "paragraph",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with threadpool internals and thread starvation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "text": "A common cause is *sync-over-async*: blocking on an async operation with `.Result` or `.Wait()`. The blocked thread sits idle while the async operation completes, yet the ThreadPool cannot reuse it for other work. Over time, this exhausts the pool."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Thread starvation caused by sync-over-async",
+        "language": "csharp",
+        "code": "public string GetData()\n{\n    // Blocks a ThreadPool thread while the async operation runs\n    return GetDataAsync().Result;\n}\n\npublic async Task<string> GetDataAsync()\n{\n    var response = await _httpClient.GetAsync(\"https://api.example.com/data\");\n    return await response.Content.ReadAsStringAsync();\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "The ThreadPool reuses threads to avoid the cost of creating new ones.",
+          "Hill climbing adjusts thread count based on queue depth.",
+          "Thread starvation occurs when all threads are busy and new work waits.",
+          "Sync-over-async is a leading cause of starvation in production."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "task-scheduling-and-continuations",
+    "async-io-vs-cpu-bound-work",
+    "deadlocks-starvation-and-livelocks"
+  ],
+  "furtherReading": [
+    { "title": "ThreadPool Class (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.threadpool" },
+    { "title": "ThreadPool starvation and how to avoid it", "url": "https://devblogs.microsoft.com/dotnet/threadpool-starvation-and-how-to-avoid-it/" }
+  ]
 }

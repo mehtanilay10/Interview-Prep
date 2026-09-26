@@ -8,54 +8,211 @@
   "order": 3,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["memory", "gc", "dotnet", "debugging", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce memory leak** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce memory leak."
+        "text": "Memory leaks in managed applications are subtle. The process does not crash; it grows. Over hours or days, working set climbs until the operating system starts paging, garbage collection pauses lengthen, and the process is eventually recycled. This lesson introduces how .NET memory leaks happen, how to detect them with production diagnostics, and how to fix the most common patterns."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How managed memory leaks happen"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce memory leak",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Event handlers are subscribed but never unsubscribed, keeping the publisher alive indefinitely",
+          "Cached objects in static dictionaries or memory cache without eviction policies",
+          "Large object heap fragmentation when byte arrays or strings are allocated and discarded frequently",
+          "Unmanaged resources held by managed wrappers without explicit Dispose calls",
+          "Captured closures in LINQ or async lambdas that reference entire parent scopes",
+          "Diagnostic or logging buffers that grow unbounded under error storms"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Garbage collection",
+            "definition": "The automatic memory manager in .NET that reclaims memory from objects no longer reachable from GC roots."
+          },
+          {
+            "term": "Large object heap",
+            "definition": "A separate heap for objects larger than 85,000 bytes that are collected less frequently and not compacted by default."
+          },
+          {
+            "term": "GC root",
+            "definition": "A reference that keeps an object alive, including static fields, thread stacks, and pinned handles."
+          },
+          {
+            "term": "Dispose pattern",
+            "definition": "A protocol for releasing unmanaged resources deterministically before garbage collection reclaims the wrapper object."
+          },
+          {
+            "term": "Weak reference",
+            "definition": "A reference that does not prevent the referenced object from being collected, useful for caches that should not extend object lifetime."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common leak in ASP.NET Core applications is an event subscription that outlives its subscriber. When a hosted service subscribes to an event on a singleton, and the subscriber is scoped or transient, the subscriber will never be collected because the singleton holds a delegate reference to it. This is invisible until you look at memory dumps or profiling data."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Event subscription leak",
+        "content": "A scoped subscriber registered with a singleton event aggregator will leak on every scope creation:",
+        "code": "public class OrderProcessor : IOrderProcessor\n{\n    private readonly IEventAggregator _events;\n\n    public OrderProcessor(IEventAggregator events)\n    {\n        _events = events;\n        _events.OrderCreated += OnOrderCreated;\n    }\n\n    private void OnOrderCreated(object sender, OrderEventArgs e)\n    {\n        // This handler keeps the entire OrderProcessor instance alive\n        // even after the scope ends\n    }\n}\n\n// Fix: unsubscribe or use WeakReference\npublic class OrderProcessor : IOrderProcessor, IDisposable\n{\n    public void Dispose()\n    {\n        _events.OrderCreated -= OnOrderCreated;\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Detection techniques"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding introduce memory leak is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Monitor working set and private memory in production with dotnet-counters or /diagnostics",
+          "Capture memory dumps with dotnet-dump when memory exceeds expected thresholds",
+          "Use PerfView or dotMemory to view object retention graphs and find GC roots",
+          "Compare generation 0, 1, and 2 collection counts to identify objects surviving too long",
+          "Review event handler registrations and static collections in suspect modules"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": ".NET memory profilers and their trade-offs",
+        "cards": [
+          {
+            "title": "dotMemory",
+            "description": "JetBrains memory profiler with a visual UI for retention graphs.",
+            "pros": ["Intuitive retention view", "Easy diff between snapshots", "Supports .NET Core and Framework"],
+            "cons": ["Paid license", "Heavier CPU overhead during profiling"]
+          },
+          {
+            "title": "PerfView",
+            "description": "Free ETW-based profiler from Microsoft with deep GC analysis.",
+            "pros": ["Completely free", "Low overhead", "Excellent for heap and GC traces"],
+            "cons": ["Steep learning curve", "UI is dated", "Requires ETW knowledge"]
+          },
+          {
+            "title": "dotnet-gcdump",
+            "description": "Lightweight cross-platform tool that collects GC dumps for analysis.",
+            "pros": ["No UI required, works on servers", "Fast collection", "Works with dotnet-trace"],
+            "cons": ["Requires manual analysis or tooling", "Less visual than dedicated profilers"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-memory-leak-detection",
+        "caption": "Memory leak investigation flow from detection to fix",
+        "definition": "graph TD\n    A[Working set rising] --> B{Steady or spiking?}\n    B -->|Steady climb| C[Capture memory dump]\n    B -->|Spiking| D[Check error storm / unbounded buffer]\n    C --> E[Load dump in profiler]\n    E --> F[Find large object types]\n    F --> G[Trace to GC root]\n    G --> H{Root is static or event?}\n    H -->|Static| I[Review cache eviction]\n    H -->|Event| J[Review subscriptions]\n    I --> K[Add eviction or size limit]\n    J --> L[Unsubscribe or use weak events]\n    K --> M[Deploy and monitor]\n    L --> M"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce memory leak, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use WeakReference for caches",
+        "text": "If you must cache objects in a static collection, consider whether the cache should extend their lifetime at all. A MemoryCache with size limits and eviction policies is almost always safer than a raw Dictionary<TKey, TValue> that grows forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "How do I confirm a leak without a profiler?",
+            "answer": "Record dotnet-counters over several hours and plot the Gen 2 heap size. A steadily climbing Gen 2 heap with no corresponding drop after a forced full GC indicates objects are being rooted. Combine this with a production memory dump for the exact types."
+          },
+          {
+            "question": "Can garbage collection cause memory leaks?",
+            "answer": "GC only reclaims unreachable objects. If a reachable object holds references to many others, GC cannot collect them. The leak is in the object graph, not in GC itself."
+          },
+          {
+            "question": "Should I disable server GC for debugging?",
+            "answer": "Server GC can make memory dumps larger and harder to interpret because each thread has its own heap. Disable it temporarily for simpler heap analysis, but always test fixes with server GC enabled."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Find the leak in a hosted service",
+        "description": "You receive a memory dump from an ASP.NET Core service that has been running for three days. The working set is 4 GB but the application should need only 200 MB. Using PerfView or dotMemory, identify the type that dominates the heap and explain why it is rooted.",
+        "steps": [
+          "Open the dump in a profiler and view the dominated-by-size view",
+          "Identify the top object type and its retained size",
+          "Inspect the path to the GC root",
+          "Propose a code fix based on the root type"
+        ],
+        "expectedOutcome": "You should be able to describe the leak mechanism in one or two sentences and propose a concrete code or configuration fix."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Memory leaks grow working set without crashing; monitor both metrics",
+          "Event handler leaks are the most common pattern in .NET services",
+          "Capture production dumps; dev-only profiling misses production data shapes",
+          "Use GC root analysis to find who is holding references",
+          "Prefer bounded caches and deterministic disposal over unbounded collections"
+        ],
+        "takeaway": "Treat unbounded growth as an incident even when the process has not crashed. The cost of investigation is far lower than the cost of an emergency restart during peak traffic."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-downstream-timeout",
+    "investigate-using-logs-metrics-and-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "Diagnose memory issues with dotnet-gcdump",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/gcdump",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How to collect and analyze GC dumps for .NET applications."
+    },
+    {
+      "title": "Garbage Collection and Memory Management",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on .NET garbage collection generations, heaps, and best practices."
+    }
+  ]
 }

@@ -3,34 +3,54 @@
   "slug": "database-capacity-planning",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Database capacity planning",
-  "description": "Learn about Database capacity planning. Master the concepts, patterns, and best practices.",
+  "title": "Database Capacity Planning",
+  "description": "Learn how to forecast database growth, size data and log files appropriately, plan tempdb capacity, and avoid the most common capacity-related production incidents.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "capacity-planning",
+    "growth",
+    "tempdb",
+    "sizing",
+    "sql-server"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Database capacity planning** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with database capacity planning."
+        "text": "Capacity planning is the practice of ensuring your SQL Server databases have enough disk, memory, CPU, and I/O to handle current and future workloads. It is not a one-time task performed before go-live. It is an ongoing process of measuring growth, predicting when resources will run out, and adding capacity before users notice."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most common capacity planning failure is the 'it worked yesterday' syndrome: a database that ran fine for months suddenly runs out of disk space or tempdb room because growth was not tracked. Capacity planning turns surprises into planned upgrades."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Key Areas to Plan For"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A complete capacity plan covers four resource categories: disk (data files, log files, tempdb), memory (buffer pool and procedure cache), CPU (worker threads and scheduler health), and network (bandwidth for replication and Always On). For each category, you need a baseline, a growth rate, and a threshold that triggers an upgrade."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Capacity Planning Dimensions",
         "items": [
-          "Understand the fundamental principles of database capacity planning",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Data file size and growth — track used space, free space, and growth rate in MB or GB per day",
+          "Transaction log size and growth — log growth is the most common cause of production outages; plan for peak workload plus overhead",
+          "Tempdb size — required for version store, sorts, hash joins, and worktables; tempdb runs out of space more often than any other file",
+          "Memory — SQL Server uses memory aggressively for the buffer pool; undersized memory causes excessive physical I/O",
+          "CPU — track batch requests per second, signal waits, and worker thread usage; plan for peak concurrency"
         ]
       }
     },
@@ -38,24 +58,162 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Sizing Data and Log Files"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding database capacity planning is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Data files should be sized to your expected growth over the next 6 to 12 months, with autogrowth set to a fixed MB value rather than a percentage. Percentage-based autogrowth causes file fragmentation (multiple file fragments) and unpredictable growth events. Log files should be sized to handle the largest expected transaction plus overhead, with autogrowth also set to a fixed value."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Check Current File Sizes and Growth Settings",
+        "content": "Query sys.database_files to see current sizes and autogrowth configuration.",
+        "language": "sql",
+        "code": "SELECT \n    DB_NAME(mf.database_id) AS database_name,\n    mf.name AS logical_name,\n    mf.type_desc,\n    mf.physical_name,\n    mf.size / 128.0 AS current_size_mb,\n    FILEPROPERTY(mf.name, 'SpaceUsed') / 128.0 AS used_mb,\n    (mf.size - FILEPROPERTY(mf.name, 'SpaceUsed')) / 128.0 AS free_mb,\n    mf.growth / 128.0 AS growth_mb,\n    mf.is_percent_growth,\n    mf.max_size,\n    mf.is_read_only\nFROM sys.master_files AS mf\nWHERE mf.database_id IN (DB_ID('AdventureWorks'), DB_ID('tempdb'))\nORDER BY database_name, mf.type_desc DESC;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Transaction Log Growth Is the #1 Outage Cause",
+        "text": "The transaction log cannot be autotruncated if there is an open transaction, a long-running replication agent, or an uncommitted backup. Always size the log for your peak workload and monitor log reuse wait_info to understand why the log is not being truncated."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Tempdb Sizing and Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Tempdb is a shared resource used by every database on the server. It stores user objects (temporary tables, table variables), internal objects (sorts, hash joins, worktables), and the version store for snapshot isolation. Because tempdb is shared, a tempdb outage affects every database on the instance."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Tempdb Best Practices",
+        "items": [
+          "Pre-size tempdb data files to the expected workload size — do not rely on autogrowth during business hours",
+          "Create multiple tempdb data files (one per CPU core up to 8, then add in chunks of 4) to reduce allocation contention",
+          "Make all tempdb data files the same size to enable proportional fill and avoid one file becoming a hotspot",
+          "Set tempdb autogrowth to a fixed MB value (e.g., 1 GB) rather than percentage",
+          "Place tempdb on the fastest available storage — tempdb I/O directly impacts query performance",
+          "Monitor tempdb space usage regularly; alert when used space exceeds 80% of total size"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with database capacity planning, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Tempdb Sizing Formula",
+        "text": "A common starting point for tempdb sizing is: (total size of largest table in the database) / 8, or simply 20% of your largest database. Adjust upward if you use heavy ETL, large sorts, or snapshot isolation with high write volume."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Growth Rate Analysis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To forecast when you will run out of space, measure your current growth rate and project forward. The simplest method is to record total database size at regular intervals (weekly) and calculate the weekly growth rate. Multiply by the number of weeks until your planned upgrade window, and compare against available free space."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Calculate Database Growth Rate",
+        "content": "Use msdb.dbo.backupset to calculate historical data growth from full backups.",
+        "language": "sql",
+        "code": "SELECT \n    DATENAME(month, backup_start_date) AS backup_month,\n    YEAR(backup_start_date) AS backup_year,\n    COUNT(*) AS backup_count,\n    AVG(backup_size / 1024.0 / 1024.0) AS avg_backup_size_mb,\n    AVG(compressed_backup_size / 1024.0 / 1024.0) AS avg_compressed_mb,\n    AVG(backup_size - compressed_backup_size) / 1024.0 / 1024.0 AS avg_savings_mb,\n    MAX(backup_start_date) AS last_backup\nFROM msdb.dbo.backupset\nWHERE database_name = 'AdventureWorks'\n  AND type = 'D'  -- full backup\n  AND backup_start_date >= DATEADD(YEAR, -1, GETDATE())\nGROUP BY YEAR(backup_start_date), DATENAME(month, backup_start_date)\nORDER BY backup_year, backup_month;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Alerting on Capacity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Capacity planning without alerting is guessing. Set up SQL Server Agent alerts or monitoring tool alerts for the following thresholds: data file free space below 20%, log file free space below 20%, tempdb used space above 80%, and growth rate exceeding your forecast. The earlier you catch a trend, the more options you have to address it."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Should I enable autogrowth at all?",
+            "answer": "Yes, as a safety net. But autogrowth should not be your primary capacity management strategy. Pre-size files for expected growth and use autogrowth only for unexpected spikes. Fixed-growth autogrowth prevents file fragmentation and gives you predictable I/O during growth events."
+          },
+          {
+            "question": "How often should I review capacity?",
+            "answer": "Review data and log growth monthly. Review tempdb and memory quarterly. For fast-growing systems, weekly reviews may be necessary. The key is to catch trends early — waiting until free space is at 5% is too late."
+          },
+          {
+            "question": "Can I shrink database files to free space?",
+            "answer": "Avoid shrinking as a regular practice. Shrink causes file fragmentation, index fragmentation, and performance degradation. Shrink only after a one-time data purge where you know the space will never be needed again, and follow with index rebuilds."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Capacity planning is continuous: measure growth rates, forecast when resources run out, and upgrade before users notice",
+          "Transaction log growth is the most common production outage cause — size logs for peak workload and monitor log reuse wait_info",
+          "Tempdb must be sized and configured correctly from the start; tempdb outages affect every database on the instance",
+          "Use fixed-MB autogrowth, not percentage-based growth, to prevent file fragmentation and unpredictable I/O",
+          "Alert on capacity thresholds (20% free for data, 20% free for logs, 80% used for tempdb) and review trends monthly"
+        ],
+        "takeaway": "Capacity planning transforms reactive firefighting into proactive infrastructure management. The best capacity plan is the one that prevents the phone from ringing at 2 AM."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "index-maintenance-vs-actual-query-performance",
+    "read-replicas-and-readwrite-separation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Capacity Planning for SQL Server (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-sizing-and-scaling",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Tempdb Database (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/databases/tempdb-database",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "SQL Server Transaction Log Architecture (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-log-architecture-and-management",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

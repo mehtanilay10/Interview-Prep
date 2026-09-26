@@ -8,54 +8,198 @@
   "order": 6,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["javascript", "memory", "performance", "debugging", "frontend"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A memory leak appears after opening and closing a modal repeatedly** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a memory leak appears after opening and closing a modal repeatedly."
+        "text": "Users open a confirmation modal, close it, and repeat this dozens of times. After a while the tab uses more memory than expected, animations stutter, and eventually the browser crashes the tab. In a single-page application this usually means the modal or something inside it is retaining references after it unmounts."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Typical leak sources"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of a memory leak appears after opening and closing a modal repeatedly",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Event listeners attached to window, document, or a portal root without cleanup in useEffect.",
+          "setInterval or setTimeout callbacks that keep running after the component unmounts.",
+          "Closures capturing large objects and being stored in a global or module-level variable.",
+          "Third-party widgets or rich-text editors that create DOM nodes and never remove them.",
+          "RxJS subscriptions or WebSocket connections left open after modal close.",
+          "React state or refs in a parent that accumulate arrays or maps on every open/close cycle."
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Garbage collection",
+            "definition": "The process by which the JavaScript engine reclaims memory from objects that are no longer reachable."
+          },
+          {
+            "term": "Retained size",
+            "definition": "The total memory kept alive by a single object because it references other objects that would otherwise be collectible."
+          },
+          {
+            "term": "WeakRef",
+            "definition": "A reference to an object that does not prevent garbage collection, useful for caches and mappings."
+          },
+          {
+            "term": "Heap snapshot",
+            "definition": "A DevTools view of the JavaScript heap that shows which objects are alive and what references keep them alive."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use Chrome DevTools Memory panel. Take a heap snapshot before opening the modal, then open and close the modal ten times, then take another snapshot. If the retained size of the modal, its listeners, or any closure grows linearly, you have a leak. The Comparison view makes it easy to spot objects that were allocated but never collected."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Correct cleanup pattern"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding a memory leak appears after opening and closing a modal repeatedly is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Leaky modal",
+        "content": "A modal that adds a keydown listener but never removes it:",
+        "code": "function Modal({ isOpen, onClose }) {\n  useEffect(() => {\n    if (!isOpen) return;\n    const handler = (e) => {\n      if (e.key === 'Escape') onClose();\n    };\n    window.addEventListener('keydown', handler);\n    // Missing cleanup on unmount or isOpen change\n  }, [isOpen, onClose]);\n\n  if (!isOpen) return null;\n  return <div className=\"modal\">...</div>;\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fixed modal",
+        "content": "Return a cleanup function that removes the listener:",
+        "code": "function Modal({ isOpen, onClose }) {\n  useEffect(() => {\n    if (!isOpen) return;\n    const handler = (e) => {\n      if (e.key === 'Escape') onClose();\n    };\n    window.addEventListener('keydown', handler);\n    return () => window.removeEventListener('keydown', handler);\n  }, [isOpen, onClose]);\n\n  if (!isOpen) return null;\n  return <div className=\"modal\">...</div>;\n}",
+        "language": "tsx"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a memory leak appears after opening and closing a modal repeatedly, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use AbortController for fetch and timers",
+        "text": "For fetch, timers, and subscriptions, pass an AbortSignal or track a mounted flag. The cleanup function should abort in-flight work so callbacks never fire after unmount."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Diagnostic tools and patterns"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Memory leak detection approaches",
+        "cards": [
+          {
+            "title": "Heap snapshots",
+            "description": "Take snapshots before and after an action, then diff them in DevTools.",
+            "pros": ["Shows retained size and retaining paths", "Built into Chrome and Firefox"],
+            "cons": ["Manual process", "Hard to automate in CI"]
+          },
+          {
+            "title": "Allocation instrumentation",
+            "description": "Record allocations over time and filter by allocation stack.",
+            "pros": ["Shows what was allocated during a specific action", "Good for leaks tied to user flow"],
+            "cons": ["Higher overhead", "Requires reproducing the exact flow"]
+          },
+          {
+            "title": "Automated leak detection",
+            "description": "Run a scripted scenario in a headless browser and compare heap sizes.",
+            "pros": ["Can run in CI", "Catches regressions early"],
+            "cons": ["Flaky", "Needs stable environment and timing"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-modal-lifecycle",
+        "caption": "Modal lifecycle with cleanup",
+        "definition": "graph TD\n    A[User opens modal] --> B[Mount modal component]\n    B --> C[Attach listeners / timers / subscriptions]\n    C --> D[User interacts]\n    D --> E[User closes modal]\n    E --> F[Unmount modal component]\n    F --> G[Run cleanup function]\n    G --> H[Remove listeners / clear timers / close subscriptions]\n    H --> I[Objects become unreachable]\n    I --> J[Garbage collector reclaims memory]\n    J --> K[Heap size returns to baseline]"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Why does the leak happen only after opening and closing repeatedly?",
+            "answer": "Each open/close cycle allocates new listeners, closures, or DOM nodes. One cycle is harmless. Dozens of cycles accumulate until the heap grows enough to trigger GC pressure or tab termination."
+          },
+          {
+            "question": "Could React itself be holding the memory?",
+            "answer": "React releases component state when a component unmounts, but only if nothing external is still referencing that state. Event listeners on window or module-level caches are common external retainers."
+          },
+          {
+            "question": "Should I use WeakMap to store modal state?",
+            "answer": "WeakMap helps when you need a cache that does not prevent garbage collection. It does not fix leaks caused by lingering event listeners or closures. Fix the cleanup first, then consider WeakMap for caches."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Find and fix a memory leak",
+        "description": "Use DevTools to confirm a leak in a modal pattern, then fix the cleanup.",
+        "steps": [
+          "Open a page with a modal that opens and closes.",
+          "Open Memory panel and take a heap snapshot.",
+          "Open and close the modal twenty times.",
+          "Take another heap snapshot and compare.",
+          "Identify the object type or closure retaining memory and add cleanup."
+        ],
+        "expectedOutcome": "After the fix, repeated open/close cycles should not increase retained heap size, and the detached DOM tree count should stay near zero."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Memory leaks in modals are usually missing cleanup for listeners, timers, or subscriptions.",
+          "Use heap snapshots to confirm the leak and identify the retaining path.",
+          "Always return a cleanup function from useEffect.",
+          "Use AbortController for fetch and timers so work stops on unmount.",
+          "Validate the fix by repeating the user flow and comparing heap sizes"
+        ],
+        "takeaway": "Cleanup is not optional in interactive components. A modal that works once but leaks on repeated use will eventually degrade the entire application for every user."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "react-page-becomes-progressively-slower-after-navigation",
+    "users-see-stale-data-after-a-successful-update"
+  ],
+  "furtherReading": [
+    {
+      "title": "Find memory leaks with Chrome DevTools",
+      "url": "https://developer.chrome.com/docs/devtools/memory-problems/",
+      "type": "article",
+      "author": "Chrome Developers",
+      "description": "Guide to using heap snapshots and allocation timelines to diagnose leaks."
+    }
+  ]
 }

@@ -3,59 +3,122 @@
   "slug": "health-endpoints-and-dependency-checks",
   "moduleSlug": "performance-observability",
   "courseSlug": "aspnet-core",
-  "title": "Health endpoints and dependency checks",
-  "description": "Learn about Health endpoints and dependency checks. Master the concepts, patterns, and best practices.",
+  "title": "Health Endpoints and Dependency Checks",
+  "description": "Build robust health endpoints in ASP.NET Core to verify database connectivity, cache availability, and upstream service health for Kubernetes probes and load balancers.",
   "order": 8,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Health endpoints and dependency checks** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with health endpoints and dependency checks."
+        "text": "Modern infrastructure needs to know when an application is ready to receive traffic and when it is healthy enough to keep running. **Health endpoints** provide this signal. ASP.NET Core includes built-in health checks that integrate with Kubernetes liveness and readiness probes, Azure Application Gateway, and load balancers."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of health endpoints and dependency checks",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Liveness vs Readiness"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding health endpoints and dependency checks is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A **liveness probe** answers 'Is the app running?' If it fails, Kubernetes restarts the container. A **readiness probe** answers 'Can this instance handle traffic?' If it fails, Kubernetes stops sending requests to that instance but does not restart it. You typically want separate endpoints for each because a database outage should remove traffic without restarting a healthy process."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Liveness Probe",
+            "definition": "A health check that determines whether the application process is alive. Failure triggers a restart."
+          },
+          {
+            "term": "Readiness Probe",
+            "definition": "A health check that determines whether the application is ready to serve traffic. Failure removes the instance from the load balancer."
+          },
+          {
+            "term": "Health Check",
+            "definition": "An endpoint or component that verifies the state of the application and its dependencies."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Health Checks in Program.cs",
+        "content": "Add health checks for the database, Redis, and a custom external service.",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddHealthChecks()\n    .AddSqlServer(\n        connectionString: builder.Configuration.GetConnectionString(\"Default\"),\n        name: \"sql\",\n        tags: new[] { \"ready\" })\n    .AddRedis(\n        redisConnectionString: builder.Configuration.GetConnectionString(\"Redis\"),\n        name: \"redis\",\n        tags: new[] { \"ready\" })\n    .AddCheck<ExternalApiHealthCheck>(\n        name: \"external-api\",\n        tags: new[] { \"ready\" });\n\nvar app = builder.Build();\n\napp.MapHealthChecks(\"/health/live\", new HealthCheckOptions\n{\n    Predicate = _ => false // no dependencies, just process alive\n});\n\napp.MapHealthChecks(\"/health/ready\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"ready\")\n});\n\napp.Run();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom Health Check",
+        "content": "Implement a custom check that verifies an external payment API is reachable.",
+        "code": "public class ExternalApiHealthCheck : IHealthCheck\n{\n    private readonly IHttpClientFactory _clientFactory;\n    private readonly ILogger<ExternalApiHealthCheck> _logger;\n\n    public ExternalApiHealthCheck(\n        IHttpClientFactory clientFactory,\n        ILogger<ExternalApiHealthCheck> logger)\n    {\n        _clientFactory = clientFactory;\n        _logger = logger;\n    }\n\n    public async Task<HealthCheckResult> CheckHealthAsync(\n        HealthCheckContext context,\n        CancellationToken cancellationToken = default)\n    {\n        try\n        {\n            var client = _clientFactory.CreateClient(\"external-api\");\n            var response = await client.GetAsync(\"/health\", cancellationToken);\n\n            return response.IsSuccessStatusCode\n                ? HealthCheckResult.Healthy(\"External API is reachable\")\n                : HealthCheckResult.Degraded(\"External API returned non-success\");\n        }\n        catch (Exception ex)\n        {\n            _logger.LogWarning(ex, \"External API health check failed\");\n            return HealthCheckResult.Unhealthy(\"External API unreachable\", ex);\n        }\n    }\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with health endpoints and dependency checks, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Keep Health Checks Fast",
+        "text": "Health checks run on a timer. A slow database query or external call inside a health check can cascade into thread pool pressure. Set short timeouts and cache results when possible."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Best Practices",
+        "items": [
+          "Separate liveness and readiness endpoints so Kubernetes can distinguish 'restart' from 'remove from load balancer.'",
+          "Set explicit timeouts on health check dependencies; 2–5 seconds is usually enough.",
+          "Avoid running expensive diagnostics inside health checks.",
+          "Return 503 for degraded or unhealthy states so load balancers react correctly."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaway",
+        "points": [
+          "Health checks are the interface between your app and the infrastructure orchestrator.",
+          "Use liveness for process health and readiness for dependency health.",
+          "Keep checks fast, timeout-bound, and independent of each other."
+        ],
+        "takeaway": "A good health endpoint is boring: it returns 200 quickly and only fails when a real dependency is broken."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "slow-api-investigation-workflow",
+    "connection-pool-exhaustion",
+    "profiling-cpu-and-allocations"
+  ],
+  "furtherReading": [
+    {
+      "title": "Health checks in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes liveness and readiness probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article"
+    },
+    {
+      "title": "AspNetCore.Diagnostics.HealthChecks",
+      "url": "https://github.com/Xabaril/AspNetCore.Diagnostics.HealthChecks",
+      "type": "tool"
+    }
+  ]
 }

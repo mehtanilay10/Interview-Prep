@@ -4,33 +4,55 @@
   "moduleSlug": "database-internals-query-optimization",
   "courseSlug": "sql-server",
   "title": "Parameter sniffing and plan instability",
-  "description": "Learn about Parameter sniffing and plan instability. Master the concepts, patterns, and best practices.",
+  "description": "Understand parameter sniffing in SQL Server, why it causes plan instability, and practical mitigation strategies.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Parameter sniffing and plan instability** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with parameter sniffing and plan instability."
+        "text": "Parameter sniffing occurs when SQL Server compiles a stored procedure or parameterized query using the actual parameter values passed on the first execution. If those values are not representative of typical workloads, the resulting plan may be optimal for the first call but poor for subsequent calls with different parameter values."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How parameter sniffing works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a stored procedure is executed, SQL Server compiles a plan and caches it. During compilation, the optimizer inspects the current parameter values and uses them to estimate row counts. The cached plan is then reused for later executions, even when new parameter values would produce a different optimal plan."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Stored procedure with sniffing risk",
+        "content": "A procedure that filters by CustomerID may produce a seek plan for a single customer and a scan plan for a broad range. The first caller determines the plan for everyone.",
+        "code": "CREATE PROCEDURE dbo.GetOrdersByCustomer\n    @CustomerID INT\nAS\nBEGIN\n    SELECT OrderID, OrderDate, TotalAmount\n    FROM dbo.Orders\n    WHERE CustomerID = @CustomerID;\nEND;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Symptoms of parameter sniffing"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common signs",
         "items": [
-          "Understand the fundamental principles of parameter sniffing and plan instability",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "A query runs fast for some parameter values and slow for others",
+          "Performance improves after the plan cache is cleared or the procedure is recompiled",
+          "A plan with an index seek appears in the cache even when a scan would be better for typical values"
         ]
       }
     },
@@ -38,24 +60,70 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Mitigation strategies"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding parameter sniffing and plan instability is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Practical fixes",
+        "items": [
+          "Use OPTION (RECOMPILE) to force a fresh compile for each execution",
+          "Use OPTIMIZE FOR to tell the optimizer to use a representative value",
+          "Use OPTIMIZE FOR UNKNOWN to ignore the sniffed value and use density-based estimates",
+          "Redesign the procedure into separate procedures for distinct parameter patterns",
+          "Use local variables to hide the actual parameter value from the optimizer"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Use OPTION (RECOMPILE)",
+        "content": "For high-volatility procedures, recompilation removes the stale plan problem at the cost of extra CPU.",
+        "code": "CREATE PROCEDURE dbo.GetOrdersByCustomer\n    @CustomerID INT\nAS\nBEGIN\n    SELECT OrderID, OrderDate, TotalAmount\n    FROM dbo.Orders\n    WHERE CustomerID = @CustomerID\n    OPTION (RECOMPILE);\nEND;",
+        "language": "sql"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with parameter sniffing and plan instability, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Plan guides and forced plans",
+        "text": "In some environments, you can use plan guides or query store forced plans to stabilize performance. These are advanced techniques and should be used with caution because they bypass normal optimization and can become outdated as data changes."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Takeaway",
+        "points": [
+          "Parameter sniffing caches a plan based on first-execution values",
+          "It causes instability when parameter distributions vary widely",
+          "RECOMPILE, OPTIMIZE FOR, and redesign are common mitigations",
+          "Query Store forced plans are a last resort for production stabilization"
+        ],
+        "takeaway": "Parameter sniffing is a feature, not a bug, but it becomes a problem when data distributions are skewed. Design procedures with uniform workloads in mind, or use recompilation strategically."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "statistics-and-cardinality-estimation",
+    "how-the-query-optimizer-chooses-a-plan",
+    "execution-plan-reading-workflow"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs - Parameter Sniffing",
+      "url": "https://learn.microsoft.com/sql/relational-databases/performance/parameter-sniffing",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Erland Sommarskog - Slow in the Application, Fast in SSMS",
+      "url": "https://www.sommarskog.se/query-plan-mysteries.html",
+      "type": "article",
+      "author": "Erland Sommarskog"
+    }
+  ]
 }

@@ -3,59 +3,200 @@
   "slug": "scopes-claims-roles-and-policies",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "Scopes, claims, roles and policies",
-  "description": "Learn about Scopes, claims, roles and policies. Master the concepts, patterns, and best practices.",
+  "title": "Scopes, Claims, Roles, and Policies",
+  "description": "Learn how scopes limit token permissions, how claims describe users, and how .NET policies enforce authorization rules. Build a clean authorization model for APIs and SPAs.",
   "order": 15,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "scopes",
+    "claims",
+    "roles",
+    "policies",
+    "authorization",
+    "rbac",
+    "asp.net-core"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Scopes, claims, roles and policies** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with scopes, claims, roles and policies."
+        "text": "Authentication tells you who a user is. Authorization decides what they can do. OAuth scopes, JWT claims, roles, and ASP.NET Core authorization policies are the tools that bridge this gap. Scopes limit what an access token can access. Claims carry attributes about the user. Roles group users by permission sets. Policies combine these into declarative rules that keep authorization logic out of your controllers."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of scopes, claims, roles and policies",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Scopes"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding scopes, claims, roles and policies is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Scopes are strings that represent permissions. When a client requests an access token, it specifies which scopes it needs. The authorization server includes only those scopes in the issued token. The resource server checks the scopes before processing the request. Common scope patterns include `read:orders` for read-only access, `write:orders` for mutations, and `admin` for full administrative access."
       }
     },
     {
-      "type": "callout",
+      "type": "key-terms",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with scopes, claims, roles and policies, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "terms": [
+          {
+            "term": "Scope",
+            "definition": "A permission string that limits what an access token can do, such as read:orders or write:profile."
+          },
+          {
+            "term": "Claim",
+            "definition": "A piece of information about a user, such as role, department, or email, carried in a token or identity."
+          },
+          {
+            "term": "Role",
+            "definition": "A named group of permissions that simplifies assigning the same set of claims to multiple users."
+          },
+          {
+            "term": "Authorization policy",
+            "definition": "A reusable, named set of requirements that determine whether a user can access a resource."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scope-based API authorization",
+        "content": "The API requires the orders:write scope for mutation endpoints.",
+        "code": "app.MapPut(\"/api/orders/{id}\", async (int id, OrderUpdate update, HttpContext ctx) =>\n{\n    var scopeClaim = ctx.User.FindFirst(\"scope\");\n    var scopes = scopeClaim?.Value.Split(' ') ?? Array.Empty<string>();\n\n    if (!scopes.Contains(\"orders:write\"))\n        return Results.Forbid();\n\n    var order = await db.Orders.FindAsync(id);\n    // Update order...\n    return Results.Ok(order);\n})\n.RequireAuthorization(new AuthorizeAttribute\n{\n    Policy = \"OrdersWritePolicy\"\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Claims and Roles"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Claims are the atomic facts about a user: their email, department, subscription tier, and roles. Roles are a special type of claim that groups users for authorization. In ASP.NET Core, the `[Authorize(Roles = \"Admin,Manager\")]` attribute checks for role claims. For more complex rules, authorization policies let you combine multiple requirements — for example, requiring both a role claim and a specific scope."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Authorization policies in .NET",
+        "content": "Define policies at startup and apply them with attributes.",
+        "code": "builder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"CanManageOrders\", policy =>\n        policy.RequireRole(\"Admin\", \"Manager\")\n              .RequireClaim(\"scope\", \"orders:write\"));\n\n    options.AddPolicy(\"CanViewReports\", policy =>\n        policy.RequireClaim(\"department\", \"Finance\", \"Executive\"));\n});\n\n// Usage:\n[Authorize(Policy = \"CanManageOrders\")]\napp.MapPut(\"/api/orders/{id}\", ...);\n\n[Authorize(Policy = \"CanViewReports\")]\napp.MapGet(\"/api/reports/financial\", ...);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resource-Based Authorization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes a user's role is not enough — they should only be able to modify their own resources. Resource-based authorization evaluates the user's claims against a specific resource instance. ASP.NET Core provides `IAuthorizationService` and custom requirement handlers that can check ownership, document state, or any business rule."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom authorization requirement handler",
+        "content": "Implement an IAuthorizationRequirement that checks if the user owns the resource.",
+        "code": "public class DocumentOwnerRequirement : IAuthorizationRequirement\n{\n    public bool RequireAdminOverride { get; set; } = true;\n}\n\npublic class DocumentOwnerHandler : AuthorizationHandler<DocumentOwnerRequirement, Document>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        DocumentOwnerRequirement requirement,\n        Document resource)\n    {\n        if (context.User.IsInRole(\"Admin\") && requirement.RequireAdminOverride)\n        {\n            context.Succeed(requirement);\n            return Task.CompletedTask;\n        }\n\n        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n        if (userId == resource.OwnerId)\n            context.Succeed(requirement);\n\n        return Task.CompletedTask;\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JavaScript Authorization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a React or Next.js frontend, authorization checks run in two places. First, the UI hides or shows elements based on the user's claims and roles — this is for usability, not security. Second, the backend API must enforce the same rules. Never rely on client-side authorization to protect data. The frontend should parse the ID token's claims and pass the access token in the Authorization header for every API call."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "React role-based rendering",
+        "content": "The UI conditionally renders buttons based on roles, but the API still enforces the rules.",
+        "code": "function OrderRow({ order, claims }) {\n  const roles = claims['roles']?.split(' ') ?? [];\n  const canEdit = roles.includes('Admin') || roles.includes('Manager');\n\n  return (\n    <div>\n      <span>{order.customerName}</span>\n      {canEdit && (\n        <button onClick={() => editOrder(order.id)}>Edit</button>\n      )}\n    </div>\n  );\n}\n\n// The API still validates:\n// PUT /api/orders/123 requires the 'orders:write' scope and owner or admin role.",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Authorization design checklist",
+        "items": [
+          {
+            "text": "Use scopes to limit API access to the minimum required permissions.",
+            "hint": "A reporting service should request only read:reports, not admin."
+          },
+          {
+            "text": "Enforce authorization in policies, not scattered across controllers.",
+            "hint": "Policies are reusable and testable."
+          },
+          {
+            "text": "Use resource-based authorization for record-level access control.",
+            "hint": "Roles alone cannot distinguish User A's record from User B's."
+          },
+          {
+            "text": "Repeat every authorization check on the backend, regardless of what the frontend shows.",
+            "hint": "Client-side hiding is a usability feature, not a security boundary."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Scopes limit what an access token can do; claims describe the user; roles group permissions.",
+          "ASP.NET Core policies combine requirements into reusable authorization rules.",
+          "Resource-based authorization checks ownership on individual records.",
+          "Frontend authorization is for usability; backend authorization is for security."
+        ],
+        "takeaway": "Authentication identifies, authorization decides. Apply the least privilege at every layer."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "oauth-20-roles-and-flows",
+    "client-credentials-for-service-to-service-calls",
+    "broken-access-control-and-idorbola"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs — Authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/authorization/",
+      "type": "article"
+    },
+    {
+      "title": "OWASP Authorization Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+      "type": "article"
+    },
+    {
+      "title": "Auth0 — Scopes and Claims",
+      "url": "https://auth0.com/docs/get-started/authentication-and-authorization-flow/scopes",
+      "type": "article"
+    }
+  ]
 }

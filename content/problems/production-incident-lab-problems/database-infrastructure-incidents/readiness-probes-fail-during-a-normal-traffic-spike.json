@@ -4,58 +4,215 @@
   "moduleSlug": "database-infrastructure-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Readiness probes fail during a normal traffic spike",
-  "description": "Problem: Readiness probes fail during a normal traffic spike. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose how a readiness probe that depends on a shared resource can cause cascading pod removals during a traffic spike, turning a load increase into a service outage.",
   "order": 4,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["kubernetes", "readiness-probe", "load-shedding", "pod-disruption-budget", "incident-response", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Readiness probes fail during a normal traffic spike** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with readiness probes fail during a normal traffic spike."
+        "text": "A readiness probe is supposed to protect users from being routed to a pod that cannot handle requests. But when the probe itself depends on a shared resource—a database connection pool, a thread pool, or a downstream API—it can become the trigger for cascading failure. Under load, the probe times out, Kubernetes removes the pod from the service endpoints, and the remaining pods absorb more traffic, causing their probes to fail, and so on. The system enters a death spiral where healthy pods are removed faster than they can recover."
       }
     },
     {
       "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
+      "data": { "level": 2, "text": "Key Concepts" }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core concepts",
         "items": [
-          "Understand the fundamental principles of readiness probes fail during a normal traffic spike",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Readiness probe: determines if a pod should receive traffic, not whether it is alive",
+          "Endpoint Slice: Kubernetes resource tracking ready pod IPs for a service",
+          "Load shedding: an application pattern that rejects requests when resources are constrained",
+          "PodDisruptionBudget: limits how many pods can be unavailable simultaneously",
+          "Cascading removal: when failing probes remove pods from service, concentrating traffic on fewer pods"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Readiness Probe",
+            "definition": "A Kubernetes probe that determines whether a container is ready to accept traffic. Failed probes remove the pod from service endpoints."
+          },
+          {
+            "term": "Endpoint Slice",
+            "definition": "A Kubernetes resource that tracks the set of ready pod IPs for a service, updated based on readiness probe results."
+          },
+          {
+            "term": "Load Shedding",
+            "definition": "An application pattern that rejects requests when resources are constrained, protecting the process from overload."
+          },
+          {
+            "term": "PodDisruptionBudget",
+            "definition": "A Kubernetes resource that limits the number of pods that can be voluntarily or involuntarily disrupted at the same time."
+          }
         ]
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "Common Causes" }
+    },
+    {
+      "type": "bullet-list",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "items": [
+          "Health check endpoint opens a database connection pool under load and times out",
+          "Readiness probe uses a tight timeout that is exceeded during CPU contention",
+          "Shared connection pool or thread pool is exhausted by the traffic spike",
+          "Probe hits a cold cache or unindexed query that degrades under concurrent load",
+          "HPA scales pods, but new pods fail readiness checks while warming up caches",
+          "Load balancer health check interval is shorter than the application warm-up time"
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "heading",
+      "data": { "level": 2, "text": "Comparison of Solutions" }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding readiness probes fail during a normal traffic spike is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Readiness Probe Solutions",
+        "cards": [
+          {
+            "title": "Increase Timeout and Delay",
+            "description": "Raise the readiness probe timeoutSeconds and initialDelaySeconds to tolerate slower responses.",
+            "pros": ["Quick configuration change", "No code changes required", "Reduces transient failures"],
+            "cons": ["Slower detection of genuinely unhealthy pods", "May keep unhealthy pods in rotation longer"]
+          },
+          {
+            "title": "Decouple Health from Dependencies",
+            "description": "Make the readiness endpoint check only application-local state, not downstream databases.",
+            "pros": ["Probe is fast and reliable", "Eliminates dependency-related failures", "True readiness signal"],
+            "cons": ["Does not verify end-to-end health", "Requires a secondary liveness or synthetic monitor"]
+          },
+          {
+            "title": "Application-Level Load Shedding",
+            "description": "Return 503 from the readiness endpoint when internal resource utilization exceeds a threshold.",
+            "pros": ["Protects the application from overload", "Signals the orchestrator to remove the pod", "Graceful degradation"],
+            "cons": ["Requires instrumentation code", "Threshold tuning is difficult", "May over-shed under bursty traffic"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-readiness-flow",
+        "caption": "Readiness probe behavior during a traffic spike",
+        "definition": "graph TD\n    A[Traffic Spike] --> B[App Resource Pressure]\n    B --> C{Readiness Probe}\n    C -->|Pass| D[Pod Receives Traffic]\n    C -->|Fail| E[Pod Removed from Endpoints]\n    E --> F[Other Pods Overloaded]\n    F --> G[More Probes Fail]\n    G --> H[Cascading Removals]\n    H --> I[Service Unavailable]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Investigation Steps" }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Check endpoint slice changes with kubectl get endpointslices to see pods being removed.",
+          "Review readiness probe configuration: timeout, period, successThreshold, and failureThreshold.",
+          "Inspect application metrics during the spike: CPU, memory, thread pool, and connection pool usage.",
+          "Run the health endpoint locally under load to reproduce the slow response.",
+          "Check if the health endpoint opens a new database connection on every request."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with readiness probes fail during a normal traffic spike, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Do not put database checks in readiness",
+        "text": "A readiness probe that verifies database connectivity can cause cascading failures. If the database is under load, every probe adds more load, and failing probes remove pods from service, concentrating traffic on fewer pods."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Best Practices" }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Keep readiness checks local: memory, thread state, and cache warmness",
+          "Use separate synthetic monitors for end-to-end dependency health",
+          "Set failureThreshold to 2 or 3 to tolerate transient slowness",
+          "Implement graceful degradation: serve cached data when the database is slow",
+          "Use PodDisruptionBudget to prevent too many pods from being removed simultaneously",
+          "Test probe behavior under load with a chaos engineering tool before production traffic"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What is the difference between readiness and liveness probes?",
+            "answer": "A liveness probe restarts the container when it fails. A readiness probe removes the pod from traffic without restarting it. Use readiness for temporary overload and liveness for permanent failure."
+          },
+          {
+            "question": "Can readiness probes cause downtime?",
+            "answer": "If too many pods fail readiness simultaneously, yes. Use PodDisruptionBudget and conservative failure thresholds to prevent cascading removal."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix a readiness probe that causes cascading failures",
+        "description": "An API gateway fails readiness probes during a marketing campaign traffic spike, causing 503 errors for all users. Diagnose and fix the probe configuration.",
+        "steps": [
+          "Examine endpoint slice changes and pod removal timestamps",
+          "Review the readiness probe configuration and the health endpoint code",
+          "Identify whether the probe depends on a shared resource that degrades under load",
+          "Refactor the health endpoint to check only local state",
+          "Configure PodDisruptionBudget to limit concurrent pod removals",
+          "Deploy and verify the fix under simulated load"
+        ],
+        "expectedOutcome": "A readiness probe that reflects true application readiness without causing cascading failures during traffic spikes."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Readiness probes should be local and lightweight",
+          "Do not validate downstream dependencies in readiness checks",
+          "Use conservative failure thresholds to avoid transient failures",
+          "Protect against cascading removal with PodDisruptionBudget",
+          "Test probe behavior under realistic load before relying on it in production"
+        ],
+        "takeaway": "A readiness probe is a signal to the load balancer, not a comprehensive health check. Design it to be fast, local, and tolerant of transient conditions."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "kubernetes-pods-restart-even-though-application-logs-look-healthy",
+    "readiness-probes-fail-during-a-normal-traffic-spike"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article"
+    },
+    {
+      "title": "PodDisruptionBudget",
+      "url": "https://kubernetes.io/docs/tasks/run-application/configure-pdb/",
+      "type": "article"
+    }
+  ]
 }

@@ -3,59 +3,192 @@
   "slug": "legacy-modernization-strategies",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "Legacy modernization strategies",
-  "description": "Learn about Legacy modernization strategies. Master the concepts, patterns, and best practices.",
+  "title": "Legacy Modernization Strategies",
+  "description": "Explore proven strategies for modernizing legacy .NET applications, including the strangler fig pattern, anti-corruption layers, and incremental replacement approaches.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "legacy",
+    "modernization",
+    "migration",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Legacy modernization strategies** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with legacy modernization strategies."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of legacy modernization strategies",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Every long-lived software system eventually becomes legacy. The .NET Framework application that runs on Windows Server 2012, the ASP.NET Web Forms site with inline SQL queries, the Windows Service that has been running unattended for seven years; these systems still deliver business value, but they are increasingly expensive to change, deploy, and secure. Modernization is the process of migrating these systems to a sustainable platform and architecture without disrupting the business they support."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding legacy modernization strategies is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The senior engineer's role in modernization is not just to write the new code but to choose the right migration strategy, manage the risk, and preserve business continuity. A bad modernization strategy can be more damaging than no modernization at all: the system is replaced, the data is migrated, and the new version is slower, less reliable, and missing features that users depended on for years."
       }
     },
     {
-      "type": "callout",
+      "type": "heading",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with legacy modernization strategies, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "level": 2,
+        "text": "The Strangler Fig Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The strangler fig pattern is one of the safest modernization strategies. Instead of replacing the legacy system all at once, you build the new system alongside it and gradually route traffic away from the old system. The name comes from the strangler fig tree, which grows around a host tree and eventually replaces it. The legacy system continues to function while the new system absorbs its responsibilities piece by piece."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Strangler fig with ASP.NET Core and YARP",
+        "content": "Using YARP reverse proxy to route requests between legacy and modern systems during gradual migration.",
+        "language": "csharp",
+        "code": "// Program.cs in the modern ASP.NET Core gateway\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddReverseProxy()\n    .LoadFromConfig(builder.Configuration.GetSection(\"ReverseProxy\"));\n\nvar app = builder.Build();\n\napp.MapReverseProxy();\napp.MapGet(\"/\", () => \"Modern API Gateway\");\n\napp.Run();\n\n// appsettings.json routes requests based on path\n// Old path /api/orders -> legacy ASP.NET app\n// New path /api/v2/orders -> modern ASP.NET Core app\n// Over time, the new paths expand and the old paths shrink\n{\n  \"ReverseProxy\": {\n    \"Routes\": [\n      {\n        \"RouteId\": \"legacy-orders\",\n        \"Match\": { \"Path\": \"/api/orders/{**catch-all}\" },\n        \"ClusterId\": \"legacy-cluster\"\n      },\n      {\n        \"RouteId\": \"modern-orders\",\n        \"Match\": { \"Path\": \"/api/v2/orders/{**catch-all}\" },\n        \"ClusterId\": \"modern-cluster\"\n      }\n    ],\n    \"Clusters\": {\n      \"legacy-cluster\": { \"Destinations\": { \"legacy\": { \"Address\": \"http://legacy-app/\" } } },\n      \"modern-cluster\": { \"Destinations\": { \"modern\": { \"Address\": \"http://modern-app/\" } } }\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Anti-Corruption Layer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An anti-corruption layer (ACL) is an adapter or translation layer that protects your new system from the design problems of the legacy system. Instead of calling the legacy database directly, the new system calls an ACL that exposes clean, modern interfaces. The ACL handles the ugly details: legacy stored procedures, table naming conventions, and data transformations. This prevents the legacy system's bad design from spreading into the modern codebase."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Anti-corruption layer in C#",
+        "content": "An ACL interface that shields the modern domain from legacy database quirks.",
+        "language": "csharp",
+        "code": "// Modern domain interface - clean and expressive\npublic interface ICustomerRepository\n{\n    Task<Customer> GetByIdAsync(Guid id, CancellationToken ct);\n    Task SaveAsync(Customer customer, CancellationToken ct);\n}\n\n// Anti-corruption layer implementation\npublic class LegacyCustomerRepository : ICustomerRepository\n{\n    private readonly LegacyDbContext _legacyContext;\n\n    public async Task<Customer> GetByIdAsync(Guid id, CancellationToken ct)\n    {\n        var dto = await _legacyContext.Cust_Table\n            .Where(c => c.CUST_ID == id.ToString())\n            .Select(c => new CustomerLegacyDto\n            {\n                Id = Guid.Parse(c.CUST_ID),\n                FullName = c.FIRST_NAME + \" \" + c.LAST_NAME,\n                Email = c.EMAIL_ADDR ?? \"unknown\"\n            })\n            .FirstAsync(ct);\n\n        return MapToDomain(dto);\n    }\n\n    public async Task SaveAsync(Customer customer, CancellationToken ct)\n    {\n        var entity = new Cust_Table\n        {\n            CUST_ID = customer.Id.ToString(),\n            FIRST_NAME = customer.FullName.Split(' ')[0],\n            LAST_NAME = customer.FullName.Split(' ')[1],\n            EMAIL_ADDR = customer.Email\n        };\n        await _legacyContext.Cust_Table.AddAsync(entity, ct);\n        await _legacyContext.SaveChangesAsync(ct);\n    }\n\n    private Customer MapToDomain(CustomerLegacyDto dto) => new()\n    {\n        Id = dto.Id,\n        FullName = dto.FullName,\n        Email = dto.Email\n    };\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Rewrite vs Migrate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A full rewrite is tempting because it promises clean code and modern architecture. In practice, rewrites are risky, expensive, and often fail to deliver the expected benefits. The original system accumulated years of implicit knowledge: edge cases, workarounds, regulatory compliance, and performance tuning. A rewrite discards all of that and rebuilds it from memory, which is almost always incomplete. Prefer incremental migration unless the legacy system is fundamentally unmaintainable, undocumented, and running on unsupported infrastructure."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Migration strategies compared",
+        "cards": [
+          {
+            "title": "Strangler Fig",
+            "description": "Gradually replace legacy functionality with new services behind a proxy.",
+            "pros": [
+              "Low risk: old system stays running",
+              "Incremental value delivery",
+              "Easy rollback per feature"
+            ],
+            "cons": [
+              "Requires proxy infrastructure",
+              "Two systems to maintain during transition",
+              "Can take a long time"
+            ]
+          },
+          {
+            "title": "Anti-Corruption Layer",
+            "description": "Build a translation layer between new and legacy systems.",
+            "pros": [
+              "Protects new system from legacy design",
+              "Allows parallel development",
+              "Clear boundary between old and new"
+            ],
+            "cons": [
+              "ACL itself becomes legacy code",
+              "Mapping logic can become complex",
+              "Performance overhead"
+            ]
+          },
+          {
+            "title": "Parallel Run",
+            "description": "Run new and old systems in parallel and compare outputs.",
+            "pros": [
+              "Validates correctness before cutover",
+              "Reduces risk of data loss",
+              "Builds confidence in the new system"
+            ],
+            "cons": [
+              "Doubles operational cost temporarily",
+              "Requires output comparison tooling",
+              "Synchronization complexity"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design a strangler fig migration plan",
+        "description": "Take a hypothetical legacy system and design a strangler fig migration strategy.",
+        "steps": [
+          "Imagine a legacy ASP.NET Web Forms application that handles orders, inventory, and customer management.",
+          "Identify the three boundaries where you would introduce the reverse proxy.",
+          "For each boundary, define the route matching rule and the destination cluster.",
+          "Choose the first module to migrate and explain why it is the safest starting point.",
+          "Describe how you would handle shared data during the transition period.",
+          "Define the criteria that would tell you when the legacy system can be decommissioned."
+        ],
+        "expectedOutcome": "A strangler fig migration plan with proxy routes, migration order, and decommissioning criteria."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Legacy modernization is a risk management exercise, not just a coding exercise.",
+          "The strangler fig pattern is the safest starting point for most migrations.",
+          "Anti-corruption layers protect new code from legacy design problems.",
+          "Prefer incremental migration over full rewrites unless the legacy system is fundamentally broken."
+        ],
+        "takeaway": "The goal of modernization is not to write perfect new code; it is to deliver business value while reducing risk. Senior engineers choose the strategy that minimizes disruption and maximizes learning along the way."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "incremental-migration-vs-rewrite",
+    "managing-technical-debt"
+  ],
+  "furtherReading": [
+    {
+      "title": "The Strangler Fig Pattern",
+      "url": "https://martinfowler.com/bliki/StranglerFigApplication.html",
+      "type": "article",
+      "author": "Martin Fowler",
+      "description": "The original description of the strangler fig pattern for gradual system replacement."
+    },
+    {
+      "title": "YARP: Yet Another Reverse Proxy",
+      "url": "https://microsoft.github.io/reverse-proxy/",
+      "type": "tool",
+      "author": "Microsoft",
+      "description": "A reverse proxy toolkit for ASP.NET Core, ideal for implementing the strangler fig pattern."
+    },
+    {
+      "title": "Modernizing .NET Applications",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/modernize/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Microsoft's guide to modernizing .NET applications, including migration patterns and tools."
+    }
+  ]
 }

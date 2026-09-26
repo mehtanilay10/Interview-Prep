@@ -3,34 +3,40 @@
   "slug": "rate-limiting",
   "moduleSlug": "full-stack-api-design",
   "courseSlug": "next-js-full-stack-react",
-  "title": "rate-limiting",
-  "description": "Learn about rate-limiting. Master the concepts, patterns, and best practices.",
+  "title": "Rate Limiting",
+  "description": "Learn how to protect Next.js APIs from abuse by limiting how many requests a client can make in a given time window using middleware and Redis.",
   "order": 7,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["rate-limiting", "redis", "performance"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**rate-limiting** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with rate-limiting."
+        "text": "Rate limiting restricts how many requests a client can send in a certain period. Without it, a single user, buggy script, or attacker can overwhelm your API, increase costs, or degrade performance for everyone else."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common Rate Limiting Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The two most common algorithms are fixed window and sliding window. Fixed window allows a set number of requests per minute or hour. Sliding window smooths out bursts by tracking requests over a rolling period."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of rate-limiting",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Fixed window: 100 requests per minute, reset at the top of each minute",
+          "Sliding window: 100 requests in any rolling 60-second period",
+          "Token bucket: refill tokens over time, allow bursts up to a limit",
+          "Identify clients by IP, API key, or authenticated user ID"
         ]
       }
     },
@@ -38,24 +44,89 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Why Redis?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding rate-limiting is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Rate limiting needs a fast shared store because your app may run on multiple servers. Redis is in-memory, supports atomic increment operations, and has built-in key expiration. It is the industry standard for this job."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Simple Redis rate limiter in Next.js middleware",
+        "code": "// middleware/ratelimit.ts\nimport { Ratelimit } from \"@upstash/ratelimit\";\nimport { Redis } from \"@upstash/redis\";\n\nexport const ratelimit = new Ratelimit({\n  redis: Redis.fromEnv(),\n  limiter: Ratelimit.slidingWindow(10, \"10 s\"),\n  analytics: true,\n});\n\n// middleware.ts\nimport { NextResponse } from \"next/server\";\nimport type { NextRequest } from \"next/server\";\nimport { ratelimit } from \"./ratelimit\";\n\nexport async function middleware(request: NextRequest) {\n  const ip = request.ip ?? \"anonymous\";\n\n  const { success } = await ratelimit.limit(ip);\n\n  if (!success) {\n    return NextResponse.json(\n      { success: false, error: { code: \"RATE_LIMITED\", message: \"Too many requests\" } },\n      { status: 429 }\n    );\n  }\n\n  return NextResponse.next();\n}\n\nexport const config = {\n  matcher: [\"/api/:path*\"],\n};",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limiting Per User"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "IP-based limiting works for anonymous traffic, but logged-in users should have limits tied to their account. This prevents one user from exhausting the shared IP limit and also lets you offer different tiers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rate limiting by authenticated user ID",
+        "code": "// app/api/generate/route.ts\nexport async function POST(request: Request) {\n  const session = await getServerSession(authOptions);\n\n  if (!session?.user?.id) {\n    return NextResponse.json(\n      { success: false, error: { code: \"UNAUTHORIZED\", message: \"Sign in required\" } },\n      { status: 401 }\n    );\n  }\n\n  const userId = session.user.id;\n  const { success } = await ratelimit.limit(`user:${userId}`);\n\n  if (!success) {\n    return NextResponse.json(\n      {\n        success: false,\n        error: {\n          code: \"RATE_LIMITED\",\n          message: \"Monthly limit reached. Upgrade for more requests.\",\n        },\n      },\n      { status: 429 }\n    );\n  }\n\n  // proceed with expensive operation\n  const result = await generateContent(body);\n  return NextResponse.json({ result });\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with rate-limiting, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Tell Clients When They Can Retry",
+        "text": "Return `Retry-After` headers with 429 responses so clients know how long to wait. Combine this with `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers for a polished API experience."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing Limits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Limits depend on the cost of the endpoint. A cheap read-only endpoint can allow more requests than an endpoint that generates AI content or writes to a database. Start generous and tighten based on real usage and cost."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "items": [
+          "Rate limiting protects your API from abuse and cost overruns",
+          "Use Redis with a sliding window for accurate, fast limits",
+          "Limit by IP for anonymous users and by user ID for authenticated users",
+          "Return standard rate-limit headers so clients can adapt gracefully"
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["authentication-in-apis", "api-versioning", "error-handling"],
+  "furtherReading": [
+    {
+      "title": "Upstash Rate Limit for Edge and Node.js",
+      "url": "https://upstash.com/docs/ratelimit/overall/getstarted",
+      "type": "article"
+    },
+    {
+      "title": "Vercel Edge Middleware Rate Limiting",
+      "url": "https://vercel.com/docs/edge-network/rate-limits",
+      "type": "article"
+    }
+  ]
 }

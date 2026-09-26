@@ -3,34 +3,93 @@
   "slug": "options-pattern-and-configuration-providers",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Options pattern and configuration providers",
-  "description": "Learn about Options pattern and configuration providers. Master the concepts, patterns, and best practices.",
+  "title": "Options Pattern and Configuration Providers",
+  "description": "Master the Options pattern for strongly typed settings, understand IOptions, IOptionsMonitor, and IOptionsSnapshot, and learn how to build custom configuration providers.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "options",
+    "configuration",
+    "settings",
+    "strongly-typed"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Options pattern and configuration providers** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with options pattern and configuration providers."
+        "text": "Modern applications need configuration from many sources: JSON files, environment variables, command-line arguments, Azure Key Vault, and more. ASP.NET Core's configuration system aggregates these sources into a single key-value hierarchy. The **Options pattern** sits on top of this system, giving you strongly typed classes to access settings instead of string-based dictionary lookups."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Using strongly typed options improves compile-time safety, enables validation, and makes your code easier to test. The framework provides three primary interfaces: `IOptions<T>` for singleton settings, `IOptionsSnapshot<T>` for scoped reloads, and `IOptionsMonitor<T>` for live updates when configuration changes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Defining Options Classes"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of options pattern and configuration providers",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "An options class is a plain C# class with public properties that match the keys in your configuration file. The options system binds the configuration hierarchy to your class automatically. You can nest options using the colon separator in configuration keys or by using the `:` syntax in JSON."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Options class and appsettings.json binding",
+        "content": "A strongly typed settings class bound from configuration.",
+        "language": "csharp",
+        "code": "public class EmailSettings\n{\n    public string SmtpHost { get; set; } = string.Empty;\n    public int SmtpPort { get; set; }\n    public bool EnableSsl { get; set; }\n    public SenderOptions Sender { get; set; } = new();\n}\n\npublic class SenderOptions\n{\n    public string Name { get; set; } = string.Empty;\n    public string Email { get; set; } = string.Empty;\n}\n\n// appsettings.json\n// {\n//   \"EmailSettings\": {\n//     \"SmtpHost\": \"smtp.example.com\",\n//     \"SmtpPort\": 587,\n//     \"EnableSsl\": true,\n//     \"Sender\": {\n//       \"Name\": \"Support Team\",\n//       \"Email\": \"support@example.com\"\n//     }\n//   }\n// }\n\n// Registration\nbuilder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(\"EmailSettings\"));\n\n// Usage\npublic class EmailService(IOptions<EmailSettings> opts)\n{\n    private readonly EmailSettings _settings = opts.Value;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "IOptions, IOptionsSnapshot, and IOptionsMonitor"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choosing the right interface depends on how often your configuration changes and whether you need fresh values within the same request. `IOptions<T>` is a singleton wrapper that reads configuration once at startup. `IOptionsSnapshot<T>` reloads configuration on each request, which is useful during development. `IOptionsMonitor<T>` supports live reload without restarting the application."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Interface",
+          "Lifetime",
+          "Reload Behavior",
+          "Use When"
+        ],
+        "rows": [
+          [
+            "IOptions<T>",
+            "Singleton",
+            "Reads once at startup",
+            "Configuration is static in production"
+          ],
+          [
+            "IOptionsSnapshot<T>",
+            "Scoped",
+            "Reloads per request",
+            "You need fresh values during development"
+          ],
+          [
+            "IOptionsMonitor<T>",
+            "Singleton",
+            "Live reload on change",
+            "You need to react to configuration changes without restarting"
+          ]
         ]
       }
     },
@@ -38,24 +97,98 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Validation and Post-Configuration"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding options pattern and configuration providers is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "You can validate options at startup using data annotations or custom validators. If validation fails, the application throws an exception and refuses to start. This prevents running with invalid configuration. You can also use `IPostConfigureOptions<T>` to modify options after all configuration sources have been bound but before they are used."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validating options with data annotations",
+        "content": "Fail fast if required settings are missing or invalid.",
+        "language": "csharp",
+        "code": "public class PaymentSettings\n{\n    [Required]\n    public string ApiKey { get; set; } = string.Empty;\n\n    [Range(1, 100)]\n    public int RetryCount { get; set; }\n}\n\nbuilder.Services.AddOptions<PaymentSettings>()\n    .Bind(builder.Configuration.GetSection(\"PaymentSettings\"))\n    .ValidateDataAnnotations()\n    .ValidateOnStart();"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with options pattern and configuration providers, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Use ValidateOnStart() in Production",
+        "text": "Without ValidateOnStart(), options validation happens lazily on the first request. This means your app can start with invalid configuration and only fail later. Always call ValidateOnStart() to catch configuration errors early."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Configuration Providers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes configuration lives outside JSON files or environment variables. You can write a custom configuration provider by implementing `IConfigurationProvider` and `IConfigurationSource`, or more commonly by using the `ConfigurationProvider` base class. Custom providers let you load secrets from Azure Key Vault, Consul, etcd, or a proprietary database."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Options Pattern",
+            "definition": "A design pattern that uses strongly typed classes to represent groups of related configuration settings."
+          },
+          {
+            "term": "IOptionsMonitor<T>",
+            "definition": "An options interface that provides live reload when configuration values change."
+          },
+          {
+            "term": "IConfigurationProvider",
+            "definition": "An abstraction that loads configuration key-value pairs from a custom source."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Options Pattern Summary",
+        "points": [
+          "Options classes are plain C# classes bound to configuration sections.",
+          "IOptions<T> is singleton and reads once at startup.",
+          "IOptionsSnapshot<T> reloads per request for development scenarios.",
+          "IOptionsMonitor<T> supports live reload without restarting.",
+          "ValidateOnStart() fails fast if configuration is invalid.",
+          "Custom providers extend configuration to any data source."
+        ],
+        "takeaway": "The Options pattern turns loose configuration keys into strongly typed, validated, and testable settings. Mastering it is essential for building maintainable, production-ready ASP.NET Core applications."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "generic-host-and-application-lifetime",
+    "dependency-injection-lifetimes-and-scope-validation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Options pattern in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation covering IOptions, IOptionsMonitor, validation, and post-configuration."
+    },
+    {
+      "title": "Custom configuration provider in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/extensions/configuration-providers",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to building custom configuration providers for external data sources."
+    }
+  ]
 }

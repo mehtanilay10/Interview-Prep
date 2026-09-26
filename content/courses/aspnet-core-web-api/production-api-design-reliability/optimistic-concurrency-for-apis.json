@@ -4,58 +4,175 @@
   "moduleSlug": "production-api-design-reliability",
   "courseSlug": "aspnet-core-web-api",
   "title": "Optimistic concurrency for APIs",
-  "description": "Learn about Optimistic concurrency for APIs. Master the concepts, patterns, and best practices.",
+  "description": "Prevent silent overwrites in multi-user systems. Learn how optimistic concurrency control works, how to implement it in Entity Framework Core, and how to surface conflicts to API consumers.",
   "order": 6,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Optimistic concurrency for APIs** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with optimistic concurrency for apis."
+        "text": "Two users can edit the same record at the same time. Without concurrency control, the second save silently overwrites the first. Optimistic concurrency control assumes conflicts are rare and detects them at save time instead of locking rows for the entire edit session."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson shows how to implement optimistic concurrency in ASP.NET Core Web API using Entity Framework Core, how to map concurrency exceptions to HTTP 409 responses, and how to guide clients through the conflict-resolution flow."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The lost-update problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "User A opens an order for editing. User B opens the same order and saves a change two seconds later. If the system only checks the entity by primary key on save, User B's update overwrites User A's work. Neither user sees a warning. The last writer wins, which is almost never what you want for financial, inventory, or scheduling data."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Real-world example",
+        "text": "In a booking system, two agents might sell the same seat to different customers. Without concurrency control, the second booking succeeds silently and one customer is left without a seat."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic versus pessimistic locking"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of optimistic concurrency for apis",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Optimistic locking: detect conflicts at save time and tell the caller to retry with fresh data. Low overhead, scales well, and fits web APIs naturally.",
+          "Pessimistic locking: hold a database lock from read to save. Safer for high-conflict scenarios but requires connection pooling, timeout tuning, and careful deadlock handling."
         ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Web APIs are almost always a better fit for optimistic concurrency because requests are short-lived, connections are pooled, and the overhead of holding locks across network round trips is rarely worth it."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Implementing with a rowversion column"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding optimistic concurrency for apis is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The standard approach in SQL Server and Entity Framework Core is a `rowversion` column. Every time the row is updated, SQL Server generates a new binary token. EF Core includes that token in the WHERE clause of the UPDATE. If the row changed since it was read, the UPDATE affects zero rows, and EF throws `DbUpdateConcurrencyException`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Entity with a rowversion",
+        "code": "public class Order\n{\n    public Guid Id { get; set; }\n    public string ShipToName { get; set; } = string.Empty;\n    public DateTime UpdatedAtUtc { get; set; }\n\n    [Timestamp]\n    public byte[] RowVersion { get; set; } = Array.Empty<byte>();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `[Timestamp]` attribute tells EF Core to treat `RowVersion` as a concurrency token. It is automatically included in UPDATE and DELETE statements and excluded from INSERT statements."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling concurrency exceptions in controllers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Catch `DbUpdateConcurrencyException`, translate it into a 409 Conflict, and include enough information for the client to re-fetch the current state and retry. Never swallow the exception or return a generic 500."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Controller handling concurrency exceptions",
+        "code": "[HttpPut(\"{id:guid}\")]\npublic async Task<IActionResult> Update(Guid id, UpdateOrderDto dto)\n{\n    var order = await _db.Orders.FindAsync(id);\n    if (order is null) return NotFound();\n\n    order.ShipToName = dto.ShipToName;\n    order.ShippedAt = DateTime.UtcNow;\n\n    try\n    {\n        await _db.SaveChangesAsync();\n    }\n    catch (DbUpdateConcurrencyException)\n    {\n        return Conflict(new ApiErrorResponse\n        {\n            Status = StatusCodes.Status409Conflict,\n            Title = \"The record was modified by another user.\",\n            Code = \"CONCURRENT_MODIFICATION\",\n            Detail = \"Refresh the record, apply your changes again, and retry.\",\n            Errors = new()\n            {\n                [\"Order\"] = new[] { \"The current version no longer matches the server.\" }\n            }\n        });\n    }\n\n    return NoContent();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Client-side merge pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After a 409, the client should fetch the latest version and display both versions to the user. The user then decides which fields to keep. This merge pattern turns a low-probability conflict into a predictable user flow rather than a data-loss bug."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with optimistic concurrency for apis, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Implementation tip",
+        "text": "Return the current server values in the 409 response body. This lets the client merge without an extra GET round-trip."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Summary"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Optimistic concurrency detects conflicts at save time rather than locking rows.",
+          "Use a SQL Server `rowversion` column with the EF Core `[Timestamp]` attribute.",
+          "Map `DbUpdateConcurrencyException` to HTTP 409 with guidance for the client.",
+          "Design a merge flow so users can resolve conflicts without losing work."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "etags-and-conditional-requests",
+    "problem-details-and-consistent-error-contracts"
+  ],
+  "furtherReading": [
+    {
+      "title": "Microsoft Docs: Concurrency conflicts in EF Core",
+      "url": "https://learn.microsoft.com/ef/core/saving/concurrency",
+      "type": "article"
+    },
+    {
+      "title": "RFC 7231: 409 Conflict",
+      "url": "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+      "type": "article"
+    },
+    {
+      "title": "Martin Fowler: Optimistic Locking",
+      "url": "https://martinfowler.com/eaaCatalog/optimisticLocking.html",
+      "type": "article"
+    }
+  ]
 }

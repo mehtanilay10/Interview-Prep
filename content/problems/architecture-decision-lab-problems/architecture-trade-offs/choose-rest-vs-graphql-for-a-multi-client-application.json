@@ -4,16 +4,16 @@
   "moduleSlug": "architecture-trade-offs",
   "courseSlug": "architecture-decision-lab-problems",
   "title": "Choose REST vs GraphQL for a multi-client application",
-  "description": "Problem: Choose REST vs GraphQL for a multi-client application. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Compare REST and GraphQL for a web app, iOS app, and admin dashboard sharing a single backend, focusing on schema design, caching, and client flexibility.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 20,
+  "tags": ["api-design", "rest", "graphql", "frontend", "backend"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Choose REST vs GraphQL for a multi-client application** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with choose rest vs graphql for a multi-client application."
+        "text": "Your team supports a React dashboard, a React Native app, and an iOS app. All three consume a shared backend. Product wants rapid iteration on the mobile clients, and the mobile team complains about too many API calls and overfetching. Should you adopt GraphQL, refactor REST endpoints, or keep the status quo?"
       }
     },
     {
@@ -24,13 +24,70 @@
       }
     },
     {
-      "type": "bullet-list",
+      "type": "key-terms",
       "data": {
-        "items": [
-          "Understand the core differences between choose rest and graphql for a multi-client application",
-          "Know when to choose choose rest over graphql for a multi-client application",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "terms": [
+          { "term": "Overfetching", "definition": "Receiving more data than needed from an API endpoint, wasting bandwidth and client processing." },
+          { "term": "Underfetching", "definition": "Receiving too little data, forcing the client to make additional requests." },
+          { "term": "Schema Stitching", "definition": "Combining multiple GraphQL schemas into a single unified schema." },
+          { "term": "N+1 Problem", "definition": "Executing one query plus N additional queries for related entities, common in naive GraphQL resolvers." }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Common mistake",
+        "text": "Adopting GraphQL does not eliminate the N+1 problem—it moves it to your resolvers. Without DataLoader patterns, a single GraphQL query can generate more database round trips than equivalent REST calls."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Two Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "REST vs GraphQL for multi-client applications",
+        "cards": [
+          {
+            "title": "REST",
+            "description": "Resource-based endpoints with fixed response shapes.",
+            "pros": [
+              "HTTP caching is first-class via ETag and Cache-Control",
+              "Simple to debug with standard tools like curl and Postman",
+              "Mature ecosystem and API gateway support",
+              "Lower learning curve for backend-only teams"
+            ],
+            "cons": [
+              "Overfetching is common for mobile clients",
+              "Underfetching requires multiple round trips",
+              "Versioning strategy adds long-term maintenance cost",
+              "Frontend changes require backend endpoint changes"
+            ],
+            "tags": ["stable", "cache-friendly"]
+          },
+          {
+            "title": "GraphQL",
+            "description": "Single endpoint, client-specified queries, schema-first design.",
+            "pros": [
+              "Clients request exactly the fields they need",
+              "Single endpoint reduces mobile HTTP overhead",
+              "Strongly typed schema acts as a contract",
+              "Excellent developer experience with introspection"
+            ],
+            "cons": [
+              "HTTP caching is complex (requires persisted queries or CDN configuration)",
+              "Query complexity and depth-limiting add server-side validation work",
+              "File uploads require multipart specification or REST fallback",
+              "Monitoring and cost attribution are harder than REST"
+            ],
+            "tags": ["flexible", "client-driven"]
+          }
         ]
       }
     },
@@ -38,24 +95,95 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Example: Client requests"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding choose rest vs graphql for a multi-client application is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "REST: Fixed response, client filters",
+        "content": "The mobile client fetches the entire user object even though it needs only the displayName and avatarUrl.",
+        "code": "GET /api/v1/users/me\n\nResponse:\n{\n  \"id\": \"abc\",\n  \"email\": \"a@b.com\",\n  \"displayName\": \"Alice\",\n  \"avatarUrl\": \"https://cdn.example.com/avatar.png\",\n  \"role\": \"admin\",\n  \"createdAt\": \"2024-01-01T00:00:00Z\"\n  // 20 more fields the mobile client ignores\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "GraphQL: Client-shaped response",
+        "content": "The mobile client requests only the fields it needs, and the dashboard requests a different projection from the same endpoint.",
+        "code": "query GetMe {\n  me {\n    displayName\n    avatarUrl\n  }\n}\n\nquery GetDashboardUser {\n  me {\n    displayName\n    email\n    role\n    createdAt\n  }\n}",
+        "language": "graphql"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Evaluation criteria",
+        "items": [
+          { "text": "Number of distinct client data shapes: high favors GraphQL." },
+          { "text": "Caching requirements: heavily cached public APIs favor REST." },
+          { "text": "Team skill: does the backend team understand resolver performance and DataLoader patterns?" },
+          { "text": "API consumer count: more consumers increase GraphQL's schema value." },
+          { "text": "Monitoring maturity: can you attribute query cost to specific clients?" }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rest-vs-graphclients",
+        "caption": "Data flow: fixed shape versus client-shaped request",
+        "definition": "graph TD\n    A[Client A - Mobile] -->|REST| B[/users/me]\n    C[Client B - Dashboard] -->|REST| D[/users/me]\n    B --> E[Fixed payload]\n    D --> F[Fixed payload]\n    E --> G[Overfetch on mobile]\n    F --> H[Overfetch on dashboard]\n    I[Client A] -->|GraphQL| J[Single endpoint]\n    K[Client B] -->|GraphQL| J\n    J --> L[Client-shaped response]\n    L --> M[No overfetching]"
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Recommended approach: Hybrid with a GraphQL facade",
+        "content": "If you already have a REST API and only the mobile clients suffer from overfetching, do not rewrite everything. Add a GraphQL federation layer in front of your existing REST endpoints. Mobile clients migrate to GraphQL; the dashboard and public API keep REST.",
+        "code": "// Apollo Federation Gateway example\nconst typeDefs = `\n  type Query {\n    me: User\n    project(id: ID!): Project\n  }\n  type User {\n    displayName: String\n    email: String\n    avatarUrl: String\n  }\n`;\n\nconst resolvers = {\n  Query: {\n    me: () => fetch('/api/v1/users/me').then(r => r.json()),\n  },\n};\n\n// REST remains the source of truth; GraphQL is a projection layer.",
+        "language": "javascript"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with choose rest vs graphql for a multi-client application, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Pragmatic note",
+        "text": "GraphQL shines when you have multiple clients with divergent data needs and a team capable of maintaining resolver performance. If you have one web client and one API consumer, REST is simpler and faster to operate."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          { "question": "Can I use both REST and GraphQL in the same product?", "answer": "Yes. GraphQL is often used for mobile and internal tools, while public APIs and webhooks remain REST." },
+          { "question": "Does GraphQL replace REST entirely?", "answer": "No. REST is simpler for file uploads, webhooks, and public APIs. Use the right tool per interface." },
+          { "question": "What about performance?", "answer": "GraphQL adds a server-side composition cost. With DataLoader batching and persisted queries, it can outperform multiple REST calls." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "GraphQL is a client-data-shape solution, not a silver bullet for API design.",
+          "REST wins for simple, cacheable, public-facing APIs.",
+          "Hybrid architectures are common and often optimal."
+        ],
+        "takeaway": "Match the API style to the client's data needs and your team's operational maturity."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "choose-rest-vs-grpc-for-internal-service-communication",
+    "choose-an-api-evolution-strategy-for-three-client-versions"
+  ],
+  "furtherReading": [
+    { "title": "GraphQL vs REST", "url": "https://graphql.org/learn/thinking-in-graphs/", "type": "article" },
+    { "title": "DataLoader", "url": "https://github.com/graphql/dataloader", "type": "tool" }
+  ]
 }

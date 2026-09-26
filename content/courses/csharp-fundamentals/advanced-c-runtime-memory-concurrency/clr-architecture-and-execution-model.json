@@ -4,33 +4,47 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "CLR architecture and execution model",
-  "description": "Learn about CLR architecture and execution model. Master the concepts, patterns, and best practices.",
+  "description": "Explore how the .NET Common Language Runtime loads assemblies, compiles code, manages memory, and enforces safety at runtime.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["CLR", "runtime", "execution", "PEVerify", "assemblies"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**CLR architecture and execution model** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with clr architecture and execution model."
+        "text": "The .NET Common Language Runtime, or CLR, is the execution engine behind every C# application. When you compile a C# project, the compiler produces assemblies, not native machine code. The CLR is responsible for taking those assemblies and turning them into instructions your CPU can actually run. Understanding this pipeline is foundational for diagnosing runtime issues, optimizing startup performance, and writing efficient managed code."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Think of the CLR as an operating system within your operating system. It handles memory, threads, exceptions, security, and interoperability — all while keeping your application isolated from others on the same machine. When you grasp what happens between `dotnet run` and your first line of application code executing, debugging and performance tuning become far more intuitive."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How the CLR executes your code"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
+      "data": {
+        "text": "A compiled C# project produces a .NET assembly — a file with the extension `.dll` or `.exe`. Inside that assembly is Common Intermediate Language, or CIL (formerly called MSIL). CIL is a platform-neutral instruction set. It is not x86 or ARM; it is a set of stack-based operations that the CLR understands. Every .NET language — C#, F#, VB.NET — compiles down to this same CIL format."
+      }
+    },
+    {
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of clr architecture and execution model",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "You write C# code and compile it with `csc` or the .NET SDK.",
+          "The compiler produces an assembly containing CIL, a manifest, and metadata.",
+          "You ship or run the assembly. The CLR's class loader reads the manifest.",
+          "PEVerify checks the assembly's metadata and CIL for type safety before execution.",
+          "When a method is first called, the JIT compiler converts its CIL to native machine code.",
+          "Subsequent calls execute the native code directly until the AppDomain unloads."
         ]
       }
     },
@@ -38,24 +52,96 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The CLR layer by layer"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding clr architecture and execution model is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The CLR is not one single component. It is organized into layers, each with a distinct job. At the bottom is the base class library support layer, which provides types like `System.Object` and `System.String`. Above that is the JIT compiler, which translates CIL into native code. The garbage collector lives alongside the JIT, reclaiming memory that your application no longer references. The type system and metadata loader ensure every method call is type-safe and every referenced assembly is found."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PEVerify in action",
+        "code": "dotnet tool install --global dotnet-verify\n\n# Verify a single assembly\npeverify MyApp.dll\n\n# Output example:\n# All classes and methods in MyApp.dll Verified.",
+        "language": "bash"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with clr architecture and execution model, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "PEVerify only checks CIL metadata",
+        "text": "PEVerify validates that the assembly's metadata and CIL are type-safe. It does not check business logic, null reference behavior, or runtime binding errors. Unsafe code blocks, interop calls, and dynamic behavior are not fully verifiable by PEVerify. Treat it as a compile-time health check, not a full safety guarantee."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "AppDomains: lightweight process isolation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The .NET Framework introduced AppDomains as a way to isolate applications within a single operating-system process. Each AppDomain has its own security settings, configuration, and loaded assemblies. You could unload an AppDomain without terminating the entire process. .NET Core and .NET 5+ removed cross-AppDomain support, but the concept survives in AssemblyLoadContext, which provides similar unloading capabilities."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "AssemblyLoadContext for plugin isolation",
+        "code": "using System.Runtime.Loader;\n\npublic class PluginLoadContext : AssemblyLoadContext\n{\n    private readonly AssemblyDependencyResolver _resolver;\n\n    public PluginLoadContext(string pluginPath)\n    {\n        _resolver = new AssemblyDependencyResolver(pluginPath);\n    }\n\n    protected override Assembly Load(AssemblyName assemblyName)\n    {\n        string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);\n        return assemblyPath != null\n            ? LoadFromAssemblyPath(assemblyPath)\n            : null;\n    }\n}\n\n// Usage: load a plugin in its own context\nvar plc = new PluginLoadContext(\"./plugins/report-generator.dll\");\nAssembly plugin = plc.LoadFromAssemblyName(\n    new AssemblyName(\"ReportGenerator\"));\n// Unload when done:\nplc.Unload();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The execution pipeline in one picture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "clr-execution-pipeline",
+        "code": "flowchart TB\n    A[\"C# Source Code\"] --> B[\"C# Compiler (csc)\"]\n    B --> C[\"Assembly (.dll/.exe)\"]\n    C --> D[\"CLR Class Loader\"]\n    D --> E[\"PEVerify\n(Type Safety Check)\"]\n    E --> F[\"JIT Compiler\n(CIL → Native)\"]\n    F --> G[\"Native Code Execution\"]\n    G --> H[\"GC Reclaims Memory\"]\n\n    style A fill:#2563eb,color:#fff\n    style G fill:#16a34a,color:#fff\n    style H fill:#9333ea,color:#fff",
+        "caption": "How C# source becomes native machine code through the CLR execution pipeline."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "The CLR turns CIL into native code, manages memory with the garbage collector, and enforces type safety.",
+          "PEVerify checks assemblies for metadata correctness but does not guarantee runtime safety.",
+          "AppDomains were replaced by AssemblyLoadContext in modern .NET for plugin isolation and unloading.",
+          "Every method starts as CIL and is JIT-compiled on first call; subsequent calls reuse the native code."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["assembly-loading-and-metadata", "jit-compilation-and-tiered-compilation", "readytorun-and-native-aot"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "CLR via C# by Jeffrey Richter",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/clr"
+    },
+    {
+      "type": "article",
+      "title": "AssemblyLoadContext class documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext"
+    },
+    {
+      "type": "article",
+      "title": "PEVerify tool documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/framework/tools/peverify-exe-peverify-tool"
+    }
+  ]
 }

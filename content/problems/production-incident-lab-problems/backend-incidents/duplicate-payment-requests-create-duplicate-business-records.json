@@ -4,33 +4,61 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Duplicate payment requests create duplicate business records",
-  "description": "Problem: Duplicate payment requests create duplicate business records. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Prevent duplicate payment records by implementing idempotency keys, the outbox pattern, and compensating transactions in payment processing systems.",
   "order": 6,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["payments", "idempotency", "duplicate-records", "outbox-pattern", "compensating-transaction"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Duplicate payment requests create duplicate business records** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with duplicate payment requests create duplicate business records."
+        "text": "A customer reports being charged twice for a single order. Your database shows two payment records with different IDs but the same order reference. The payment gateway confirms it received and processed two requests. The root cause is a missing idempotency mechanism: when the client retried after a network timeout, the server treated it as a new payment instead of a duplicate."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why duplicate payments happen"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of duplicate payment requests create duplicate business records",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Client times out waiting for the payment response and retries with a new request ID",
+          "Server processes the payment but crashes before returning the response",
+          "Network retries at the gateway or load balancer level resend the request",
+          "User double-clicks the Pay button because the UI does not disable immediately",
+          "A webhook from the payment provider is processed twice due to redelivery"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Idempotency key",
+            "definition": "A unique identifier provided by the client that the server uses to detect duplicate requests."
+          },
+          {
+            "term": "Double-spend",
+            "definition": "The risk of charging a customer twice for the same transaction without their knowledge."
+          },
+          {
+            "term": "Outbox pattern",
+            "definition": "Storing payment events in an outbox table within the same database transaction as the payment record, then publishing them reliably."
+          },
+          {
+            "term": "Compensating transaction",
+            "definition": "A reverse operation that undoes the effects of a previous transaction, used to correct duplicates or failures."
+          },
+          {
+            "term": "Payment gateway",
+            "definition": "An external service (Stripe, PayPal, etc.) that processes payment authorizations and captures."
+          }
         ]
       }
     },
@@ -38,24 +66,135 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Prevention architecture"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding duplicate payment requests create duplicate business records is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Client generates a unique idempotency key (e.g., UUID) for every payment attempt",
+          "Server stores the idempotency key with the payment result before calling the gateway",
+          "On duplicate requests, the server returns the stored result instead of reprocessing",
+          "Use database unique constraints on (order_id, status) to prevent duplicate records at the data layer",
+          "Implement the outbox pattern to ensure payment events are published exactly once"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Duplicate payment prevention patterns",
+        "cards": [
+          {
+            "title": "Idempotency key in request",
+            "description": "Client sends a unique key; server deduplicates using a lookup table.",
+            "pros": ["Client controls uniqueness", "Works across retries and servers", "Standard in payment APIs"],
+            "cons": ["Requires client cooperation", "Server must persist keys with TTL"]
+          },
+          {
+            "title": "Database unique constraint",
+            "description": "Enforce uniqueness at the database level with a composite key.",
+            "pros": ["Cannot be bypassed by application bugs", "Atomic enforcement", "Low overhead"],
+            "cons": ["Less flexible for complex business rules", "May require schema changes"]
+          },
+          {
+            "title": "Outbox pattern",
+            "description": "Store payment events in the same transaction as the payment record.",
+            "pros": ["No lost events on crash", "Exactly-once publishing semantics", "Atomic with business state"],
+            "cons": ["Requires relay process", "Added storage and complexity"]
+          },
+          {
+            "title": "Compensating refund",
+            "description": "Detect duplicates asynchronously and issue a refund automatically.",
+            "pros": ["Fixes mistakes after they happen", "No client changes required"],
+            "cons": ["Customer experience is poor", "Refund fees and regulatory reporting"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent payment processing",
+        "content": "Controller action that handles duplicate payment requests gracefully:",
+        "code": "[HttpPost]\npublic async Task<IActionResult> CreatePayment([FromBody] PaymentRequest request)\n{\n    var existing = await _db.Payments\n        .FirstOrDefaultAsync(p => p.IdempotencyKey == request.IdempotencyKey);\n    \n    if (existing != null)\n    {\n        return Ok(new PaymentResponse\n        {\n            PaymentId = existing.Id,\n            Status = existing.Status,\n            Message = \"Duplicate request\"\n        });\n    }\n    \n    var payment = new Payment\n    {\n        Id = Guid.NewGuid(),\n        IdempotencyKey = request.IdempotencyKey,\n        OrderId = request.OrderId,\n        Amount = request.Amount,\n        Status = PaymentStatus.Processing\n    };\n    \n    _db.Payments.Add(payment);\n    await _db.SaveChangesAsync();\n    \n    // Process with gateway...\n    \n    return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, payment);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-idempotent-payment",
+        "caption": "Idempotent payment flow with duplicate detection",
+        "definition": "graph TD\n    A[Client: Create Payment] --> B[Generate Idempotency Key]\n    B --> C[POST /payments]\n    C --> D{Key already exists?}\n    D -->|Yes| E[Return existing payment]\n    D -->|No| F[Create payment record]\n    F --> G[Call payment gateway]\n    G --> H{Success?}\n    H -->|Yes| I[Update payment: Succeeded]\n    H -->|No| J[Update payment: Failed]\n    I --> K[Return 201 Created]\n    J --> K\n    E --> L[Client receives result]\n    K --> L"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with duplicate payment requests create duplicate business records, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Payments require idempotency by default",
+        "text": "Any payment endpoint that does not accept and enforce an idempotency key is a liability. When a customer is charged twice, the cost is not just the refund: it is trust, regulatory exposure, and payment processor fees."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should the client or server generate the idempotency key?",
+            "answer": "The client should generate it. If the server generates it, the client cannot safely retry because it does not know the key for the original request."
+          },
+          {
+            "question": "How long should I keep idempotency keys?",
+            "answer": "Keep them for at least the refund window plus a buffer (e.g., 90 days). After that, archive them to cold storage."
+          },
+          {
+            "question": "What if the payment gateway itself duplicates the charge?",
+            "answer": "Use the gateway's idempotency key feature (Stripe supports this natively). Combine it with your own idempotency key for defense in depth."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add idempotency to a payment API",
+        "description": "Find a payment or checkout endpoint in your codebase. Add an idempotency key requirement and duplicate detection logic.",
+        "steps": [
+          "Identify the payment creation endpoint and its current input schema",
+          "Add an IdempotencyKey field to the request model",
+          "Create a Payments table with a unique constraint on IdempotencyKey",
+          "Implement the duplicate-check logic before calling the payment gateway",
+          "Write a test that sends the same request twice and asserts the second returns the same result"
+        ],
+        "expectedOutcome": "You should have a payment endpoint that safely handles retries without creating duplicate charges or records."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Duplicate payment requests are expected in distributed systems; handle them by design",
+          "Require client-generated idempotency keys on all payment endpoints",
+          "Enforce uniqueness at the database level with a unique constraint",
+          "Use the outbox pattern to ensure payment events are published reliably"
+        ],
+        "takeaway": "In payment systems, idempotency is not a feature; it is a requirement. Build it into the API contract from the first version."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Stripe Idempotency",
+      "url": "https://stripe.com/docs/api/idempotent_requests",
+      "type": "article",
+      "author": "Stripe",
+      "description": "How Stripe implements idempotency keys to prevent duplicate charges."
+    }
+  ]
 }

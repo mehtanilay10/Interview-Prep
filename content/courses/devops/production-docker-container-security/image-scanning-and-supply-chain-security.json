@@ -4,58 +4,194 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Image scanning and supply-chain security",
-  "description": "Learn about Image scanning and supply-chain security. Master the concepts, patterns, and best practices.",
+  "description": "Scan Docker images for vulnerabilities, verify image provenance with signatures, and build a supply-chain security pipeline for production deployments.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "docker",
+    "security",
+    "supply-chain",
+    "vulnerability-scanning"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Image scanning and supply-chain security** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with image scanning and supply-chain security."
+        "text": "Container supply-chain security is the practice of ensuring that the code, dependencies, base images, and build pipelines that produce a container image are trustworthy. It covers vulnerability scanning, image signing, provenance attestation, and admission control at deploy time."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Vulnerability scanning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A vulnerability scanner compares the packages in a container image against a database of known vulnerabilities. Scanners such as Trivy, Grype, and Snyk can run locally, in CI, or as part of your container registry. The goal is to catch known CVEs before the image reaches production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scanning an image with Trivy",
+        "content": "Run Trivy against a local image to list critical and high vulnerabilities.",
+        "language": "bash",
+        "code": "trivy image --severity CRITICAL,HIGH myapp:latest"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not every CVE is exploitable in your image. A vulnerability in a package that is not installed, or in a package that is installed but not reachable from the network, may not be a practical risk. Use context-aware triage rather than blindly blocking every CVE above a threshold."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Image provenance and signing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An image that passes vulnerability scanning is still not necessarily safe. It could have been built from a compromised source, modified after scanning, or replaced with a look-alike image in the registry. Image signing and provenance attestation address these risks by cryptographically binding an image to the build that produced it."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Key supply-chain security concepts",
         "items": [
-          "Understand the fundamental principles of image scanning and supply-chain security",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Docker Content Trust (DCT) signs images with Sigstore cosign and verifies signatures before pull",
+          "SLSA provenance attestations record the build source, builder, and dependencies in a signed attestation",
+          "Notation is a CNCF project for signing and verifying container images with multiple signatures and standards",
+          "Sigstore provides free code signing certificates and a transparency log for supply-chain artifacts"
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Signing an image with cosign",
+        "content": "Sign a pushed image with a key pair and verify it before deployment.",
+        "language": "bash",
+        "code": "# Sign the image\ncosign sign --key cosign.key myregistry.example.com/myapp:1.0.0\n\n# Verify the signature before deployment\ncosign verify --key cosign.pub myregistry.example.com/myapp:1.0.0 \\\n  --certificate-identity myapp-builder \\\n  --certificate-oidc-issuer https://accounts.google.com"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Software Bill of Materials"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding image scanning and supply-chain security is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A Software Bill of Materials (SBOM) is a machine-readable inventory of every component in an image. Syft, Trivy, and Docker Scout can generate SBOMs in CycloneDX or SPDX format. SBOMs let you answer the question 'what is actually inside this image' without rebuilding or scanning it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Generating an SBOM with Syft",
+        "content": "Generate a CycloneDX SBOM for a local image.",
+        "language": "bash",
+        "code": "syft myapp:latest -o cyclonedx-json > myapp-sbom.json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CI/CD supply-chain gates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Automate scanning, signing, and SBOM generation in your CI/CD pipeline so that every image is checked before it can be deployed. Deny images that fail scanning, lack a signature, or have an unexpected SBOM fingerprint."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CI/CD supply-chain gate",
+        "content": "A simplified pipeline step that blocks images with critical vulnerabilities.",
+        "language": "yaml",
+        "code": "steps:\n  - name: Build image\n    run: docker build -t myapp:${{\\github.sha}} .\n\n  - name: Scan image\n    run: |\n      trivy image --exit-code 1 --severity CRITICAL myapp:${{\\github.sha}}\n\n  - name: Generate SBOM\n    run: syft myapp:${{\\github.sha}} -o cyclonedx-json > sbom.json\n\n  - name: Sign image\n    env:\n      COSIGN_PASSWORD: ${{\\secrets.COSIGN_PASSWORD}}\n    run: |\n      echo \"${{ secrets.COSIGN_PRIVATE_KEY }}\" | base64 -d > cosign.key\n      cosign sign --key cosign.key myregistry.example.com/myapp:${{\\github.sha}}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with image scanning and supply-chain security, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Supply-chain attacks are rising",
+        "text": "Attacks such as dependency confusion, typosquatting, and compromised build pipelines have increased dramatically. Scanning alone is not enough. Combine scanning with image signing, SBOM generation, and a trusted build environment."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Docker Scout"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Docker Scout is Docker's native supply-chain security platform. It integrates with Docker Hub and Docker Desktop to provide vulnerability data, SBOM generation, and policy enforcement directly in the Docker workflow. Scout can also compare images and show you how a new base image version changes your vulnerability profile."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Scan every image before it reaches production with Trivy, Grype, or Snyk",
+          "Sign images to prove they were built by your trusted pipeline",
+          "Generate SBOMs so you can audit components without rebuilding or rescanning",
+          "Automate scanning, signing, and SBOM generation in CI/CD with hard failure gates",
+          "Use Docker Scout for integrated visibility into image vulnerabilities and policy compliance"
+        ],
+        "takeaway": "Supply-chain security is a pipeline discipline: every image must be scanned, signed, and attested before it is allowed to run in production."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "image-layers-and-build-cache",
+    "minimal-and-secure-runtime-images",
+    "container-secrets"
+  ],
+  "furtherReading": [
+    {
+      "title": "Trivy documentation",
+      "url": "https://aquasecurity.github.io/trivy/",
+      "type": "tool",
+      "author": "Aqua Security"
+    },
+    {
+      "title": "Sigstore cosign",
+      "url": "https://docs.sigstore.dev/cosign/overview/",
+      "type": "tool",
+      "author": "Sigstore"
+    },
+    {
+      "title": "Syft SBOM generator",
+      "url": "https://github.com/anchore/syft",
+      "type": "tool",
+      "author": "Anchore"
+    },
+    {
+      "title": "Docker Scout",
+      "url": "https://docs.docker.com/scout/",
+      "type": "article",
+      "author": "Docker"
+    }
+  ]
 }

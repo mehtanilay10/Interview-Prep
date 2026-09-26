@@ -4,59 +4,153 @@
   "moduleSlug": "c-net-follow-ups",
   "courseSlug": "interview-qa",
   "title": "ValueTask: what problem does it solve and when can it make code worse?",
-  "description": "Interview question: ValueTask: what problem does it solve and when can it make code worse?. Learn the answer with detailed explanation and examples.",
+  "description": "Learn why ValueTask exists, how it reduces allocations for high-throughput paths, and the pitfalls of using it incorrectly.",
   "order": 7,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 27,
+  "tags": [
+    "valuetask",
+    "task",
+    "allocations",
+    "async",
+    "performance"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**ValueTask: what problem does it solve and when can it make code worse?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with valuetask: what problem does it solve and when can it make code worse?."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of valuetask: what problem does it solve and when can it make code worse?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "`ValueTask` was introduced in .NET Core 2.1 to solve a specific allocation problem. A `Task` is a reference type; every `async` method that completes synchronously still allocates a `Task` object on the heap. In high-throughput code paths — think serializers, pooling, or tight loops — those allocations add up."
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding valuetask: what problem does it solve and when can it make code worse? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "`ValueTask` is a value type that can wrap either a `Task` or a cached result. When the operation completes synchronously, it returns the cached result without any heap allocation. When it completes asynchronously, it wraps the underlying `Task`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The problem it solves"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Consider a method that reads from a memory cache. Most of the time the data is already present, so the operation completes synchronously. With `Task`, each call allocates a `Task` object even though the work was instant. With `ValueTask`, the hot path avoids the allocation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Task vs ValueTask allocation behavior",
+        "content": "Task always allocates on the heap. ValueTask can return a cached success result without allocating.",
+        "code": "public async Task<string> ReadWithTaskAsync(string key)\n{\n    // Even on cache hit, a Task<string> is allocated.\n    return await _cache.GetAsync(key);\n}\n\npublic async ValueTask<string> ReadWithValueTaskAsync(string key)\n{\n    // On cache hit: returns ValueTask<string> with cached result.\n    // On cache miss: wraps the underlying Task<string>.\n    return await _cache.GetAsync(key).ConfigureAwait(false);\n}",
+        "language": "csharp"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with valuetask: what problem does it solve and when can it make code worse?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Measure before converting",
+        "text": "Not every async method benefits from ValueTask. Profile allocations with event counters or dotnet-trace. If the method is not on a hot path, the extra complexity is not worth it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When ValueTask makes code worse"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ValueTask has strict rules about how many times you can await it and when you can access its result. Breaking these rules causes runtime exceptions or data corruption."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Pitfalls",
+        "items": [
+          "You may await ValueTask exactly once. A second await throws `InvalidOperationException`.",
+          "You may not use `.Result` or `.Wait()` on a ValueTask that is wrapping an incomplete operation.",
+          "Storing a ValueTask in a field or local variable and awaiting it later is unsafe unless you know it has completed.",
+          "ValueTask increases struct copying; misuse can hurt performance more than Task."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Incorrect reuse",
+        "content": "This code awaits the same ValueTask twice, which throws at runtime.",
+        "code": "ValueTask<int> vt = GetValueAsync();\n\nint a = await vt;          // OK\nint b = await vt;          // InvalidOperationException!",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Guidelines"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Use ValueTask when",
+        "items": [
+          "The method is called millions of times per second and profiling shows Task allocations as a bottleneck.",
+          "The method completes synchronously in the common case and asynchronously only rarely.",
+          "You can guarantee single-await consumption in the call graph."
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If you cannot verify these conditions, stick with `Task`. It is safer, easier to reason about, and the allocation cost is negligible for most business logic."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "ValueTask eliminates allocations on synchronous completion paths.",
+          "It is not a drop-in replacement for Task; it has strict consumption rules.",
+          "Profile before adopting ValueTask; most code is fine with Task.",
+          "Incorrect usage causes runtime exceptions that are hard to debug."
+        ],
+        "takeaway": "Use ValueTask for measured hot paths, and Task everywhere else."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation",
+    "spant-what-does-it-improve-and-what-constraints-does-it-introduce",
+    "taskrun-when-is-it-appropriate-in-an-aspnet-core-application"
+  ],
+  "furtherReading": [
+    {
+      "title": "Stephen Toub — ValueTask overview",
+      "url": "https://devblogs.microsoft.com/dotnet/valuetask-usage-guidelines/",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft — ValueTask struct",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.valuetask",
+      "type": "article"
+    },
+    {
+      "title": "Nick Chapsas — Task vs ValueTask",
+      "url": "https://www.youtube.com/watch?v=FWk8nX7gtLM",
+      "type": "video"
+    }
+  ],
+  "technology": "C#"
 }

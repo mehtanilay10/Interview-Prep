@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an HTTP client implementation that creates sockets repeatedly** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an http client implementation that creates sockets repeatedly."
+        "text": "An API creates a new HttpClient instance for every outgoing request instead of reusing a single instance. Each HttpClient creates a new socket connection, performs the request, and disposes the socket. Under moderate load, the application exhausts the available socket ports, triggers port exhaustion errors, and begins failing with SocketException. The problem is intermittent in development and guaranteed in production."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an http client implementation that creates sockets repeatedly",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand why HttpClient is designed to be instantiated once and reused for the application lifetime",
+          "Learn how socket exhaustion occurs when connections are not pooled",
+          "Identify the difference between HttpClient, HttpClientFactory, and SocketsHttpHandler",
+          "Apply dependency injection and IHttpClientFactory to manage HTTP client lifetimes correctly"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Socket exhaustion",
+            "definition": "A condition where the operating system runs out of available TCP ports because connections are opened and closed faster than they enter TIME_WAIT state."
+          },
+          {
+            "term": "HttpClientFactory",
+            "definition": "An ASP.NET Core service that manages HttpClient lifetimes, pooling, and DNS refresh automatically."
+          },
+          {
+            "term": "SocketsHttpHandler",
+            "definition": "The default HTTP handler in .NET Core that manages connection pooling, DNS, and HTTP/2."
+          },
+          {
+            "term": "TIME_WAIT",
+            "definition": "A TCP state where a closed socket remains reserved for a period to ensure delayed packets are discarded."
+          }
         ]
       }
     },
@@ -44,15 +67,178 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an http client implementation that creates sockets repeatedly is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Creating HttpClient per request is one of the most common and most damaging performance mistakes in .NET. It exhausts sockets, causes DNS resolution to fail because connections are cached indefinitely, and triggers cascading failures when the application cannot reach any external service. The fix is simple: register HttpClient once and let the framework manage it."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an http client implementation that creates sockets repeatedly, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "New HttpClient per request is an anti-pattern",
+        "text": "Microsoft explicitly documents that HttpClient should be instantiated once and reused. Creating it per request causes socket exhaustion, DNS problems, and unpredictable behavior under load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The problematic code creates a new HttpClient inside a method or controller action. Each instance creates a new socket, sends the request, and leaves the socket in TIME_WAIT. After a few hundred requests, the application cannot open new connections and begins throwing SocketException. The developer may not notice in local testing because the request volume is low."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating HttpClient per request",
+        "content": "A method that creates and disposes HttpClient for every call:",
+        "code": "public async Task<string> GetWeatherAsync(string city)\n{\n    using var client = new HttpClient();\n    // Each call creates a new socket connection\n    var response = await client.GetAsync($\"https://api.weather.com/{city}\");\n    response.EnsureSuccessStatusCode();\n    return await response.Content.ReadAsStringAsync();\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The correct implementation uses IHttpClientFactory, registered in Program.cs, to create and manage HttpClient instances. The factory pools connections, handles DNS refresh, and integrates with Polly for resilience. Each named or typed client gets its own configuration, and the factory ensures the underlying SocketsHttpHandler is reused."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering and using typed HttpClient",
+        "content": "Configure a typed client in Program.cs and inject it where needed:",
+        "code": "// Program.cs\nbuilder.Services.AddHttpClient<IWeatherClient, WeatherClient>(client =>\n{\n    client.BaseAddress = new Uri(\"https://api.weather.com/\");\n    client.Timeout = TimeSpan.FromSeconds(10);\n});\n\n// WeatherClient.cs\npublic class WeatherClient : IWeatherClient\n{\n    private readonly HttpClient _httpClient;\n\n    public WeatherClient(HttpClient httpClient)\n    {\n        _httpClient = httpClient;\n    }\n\n    public async Task<string> GetWeatherAsync(string city)\n    {\n        var response = await _httpClient.GetAsync(city);\n        response.EnsureSuccessStatusCode();\n        return await response.Content.ReadAsStringAsync();\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "HttpClient management strategies",
+        "cards": [
+          {
+            "title": "New HttpClient per request",
+            "description": "Create and dispose HttpClient inside the method.",
+            "pros": ["Appears simple"],
+            "cons": ["Socket exhaustion", "DNS caching issues", "Unreliable under load"]
+          },
+          {
+            "title": "Static HttpClient",
+            "description": "Share a single static HttpClient instance across the application.",
+            "pros": ["Reuses connections", "Simple to implement"],
+            "cons": ["DNS changes not picked up", "Hard to configure per-endpoint", "No Polly integration"]
+          },
+          {
+            "title": "IHttpClientFactory",
+            "description": "Use the built-in factory to manage typed or named clients.",
+            "pros": ["Connection pooling", "DNS refresh", "Polly integration", "Testable"],
+            "cons": ["Slightly more setup"]
+          },
+          {
+            "title": "Refit or RestEase",
+            "description": "Use a typed REST client library that wraps HttpClient.",
+            "pros": ["Declarative API definitions", "Built on IHttpClientFactory"],
+            "cons": ["Additional dependency", "Less control over low-level details"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "socket-exhaustion",
+        "caption": "How per-request HttpClient causes socket exhaustion",
+        "definition": "graph LR\n    A[Request 1] --> B[New HttpClient]\n    B --> C[Open Socket]\n    C --> D[Request completes]\n    D --> E[Socket in TIME_WAIT]\n    F[Request 2] --> G[New HttpClient]\n    G --> H[Open Socket]\n    H --> I[Request completes]\n    I --> J[Socket in TIME_WAIT]\n    E --> K[Ports exhausted]\n    J --> K\n    K --> L[SocketException]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Diagnosing Socket Exhaustion"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Symptoms and tools",
+        "items": [
+          "Error messages: 'No such host is known' or 'An attempt was made to access a socket in a way forbidden by its access permissions'",
+          "netstat -ano shows thousands of connections in TIME_WAIT state",
+          "Performance counters show low available ports and high connection rate",
+          "Event log entries for HTTP.sys or socket errors under load"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "DNS and stale connections",
+        "text": "A static HttpClient also caches DNS for the lifetime of the handler. If the downstream service changes its IP address, the client continues hitting the old address. IHttpClientFactory periodically refreshes DNS by creating new handlers."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Is HttpClient disposable?",
+            "answer": "Yes, but you should not dispose it after every use. When you use IHttpClientFactory, the factory manages the lifetime and disposal of the underlying handler. Your typed client should not dispose the injected HttpClient."
+          },
+          {
+            "question": "What is the default connection limit in .NET?",
+            "answer": "ServicePointManager.DefaultConnectionLimit is often 2 per host in .NET Framework. In .NET Core, SocketsHttpHandler defaults to int.MaxValue, but per-request creation still causes socket exhaustion through TIME_WAIT accumulation."
+          },
+          {
+            "question": "Can I reuse HttpClient across services?",
+            "answer": "Yes, but prefer typed clients for testability and configuration. Each typed client gets its own named HttpClient with its own configuration while sharing the underlying handler pool."
+          },
+          {
+            "question": "What about gRPC clients?",
+            "answer": "gRPC clients are also designed to be reused. Use AddGrpcClient with IHttpClientFactory for the same connection pooling and resilience benefits."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Fix socket exhaustion",
+        "description": "Refactor an application that creates HttpClient per request to use IHttpClientFactory.",
+        "steps": [
+          "Search the codebase for new HttpClient() inside methods",
+          "Define a typed client interface and implementation for each external API",
+          "Register typed clients in Program.cs using AddHttpClient",
+          "Inject the typed client instead of creating HttpClient inline",
+          "Run a load test and verify socket counts stay stable"
+        ],
+        "expectedOutcome": "The application reuses connections through a pooled handler. Socket counts remain stable under load, and DNS changes are picked up automatically."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "HttpClient is intended to be reused for the lifetime of the application",
+          "IHttpClientFactory manages pooling, DNS, and Polly integration",
+          "Socket exhaustion manifests as intermittent failures under load",
+          "Typed clients make dependency injection and testing straightforward"
+        ],
+        "takeaway": "A new HttpClient per request is not a harmless shortcut; it is a production incident in waiting."
       }
     }
   ],

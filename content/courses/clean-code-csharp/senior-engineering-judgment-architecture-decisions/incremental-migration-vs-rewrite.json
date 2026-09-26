@@ -3,34 +3,75 @@
   "slug": "incremental-migration-vs-rewrite",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "Incremental migration vs rewrite",
-  "description": "Learn about Incremental migration vs rewrite. Master the concepts, patterns, and best practices.",
+  "title": "Incremental Migration vs Rewrite",
+  "description": "Learn to evaluate the trade-offs between migrating a legacy system incrementally and rebuilding it from scratch, with specific guidance for .NET modernization projects.",
   "order": 10,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": [
+    "migration",
+    "rewrite",
+    "legacy",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Incremental migration vs rewrite** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with incremental migration vs rewrite."
+        "text": "The rewrite is the most seductive architecture decision. The legacy system is messy, the team hates working on it, and the business keeps requesting features that are hard to implement. A rewrite promises clean code, modern patterns, and a happy team. In practice, rewrites are among the most dangerous projects in software engineering. They take longer than expected, lose critical business logic, and often ship with fewer features than the original. Incremental migration is almost always the safer path."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In the .NET world, the rewrite temptation is particularly strong when moving from .NET Framework to .NET 8, from Web Forms to Blazor, or from WCF to gRPC. The target platform is clearly better, the documentation is excellent, and the team is eager to use modern tools. But the legacy system is not just code; it is years of accumulated business rules, workarounds, regulatory compliance, and operational knowledge. Rewriting it from scratch means rediscovering all of that the hard way."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Rewrites Fail"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common causes of rewrite failure",
         "items": [
-          "Understand the core differences between incremental migration and rewrite",
-          "Know when to choose incremental migration over rewrite",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+          "Underestimated complexity: the original system had more edge cases and business rules than anyone remembered.",
+          "Lost tribal knowledge: the engineers who understood the legacy quirks have left or are busy maintaining the old system.",
+          "Feature creep: the new system must match every feature of the old system, but the scope expands as stakeholders remember requirements.",
+          "Long time-to-value: the business gets no new features until the rewrite is complete, which can take years.",
+          "Budget overruns: the rewrite consumes engineering capacity that could have been spent on incremental improvements."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The second-system effect",
+        "text": "Fred Brooks described the tendency to over-engineer the second version of a system. Rewrites often include every pattern, library, and architectural style the team has ever wanted to try. The result is a system that is more complex than the original, harder to maintain, and no closer to the business's actual needs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Incremental Migration Strategies"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Proven incremental migration approaches",
+        "items": [
+          "Strangler fig: route new requests to a modern service while the legacy system continues to serve existing traffic.",
+          "Feature flags: ship new code behind flags and enable it gradually for subsets of users.",
+          "Branch by abstraction: extract an interface around a legacy component and replace the implementation incrementally.",
+          "Parallel run: operate both systems simultaneously and compare outputs before decommissioning the legacy one.",
+          "Data migration in phases: migrate one table, one bounded context, or one customer segment at a time."
         ]
       }
     },
@@ -38,24 +79,141 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "C# Example: Branch by Abstraction"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding incremental migration vs rewrite is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Branch by abstraction is a technique where you introduce an interface around a legacy component, implement the new logic in a new class, and gradually switch the dependency. In C#, this works well with dependency injection containers like the built-in .NET DI container or Autofac. The key is that the rest of the codebase never knows which implementation is active."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with incremental migration vs rewrite, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Branch by abstraction with .NET DI",
+        "content": "Replacing a legacy report generator incrementally behind an interface.",
+        "language": "csharp",
+        "code": "// Step 1: Define the abstraction\npublic interface IReportGenerator\n{\n    Task<byte[]> GenerateSalesReportAsync(ReportRequest request, CancellationToken ct);\n}\n\n// Step 2: Keep the legacy implementation\npublic class LegacyReportGenerator : IReportGenerator\n{\n    public async Task<byte[]> GenerateSalesReportAsync(ReportRequest request, CancellationToken ct)\n    {\n        // Existing complex logic with Crystal Reports\n        return await _legacyEngine.GenerateAsync(request);\n    }\n}\n\n// Step 3: Build the new implementation\npublic class ModernReportGenerator : IReportGenerator\n{\n    public async Task<byte[]> GenerateSalesReportAsync(ReportRequest request, CancellationToken ct)\n    {\n        var data = await _repository.GetSalesDataAsync(request.DateRange, ct);\n        return await _pdfRenderer.RenderAsync(data, ct);\n    }\n}\n\n// Step 4: Register both in DI and switch via configuration\nbuilder.Services.AddKeyedSingleton<IReportGenerator, LegacyReportGenerator>(\"legacy\");\nbuilder.Services.AddKeyedSingleton<IReportGenerator, ModernReportGenerator>(\"modern\");\n\n// Step 5: Resolve based on a feature flag\npublic class ReportController : ControllerBase\n{\n    private readonly IReportGenerator _generator;\n\n    public ReportController([FromKeyedServices(\"modern\")] IReportGenerator modernGenerator, IFeatureManager features)\n    {\n        _generator = features.IsEnabledAsync(\"UseModernReports\").Result\n            ? modernGenerator\n            : new LegacyReportGenerator(); // Or inject by key\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When a Rewrite Is Justified"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rewrites are occasionally justified. They make sense when the legacy platform is unsupported, the data model is so corrupted that migration is impossible, the team has zero institutional knowledge left, or the business model has changed so drastically that the old architecture cannot support the new requirements even with incremental changes. Even in these cases, consider rewriting one bounded context at a time rather than the entire system."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Incremental migration vs full rewrite",
+        "cards": [
+          {
+            "title": "Incremental Migration",
+            "description": "Gradually replace legacy components while keeping the system running.",
+            "pros": [
+              "Continuous value delivery",
+              "Low risk of business disruption",
+              "Learning from real usage patterns"
+            ],
+            "cons": [
+              "Requires maintaining dual systems temporarily",
+              "Can feel slower to stakeholders",
+              "Abstractions may need redesign later"
+            ]
+          },
+          {
+            "title": "Full Rewrite",
+            "description": "Rebuild the entire system from scratch in a modern platform.",
+            "pros": [
+              "Clean architectural slate",
+              "No legacy constraints during design",
+              "Appealing to engineering teams"
+            ],
+            "cons": [
+              "High risk of missing requirements",
+              "No value until complete",
+              "Usually takes 2-3x longer than estimated"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What if management insists on a rewrite?",
+            "answer": "Present the rewrite risk as a business case. Estimate the total cost, the time to first production feature, and the probability of missing critical legacy behavior. Often, framing the rewrite as a high-risk project with a 60-80 percent failure rate is enough to get management to consider incremental alternatives."
+          },
+          {
+            "question": "How do we handle data migration during incremental migration?",
+            "answer": "Use a dual-write strategy: write to both the legacy and new systems during the transition. This allows you to validate the new system's data without risking the old system's integrity. Once the new system is stable, switch reads to the new system and stop writing to the old one."
+          },
+          {
+            "question": "When can we decommission the legacy system?",
+            "answer": "Only when every feature, every integration, and every data dependency has been migrated and validated in production. A good decommissioning criterion is: the legacy system has zero traffic for one month and no team depends on its data. Until then, keep it running."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Evaluate rewrite vs migration for a real system",
+        "description": "Analyze a legacy system you know and decide whether a rewrite or incremental migration is more appropriate.",
+        "steps": [
+          "Describe the legacy system: platform, age, business criticality, and current pain points.",
+          "Identify the three biggest risks of a full rewrite for this system.",
+          "Identify the first bounded context or module you would extract incrementally.",
+          "Design a strangler fig or branch-by-abstraction plan for that module.",
+          "Write a one-paragraph recommendation for management explaining why incremental migration is safer.",
+          "Define the criteria that would trigger a reassessment of this recommendation."
+        ],
+        "expectedOutcome": "A written migration recommendation with risk analysis and a concrete incremental plan."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Full rewrites are high-risk and frequently fail to match the original system's behavior.",
+          "Incremental migration delivers continuous value and preserves business knowledge.",
+          "Branch by abstraction and strangler fig are proven patterns for C# modernization.",
+          "Decommission legacy systems only after every dependency has been validated in production."
+        ],
+        "takeaway": "Senior engineers treat rewrites as a last resort, not a first choice. The safest path to modernization is the one that keeps the business running while the code improves."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "legacy-modernization-strategies",
+    "architecture-decision-records"
+  ],
+  "furtherReading": [
+    {
+      "title": "Working Effectively with Legacy Code",
+      "url": "https://www.informit.com/store/working-effectively-with-legacy-code-9780131177055/",
+      "type": "book",
+      "author": "Michael Feathers",
+      "description": "The definitive guide to safely changing and modernizing legacy codebases."
+    },
+    {
+      "title": "Rewrite Or Refactor",
+      "url": "https://martinfowler.com/bliki/RewriteOrRefactor.html",
+      "type": "article",
+      "author": "Martin Fowler",
+      "description": "A decision framework for choosing between rewriting and refactoring a legacy system."
+    }
+  ]
 }

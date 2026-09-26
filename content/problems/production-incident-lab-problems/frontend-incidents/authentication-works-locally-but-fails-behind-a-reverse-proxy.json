@@ -8,54 +8,206 @@
   "order": 8,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["authentication", "nextauth", "proxy", "infrastructure", "security"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Authentication works locally but fails behind a reverse proxy** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with authentication works locally but fails behind a reverse proxy."
+        "text": "A Next.js application authenticates users perfectly on localhost, but after deploying behind Nginx or a cloud load balancer, users are immediately redirected back to the sign-in page or receive token errors. The application itself did not change; the network path did. This is a classic environment-boundary bug."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why it works locally but breaks in production"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of authentication works locally but fails behind a reverse proxy",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Cookies set on localhost are accepted without a domain, but production cookies need an exact domain or secure flag.",
+          "Reverse proxies terminate TLS and forward requests over HTTP, stripping or changing headers the app relies on.",
+          "NextAuth v5 trusts the X-Forwarded-Proto and Host headers only when explicitly configured.",
+          "The auth callback URL registered with the identity provider must match the production origin exactly.",
+          "Session tokens stored in httpOnly cookies may be rejected if SameSite or Secure attributes are mismatched.",
+          "CORS and CSRF protection behave differently when the frontend and API are served from different origins."
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Reverse proxy",
+            "definition": "A server that sits in front of a web application and forwards client requests, often handling TLS termination, load balancing, and caching."
+          },
+          {
+            "term": "Trusted proxy",
+            "definition": "A proxy whose headers the application is configured to accept, because the proxy is under your control."
+          },
+          {
+            "term": "SameSite cookie",
+            "definition": "A cookie attribute that controls when the browser sends the cookie with cross-site requests, used to mitigate CSRF."
+          },
+          {
+            "term": "Secure cookie",
+            "definition": "A cookie attribute that restricts transmission to HTTPS only. Browsers reject Secure cookies over plain HTTP."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Inspect the Network tab in production DevTools. Look at the auth callback request and response headers. If the Set-Cookie header is missing, or if the cookie is present but not sent on the next request, the problem is almost always cookie configuration, trust proxy settings, or a mismatched callback URL."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Production-ready fixes"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding authentication works locally but fails behind a reverse proxy is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "NextAuth v5 trusted proxy configuration",
+        "content": "Tell NextAuth which proxies are trusted so it reads X-Forwarded headers correctly:",
+        "code": "// auth.ts\nexport const authOptions = {\n  trustHost: true,\n  // Explicitly trust the proxy if it is under your control\n  // or rely on trustHost for single-origin deployments\n};\n\nexport { auth as GET, auth as POST } from '@/auth';",
+        "language": "ts"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Nginx proxy headers",
+        "content": "Pass the original protocol and host so the app knows it is behind TLS:",
+        "code": "server {\n  listen 443 ssl;\n  server_name app.example.com;\n\n  location / {\n    proxy_pass http://localhost:3000;\n    proxy_set_header Host $host;\n    proxy_set_header X-Real-IP $remote_addr;\n    proxy_set_header X-Forwarded-Proto $scheme;\n    proxy_set_header X-Forwarded-Host $host;\n  }\n}",
+        "language": "nginx"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with authentication works locally but fails behind a reverse proxy, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Do not trust all proxies blindly",
+        "text": "Enabling trustHost globally in a multi-tenant environment can allow header spoofing. Only trust proxies that terminate TLS in front of your application, and prefer explicit allow-lists over catch-all flags."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison of auth cookie strategies"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Cookie configurations behind a proxy",
+        "cards": [
+          {
+            "title": "httpOnly + SameSite=Lax + Secure",
+            "description": "Standard secure configuration for same-site apps.",
+            "pros": ["Protects against XSS and CSRF", "Works with most reverse proxies"],
+            "cons": ["Breaks if the app is embedded in an iframe", "Requires HTTPS"]
+          },
+          {
+            "title": "httpOnly + SameSite=None + Secure",
+            "description": "Required when the frontend and auth API are on different origins.",
+            "pros": ["Supports cross-site auth flows", "Works with OAuth redirects"],
+            "cons": ["Slightly higher CSRF risk", "Must be served over HTTPS only"]
+          },
+          {
+            "title": "JWT in localStorage",
+            "description": "Store the token in the browser and attach it manually to requests.",
+            "pros": ["No cookie domain issues", "Easy to inspect and debug"],
+            "cons": ["Vulnerable to XSS", "No automatic sending with requests", "Must handle refresh manually"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-auth-proxy-flow",
+        "caption": "Authentication flow behind a reverse proxy",
+        "definition": "graph TD\n    A[User visits https://app.example.com] --> B[Reverse proxy terminates TLS]\n    B --> C[Proxy forwards request with X-Forwarded-Proto: https]\n    C --> D[Next.js app receives request]\n    D --> E{trustHost enabled?}\n    E -->|Yes| F[App trusts Host and X-Forwarded-Proto]\n    E -->|No| G[App treats request as HTTP and rejects secure cookies]\n    F --> H[Auth cookie is set with Secure flag]\n    G --> I[Auth callback fails or redirect loop]\n    H --> J[User session persists across requests]\n    I --> K[User sees sign-in page repeatedly]"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Why does the callback URL need to match exactly?",
+            "answer": "OAuth providers compare the callback URL registered in the developer console with the one sent in the authorization request. A mismatch causes the provider to reject the request before issuing a code."
+          },
+          {
+            "question": "Should I use AUTH_TRUST_HOST or trustHost?",
+            "answer": "In NextAuth v5, trustHost tells the framework to trust the Host and X-Forwarded headers. Use it when you control the proxy and know it terminates TLS correctly."
+          },
+          {
+            "question": "How do I debug cookie issues?",
+            "answer": "Check the Application tab in DevTools: look at the cookie domain, path, Secure, HttpOnly, and SameSite attributes. Also check the Network tab for the Set-Cookie header on the auth callback response."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Reproduce and fix a proxy auth failure",
+        "description": "Set up a local reverse proxy in front of a Next.js app and break auth, then fix it.",
+        "steps": [
+          "Create a minimal Next.js app with NextAuth Google OAuth.",
+          "Register the callback URL as https://localhost:3000/api/auth/callback/google.",
+          "Start the app on port 3000 and set up Caddy or Nginx on port 443.",
+          "Visit the proxy URL and attempt to sign in.",
+          "Compare cookie behavior with and without trustHost enabled.",
+          "Fix the configuration so auth works through the proxy."
+        ],
+        "expectedOutcome": "You should be able to explain which header or cookie attribute changed between localhost and the proxy, and you should have a working production-like auth flow."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Reverse proxies terminate TLS and can strip or rewrite headers.",
+          "NextAuth v5 requires trustHost when behind a proxy so it reads X-Forwarded headers.",
+          "OAuth callback URLs must match the production origin exactly.",
+          "Cookie attributes like Secure, HttpOnly, and SameSite must align with the deployment topology.",
+          "Debug with DevTools Application and Network tabs before changing code"
+        ],
+        "takeaway": "Authentication bugs at the proxy boundary are infrastructure problems masquerading as application bugs. Trace the request from the browser through the proxy to the app to find the mismatch."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "hydration-mismatches-occur-only-in-production",
+    "users-see-stale-data-after-a-successful-update"
+  ],
+  "furtherReading": [
+    {
+      "title": "NextAuth.js trusted proxy configuration",
+      "url": "https://next-auth.js.org/configuration/nextjs#trust-host",
+      "type": "article",
+      "author": "NextAuth.js",
+      "description": "Official guidance on configuring trusted hosts and proxies for NextAuth."
+    },
+    {
+      "title": "OWASP Secure Cookie Attribute",
+      "url": "https://owasp.org/www-community/controls/SecureCookieAttribute",
+      "type": "article",
+      "author": "OWASP",
+      "description": "Explanation of the Secure, HttpOnly, and SameSite cookie attributes."
+    }
+  ]
 }

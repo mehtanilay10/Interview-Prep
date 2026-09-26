@@ -4,33 +4,66 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Minimal and secure runtime images",
-  "description": "Learn about Minimal and secure runtime images. Master the concepts, patterns, and best practices.",
+  "description": "Choose the right base image for production, understand the Alpine versus Debian trade-offs, and harden runtime images to reduce attack surface.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 35,
+  "tags": ["docker", "base-images", "runtime-hardening"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Minimal and secure runtime images** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with minimal and secure runtime images."
+        "text": "The base image you choose becomes the foundation of every security control, every performance optimization, and every compatibility test downstream. A large base image like `ubuntu:latest` carries thousands of packages you do not need, while a minimal image like `alpine` or `distroless` reduces both attack surface and image size."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The spectrum of base images"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of minimal and secure runtime images",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Base images fall along a spectrum from full operating systems to almost nothing. Understanding where each option sits helps you make informed trade-offs between compatibility, tooling, size, and security."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Common base image choices",
+        "cards": [
+          {
+            "title": "Full distro images",
+            "description": "Complete operating system images such as `ubuntu:22.04` or `debian:12`.",
+            "pros": ["Familiar package manager", "Broad compatibility", "Easy to debug inside the container"],
+            "cons": ["Large image size", "Large attack surface", "Longer pull and deploy times"]
+          },
+          {
+            "title": "Slim distro images",
+            "description": "Stripped-down variants such as `debian:12-slim` that remove docs and some utilities.",
+            "pros": ["Smaller than full images", "Still familiar", "Good compatibility"],
+            "cons": ["Still carry more than needed", "glibc-based musl differences do not apply"]
+          },
+          {
+            "title": "Alpine images",
+            "description": "Tiny images based on Alpine Linux and musl libc, such as `node:20-alpine`.",
+            "pros": ["Very small image size", "Minimal attack surface", "Fast pulls"],
+            "cons": ["musl libc differences", "Some native binaries may not work", "Smaller package repositories"]
+          },
+          {
+            "title": "Distroless images",
+            "description": "Google's distroless images contain only the application and its runtime dependencies, no shell or package manager.",
+            "pros": ["Minimal attack surface", "No shell to exploit", "Very small"],
+            "cons": ["Harder to debug", "Requires exact binary compatibility", "Fewer prebuilt variants"]
+          },
+          {
+            "title": "Scratch images",
+            "description": "The empty base image. Only truly static binaries can run on `scratch`.",
+            "pros": ["Absolute minimum size", "No OS-level vulnerabilities"],
+            "cons": ["Only static binaries", "No shell, no debugging tools", "Very limited use cases"]
+          }
         ]
       }
     },
@@ -38,24 +71,161 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Security benefits of smaller images"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding minimal and secure runtime images is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Every package in an image is a potential vulnerability. The more packages you include, the more Common Vulnerabilities and Exposures (CVEs) apply to your image. A minimal image dramatically reduces the number of packages that need scanning, patching, and monitoring."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with minimal and secure runtime images, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Image scanners expose the difference",
+        "text": "Tools like Trivy and Grype routinely report hundreds of CVEs in `ubuntu:latest` and much fewer in `alpine` or distroless images. Fewer packages mean fewer vulnerabilities to track, patch, and explain to auditors."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pinning base images"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always pin base images to a specific digest or a specific minor version. Floating tags such as `latest` or `20` change over time and can silently introduce new packages, new vulnerabilities, or behavioral differences into your build."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pinned base image with digest",
+        "content": "Pin both the tag and the digest for maximum reproducibility. The digest is a SHA256 hash of the image manifest.",
+        "language": "dockerfile",
+        "code": "FROM node:20.18.0-alpine@sha256:3a9bdbee3d6d86d75545cf1917f1a2b3b0d8f9e4a2c5e7f9a1b3c5d7e9f1a3b5"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Digests are long and awkward to type, so many teams use version-pinned tags in Dockerfiles and enforce digest verification in CI. Both approaches are valid. The important thing is to avoid floating tags in production."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Alpine versus Debian in production"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Alpine Linux uses musl libc instead of glibc. Most interpreted languages such as Python, Node.js, and Go work fine on Alpine, but native extensions and dynamically linked binaries may fail. Test thoroughly before choosing Alpine for C++, .NET native, or other native-dependent workloads."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Factor", "Alpine", "Debian slim", "Distroless"],
+        "rows": [
+          ["Typical image size", "~5 MB", "~30 MB", "~10-20 MB"],
+          ["Shell available", "Yes (ash)", "Yes (bash)", "No"],
+          ["Package manager", "apk", "apt", "None"],
+          ["C standard library", "musl", "glibc", "glibc or static"],
+          ["Best for", "Small services, interpreted languages", "Broad compatibility, debugging", "Maximum security, statically linked binaries"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hardening the runtime image"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After choosing a base image, harden it by removing unnecessary packages, disabling root execution where possible, and cleaning up package manager caches. Each of these steps reduces both the attack surface and the image size."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Runtime hardening checklist",
+        "items": [
+          "Remove the `curl`, `wget`, and `git` packages after dependencies are installed",
+          "Clear package manager caches in the same RUN instruction that installs packages",
+          "Create a non-root user and set it as the container's default user",
+          "Set `USER` before the final CMD so the process runs without root privileges",
+          "Remove the `ENTRYPOINT` or `CMD` shell forms to avoid implicit shell execution"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Hardened runtime stage",
+        "content": "A hardened Dockerfile creates a non-root user, removes package caches, and avoids running the application as root.",
+        "language": "dockerfile",
+        "code": "FROM node:20-alpine\n\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci --production \\\n    && addgroup -g 1001 -S appgroup \\\n    && adduser -u 1001 -S appuser -G appgroup \\\n    && chown -R appuser:appgroup /app\n\nUSER appuser\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Distroless and scratch for maximum security"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Distroless images contain only the application binary and its dynamic library dependencies. There is no shell, no package manager, and no SSH server. An attacker who gains code execution inside a distroless container has very few tools available for lateral movement."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Debugging distroless containers",
+        "text": "Because distroless images lack a shell, you cannot `docker exec` into them for debugging. Use `kubectl debug` with an ephemeral debug container, or temporarily switch to a debug image in non-production environments."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Base image choice affects size, compatibility, and security",
+          "Pin base images to digests or specific minor versions to prevent silent drift",
+          "Alpine is small and secure but may not support native binaries that depend on glibc",
+          "Distroless images offer maximum security by removing the shell and package manager",
+          "Always create a non-root user and run the application without root privileges"
+        ],
+        "takeaway": "The smallest compatible base image is usually the most secure, but compatibility must be verified before adopting Alpine or distroless in production."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["image-layers-and-build-cache", "multi-stage-builds", "image-scanning-and-supply-chain-security"],
+  "furtherReading": [
+    {
+      "title": "Docker Hub: Official images",
+      "url": "https://hub.docker.com/search?image_filter=official",
+      "type": "tool",
+      "author": "Docker"
+    },
+    {
+      "title": "Google distroless images",
+      "url": "https://github.com/GoogleContainerTools/distroless",
+      "type": "tool",
+      "author": "Google"
+    }
+  ]
 }

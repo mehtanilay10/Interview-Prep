@@ -4,58 +4,215 @@
   "moduleSlug": "database-infrastructure-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Kubernetes pods restart even though application logs look healthy",
-  "description": "Problem: Kubernetes pods restart even though application logs look healthy. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose silent pod restarts caused by OOMKill, liveness probe failures, or node pressure when application logs show no errors.",
   "order": 3,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["kubernetes", "oomkill", "liveness-probe", "node-pressure", "incident-response", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Kubernetes pods restart even though application logs look healthy** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with kubernetes pods restart even though application logs look healthy."
+        "text": "The application logs are clean. No exceptions, no stack traces, no warnings. But the pod has restarted twelve times in the last hour. Kubernetes is killing the container for reasons the application never sees: an out-of-memory kill at the kernel level, a liveness probe that fails during a GC pause, or node pressure that evicts the pod without the application logging anything. The fix is not in your code—it is in the pod spec, the resource limits, and the probe configuration."
       }
     },
     {
       "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Key Concepts"
-      }
+      "data": { "level": 2, "text": "Key Concepts" }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core concepts",
         "items": [
-          "Understand the fundamental principles of kubernetes pods restart even though application logs look healthy",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "OOMKilled: the Linux OOM killer terminates the process when it exceeds its memory limit (exit code 137)",
+          "Liveness probe: a Kubernetes check that restarts the container when it fails",
+          "Startup probe: delays liveness and readiness checks until the application has finished initializing",
+          "Node pressure eviction: the kubelet evicts pods when a node runs low on memory or disk",
+          "QoS class: Kubernetes classifies pods as Guaranteed, Burstable, or BestEffort based on resource requests and limits"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "OOMKilled",
+            "definition": "A container exit code (137) indicating the Linux OOM killer terminated the process because it exceeded its memory limit."
+          },
+          {
+            "term": "Liveness Probe",
+            "definition": "A Kubernetes probe that determines whether a container is running. If it fails, the kubelet kills and restarts the container."
+          },
+          {
+            "term": "Startup Probe",
+            "definition": "A probe that delays liveness and readiness checks until the application has finished starting up, preventing premature restarts."
+          },
+          {
+            "term": "Node Pressure Eviction",
+            "definition": "The kubelet evicts pods when a node runs low on memory, disk, or inodes, prioritizing by QoS class."
+          }
         ]
       }
     },
     {
       "type": "heading",
+      "data": { "level": 2, "text": "Common Causes" }
+    },
+    {
+      "type": "bullet-list",
       "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "items": [
+          "Memory limit is lower than the application actual working set, causing OOMKill",
+          "Liveness probe is too aggressive and fails during legitimate startup or GC pauses",
+          "Health check endpoint is not implemented or returns 500 during initialization",
+          "Node pressure evicts pods when the node runs low on memory or disk",
+          "Process receives a SIGTERM from the kubelet and exits before flushing logs",
+          "Startup probe is missing, so liveness checks run before the app is ready"
+        ]
       }
     },
     {
-      "type": "paragraph",
+      "type": "heading",
+      "data": { "level": 2, "text": "Comparison of Root Causes" }
+    },
+    {
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding kubernetes pods restart even though application logs look healthy is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Pod Restart Root Causes",
+        "cards": [
+          {
+            "title": "OOMKilled",
+            "description": "The container exceeded its memory limit and the kernel killed the process.",
+            "pros": ["Clear signal in pod status", "Exit code 137 confirms cause", "Memory metrics show spike"],
+            "cons": ["Application never logs the event", "Requires resource monitoring to catch", "May not happen under low traffic"]
+          },
+          {
+            "title": "Liveness Probe Failure",
+            "description": "The health check endpoint returned a non-success response, so Kubernetes restarted the container.",
+            "pros": ["Event reason is ProbeError", "Configurable threshold and delay", "Independent of memory metrics"],
+            "cons": ["May be caused by transient slowness", "Requires correct probe implementation", "Can mask memory issues"]
+          },
+          {
+            "title": "Node Pressure Eviction",
+            "description": "The node ran low on memory or disk and evicted pods to free resources.",
+            "pros": ["Eviction events appear in node status", "Can be tuned with QoS classes", "Helps protect node stability"],
+            "cons": ["Pod may be rescheduled on another node", "Affects multiple pods at once", "Hard to distinguish from OOMKill"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-k8s-restart-flow",
+        "caption": "Kubernetes pod restart decision flow",
+        "definition": "graph TD\n    A[Container Running] --> B{Probe Check}\n    B -->|Liveness Fail| C[Kill Container]\n    B -->|Readiness Fail| D[Remove from Service]\n    B -->|Pass| E[Continue]\n    C --> F[Restart Container]\n    F --> G{Startup Probe?}\n    G -->|Yes| H[Wait for Startup]\n    G -->|No| I[Run Liveness Immediately]\n    H --> J[App Ready]\n    I --> J"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Resolution Steps" }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Run kubectl describe pod and check Last State Reason and Exit Code.",
+          "If OOMKilled, increase the memory limit or reduce the application working set.",
+          "If liveness probe failure, verify the health endpoint is fast, reliable, and does not depend on downstream services.",
+          "Add a startup probe with a generous failure threshold to delay liveness checks until the app is ready.",
+          "Review node allocatable and eviction thresholds with kubectl describe node.",
+          "Add resource requests and limits to stabilize scheduling and QoS class."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with kubernetes pods restart even though application logs look healthy, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Probes should not depend on downstreams",
+        "text": "Liveness probes must be independent. If your health check calls a database or external API, a downstream outage will cause your pod to restart even when the application is healthy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Prevention Patterns" }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Define realistic memory requests and limits based on load-test profiling, not guesses",
+          "Use a startup probe for applications with slow initialization or JIT compilation",
+          "Keep liveness probes lightweight: check a local endpoint or thread state, not dependencies",
+          "Set container lifecycle preStop hooks to allow graceful shutdown and log flushing",
+          "Monitor OOMKill events with a Prometheus rule or Datadog monitor",
+          "Run chaos experiments that induce memory pressure to validate restart behavior"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Why does the app log show no errors before restart?",
+            "answer": "OOMKill terminates the process at the kernel level. The application never gets a chance to log the event. Check pod status and node events instead of container logs."
+          },
+          {
+            "question": "Should I increase the liveness probe failure threshold?",
+            "answer": "Increase the threshold or add a startup probe if the app has slow or variable startup times. Do not mask a genuinely unhealthy endpoint by making the probe too lenient."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Investigate a crashing pod",
+        "description": "A .NET API pod restarts every few minutes. kubectl logs shows no errors. Diagnose using kubectl describe, events, and metrics.",
+        "steps": [
+          "Check the pod Last State Reason and Exit Code",
+          "Inspect node memory pressure and OOM events",
+          "Review container memory limits and actual usage with kubectl top",
+          "Examine the liveness probe configuration and endpoint implementation",
+          "Implement a fix: increase limits, add startup probe, or fix the health check"
+        ],
+        "expectedOutcome": "You should identify whether the root cause is OOMKill, probe failure, or node eviction and implement a targeted fix."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "OOMKill leaves no application logs; check pod status and exit codes",
+          "Use startup probes to protect slow-initializing apps from premature restarts",
+          "Keep liveness probes independent of external dependencies",
+          "Set memory limits based on profiling data, not arbitrary values",
+          "Monitor restart counts and OOMKill events as a first-class health signal"
+        ],
+        "takeaway": "Healthy application logs do not prove the container is healthy. Kubernetes probes and resource limits are the real source of truth for pod lifecycle."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "container-image-deployment-works-locally-but-fails-in-production",
+    "readiness-probes-fail-during-a-normal-traffic-spike"
+  ],
+  "furtherReading": [
+    {
+      "title": "Kubernetes Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article"
+    },
+    {
+      "title": "Kubernetes QoS Classes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-class/",
+      "type": "article"
+    }
+  ]
 }

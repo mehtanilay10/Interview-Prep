@@ -3,59 +3,211 @@
   "slug": "csrf-and-same-site-cookies",
   "moduleSlug": "modern-web-security-identity",
   "courseSlug": "full-stack-security-for-net-and-react",
-  "title": "CSRF and same-site cookies",
-  "description": "Learn about CSRF and same-site cookies. Master the concepts, patterns, and best practices.",
+  "title": "CSRF and Same-Site Cookies",
+  "description": "Learn how Cross-Site Request Forgery tricks browsers into making unwanted requests on behalf of users. Explore anti-forgery tokens, SameSite cookie attributes, and how .NET and JavaScript handle these defenses.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "csrf",
+    "same-site-cookies",
+    "anti-forgery",
+    "cookies",
+    "OWASP"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**CSRF and same-site cookies** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with csrf and same-site cookies."
+        "text": "Cross-Site Request Forgery, or CSRF, is an attack that exploits the browser's habit of automatically attaching cookies to every request to a given domain. If a user is logged into their bank and then visits a malicious website, that site can silently submit a form to the bank — and the browser attaches the user's session cookie. The bank sees a legitimate request and processes it."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of csrf and same-site cookies",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "How CSRF Works"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding csrf and same-site cookies is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The attack needs three ingredients: an authenticated user, a session cookie that the browser sends automatically, and a state-changing endpoint (like POST /transfer). The attacker hosts a hidden form on their own site. When the victim visits, the form submits to the real bank. Because the browser includes the session cookie, the bank thinks the user initiated the transfer."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "CSRF",
+            "definition": "Cross-Site Request Forgery: an attack that forces a user's browser to send an unwanted authenticated request."
+          },
+          {
+            "term": "Anti-forgery token",
+            "definition": "A secret value tied to the user's session that the server requires on every state-changing request."
+          },
+          {
+            "term": "SameSite cookie",
+            "definition": "A cookie attribute that controls whether the browser sends the cookie with cross-site requests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Attacker's hidden form",
+        "content": "A malicious page silently submits a transfer request using the victim's browser.",
+        "code": "<form action=\"https://bank.example.com/transfer\" method=\"POST\">\n  <input name=\"toAccount\" value=\"ATTACKER_ACCOUNT\" />\n  <input name=\"amount\" value=\"5000\" />\n</form>\n<script>document.forms[0].submit();</script>",
+        "language": "html"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with csrf and same-site cookies, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "CSRF affects any cookie-based session",
+        "text": "If your API uses cookie-based authentication (including httpOnly session cookies), it is vulnerable to CSRF unless you add explicit protections. Bearer tokens in Authorization headers are NOT sent automatically by browsers, so they are naturally immune to CSRF."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Defense 1: Anti-Forgery Tokens"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Anti-forgery tokens tie a hidden form field or request header to a cookie that the server set earlier. The server rejects any POST request that does not contain both values. Because the attacker cannot read the cookie value from a different origin, they cannot forge the token. ASP.NET Core provides the [ValidateAntiForgeryToken] attribute and the @Html.AntiForgeryToken() helper for exactly this purpose."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Anti-forgery in a Razor Page",
+        "content": "The form includes an anti-forgery token, and the handler validates it automatically.",
+        "code": "<form method=\"post\">\n    @Html.AntiForgeryToken()\n    <input name=\"amount\" />\n    <button type=\"submit\">Transfer</button>\n</form>\n\n// In the PageModel:\n[ValidateAntiForgeryToken]\npublic async Task<IActionResult> OnPostAsync(decimal amount)\n{\n    // Process transfer safely\n    return RedirectToPage(\"Success\");\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Defense 2: SameSite Cookies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The SameSite attribute tells the browser when to attach cookies. SameSite=Strict sends cookies only on first-party navigation. SameSite=Lax allows cookies on top-level GET navigations but blocks them on cross-site POSTs, iframes, and image loads. SameSite=None requires the Secure attribute and is used only for true third-party scenarios."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "SameSite value",
+          "Cross-site POST",
+          "Cross-site GET",
+          "When to use"
+        ],
+        "rows": [
+          [
+            "Strict",
+            "Blocked",
+            "Blocked",
+            "Highly sensitive apps where no cross-site navigation is needed"
+          ],
+          [
+            "Lax",
+            "Blocked",
+            "Allowed (top-level only)",
+            "Most applications; balances security and usability"
+          ],
+          [
+            "None",
+            "Allowed",
+            "Allowed",
+            "True third-party embeds; requires Secure"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring cookies in ASP.NET Core",
+        "content": "Set the SameSite and Secure attributes in Program.cs.",
+        "code": "builder.Services.AddAntiforgery(options =>\n{\n    options.Cookie.SameSite = SameSiteMode.Lax;\n    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;\n    options.HeaderName = \"X-XSRF-TOKEN\";\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "CSRF prevention checklist",
+        "items": [
+          {
+            "text": "Add anti-forgery tokens to every state-changing form and API endpoint.",
+            "hint": "ASP.NET Core handles this automatically for Razor Pages when configured."
+          },
+          {
+            "text": "Set SameSite=Lax on session cookies unless your app specifically requires None.",
+            "hint": "Lax blocks the majority of CSRF attacks with no user-visible side effects."
+          },
+          {
+            "text": "Require custom headers (X-XSRF-TOKEN) for AJAX and fetch requests.",
+            "hint": "JavaScript can read non-httpOnly cookies, but cross-origin scripts cannot."
+          },
+          {
+            "text": "Do not rely on secret URL parameters for CSRF protection.",
+            "hint": "URLs leak through Referer headers, browser history, and server logs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "CSRF exploits the browser's automatic cookie handling to make unwanted authenticated requests.",
+          "Anti-forgery tokens verify that the request came from your own page, not a third-party site.",
+          "SameSite cookies limit cross-site cookie delivery and block most CSRF by default.",
+          "Use both defenses together: anti-forgery tokens for strong protection, SameSite as a second layer."
+        ],
+        "takeaway": "State-changing endpoints need two defenses: tokens to prove intent, and cookies that refuse cross-site rides."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "broken-access-control-and-idorbola",
+    "xss-and-output-encoding",
+    "csp-and-browser-security-headers"
+  ],
+  "furtherReading": [
+    {
+      "title": "OWASP CSRF Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft Docs — Prevent Cross-Site Request Forgery (XSRF/CSRF) in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/security/anti-request-forgery",
+      "type": "article"
+    },
+    {
+      "title": "SameSite Cookies — MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite",
+      "type": "article"
+    }
+  ]
 }

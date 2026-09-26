@@ -4,32 +4,174 @@
   "moduleSlug": "modern-state-application-architecture",
   "courseSlug": "react-advanced-patterns",
   "title": "Local state vs server state vs URL state",
-  "description": "Learn about Local state vs server state vs URL state. Master the concepts, patterns, and best practices.",
+  "description": "Understand the differences between local state, server state, and URL state in React. Learn when each kind of state is appropriate, how to choose the right tool, and how to avoid common architecture mistakes.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "architecture",
+    "state-management",
+    "react"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Local state vs server state vs URL state** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with local state vs server state vs url state."
+        "text": "Not all state in a React application is the same. Some values live only inside a single component, others live on a remote server, and a third kind is encoded directly into the URL. Treating these three kinds of state as interchangeable is one of the most common sources of bugs in medium-to-large React applications."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In this lesson, we build a clear mental model for **local state**, **server state**, and **URL state**. For each kind, you will learn its lifetime, who owns it, where it is stored, and which React features or libraries are the best fit."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Local state"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Local state is state that belongs to a single component (or a small subtree) and disappears when the component unmounts. It is the default kind of state in React, created with `useState` or `useReducer`."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Typical examples of local state",
         "items": [
-          "Master advanced aspects of local state vs server state vs url state",
-          "Master advanced aspects of local state vs server state vs url state",
-          "Master advanced aspects of local state vs server state vs url state"
+          "Whether a dropdown menu is open",
+          "The current value of a text input that has not been submitted yet",
+          "A loading spinner that appears while an event handler runs",
+          "A tab selection inside a reusable widget"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Local state example — a search filter panel",
+        "content": "A filter panel keeps its selected categories in local state because those selections are UI-only and do not need to survive a page reload.",
+        "language": "tsx",
+        "code": "function FilterPanel({ products }: { products: Product[] }) {\n  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);\n  const [isOpen, setIsOpen] = useState(false);\n\n  const visibleProducts = products.filter((p) => {\n    if (!selectedCategory) return true;\n    return p.category === selectedCategory;\n  });\n\n  return (\n    <div>\n      <button onClick={() => setIsOpen((prev) => !prev)}>\n        {isOpen ? 'Hide filters' : 'Show filters'}\n      </button>\n      {isOpen && (\n        <select\n          value={selectedCategory ?? ''}\n          onChange={(e) => setSelectedCategory(e.target.value || null)}\n        >\n          <option value=\"\">All categories</option>\n          {categories.map((c) => (\n            <option key={c} value={c}>{c}</option>\n          ))}\n        </select>\n      )}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server state"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Server state is data that originates from a backend and is fetched over the network. It is inherently asynchronous, can become stale, and must be synchronized with the server. Despite being stored remotely, many apps incorrectly place server state into local React state or even into Context."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Do not treat server state as local state",
+        "text": "Caching API responses inside `useState` leads to stale data, race conditions, and missing loading or error states. Use a purpose-built server-state library such as TanStack Query, SWR, or Apollo Client instead."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server state with TanStack Query",
+        "content": "The query library manages caching, background refetching, and loading/error states automatically.",
+        "language": "tsx",
+        "code": "function ProductList() {\n  const { data, isLoading, error } = useQuery({\n    queryKey: ['products'],\n    queryFn: fetchProducts,\n    staleTime: 1000 * 60 * 5,\n  });\n\n  if (isLoading) return <p>Loading products...</p>;\n  if (error) return <p>Failed to load products.</p>;\n\n  return (\n    <ul>\n      {data.map((product) => (\n        <li key={product.id}>{product.name}</li>\n      ))}\n    </ul>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "URL state"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "URL state is any piece of state that is encoded in the browser's address bar. Because the URL is the single shared source of truth across tabs, it can be bookmarked, refreshed, and shared. It is the right home for filters, pagination, sort order, and selected IDs that define what the user is currently looking at."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Good candidates for URL state",
+        "items": [
+          "Active filters on a search results page",
+          "The current page number in a paginated list",
+          "The selected tab inside a settings page",
+          "A product ID in a product detail view",
+          "Search query text entered by the user"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "URL state with React Router",
+        "content": "The search query is synchronized with the URL query string using `useSearchParams`, so users can bookmark their filtered view.",
+        "language": "tsx",
+        "code": "import { useSearchParams } from 'react-router-dom';\n\nfunction SearchPage() {\n  const [searchParams, setSearchParams] = useSearchParams();\n  const query = searchParams.get('q') ?? '';\n\n  const results = useQuery({\n    queryKey: ['search', query],\n    queryFn: () => searchProducts(query),\n    enabled: query.length > 0,\n  });\n\n  return (\n    <div>\n      <input\n        value={query}\n        onChange={(e) =>\n          setSearchParams({ q: e.target.value }, { replace: true })\n        }\n        placeholder=\"Search products...\"\n      />\n      {results.data?.map((item) => (\n        <div key={item.id}>{item.title}</div>\n      ))}\n    </div>\n  );\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Side-by-side comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Dimension",
+          "Local state",
+          "Server state",
+          "URL state"
+        ],
+        "rows": [
+          [
+            "Owner",
+            "One React component",
+            "Remote backend",
+            "Browser address bar"
+          ],
+          [
+            "Lifetime",
+            "Until unmount",
+            "Until invalidated",
+            "Until URL changes or bookmark is deleted"
+          ],
+          [
+            "Bookmarkable",
+            "No",
+            "No",
+            "Yes"
+          ],
+          [
+            "Shared across tabs",
+            "No",
+            "Depends on cache",
+            "Yes"
+          ],
+          [
+            "Typical tool",
+            "useState / useReducer",
+            "TanStack Query, SWR",
+            "React Router, Next.js router"
+          ]
         ]
       }
     },
@@ -37,24 +179,69 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "When to choose each kind"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding local state vs server state vs url state is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Decision checklist",
+        "items": [
+          "Does the value describe what the user is currently viewing or filtering? Put it in URL state.",
+          "Does the value come from an API call and may change independently of the UI? Put it in server state.",
+          "Is the value UI-only, ephemeral, and scoped to one component tree? Put it in local state."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with local state vs server state vs url state, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Architecture check",
+        "text": "Before adding a new piece of state, ask: who owns it, where should the single source of truth live, and what should happen when the user refreshes the page? The answers usually point directly at one of the three kinds."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: classify some state",
+        "description": "Given a dashboard page with a date-range picker, a list of notifications fetched from an API, and a sidebar collapse toggle, classify each piece of state as local, server, or URL state and explain your reasoning.",
+        "expectedOutcome": "You should place the date range in URL state, the notifications in server state using a query library, and the sidebar toggle in local state."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Local state is ephemeral and component-scoped.",
+          "Server state should be managed by a dedicated server-state library.",
+          "URL state is bookmarkable, shareable, and the natural home for filters and navigation.",
+          "The right boundary between these three kinds prevents stale data, race conditions, and lost navigation context."
+        ],
+        "takeaway": "Before reaching for useState or Context, ask which of the three state owners should actually hold the value."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "when-to-use-context-and-when-not-to",
+    "derived-state-and-avoiding-duplicated-state"
+  ],
+  "furtherReading": [
+    {
+      "title": "TanStack Query documentation",
+      "url": "https://tanstack.com/query/latest",
+      "type": "tool"
+    },
+    {
+      "title": "React Router - URL State",
+      "url": "https://reactrouter.com/home",
+      "type": "tool"
+    },
+    {
+      "title": "You Might Not Need Redux",
+      "url": "https://medium.com/@dan_abramov/you-might-not-need-redux-be46360cf367",
+      "type": "article"
+    }
+  ]
 }

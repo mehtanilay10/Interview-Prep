@@ -4,58 +4,217 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 5: Validation, error handling and API contracts",
-  "description": "Project: Phase 5: Validation, error handling and API contracts. Build and understand this project with step-by-step guidance.",
+  "description": "Implement FluentValidation pipeline behavior for command validation, ASP.NET Core ProblemDetails for consistent error responses, and a shared Result<T> pattern that preserves error context from domain to transport layer.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "validation",
+    "fluentvalidation",
+    "problemdetails",
+    "api-contracts",
+    "result-pattern",
+    "error-handling"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 5: Validation, error handling and API contracts** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 5: validation, error handling and api contracts."
+        "text": "A well-designed API contract is a form of documentation that never gets stale. When every endpoint returns the same envelope and every error follows RFC 7807 (ProblemDetails), clients can build predictable error UIs without reading your wiki."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of phase 5: validation, error handling and api contracts",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "The Result<T> pattern"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 5: validation, error handling and api contracts is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Instead of throwing exceptions for business rule violations (which obscures the control flow and leaks stack traces), handlers return Result<T>. Success carries the value; Failure carries a list of human-readable errors."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Result<T> discriminated type",
+        "content": "A sealed record type gives you exhaustive pattern matching in C#.",
+        "language": "csharp",
+        "code": "public sealed record Result<T>(T? Value, IReadOnlyList<string> Errors)\n{\n    public static Result<T> Success(T value)\n        => new(value, []);\n\n    public static Result<T> Failure(IEnumerable<string> errors)\n        => new(default, [.. errors]);\n\n    public bool IsSuccess => Errors.Count == 0;\n}\n\n// Usage in handler:\npublic async Task<Result<Guid>> Handle(SubmitExpenseReportCommand request, CancellationToken ct)\n{\n    var report = new ExpenseReport(request.EmployeeId, request.OrganizationId);\n    foreach (var line in request.LineItems)\n        report.AddLineItem(line.ToDomain());\n\n    try { report.Submit(_policy); }\n    catch (DomainException ex)\n    {\n        return Result<Guid>.Failure([ex.Message]);\n    }\n\n    await _reports.AddAsync(report, ct);\n    await _uow.SaveChangesAsync(ct);\n    return Result<Guid>.Success(report.Id);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FluentValidation pipeline behavior"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Validators run before the handler executes. If validation fails, the pipeline short-circuits and returns a 422 with a list of errors. Domain exceptions that slip through the validator are caught by a second behavior and mapped to 400/422."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Validation pipeline behavior",
+        "content": "Generic IPipelineBehavior<,> lets MediatR intercept every command.",
+        "language": "csharp",
+        "code": "public class ValidationPipelineBehavior<TRequest, TResponse>\n    : IPipelineBehavior<TRequest, TResponse>\n    where TRequest : IRequest<TResponse>\n{\n    private readonly IEnumerable<IValidator<TRequest>> _validators;\n\n    public ValidationPipelineBehavior(IEnumerable<IValidator<TRequest>> validators)\n    {\n        _validators = validators;\n    }\n\n    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)\n    {\n        if (!_validators.Any())\n            return await next();\n\n        var context = new ValidationContext<TRequest>(request);\n        var results = await Task.WhenAll(\n            _validators.Select(v => v.ValidateAsync(context, ct)));\n\n        var failures = results\n            .SelectMany(r => r.Errors)\n            .Where(f => f is not null)\n            .ToList();\n\n        if (failures.Count > 0)\n        {\n            var errors = failures.Select(f => f.ErrorMessage).ToList();\n            if (typeof(TResponse).IsGenericType && typeof(TResponse).GetGenericTypeDefinition() == typeof(Result<>))\n            {\n                var resultType = typeof(Result<>).MakeGenericType(typeof(TResponse).GenericTypeArguments[0]);\n                var failureMethod = resultType.GetMethod(nameof(Result<Guid>.Failure))!;\n                var failureResult = failureMethod.Invoke(null, [errors])!;\n                return (TResponse)failureResult;\n            }\n\n            throw new ValidationException(failures);\n        }\n\n        return await next();\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: SubmitExpenseReportValidator with FluentValidation",
+        "content": "Validators enforce shape and business rules before hitting the domain.",
+        "language": "csharp",
+        "code": "public class SubmitExpenseReportValidator : AbstractValidator<SubmitExpenseReportCommand>\n{\n    public SubmitExpenseReportValidator()\n    {\n        RuleFor(x => x.OrganizationId).NotEmpty();\n        RuleFor(x => x.EmployeeId).NotEmpty();\n        RuleFor(x => x.LineItems).NotEmpty().WithMessage(\"A report must contain at least one line item.\");\n\n        RuleForEach(x => x.LineItems).ChildRules(item =>\n        {\n            item.RuleFor(x => x.Amount.Amount).GreaterThan(0).WithMessage(\"Amount must be positive.\");\n            item.RuleFor(x => x.Date)\n                .LessThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow))\n                .WithMessage(\"Line items cannot be dated in the future.\");\n            item.RuleFor(x => x.Description)\n                .MaximumLength(500).When(x => !string.IsNullOrWhiteSpace(x.Description));\n        });\n\n        RuleFor(x => x.LineItems)\n            .Must(items => items.Count <= 50)\n            .WithMessage(\"A single report cannot exceed 50 line items.\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ProblemDetails global error response"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core 8+ includes ProblemDetails support out of the box. We register a custom exception handler to map DomainException, ValidationException, and NotFoundException to consistent RFC 7807 responses."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Global exception handler with ProblemDetails",
+        "content": "Keep error schemas consistent so the React app can build a single ErrorBanner component.",
+        "language": "csharp",
+        "code": "public class GlobalExceptionHandler(IProblemDetailsService pds, ILogger<GlobalExceptionHandler> log)\n    : ExceptionHandlerMiddleware\n{\n    public override async Task TryHandleAsync(HttpContext ctx, Exception ex, CancellationToken ct)\n    {\n        log.LogError(ex, \"Unhandled exception: {Message}\", ex.Message);\n\n        var (status, title, detail) = ex switch\n        {\n            ValidationException vex => (StatusCodes.Status422UnprocessableEntity, \"Validation Failed\", vex.Message),\n            DomainException dex => (StatusCodes.Status400BadRequest, \"Business Rule Violation\", dex.Message),\n            NotFoundException _ => (StatusCodes.Status404NotFound, \"Not Found\", ex.Message),\n            _ => (StatusCodes.Status500InternalServerError, \"Server Error\", \"An unexpected error occurred.\")\n        };\n\n        ctx.Response.StatusCode = status;\n        ctx.Response.ContentType = \"application/problem+json\";\n\n        var problem = new ProblemDetailsContext\n        {\n            HttpContext = ctx,\n            ProblemDetails =\n            {\n                Status = status,\n                Title = title,\n                Detail = detail,\n                Type = ex.GetType().FullName,\n                Instance = ctx.Request.Path,\n            }\n        };\n\n        await pds.WriteAsync(problem);\n        return true;\n    }\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 5: validation, error handling and api contracts, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Never return stack traces to the client",
+        "text": "In production, GenericProblemDetails should strip Type and any internal exception details. Log the full exception server-side; return only Title and Detail to the client."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "API contract versioning"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Contract changes are inevitable. Use media type versioning (e.g., `application/vnd.expense.v1+json`) or URL versioning (`/api/v1/expense-reports`) from day one. Avoid silent breaking changes — if you must change a DTO, bump the version and support both during migration."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "API versioning strategies",
+        "cards": [
+          {
+            "title": "URL versioning",
+            "description": "Prefix routes with /v1/, /v2/.",
+            "pros": [
+              "Explicit",
+              "Easy to test in Swagger",
+              "Clear for consumers"
+            ],
+            "cons": [
+              "Pollutes route namespace",
+              "Harder to deprecate old versions"
+            ]
+          },
+          {
+            "title": "Media type versioning",
+            "description": "Version in Accept/Content-Type header.",
+            "pros": [
+              "Clean URLs",
+              "Standard HTTP approach"
+            ],
+            "cons": [
+              "Harder to demo in browser",
+              "Requires header management in clients"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 5 deliverables",
+        "items": [
+          {
+            "text": "Result<T> type implemented with Success and Failure factory methods."
+          },
+          {
+            "text": "ValidationPipelineBehavior registered globally; failing requests return 422 before hitting the handler."
+          },
+          {
+            "text": "SubmitExpenseReportValidator covers all business rules (amounts, dates, item count)."
+          },
+          {
+            "text": "GlobalExceptionHandler maps DomainException → 400, ValidationException → 422, NotFound → 404."
+          },
+          {
+            "text": "All API responses include the standard ProblemDetails envelope in development."
+          },
+          {
+            "text": "At least one contract test proving the submit endpoint returns the expected JSON schema."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 5 summary",
+        "points": [
+          "Result<T> removes exception-driven control flow from handlers.",
+          "FluentValidation + pipeline behavior keeps validators co-located with commands.",
+          "ProblemDetails provides a standard error envelope clients can rely on.",
+          "API versioning from day one prevents painful breaking-change migrations later."
+        ],
+        "takeaway": "Consistent error responses are a product feature, not an afterthought. A frontend engineer building an ErrorBanner component will thank you for a stable, documented contract."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Microsoft: ProblemDetails in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/#problem-details",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "FluentValidation Documentation",
+      "url": "https://docs.fluentvalidation.net/",
+      "type": "article"
+    },
+    {
+      "title": "RFC 7807: Problem Details for HTTP APIs",
+      "url": "https://datatracker.ietf.org/doc/html/rfc7807",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft: API versioning",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/web-api/advanced/versioning",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

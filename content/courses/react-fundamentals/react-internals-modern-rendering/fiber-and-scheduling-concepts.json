@@ -4,33 +4,44 @@
   "moduleSlug": "react-internals-modern-rendering",
   "courseSlug": "react-fundamentals",
   "title": "Fiber and scheduling concepts",
-  "description": "Learn about Fiber and scheduling concepts. Master the concepts, patterns, and best practices.",
+  "description": "Explore React's Fiber architecture and how its scheduler assigns priorities to work so the UI stays responsive during large updates.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "react",
+    "fiber",
+    "scheduler",
+    "internals"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Fiber and scheduling concepts** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with fiber and scheduling concepts."
+        "text": "Before React 16, the renderer used a recursive algorithm that blocked the main thread until the entire tree was finished. **Fiber** replaced that design with a linked-list unit of work that can be paused, split, and resumed. The **scheduler** then decides which fibers to process next based on priority."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Fiber node"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every React element has a corresponding Fiber node. A Fiber stores the component type, state, effects, and pointers to its parent, child, and sibling. This linked-list structure replaces deep recursion and lets React walk the tree iteratively."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of fiber and scheduling concepts",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "One Fiber per component instance",
+          "Links to parent, first child, and next sibling",
+          "Stores pending state, effects, and work-in-progress data",
+          "Two versions exist: current and work-in-progress"
         ]
       }
     },
@@ -38,24 +49,142 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Priority levels"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding fiber and scheduling concepts is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "React assigns each update a priority. Higher-priority work — like a button click — jumps ahead of lower-priority work — like an offscreen analytics render. This prevents urgent interactions from feeling laggy."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Priority",
+          "Use case",
+          "Behavior"
+        ],
+        "rows": [
+          [
+            "Immediate",
+            "User input that blocks display",
+            "Runs synchronously"
+          ],
+          [
+            "User-blocking",
+            "Click, scroll, or keyboard event",
+            "High priority; yields to input"
+          ],
+          [
+            "Normal",
+            "Standard setState updates",
+            "Default priority; can be interrupted"
+          ],
+          [
+            "Low",
+            "Non-urgent data prefetch",
+            "Runs when idle"
+          ],
+          [
+            "Idle",
+            "Offscreen logging, prefetch",
+            "Runs only when browser is free"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How scheduling works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When an update is scheduled, React does not execute it immediately. Instead, it asks the browser for an idle callback, then walks the Fiber tree and processes units of work one at a time. If the browser needs to handle user input, React pauses, yields, and resumes later."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "fiber-scheduling-work-loop",
+        "caption": "How React's scheduler walks Fiber nodes and yields to the browser.",
+        "definition": "flowchart TD\n    A[Update scheduled] --> B{Is priority high?}\n    B -->|Yes| C[Process immediately]\n    B -->|No| D[Request idle callback]\n    D --> E[Work on one Fiber unit]\n    E --> F{More units?}\n    F -->|Yes| G{Yield to browser?}\n    G -->|Yes| D\n    G -->|No| E\n    F -->|No| H[Commit phase]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Transitions show scheduling in action",
+        "content": "useTransition marks an update as non-urgent so the scheduler can interleave it with user input.",
+        "code": "import { useState, useTransition } from 'react';\n\nfunction SearchPage() {\n  const [query, setQuery] = useState('');\n  const [results, setResults] = useState<string[]>([]);\n  const [isPending, startTransition] = useTransition();\n\n  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {\n    const next = e.target.value;\n    setQuery(next);\n\n    startTransition(() => {\n      setResults(filterResults(next));\n    });\n  }\n\n  return (\n    <>\n      <input value={query} onChange={handleChange} />\n      {isPending && <Spinner />}\n      <ResultList results={results} />\n    </>\n  );\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with fiber and scheduling concepts, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Think in units of work",
+        "text": "A single setState may spawn many Fiber units. The scheduler processes them one by one, so a component tree with thousands of nodes still yields to the browser between batches."
       }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Fiber replaces recursive rendering with an iterative linked list",
+          "The scheduler assigns priorities so urgent work runs first",
+          "Low-priority updates can be interrupted and resumed",
+          "useTransition is the user-facing API for scheduling non-urgent work"
+        ],
+        "takeaway": "If a large list update freezes typing, wrap the heavy work in a transition so the scheduler can keep the input responsive."
+      }
+    },
+    {
+      "type": "relatedLessons",
+      "data": {
+        "slugs": [
+          "render-phase-vs-commit-phase",
+          "concurrent-rendering"
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "React Docs: Behind the Scenes of Fiber",
+          "url": "https://github.com/acdlite/react-fiber-architecture",
+          "type": "article"
+        },
+        {
+          "title": "React Docs: useTransition",
+          "url": "https://react.dev/reference/react/useTransition",
+          "type": "article"
+        }
+      ]
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "render-phase-vs-commit-phase",
+    "concurrent-rendering"
+  ],
+  "furtherReading": [
+    {
+      "title": "React Fiber Architecture",
+      "url": "https://github.com/acdlite/react-fiber-architecture",
+      "type": "article"
+    },
+    {
+      "title": "React Docs: useTransition",
+      "url": "https://react.dev/reference/react/useTransition",
+      "type": "article"
+    }
+  ]
 }

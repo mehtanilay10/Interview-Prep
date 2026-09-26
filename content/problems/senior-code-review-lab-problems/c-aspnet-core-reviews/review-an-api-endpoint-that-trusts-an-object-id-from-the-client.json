@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review an API endpoint that trusts an object ID from the client** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review an api endpoint that trusts an object id from the client."
+        "text": "An API endpoint accepts an identifier directly from the request body or route and uses it to query or update data without verifying that the authenticated user owns that resource. An attacker who knows or guesses another user's identifier can read or modify data that does not belong to them. This is an Insecure Direct Object Reference, or IDOR, and it is one of the most common and most impactful API vulnerabilities."
       }
     },
     {
@@ -27,10 +27,33 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review an api endpoint that trusts an object id from the client",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Understand how object identifiers flow from client to database in a typical REST API",
+          "Learn why client-supplied IDs must be validated against the current user's ownership or permissions",
+          "Identify the difference between horizontal privilege escalation (accessing another user's data) and vertical escalation (gaining admin rights)",
+          "Apply defense-in-depth: ownership checks, resource-based authorization, and opaque identifiers"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "IDOR",
+            "definition": "Insecure Direct Object Reference: accessing a resource by its identifier without verifying that the caller is authorized to access it."
+          },
+          {
+            "term": "Horizontal privilege escalation",
+            "definition": "Accessing data or actions belonging to another user with the same privilege level."
+          },
+          {
+            "term": "Vertical privilege escalation",
+            "definition": "Accessing data or actions belonging to a higher privilege level, such as an admin function from a regular user account."
+          },
+          {
+            "term": "Resource-based authorization",
+            "definition": "Checking whether the current user owns or is permitted to access the specific resource identified by the request, rather than relying solely on route or role checks."
+          }
         ]
       }
     },
@@ -44,15 +67,179 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review an api endpoint that trusts an object id from the client is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "IDOR vulnerabilities appear in every type of application: SaaS dashboards, mobile APIs, and internal admin tools. Automated scanners detect them easily, and real-world exploitation is straightforward: change the ID in the URL from 123 to 124 and observe the response. A single missing ownership check can expose thousands of user records, and the breach may go unnoticed for months because the API returns 200 OK rather than an error."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "IDOR is a data breach waiting to happen",
+        "text": "If an endpoint returns data based solely on an ID from the client, assume an attacker will enumerate it. Ownership checks are not optional; they are the baseline for any endpoint that touches user data."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Flawed Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The vulnerable endpoint receives an order ID from the route, queries the database, and returns the result. There is no check that the order belongs to the authenticated user. An attacker who knows a valid order ID for another user can retrieve that order's contents, shipping address, and payment details."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable endpoint",
+        "content": "An endpoint that trusts the client-supplied ID without ownership verification:",
+        "code": "[HttpGet(\"orders/{orderId}\")]\n[Authorize]\npublic async Task<ActionResult<OrderDto>> GetOrder(int orderId)\n{\n    var order = await _context.Orders.FindAsync(orderId);\n    if (order == null) return NotFound();\n\n    return Ok(order);\n    // No check: does this order belong to the current user?\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Correct Implementation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The fix is to scope every query by the current user's identity. The user ID comes from the authenticated context, not the request body. Additionally, use non-sequential identifiers such as GUIDs or ULIDs to make enumeration harder, though ownership checks are still required even with opaque IDs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Secure endpoint with ownership check",
+        "content": "Filter by the current user's ID before returning data:",
+        "code": "[HttpGet(\"orders/{orderId}\")]\n[Authorize]\npublic async Task<ActionResult<OrderDto>> GetOrder(int orderId, ClaimsPrincipal user)\n{\n    var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;\n    if (userId == null) return Unauthorized();\n\n    var order = await _context.Orders\n        .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);\n\n    if (order == null) return NotFound();\n\n    return Ok(order);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Defense strategies for IDOR",
+        "cards": [
+          {
+            "title": "Ownership filter in query",
+            "description": "Add the current user's ID to every WHERE clause.",
+            "pros": ["Simple", "Defeats enumeration", "Works with any identifier type"],
+            "cons": ["Easy to forget in a new endpoint", "Does not protect against leaked admin tokens"]
+          },
+          {
+            "title": "Opaque identifiers",
+            "description": "Use random GUIDs or ULIDs instead of sequential integers.",
+            "pros": ["Harder to enumerate", "No information leakage about record count"],
+            "cons": ["Still requires ownership checks", "Larger index size"]
+          },
+          {
+            "title": "Resource-based authorization policies",
+            "description": "Use a centralized policy or requirement that checks ownership before the action executes.",
+            "pros": ["Consistent across all endpoints", "Testable", "Hard to bypass"],
+            "cons": ["Requires upfront design", "More infrastructure code"]
+          },
+          {
+            "title": "Per-record encryption",
+            "description": "Encrypt sensitive fields so that even if the record is accessed, the data is unreadable.",
+            "pros": ["Protects data at rest", "Defense in depth"],
+            "cons": ["Complex key management", "Does not prevent unauthorized access"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "idor-attack-flow",
+        "caption": "How an IDOR attack bypasses authorization",
+        "definition": "graph LR\n    A[Attacker requests /orders/123] --> B[Server finds order 123]\n    B --> C{Check order.UserId == attacker.Id?}\n    C -->|Yes| D[Return order]\n    C -->|No| E[Return 403 Forbidden]\n    F[Attacker requests /orders/124] --> G[Server finds order 124]\n    G --> H{Check order.UserId == attacker.Id?}\n    H -->|Yes| D\n    H -->|No| E"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prevention Checklist"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Secure API design rules",
+        "items": [
+          "Every endpoint that returns or modifies data must filter by the current user's ID",
+          "Never trust route parameters, query strings, or request bodies as the sole source of authorization",
+          "Use resource-based authorization for any endpoint that accesses records by ID",
+          "Return 404 instead of 403 when a resource is not found or not owned; this prevents enumeration",
+          "Log access to sensitive records with user ID and resource ID for audit trails"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review an api endpoint that trusts an object id from the client, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Return 404, not 403",
+        "text": "Returning 404 when a user does not own a resource prevents attackers from enumerating valid IDs. If you return 403, the attacker knows the ID exists and can try another one."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Are sequential IDs really a vulnerability?",
+            "answer": "By themselves, no. But they make enumeration trivial. Combine sequential IDs with missing ownership checks and you have a data breach. Use opaque IDs as a second layer of defense."
+          },
+          {
+            "question": "Does GraphQL have the same problem?",
+            "answer": "Yes. GraphQL queries can request any field by ID. Ownership checks must be applied at the resolver level, not just at the transport or schema level."
+          },
+          {
+            "question": "How do I test for IDOR?",
+            "answer": "Create two users, log in as user A, and try to access a resource owned by user B. The API should return 404. Automate this in your integration test suite."
+          },
+          {
+            "question": "What about batch endpoints?",
+            "answer": "Batch endpoints amplify IDOR because a single request can access many records. Filter each item in the batch by the current user's ID, and reject the entire batch if any item fails the check."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Audit an API for IDOR",
+        "description": "Review a set of API endpoints and identify every route that accepts a client-supplied ID without verifying ownership.",
+        "steps": [
+          "List all GET, PUT, PATCH, and DELETE endpoints that accept an ID parameter",
+          "For each endpoint, trace the query to verify it filters by the current user",
+          "Write an integration test that creates two users, accesses user A's resource as user B, and expects 404",
+          "Add resource-based authorization policies to any endpoint that fails the test",
+          "Document the fix in the pull request description"
+        ],
+        "expectedOutcome": "Every endpoint that accesses data by ID includes an ownership filter. The integration test suite catches any new IDOR regression."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Client-supplied IDs are untrusted input, not authorization",
+          "Always filter queries by the authenticated user's identity",
+          "Return 404 to prevent enumeration",
+          "Automate IDOR checks in your integration test suite"
+        ],
+        "takeaway": "If an API trusts the client for authorization, the client becomes the attacker."
       }
     }
   ],

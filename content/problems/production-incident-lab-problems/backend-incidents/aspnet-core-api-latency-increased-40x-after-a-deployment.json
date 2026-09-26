@@ -4,33 +4,62 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "ASP.NET Core API latency increased 40x after a deployment",
-  "description": "Problem: ASP.NET Core API latency increased 40x after a deployment. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose a 40x latency regression in an ASP.NET Core API after deployment by investigating middleware, DI container behavior, compilation settings, and database access patterns.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["asp.net-core", "latency", "deployment", "middleware", "diagnostics", "kestrel"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**ASP.NET Core API latency increased 40x after a deployment** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with asp.net core api latency increased 40x after a deployment."
+        "text": "After deploying a minor update to an ASP.NET Core API, p95 latency jumps from 120ms to 5 seconds. CPU usage is normal, memory is stable, and the health check endpoint responds quickly. The regression affects only authenticated endpoints. You need to find the bottleneck using ASP.NET Core diagnostics and fix it without reverting the deployment."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common ASP.NET Core latency culprits"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of asp.net core api latency increased 40x after a deployment",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Synchronous I/O introduced in a new middleware or controller action blocks the thread pool",
+          "A new scoped service was registered as singleton, causing memory leaks and GC pressure",
+          "Database queries without indexes or with N+1 fetching patterns after an ORM model change",
+          "JSON serialization options changed to include reference loops, causing massive payload sizes",
+          "Response caching was disabled accidentally during the deployment",
+          "A new authentication handler makes remote calls on every request without caching"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Middleware",
+            "definition": "Software that sits between the server and application logic, processing requests and responses in a pipeline."
+          },
+          {
+            "term": "Dependency injection lifetime",
+            "definition": "The scope of a registered service: transient, scoped, or singleton. Misconfigured lifetimes cause memory leaks and thread safety bugs."
+          },
+          {
+            "term": "Kestrel",
+            "definition": "The cross-platform web server for ASP.NET Core, responsible for accepting connections and passing requests to the middleware pipeline."
+          },
+          {
+            "term": "Synchronous I/O",
+            "definition": "Blocking operations that hold a thread while waiting for I/O to complete, exhausting the thread pool under load."
+          },
+          {
+            "term": "Source generators",
+            "definition": "Compile-time code generation in .NET that can improve startup performance by pre-generating serialization and routing code."
+          }
         ]
       }
     },
@@ -38,24 +67,116 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Diagnostic steps"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding asp.net core api latency increased 40x after a deployment is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Enable ASP.NET Core diagnostics and collect metrics from DiagnosticListener",
+          "Use dotnet-trace or Visual Studio Profiler to capture a 30-second trace during the latency spike",
+          "Inspect the trace for synchronous I/O calls: .Result, .Wait(), or .GetAwaiter().GetHandle()",
+          "Check dependency injection registrations in Program.cs for lifetime mismatches",
+          "Review database query plans for new queries introduced in the deployment",
+          "Compare middleware pipeline order between the previous and current release"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Synchronous I/O in a controller",
+        "content": "A new controller action blocks on an async database call:",
+        "code": "// Before: async all the way\n[HttpGet]\npublic async Task<ActionResult<List<Order>>> GetOrders()\n{\n    return await _dbContext.Orders.ToListAsync();\n}\n\n// After deployment: synchronous block introduced\n[HttpGet]\npublic ActionResult<List<Order>> GetOrders()\n{\n    return _dbContext.Orders.ToListAsync().Result; // Blocks thread!\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "ASP.NET Core hosting and compilation modes",
+        "cards": [
+          {
+            "title": "In-process hosting",
+            "description": "ASP.NET Core runs inside the IIS worker process.",
+            "pros": ["Best performance on Windows", "Lower request latency"],
+            "cons": ["IIS configuration issues affect the app", "Less isolation"]
+          },
+          {
+            "title": "Out-of-process hosting",
+            "description": "ASP.NET Core runs in a separate Kestrel process behind IIS as a reverse proxy.",
+            "pros": ["Better isolation", "IIS handles process management"],
+            "cons": ["Slightly higher latency", "More moving parts"]
+          },
+          {
+            "title": "ReadyToRun compilation",
+            "description": "Pre-compiles IL to native code at build time.",
+            "pros": ["Faster startup time", "Reduces JIT overhead"],
+            "cons": ["Larger deployment artifacts", "May miss runtime optimizations"]
+          },
+          {
+            "title": "AOT compilation",
+            "description": "Ahead-of-time compilation with native AOT in .NET 8+.",
+            "pros": ["Smallest deployments", "Fastest startup", "No JIT required"],
+            "cons": ["Reflection limitations", "Longer build times", "Not all APIs supported"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-aspnet-request-pipeline",
+        "caption": "ASP.NET Core request pipeline and common latency injection points",
+        "definition": "graph LR\n    A[Request] --> B[Kestrel]\n    B --> C[Middleware 1: Auth]\n    C --> D[Middleware 2: Logging]\n    D --> E[Middleware 3: Custom]\n    E --> F[Routing]\n    F --> G[Controller]\n    G --> H{Async all the way?}\n    H -->|Yes| I[DbContext async]\n    H -->|No| J[Thread blocked]\n    I --> K[Response]\n    J --> L[Thread pool starvation]\n    L --> M[503 / Timeout]"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with asp.net core api latency increased 40x after a deployment, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Sync-over-async is a silent killer",
+        "text": "Calling .Result or .Wait() on an async method in ASP.NET Core blocks a thread pool thread. Under load, this exhausts the thread pool and causes request queuing. Always use async/await all the way down."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Profile an ASP.NET Core API for latency",
+        "description": "Take a sample ASP.NET Core API and introduce a latency regression by adding synchronous I/O. Then use dotnet-trace to find it.",
+        "steps": [
+          "Create or clone a small ASP.NET Core Web API project",
+          "Add a controller action that calls an async method with .Result",
+          "Run the API and generate load with a tool like k6 or Apache Bench",
+          "Capture a trace with dotnet-trace collect --providers Microsoft-AspNetCore-Server-Kestrel",
+          "Identify the blocking call in the trace and fix it to async/await"
+        ],
+        "expectedOutcome": "You should see thread pool starvation in the trace and a measurable latency drop after fixing the sync-over-async call."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Compare middleware and DI registration changes between releases first",
+          "Use async/await all the way down to avoid thread pool starvation",
+          "Profile with dotnet-trace rather than guessing from metrics alone",
+          "Verify the fix in a canary deployment before rolling out to all instances"
+        ],
+        "takeaway": "In ASP.NET Core, the most common cause of post-deployment latency is not the database; it is blocking asynchronous code in the request pipeline."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Diagnostics in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/diagnostics/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on ASP.NET Core diagnostics, tracing, and logging."
+    }
+  ]
 }

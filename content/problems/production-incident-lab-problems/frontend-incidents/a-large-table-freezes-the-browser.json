@@ -8,54 +8,211 @@
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["react", "performance", "virtualization", "frontend", "senior-engineer"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**A large table freezes the browser** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with a large table freezes the browser."
+        "text": "Users open a management dashboard and the browser tab hangs for several seconds while a table of five hundred rows renders. The CPU spikes to one hundred percent, scrolling is janky, and the page becomes unresponsive until the work finishes. In a React application, this is almost always caused by rendering too many DOM nodes, expensive calculations inside render, or layout thrashing."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common culprits"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of a large table freezes the browser",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Rendering thousands of rows into the DOM without windowing or virtualization.",
+          "Expensive cell formatting or parsing running on every render for every row.",
+          "Unstable props or inline callbacks causing the entire table to re-render on every keystroke.",
+          "Layout thrashing: reading offsetWidth or getBoundingClientRect inside render, forcing synchronous reflows.",
+          "Missing memoization on row components, so changing one cell redraws the whole table.",
+          "Third-party data-grid libraries that mount full DOM trees even for off-screen rows."
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Virtualization",
+            "definition": "Rendering only the visible subset of rows so DOM node count stays constant regardless of data length."
+          },
+          {
+            "term": "Windowed list",
+            "definition": "A list that calculates which items fall inside the viewport and renders only those, plus a small overscan buffer."
+          },
+          {
+            "term": "Layout thrashing",
+            "definition": "Interleaving DOM reads and writes, forcing the browser to recalculate layout repeatedly during a single frame."
+          },
+          {
+            "term": "Reconciliation",
+            "definition": "React's algorithm for comparing the new virtual DOM tree with the previous one to determine which DOM nodes to update."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with the DevTools Performance panel. Record a trace while the table renders, then look for long tasks and forced synchronous layouts. If the main thread is blocked for hundreds of milliseconds, the fix is almost always to reduce the number of DOM nodes or move work off the render path."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Solution approaches"
       }
     },
     {
-      "type": "paragraph",
+      "type": "example",
       "data": {
-        "text": "Understanding a large table freezes the browser is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Before virtualization",
+        "content": "A naive table maps every row directly to a DOM node:",
+        "code": "function DataTable({ rows }) {\n  return (\n    <table>\n      <tbody>\n        {rows.map((row) => (\n          <tr key={row.id}>\n            <td>{row.name}</td>\n            <td>{row.value}</td>\n          </tr>\n        ))}\n      </tbody>\n    </table>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "After virtualization",
+        "content": "A virtualized table renders only the visible window and recycles DOM nodes as the user scrolls:",
+        "code": "import { FixedSizeList as List } from 'react-window';\n\nfunction VirtualTable({ rows }) {\n  const Row = ({ index, style }) => (\n    <div style={style}>\n      {rows[index].name} — {rows[index].value}\n    </div>\n  );\n\n  return (\n    <List\n      height={400}\n      itemCount={rows.length}\n      itemSize={35}\n      width=\"100%\"\n    >\n      {Row}\n    </List>\n  );\n}",
+        "language": "tsx"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with a large table freezes the browser, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Virtualization is not free",
+        "text": "Virtualized lists add scroll anchoring, keyboard navigation, and dynamic-height complexity. If your table has fewer than fifty rows, the engineering cost usually outweighs the performance gain."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison of techniques"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Techniques for large tables",
+        "cards": [
+          {
+            "title": "CSS content-visibility",
+            "description": "Lets the browser skip rendering work for off-screen content.",
+            "pros": ["Zero JavaScript required", "Works with existing markup"],
+            "cons": ["Limited browser support", "No control over scroll anchoring"]
+          },
+          {
+            "title": "react-window / react-virtuoso",
+            "description": "JavaScript libraries that render only visible rows and recycle DOM nodes.",
+            "pros": ["Predictable performance", "Handles dynamic data well"],
+            "cons": ["Requires component rewrite", "Dynamic row heights add complexity"]
+          },
+          {
+            "title": "Pagination",
+            "description": "Load and render a fixed page of rows at a time.",
+            "pros": ["Simple to implement", "Predictable memory usage"],
+            "cons": ["Poor UX for ad-hoc analysis", "Requires server round-trips"]
+          },
+          {
+            "title": "Server-side rendering only",
+            "description": "Render the table once on the server and avoid client-side diffing.",
+            "pros": ["Fast initial paint", "Good for SEO"],
+            "cons": ["No interactivity without hydration", "Still sends full HTML"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-table-render-path",
+        "caption": "Decision flow for large table rendering",
+        "definition": "graph TD\n    A[Large table detected] --> B{Rows > 200?}\n    B -->|Yes| C[Need virtualization?]\n    B -->|No| D[Standard HTML table]\n    C -->|Yes| E[Pick virtualized list library]\n    C -->|No| F[content-visibility + memoized rows]\n    E --> G[Fixed or dynamic height?]\n    G -->|Fixed| H[react-window FixedSizeList]\n    G -->|Dynamic| I[react-virtuoso or react-window VariableSizeList]\n    H --> J[Test scroll performance]\n    I --> J\n    F --> J\n    J --> K{Meets 60fps?}\n    K -->|Yes| L[Ship and monitor]\n    K -->|No| M[Profile with DevTools and iterate]"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How many rows trigger virtualization?",
+            "answer": "There is no fixed threshold. If your table causes long tasks or jank, profile it. Many teams start evaluating virtualization at one hundred to two hundred rows, but the real cutoff depends on cell complexity and device capability."
+          },
+          {
+            "question": "Can I use virtualization with server-side data fetching?",
+            "answer": "Yes. Fetch data in pages or with infinite scroll, then feed the accumulated rows into the virtualized list. Keep the scroll position stable when new pages arrive."
+          },
+          {
+            "question": "Does virtualization break browser search and copy-paste?",
+            "answer": "It can. Off-screen rows are not in the DOM, so Ctrl+F may miss them and screen readers may skip them. Add a fallback or ensure critical content is exposed accessibly."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Profile and virtualize a large table",
+        "description": "Take a page that renders a thousand-row table. Measure the current render cost, then implement virtualization and compare.",
+        "steps": [
+          "Open DevTools Performance panel and record a render of the full table.",
+          "Note the main-thread blocking time and DOM node count.",
+          "Install react-window and replace the tbody map with a FixedSizeList.",
+          "Record the same interaction again and compare frame times.",
+          "Check that sorting and filtering still work and that scroll position is preserved."
+        ],
+        "expectedOutcome": "You should reduce DOM node count from thousands to a fixed window plus overscan, and frame times during scroll should drop below sixteen milliseconds."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Profile before optimizing: use Performance panel and flame graphs.",
+          "Reduce DOM node count with virtualization when rows exceed a few hundred.",
+          "Memoize row components to avoid unnecessary re-renders.",
+          "Avoid layout thrashing by batching DOM reads and writes.",
+          "Validate scroll behavior, accessibility, and copy-paste after changes"
+        ],
+        "takeaway": "A senior engineer does not guess at performance. They measure render cost, identify the bottleneck, and choose the smallest change that restores interactivity."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "round-4-debug-a-react-performance-regression",
+    "react-page-becomes-progressively-slower-after-navigation"
+  ],
+  "furtherReading": [
+    {
+      "title": "react-window documentation",
+      "url": "https://react-window.vercel.app/",
+      "type": "tool",
+      "author": "Brian Vaughn",
+      "description": "Official documentation for the react-window virtualization library with examples."
+    },
+    {
+      "title": "Avoid large, complex layouts and layout thrashing",
+      "url": "https://web.dev/avoid-large-complex-layouts-and-layout-thrashing/",
+      "type": "article",
+      "author": "Web.dev",
+      "description": "Guidance on minimizing forced synchronous layouts in the browser."
+    }
+  ]
 }

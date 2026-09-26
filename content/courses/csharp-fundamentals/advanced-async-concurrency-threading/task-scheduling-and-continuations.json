@@ -4,58 +4,98 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "Task scheduling and continuations",
-  "description": "Learn about Task scheduling and continuations. Master the concepts, patterns, and best practices.",
+  "description": "Understand how the TPL schedules tasks and how continuations let you compose asynchronous workflows.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Task scheduling and continuations** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with task scheduling and continuations."
+        "text": "When you call `Task.Run`, you are asking the Task Parallel Library to schedule work. The TPL decides *where* and *when* that work runs using a scheduler. Continuations then let you chain follow-up work that runs after a task completes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Task schedulers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A `TaskScheduler` determines how and where queued tasks execute. The default scheduler runs tasks on the ThreadPool. You can create custom schedulers for specialized behavior, such as limiting concurrency or running tasks on a dedicated thread."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of task scheduling and continuations",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "**ThreadPoolTaskScheduler** — The default. Uses the ThreadPool and balances load across cores.",
+          "**SynchronizationContextTaskScheduler** — Used in UI and ASP.NET contexts. Posts work back to the original context.",
+          "**Custom schedulers** — Built by subclassing `TaskScheduler` for custom queuing logic."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using a custom TaskScheduler",
+        "language": "csharp",
+        "code": "public class LimitedConcurrencyLevelTaskScheduler : TaskScheduler\n{\n    [ThreadStatic]\n    private static bool _currentThreadIsProcessing;\n\n    private readonly int _maxDegreeOfParallelism;\n    private readonly Queue<Task> _tasks = new Queue<Task>();\n\n    public LimitedConcurrencyLevelTaskScheduler(int maxDegreeOfParallelism)\n    {\n        _maxDegreeOfParallelism = maxDegreeOfParallelism;\n    }\n\n    protected override IEnumerable<Task> GetScheduledTasks()\n    {\n        return _tasks.ToArray();\n    }\n\n    protected override void QueueTask(Task task)\n    {\n        lock (_tasks)\n        {\n            _tasks.Enqueue(task);\n        }\n        ThreadPool.QueueUserWorkItem(ProcessNext);\n    }\n\n    private void ProcessNext(object _)\n    {\n        if (_currentThreadIsProcessing)\n            return;\n\n        _currentThreadIsProcessing = true;\n        try\n        {\n            while (_tasks.Count > 0)\n            {\n                Task task;\n                lock (_tasks)\n                {\n                    task = _tasks.Dequeue();\n                }\n                TryExecuteTask(task);\n            }\n        }\n        finally\n        {\n            _currentThreadIsProcessing = false;\n        }\n    }\n}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Continuations"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding task scheduling and continuations is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A continuation is work that runs automatically when a task finishes. You create continuations with `ContinueWith` or by simply `await`-ing the task. Continuations capture the current `SynchronizationContext` by default, which means they may run on a specific thread (like the UI thread) unless told otherwise."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Continuation with ContinueWith",
+        "language": "csharp",
+        "code": "Task<int> computeTask = Task.Run(() => ComputeValue());\n\ncomputeTask.ContinueWith(antecedent =>\n{\n    Console.WriteLine($\"Result: {antecedent.Result}\");\n}, TaskScheduler.Default); // Runs on ThreadPool"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with task scheduling and continuations, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Prefer async/await over ContinueWith",
+        "text": "`ContinueWith` is powerful but easy to misuse. It does not catch exceptions automatically and can lead to unobserved exceptions. `async`/`await` composes continuations safely and reads more naturally."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "The default TaskScheduler uses the ThreadPool.",
+          "Custom schedulers can limit concurrency or change execution context.",
+          "Continuations run after a task completes.",
+          "`async`/`await` is generally safer than `ContinueWith`."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "threadpool-internals-and-thread-starvation",
+    "async-io-vs-cpu-bound-work",
+    "diagnosing-async-performance-problems"
+  ],
+  "furtherReading": [
+    { "title": "TaskScheduler Class (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskscheduler" },
+    { "title": "Chaining tasks by using continuations (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/standard-async/continuation-logic" }
+  ]
 }

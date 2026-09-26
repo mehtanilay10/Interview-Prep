@@ -4,33 +4,125 @@
   "moduleSlug": "c-net-follow-ups",
   "courseSlug": "interview-qa",
   "title": "Task.Run: when is it appropriate in an ASP.NET Core application?",
-  "description": "Interview question: Task.Run: when is it appropriate in an ASP.NET Core application?. Learn the answer with detailed explanation and examples.",
+  "description": "Understand when Task.Run is a legitimate tool in ASP.NET Core and when it harms scalability or hides blocking code.",
   "order": 6,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 24,
+  "tags": [
+    "task",
+    "thread-pool",
+    "scalability",
+    "aspnet-core",
+    "background-work"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Task.Run: when is it appropriate in an ASP.NET Core application?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with task.run: when is it appropriate in an asp.net core application?."
+        "text": "`Task.Run` queues work to the .NET thread pool. In a console app or desktop app, that is often exactly what you want. In ASP.NET Core, the answer is more nuanced because the server already manages a thread pool sized for incoming requests."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Using `Task.Run` inside a request handler can actually hurt throughput: it steals a thread from the request pool to run work that the caller already has a thread for. If the inner work is CPU-bound, you have gained nothing. If the inner work is I/O-bound, it should have been async all the way down."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "When it is appropriate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Task.Run` is appropriate when you need to offload CPU-bound work from a request thread and you have verified that doing so does not exhaust the pool. It is also appropriate in console apps, tests, and hosted background services where you control the threading model."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Valid uses in ASP.NET Core",
         "items": [
-          "Understand the fundamental principles of task.run: when is it appropriate in an asp.net core application?",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "A dedicated `BackgroundService` or `IHostedService` that processes work on its own schedule.",
+          "A short CPU-bound operation in a low-traffic admin endpoint where responsiveness matters more than maximum throughput.",
+          "Calling legacy synchronous APIs from an async context when no async alternative exists."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Task.Run in a background service",
+        "content": "Background services are the right place for long-running CPU work; they do not block request threads.",
+        "code": "public class ReportGenerator : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            // CPU-bound work is explicitly offloaded here.\n            await Task.Run(() => GenerateDailyReport(), stoppingToken);\n            await Task.Delay(TimeSpan.FromHours(1), stoppingToken);\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The fire-and-forget trap",
+        "text": "Do not start a Task.Run inside a controller action and return before it finishes. The request may end, the scope may dispose, and the background work may crash or leak resources."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Better alternatives"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For I/O-bound work, prefer native async APIs. For long-running background work, use `BackgroundService`, a message queue, or a hosted timer. These approaches keep the request thread pool clean and make failures observable."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Task.Run vs alternatives",
+        "cards": [
+          {
+            "title": "Task.Run in controller",
+            "description": "Offloads work to thread pool inside a request.",
+            "pros": [
+              "Quick way to keep a UI responsive"
+            ],
+            "cons": [
+              "Reduces request throughput",
+              "Can starve the thread pool",
+              "Risk of unobserved exceptions"
+            ]
+          },
+          {
+            "title": "BackgroundService",
+            "description": "Hosted background service with its own lifetime.",
+            "pros": [
+              "Does not block requests",
+              "Supports graceful shutdown",
+              "Easier to observe and log"
+            ],
+            "cons": [
+              "Requires explicit hosting setup"
+            ]
+          },
+          {
+            "title": "Message queue",
+            "description": "Offload work to an external worker.",
+            "pros": [
+              "Best scalability",
+              "Retry and dead-letter support",
+              "Decouples web tier from processing"
+            ],
+            "cons": [
+              "More infrastructure"
+            ]
+          }
         ]
       }
     },
@@ -38,25 +130,50 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "How to explain this in an interview"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding task.run: when is it appropriate in an asp.net core application? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A strong answer covers four points: what `Task.Run` does, why ASP.NET Core's thread pool makes it risky inside requests, where it is acceptable, and what alternative you would choose in each scenario. Mentioning `BackgroundService` and hosted services shows you understand the server model beyond the language feature."
       }
     },
     {
-      "type": "callout",
+      "type": "summary-box",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with task.run: when is it appropriate in an asp.net core application?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Key takeaways",
+        "points": [
+          "Avoid Task.Run inside ASP.NET Core request handlers unless the work is CPU-bound and short.",
+          "Use BackgroundService or a message queue for long-running background work.",
+          "Prefer async I/O over Task.Run for I/O-bound operations.",
+          "Always discuss the thread pool impact when evaluating Task.Run."
+        ],
+        "takeaway": "Task.Run is a thread pool scheduler, not a magic scalability tool for web requests."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation",
+    "valuetask-what-problem-does-it-solve-and-when-can-it-make-code-worse",
+    "concurrency-how-would-you-diagnose-a-race-condition-that-occurs-once-a-day"
+  ],
+  "furtherReading": [
+    {
+      "title": "Stephen Cleary — Task.Run Etiquette",
+      "url": "https://blog.stephencleary.com/2013/11/async-oops-i-did-it-again.html",
+      "type": "article"
+    },
+    {
+      "title": "Microsoft — Background tasks with hosted services",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article"
+    },
+    {
+      "title": "David Fowler — ASP.NET Core threading model",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/",
+      "type": "article"
+    }
+  ],
+  "technology": "C#"
 }

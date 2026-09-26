@@ -8,54 +8,212 @@
   "order": 4,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["timeout", "resilience", "circuit-breaker", "senior-engineer", "production"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Introduce downstream timeout** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with introduce downstream timeout."
+        "text": "A downstream service starts returning 500s or hanging, and your API threads pile up waiting for responses. Without timeout and circuit-breaker policies, a single slow dependency can cascade into a full outage. This lesson covers how to set timeouts, configure retries safely, and use circuit breakers to fail fast when a dependency is unhealthy."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Failure patterns"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of introduce downstream timeout",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "No timeout on HTTP or database calls, causing threads to wait indefinitely",
+          "Aggressive retries that amplify load on an already struggling downstream",
+          "Missing fallback behavior when the dependency returns errors",
+          "Thread pool starvation under sustained high latency, making the entire app unresponsive",
+          "Timeout values that are longer than the load balancer or reverse proxy timeout, causing silent connection drops"
         ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Circuit breaker",
+            "definition": "A pattern that stops sending requests to an unhealthy dependency after a threshold of failures is reached, allowing it time to recover."
+          },
+          {
+            "term": "Retry storm",
+            "definition": "A situation where multiple clients simultaneously retry failed requests, overwhelming the recovering service."
+          },
+          {
+            "term": "Bulkhead",
+            "definition": "Isolating resources such as thread pools or connection pools per dependency so one failing service cannot consume all capacity."
+          },
+          {
+            "term": "Timeout",
+            "definition": "A maximum allowed duration for an operation; exceeding it triggers cancellation or a fallback path."
+          },
+          {
+            "term": "Backpressure",
+            "definition": "Signaling to upstream callers that the system is overloaded so they can slow down rather than queue indefinitely."
+          }
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest default is a short timeout, no automatic retry, and an explicit fallback. Add retry only after you understand the failure mode. Retry is appropriate for transient network errors and 503s; it is not appropriate for 400s, 401s, or 409s. Retrying a failed write without idempotency guarantees can create duplicate records."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Polly timeout and retry policy",
+        "content": "A defensive HTTP policy in ASP.NET Core using Polly:",
+        "code": "var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(\n    TimeSpan.FromSeconds(5),\n    TimeoutStrategy.Pessimistic);\n\nvar retryPolicy = Policy<HttpResponseMessage>\n    .Handle<TimeoutRejectedException>()\n    .OrResult(r => (int)r.StatusCode == 503)\n    .WaitAndRetryAsync(3, retryAttempt =>\n        TimeSpan.FromMilliseconds(200 * Math.Pow(2, retryAttempt)),\n        onRetry: (outcome, timespan, retryNumber, context) =>\n        {\n            _logger.LogWarning(\n                \"Retry {Retry} for {Url} after {Ms}ms\",\n                retryNumber, context[\"url\"], timespan.TotalMilliseconds);\n            return Task.CompletedTask;\n        });\n\nvar circuitBreaker = Policy<HttpResponseMessage>\n    .Handle<HttpRequestException>()\n    .CircuitBreakerAsync(2, TimeSpan.FromMinutes(1));",
+        "language": "csharp"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Policy selection guide"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding introduce downstream timeout is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Set timeouts shorter than every upstream timeout in the call chain",
+          "Use exponential backoff with jitter for retries to avoid synchronized retries",
+          "Configure circuit breakers with failure thresholds and recovery windows appropriate to the dependency SLO",
+          "Add fallbacks or graceful degradation for user-facing requests",
+          "Test policies with chaos testing or fault injection before relying on them"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Resilience library options",
+        "cards": [
+          {
+            "title": "Polly",
+            "description": "Mature .NET resilience library with timeout, retry, circuit breaker, and bulkhead.",
+            "pros": ["Widely adopted in .NET", "Composable policies", "Good documentation"],
+            "cons": ["Manual composition required", "No built-in distributed tracing integration"]
+          },
+          {
+            "title": "Resilience4j",
+            "description": "Lightweight fault-tolerance library inspired by Hystrix for JVM ecosystems.",
+            "pros": ["Functional and reactive APIs", "Built-in metrics via Micrometer", "Small surface area"],
+            "cons": ["Primarily Java/Kotlin", "Requires manual wiring in .NET if used interop"]
+          },
+          {
+            "title": "YARP with health probes",
+            "description": "Reverse proxy with built-in passive and active health checks.",
+            "pros": ["Removes unhealthy nodes automatically", "Integrated with ASP.NET Core", "Supports session affinity"],
+            "cons": ["Only solves proxy-level failures", "Does not replace application-level resilience"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-circuit-breaker-states",
+        "caption": "Circuit breaker state transitions under request load",
+        "definition": "stateDiagram-v2\n    [*] --> Closed\n    Closed --> Open: Failure threshold exceeded\n    Open --> HalfOpen: Recovery timeout elapsed\n    HalfOpen --> Closed: Test request succeeds\n    HalfOpen --> Open: Test request fails\n\n    note right of Closed\n        Normal operation.\n        Requests pass through.\n        Failures are counted.\n    end note\n\n    note right of Open\n        Fast-fail all requests.\n        Downstream is considered\n        unhealthy.\n    end note\n\n    note right of HalfOpen\n        Allow one test request.\n        If it succeeds, close the\n        circuit. Otherwise, reopen.\n    end note"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with introduce downstream timeout, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "info",
+        "title": "Timeouts must be end-to-end",
+        "text": "If your API timeout is 30 seconds but the load balancer kills connections at 15 seconds, the client sees a connection drop rather than a timeout. Document and enforce timeout budgets across every hop in the request path."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frequently asked questions"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "What timeout should I use for HTTP calls?",
+            "answer": "Start with 5 to 10 seconds for internal services and 2 to 5 seconds for external APIs. The exact value should be shorter than the caller's timeout to leave room for fallback logic. Measure actual p99 latency before deciding."
+          },
+          {
+            "question": "Should I retry on all 5xx errors?",
+            "answer": "Retry on 503 Service Unavailable and occasionally 502 Bad Gateway. Do not retry 500 unless you know it is transient. Retrying 504 Gateway Timeout is risky because the downstream may have processed the request."
+          },
+          {
+            "question": "How do I test resilience policies without breaking production?",
+            "answer": "Use fault injection in integration tests. Libraries like Polly.Testing and ASP.NET Core's TestServer let you simulate timeouts, 500s, and latency. Run these in CI on every PR that touches resilience code."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add resilience to an existing HTTP client",
+        "description": "Take an existing HttpClient call that has no timeout or retry. Add a timeout, exponential backoff retry, and circuit breaker. Explain the rationale for each value you chose.",
+        "steps": [
+          "Measure current p95 and p99 latency for the dependency",
+          "Set timeout to 1.5x p99 with a hard ceiling of 10 seconds",
+          "Add retry only for timeout and 503 responses",
+          "Configure circuit breaker based on the dependency's error budget",
+          "Write a test that verifies the circuit opens after repeated failures"
+        ],
+        "expectedOutcome": "You should have a resilient client with documented timeout, retry, and circuit-breaker settings, plus a test that proves the behavior."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Timeouts protect thread pools and user experience",
+          "Retry only transient failures; retrying non-idempotent writes causes duplicates",
+          "Circuit breakers fail fast and let unhealthy dependencies recover",
+          "Test resilience policies with fault injection",
+          "Document the timeout budget across every service hop"
+        ],
+        "takeaway": "Resilience is not about preventing failures. It is about preventing failures from spreading. A senior engineer designs systems assuming every dependency will fail and ensures the blast radius stays bounded."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "baseline-healthy-application-and-telemetry",
+    "introduce-cache-failure",
+    "introduce-broken-deployment",
+    "investigate-using-logs-metrics-and-traces"
+  ],
+  "furtherReading": [
+    {
+      "title": "Release It! by Michael Nygard",
+      "url": "https://pragprog.com/book/mnee2/release-it-second-edition",
+      "type": "book",
+      "author": "Michael Nygard",
+      "description": "The definitive guide to production-ready patterns including circuit breakers, bulkheads, and timeouts."
+    },
+    {
+      "title": "Polly Documentation",
+      "url": "https://www.pollydocs.org/",
+      "type": "tool",
+      "author": "Polly Contributors",
+      "description": "Official documentation for the .NET resilience and transient-fault-handling library."
+    }
+  ]
 }

@@ -3,34 +3,40 @@
   "slug": "authentication-in-apis",
   "moduleSlug": "full-stack-api-design",
   "courseSlug": "next-js-full-stack-react",
-  "title": "authentication-in-apis",
-  "description": "Learn about authentication-in-apis. Master the concepts, patterns, and best practices.",
+  "title": "Authentication in APIs",
+  "description": "Learn how to protect API endpoints with JWT, sessions, and NextAuth.js so only authorized users can access protected resources.",
   "order": 6,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["auth", "jwt", "nextauth"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**authentication-in-apis** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with authentication-in-apis."
+        "text": "Authentication answers one question: who is calling this API? Without it, anyone on the internet could read or modify your data. In Next.js, you can protect Route Handlers and API Routes using sessions, JWTs, or both."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Sessions vs Tokens"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sessions store user state on the server and hand the client a session ID cookie. Tokens, usually JWTs, store the user data inside the token itself. NextAuth.js supports both and handles the hard parts like cookie encryption and token refresh."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of authentication-in-apis",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Sessions: server stores state, client holds a session cookie",
+          "JWTs: client holds a self-contained token with user claims",
+          "NextAuth.js abstracts both so you can switch strategies later",
+          "Cookies should be `httpOnly`, `secure`, and `sameSite` in production"
         ]
       }
     },
@@ -38,24 +44,97 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Getting the Session in a Route Handler"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding authentication-in-apis is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "NextAuth.js provides `getServerSession` to read the current session inside any server-side code. Use it at the top of your Route Handler to reject unauthenticated requests before doing any work."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Protecting a Route Handler with NextAuth",
+        "code": "// app/api/posts/route.ts\nimport { NextResponse } from \"next/server\";\nimport { getServerSession } from \"next-auth\";\nimport { authOptions } from \"@/lib/auth\";\n\nexport async function POST(request: Request) {\n  const session = await getServerSession(authOptions);\n\n  if (!session?.user?.id) {\n    return NextResponse.json(\n      { success: false, error: { code: \"UNAUTHORIZED\", message: \"Please sign in\" } },\n      { status: 401 }\n    );\n  }\n\n  const body = await request.json();\n  const post = await db.post.create({\n    data: {\n      ...body,\n      authorId: session.user.id,\n    },\n  });\n\n  return NextResponse.json({ post }, { status: 201 });\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Role-Based Access"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sometimes you need more than 'is the user signed in?' You may need to check whether the user is an admin, a team member, or the owner of a resource. Store roles or permissions in the session and check them explicitly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Checking user role in an API route",
+        "code": "// lib/auth.ts\nexport const authOptions: AuthOptions = {\n  // ... providers, callbacks, etc.\n  callbacks: {\n    async session({ session, token }) {\n      if (session.user) {\n        session.user.role = token.role as string;\n      }\n      return session;\n    },\n  },\n};\n\n// app/api/admin/users/route.ts\nexport async function GET() {\n  const session = await getServerSession(authOptions);\n\n  if (session?.user?.role !== \"ADMIN\") {\n    return NextResponse.json(\n      { success: false, error: { code: \"FORBIDDEN\", message: \"Admin access required\" } },\n      { status: 403 }\n    );\n  }\n\n  const users = await db.user.findMany();\n  return NextResponse.json({ users });\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with authentication-in-apis, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Never Trust the Client",
+        "text": "A user can edit cookies, modify local storage, or change headers in their browser. Always enforce authorization on the server, even if you have client-side checks. The server is the only authority."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Passing Credentials from the Client"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When calling a protected API from the browser, the session cookie is sent automatically if it is `sameSite: lax` or `sameSite: strict`. For cross-origin requests, set `credentials: 'include'` in `fetch` and configure CORS to allow the origin and credentials."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fetching a protected API with credentials",
+        "code": "// app/components/ProfileButton.tsx\n\"use client\";\n\nasync function loadProfile() {\n  const res = await fetch(\"https://yourdomain.com/api/profile\", {\n    credentials: \"include\",\n  });\n\n  if (res.status === 401) {\n    // redirect to login or show sign-in prompt\n    return;\n  }\n\n  const data = await res.json();\n  console.log(data);\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "items": [
+          "Use `getServerSession` in Route Handlers to identify the caller",
+          "Return 401 for missing auth and 403 for insufficient permissions",
+          "Store roles in the session callback if you need access control",
+          "Never rely on client-side checks alone; always verify on the server"
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["error-handling", "rate-limiting", "request-validation"],
+  "furtherReading": [
+    {
+      "title": "NextAuth.js Documentation",
+      "url": "https://next-auth.js.org/",
+      "type": "article"
+    },
+    {
+      "title": "JWT.io Introduction",
+      "url": "https://jwt.io/introduction",
+      "type": "article"
+    }
+  ]
 }

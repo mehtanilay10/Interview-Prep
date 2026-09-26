@@ -4,58 +4,200 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 4: SQL schema, EF Core and transaction boundaries",
-  "description": "Project: Phase 4: SQL schema, EF Core and transaction boundaries. Build and understand this project with step-by-step guidance.",
+  "description": "Design the SQL Server schema with proper indexes, foreign keys, soft-delete, and audit columns. Configure EF Core with owned types, value converters, and explicit transaction boundaries using the unit-of-work pattern.",
   "order": 4,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "sql-server",
+    "ef-core",
+    "transactions",
+    "unit-of-work",
+    "soft-delete",
+    "indexing"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 4: SQL schema, EF Core and transaction boundaries** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 4: sql schema, ef core and transaction boundaries."
+        "text": "The database schema is the longest-lived artifact in your system. A schema designed around CRUD convenience will become a liability when you need to add audit trails, multi-tenancy, or historical reporting. This phase locks in the physical model and the transaction guarantees your business logic depends on."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Schema design principles"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Principles",
         "items": [
-          "Understand the fundamental principles of phase 4: sql schema, ef core and transaction boundaries",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Every table has CreatedAt, CreatedBy, UpdatedAt, UpdatedBy, IsDeleted, DeletedAt for audit and soft-delete.",
+          "All foreign keys are explicit; never rely on conventions alone.",
+          "Natural keys (e.g., ExpenseReport.Id) are GUIDs; surrogate keys are identity ints for junction tables.",
+          "Covering indexes on high-frequency query paths; filtered indexes on IsDeleted = 0."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL: ExpenseReports table schema",
+        "content": "Use SEQUENTIAL GUIDs (NEWSEQUENTIALID) for better index fragmentation than random GUIDs.",
+        "language": "sql",
+        "code": "CREATE TABLE Organizations (\n    Id UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID() PRIMARY KEY,\n    Name NVARCHAR(200) NOT NULL,\n    Slug NVARCHAR(100) NOT NULL UNIQUE,\n    Currency CHAR(3) NOT NULL DEFAULT 'USD',\n    CreatedAt DATETIMEOFFSET NOT NULL DEFAULT SYSUTCDATETIME(),\n    CreatedBy NVARCHAR(200) NOT NULL,\n    UpdatedAt DATETIMEOFFSET NULL,\n    UpdatedBy NVARCHAR(200) NULL,\n    IsDeleted BIT NOT NULL DEFAULT 0,\n    DeletedAt DATETIMEOFFSET NULL\n);\n\nCREATE TABLE ExpenseReports (\n    Id UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID() PRIMARY KEY,\n    OrganizationId UNIQUEIDENTIFIER NOT NULL FOREIGN KEY REFERENCES Organizations(Id),\n    EmployeeId UNIQUEIDENTIFIER NOT NULL FOREIGN KEY REFERENCES Users(Id),\n    Status INT NOT NULL DEFAULT 0,\n    TotalAmount DECIMAL(18,2) NOT NULL,\n    Currency CHAR(3) NOT NULL DEFAULT 'USD',\n    SubmittedAt DATETIMEOFFSET NULL,\n    ApprovedAt DATETIMEOFFSET NULL,\n    CreatedAt DATETIMEOFFSET NOT NULL DEFAULT SYSUTCDATETIME(),\n    CreatedBy NVARCHAR(200) NOT NULL,\n    UpdatedAt DATETIMEOFFSET NULL,\n    UpdatedBy NVARCHAR(200) NULL,\n    IsDeleted BIT NOT NULL DEFAULT 0,\n    DeletedAt DATETIMEOFFSET NULL\n);\n\nCREATE INDEX IX_ExpenseReports_Org_Status\n    ON ExpenseReports (OrganizationId, Status)\n    WHERE IsDeleted = 0;\n\nCREATE TABLE LineItems (\n    Id INT IDENTITY(1,1) PRIMARY KEY,\n    ExpenseReportId UNIQUEIDENTIFIER NOT NULL FOREIGN KEY REFERENCES ExpenseReports(Id) ON DELETE CASCADE,\n    Category INT NOT NULL,\n    Amount DECIMAL(18,2) NOT NULL,\n    Currency CHAR(3) NOT NULL DEFAULT 'USD',\n    TransactionDate DATE NOT NULL,\n    Description NVARCHAR(500) NULL,\n    RequiresReceipt BIT NOT NULL DEFAULT 0,\n    CreatedAt DATETIMEOFFSET NOT NULL DEFAULT SYSUTCDATETIME()\n);\n\nCREATE INDEX IX_LineItems_ReportId ON LineItems (ExpenseReportId);"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "EF Core DbContext configuration"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 4: sql schema, ef core and transaction boundaries is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Configure owned types for Money, value converters for enums, and global query filters for soft-delete. Keep the DbContext in Infrastructure, not Domain."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: ExpenseDbContext configuration",
+        "content": "Use Fluent API exclusively for complex mappings. Data annotations are fine for simple cases, but Fluent API keeps mapping logic in one place and survives model refactoring.",
+        "language": "csharp",
+        "code": "public class ExpenseDbContext(DbContextOptions<ExpenseDbContext> options) : DbContext(options)\n{\n    public DbSet<ExpenseReport> ExpenseReports => Set<ExpenseReport>();\n    public DbSet<LineItem> LineItems => Set<LineItem>();\n    public DbSet<Organization> Organizations => Set<Organization>();\n    public DbSet<Department> Departments => Set<Department>();\n    public DbSet<PolicyRule> PolicyRules => Set<PolicyRule>();\n\n    protected override void OnModelCreating(ModelBuilder model)\n    {\n        model.ApplyConfigurationsFromAssembly(typeof(ExpenseDbContext).Assembly);\n\n        model.Entity<ExpenseReport>(e =>\n        {\n            e.ToTable(\"ExpenseReports\");\n            e.HasKey(x => x.Id);\n            e.Property(x => x.Id)\n                .ValueGeneratedOnAdd()\n                .HasDefaultValueSql(\"NEWSEQUENTIALID()\");\n            e.OwnsOne(x => x.TotalAmount, money =>\n            {\n                money.Property(p => p.Amount).HasColumnName(\"TotalAmount\");\n                money.Property(p => p.Currency).HasColumnName(\"Currency\");\n            });\n            e.HasIndex(x => new { x.OrganizationId, x.Status })\n                .HasFilter(\"IsDeleted = 0\");\n            e.HasMany(x => x.LineItems)\n                .WithOne()\n                .HasForeignKey(x => x.ExpenseReportId)\n                .OnDelete(DeleteBehavior.Cascade);\n            e.HasMany(x => x.Approvals)\n                .WithOne()\n                .HasForeignKey(x => x.ExpenseReportId)\n                .OnDelete(DeleteBehavior.Restrict);\n        });\n\n        model.Entity<LineItem>(e =>\n        {\n            e.ToTable(\"LineItems\");\n            e.HasKey(x => x.Id);\n            e.Property(x => x.Id).UseIdentityColumn();\n            e.Property(x => x.Category)\n                .HasConversion<string>()\n                .HasMaxLength(50);\n            e.Property(x => x.Amount).HasColumnType(\"DECIMAL(18,2)\");\n            e.HasIndex(x => x.ExpenseReportId);\n        });\n\n        model.Entity<Organization>(e =>\n        {\n            e.ToTable(\"Organizations\");\n            e.HasIndex(x => x.Slug).IsUnique();\n        });\n\n        model.Entity<PolicyRule>(e =>\n        {\n            e.ToTable(\"PolicyRules\");\n            e.HasIndex(x => new { x.OrganizationId, x.Category })\n                .HasFilter(\"IsDeleted = 0 AND IsActive = 1\");\n        });\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Unit of work and transaction boundaries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core's DbContext is technically a unit of work and DbSet is a repository, but we wrap them in explicit abstractions for two reasons: testability (swap EF Core for an in-memory provider in tests) and explicit transaction control across multiple repositories."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: UnitOfWork implementation with ambient transaction",
+        "content": "Begin a transaction at the handler level and commit only if all domain operations succeed.",
+        "language": "csharp",
+        "code": "public interface IUnitOfWork : IDisposable, IAsyncDisposable\n{\n    Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default);\n    Task<int> SaveChangesAsync(CancellationToken ct = default);\n}\n\npublic sealed class EfCoreUnitOfWork(ExpenseDbContext db) : IUnitOfWork\n{\n    public async Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default)\n    {\n        var tx = await db.Database.BeginTransactionAsync(ct);\n        return new EfCoreTransaction(tx);\n    }\n\n    public async Task<int> SaveChangesAsync(CancellationToken ct = default)\n    {\n        return await db.SaveChangesAsync(ct);\n    }\n\n    public void Dispose() => db.Dispose();\n    public async ValueTask DisposeAsync() => await db.DisposeAsync();\n}\n\npublic sealed class EfCoreTransaction : ITransaction\n{\n    private readonly IDbContextTransaction _tx;\n    public EfCoreTransaction(IDbContextTransaction tx) => _tx = tx;\n    public async Task CommitAsync(CancellationToken ct = default)\n        => await _tx.CommitAsync(ct);\n    public async Task RollbackAsync(CancellationToken ct = default)\n        => await _tx.RollbackAsync(ct);\n    public ValueTask DisposeAsync() => _tx.DisposeAsync();\n}"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 4: sql schema, ef core and transaction boundaries, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Transaction scope matters",
+        "text": "If a handler calls two repositories, and one fails after the other succeeded, you have a data integrity bug. Always wrap multi-repository work in an explicit transaction. MediatR pipeline behaviors are a clean place to do this automatically."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-transaction",
+        "caption": "Transaction boundary in ApproveExpenseReport flow",
+        "definition": "sequenceDiagram\n    participant H as ApproveExpenseReportHandler\n    participant R as IExpenseReportRepository\n    participant E as ExpenseReport (Domain)\n    participant U as IUnitOfWork\n    participant D as Database\n\n    H->>U: BeginTransactionAsync()\n    U->>D: BEGIN TRANSACTION\n    H->>R: GetByIdAsync(id)\n    R->>D: SELECT ...\n    D->>R: ExpenseReport\n    R->>H: expenseReport\n    H->>E: Approve(approverId)\n    E->>E: Validate & raise domain event\n    H->>R: UpdateAsync(expenseReport)\n    R->>D: UPDATE ExpenseReports SET ...\n    H->>U: SaveChangesAsync()\n    U->>D: COMMIT TRANSACTION\n    H->>H: Publish domain events"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Seeding and migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core migrations are source-controlled and applied via `dotnet ef database update` in CI/CD. Seed data for roles, permissions, and default policy rules should be idempotent."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Idempotent seed data",
+        "content": "Seed methods must be safe to run multiple times without duplicating records.",
+        "language": "csharp",
+        "code": "public static class DbSeeder\n{\n    public static async Task SeedAsync(ExpenseDbContext db, CancellationToken ct)\n    {\n        if (!await db.Organizations.AnyAsync(ct))\n        {\n            var org = new Organization(\"Acme Corp\", \"acme-corp\", Currency.USD);\n            db.Organizations.Add(org);\n\n            var travel = new PolicyRule(org.Id, LineItemCategory.Travel, maxAmount: 500m, requiresReceipt: true);\n            var meals = new PolicyRule(org.Id, LineItemCategory.Meals, maxAmount: 75m, requiresReceipt: false);\n            db.PolicyRules.AddRange([travel, meals]);\n\n            await db.SaveChangesAsync(ct);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 4 deliverables",
+        "items": [
+          {
+            "text": "SQL Server tables for Organizations, Users, Departments, ExpenseReports, LineItems, Approvals, PolicyRules, Receipts."
+          },
+          {
+            "text": "EF Core DbContext with owned types (Money), value converters (enums), and global query filters."
+          },
+          {
+            "text": "Soft-delete implemented with IsDeleted + DeletedAt + global filter."
+          },
+          {
+            "text": "Covering and filtered indexes for common query paths."
+          },
+          {
+            "text": "IUnitOfWork + ITransaction abstractions with EfCore implementations."
+          },
+          {
+            "text": "At least one integration test proving a transaction rolls back on handler failure."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 4 summary",
+        "points": [
+          "Schema is the longest-lived artifact — invest in indexes and audit columns now.",
+          "Soft-delete is non-negotiable for financial data; never hard-delete an expense report.",
+          "EF Core owned types map value objects cleanly to single columns or complex types.",
+          "Explicit transaction boundaries prevent partial writes when multiple repositories are involved."
+        ],
+        "takeaway": "A well-designed schema makes the rest of the application easier. A poorly designed one forces you to add triggers, compensating transactions, or application-level rollbacks later."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Microsoft: EF Core relational modeling",
+      "url": "https://learn.microsoft.com/en-us/ef/core/modeling/",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Microsoft: Transactions in EF Core",
+      "url": "https://learn.microsoft.com/en-us/ef/core/saving/transactions",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "SQL Server: Index design guide",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "NEWSEQUENTIALID (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/functions/newsequentialid-transact-sql",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

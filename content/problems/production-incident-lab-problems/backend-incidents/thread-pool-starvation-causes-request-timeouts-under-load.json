@@ -4,33 +4,62 @@
   "moduleSlug": "backend-incidents",
   "courseSlug": "production-incident-lab-problems",
   "title": "Thread pool starvation causes request timeouts under load",
-  "description": "Problem: Thread pool starvation causes request timeouts under load. Solve this problem with multiple approaches and detailed explanations.",
+  "description": "Diagnose thread pool starvation in a backend service caused by blocking I/O, sync-over-async, or thread pool misconfiguration, and apply async patterns and thread pool tuning.",
   "order": 3,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
-  "tags": [],
+  "tags": ["thread-pool", "async-await", "blocking-io", "starvation", "timeout", "dotnet"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Thread pool starvation causes request timeouts under load** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with thread pool starvation causes request timeouts under load."
+        "text": "Under moderate traffic, your API starts returning 504 and 503 errors. CPU usage is only 30%, but request latency climbs steadily and eventually times out. Thread dump analysis reveals that 95% of worker threads are blocked on I/O operations. The service is not CPU-bound; it is thread-pool-starved because blocking calls are holding threads hostage."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Symptoms of thread pool starvation"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of thread pool starvation causes request timeouts under load",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "CPU utilization is low despite high request latency",
+          "Thread pool queue length grows continuously under load",
+          "Active thread count is at or near the maximum",
+          "Thread dumps show most threads blocked on I/O: network, file, or database calls",
+          "Response times increase linearly with concurrent request count",
+          "Timeouts occur only during traffic spikes, not at baseline"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Thread pool starvation",
+            "definition": "A condition where all worker threads are busy, so new work items queue indefinitely."
+          },
+          {
+            "term": "Blocking I/O",
+            "definition": "Synchronous operations that hold a thread while waiting for external resources such as disk, network, or database."
+          },
+          {
+            "term": "Async/await",
+            "definition": "Language-level asynchronous programming that frees threads while waiting for I/O to complete."
+          },
+          {
+            "term": "Synchronization context",
+            "definition": "A context object that controls how async continuations are scheduled, important in UI and legacy server frameworks."
+          },
+          {
+            "term": "Completion port",
+            "definition": "A Windows kernel mechanism that efficiently handles many concurrent I/O operations with a small number of threads."
+          }
         ]
       }
     },
@@ -38,24 +67,115 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Common causes in .NET"
       }
     },
     {
-      "type": "paragraph",
+      "type": "bullet-list",
       "data": {
-        "text": "Understanding thread pool starvation causes request timeouts under load is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "items": [
+          "Task.Wait() or .Result is called on an async method, blocking the calling thread",
+          "A synchronous file or network API is used inside an async controller action",
+          "ThreadPool.SetMinThreads is left at the default, which is too low for bursty workloads",
+          "Long-running CPU work is offloaded to the thread pool with Task.Run instead of ValueTask",
+          "A third-party library uses blocking I/O internally and is not fully async"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Synchronous vs asynchronous request handling",
+        "cards": [
+          {
+            "title": "Synchronous blocking",
+            "description": "Each request holds a thread for the entire duration, including I/O wait.",
+            "pros": ["Simple to reason about", "No async/await complexity"],
+            "cons": ["One thread per concurrent request", "Thread pool exhaustion under load", "High memory overhead"]
+          },
+          {
+            "title": "Async/await",
+            "description": "Thread is released during I/O and returned to the pool; a thread resumes the request when data arrives.",
+            "pros": ["Scales to thousands of concurrent I/O-bound requests", "Low thread count under load", "Better resource utilization"],
+            "cons": ["Debugging async flows is harder", "Deadlocks possible with sync-over-async"]
+          },
+          {
+            "title": "Thread pool tuning",
+            "description": "Manually adjust minimum and maximum thread counts.",
+            "pros": ["Quick fix for bursty workloads", "No code changes required"],
+            "cons": ["Does not fix blocking code", "Can cause thread thrashing if misconfigured"]
+          },
+          {
+            "title": "Dedicated I/O threads",
+            "description": "Use a custom TaskScheduler or channel-based pipeline for I/O work.",
+            "pros": ["Isolates I/O from request threads", "Better control over concurrency"],
+            "cons": ["Complex implementation", "Hard to debug"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sync-over-async deadlock and starvation",
+        "content": "Calling .Result on an async method blocks the synchronization context:",
+        "code": "// Blocking: holds a thread while waiting\npublic IActionResult GetData()\n{\n    var data = _service.GetDataAsync().Result; // Blocks thread!\n    return Ok(data);\n}\n\n// Async: frees the thread while waiting\npublic async Task<IActionResult> GetData()\n{\n    var data = await _service.GetDataAsync();\n    return Ok(data);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-thread-pool-starvation",
+        "caption": "Thread pool starvation progression under load",
+        "definition": "graph TD\n    A[10 requests arrive] --> B[10 threads assigned]\n    B --> C[All threads call downstream API]\n    C --> D[Threads blocked on I/O]\n    D --> E[50 more requests arrive]\n    E --> F[No threads available]\n    F --> G[Requests queue in ThreadPool]\n    G --> H[Queue grows to 500]\n    H --> I[503/504 timeouts returned]\n    I --> J[Client retries]\n    J --> E"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with thread pool starvation causes request timeouts under load, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Async/await is not just for scalability",
+        "text": "In ASP.NET Core, async/await is the default for a reason. Even a single blocking call in middleware or a filter can starve the thread pool and affect all requests. Audit third-party libraries for synchronous APIs before adding them to your critical path."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Diagnose thread pool starvation with a thread dump",
+        "description": "Generate load against an API with an intentional blocking call. Capture a thread dump and identify the starvation pattern.",
+        "steps": [
+          "Create an API with an endpoint that calls Task.Delay(5000).Result",
+          "Run a load test with 100 concurrent requests",
+          "Capture a thread dump using dotnet-dump or ProcDump",
+          "Identify the percentage of threads blocked on the Result call",
+          "Fix the endpoint to use await and verify thread count drops under load"
+        ],
+        "expectedOutcome": "You should see most threads blocked on the sync-over-async call before the fix, and a healthy thread count after converting to await."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Thread pool starvation presents as high latency with low CPU",
+          "Use thread dumps to confirm that threads are blocked on I/O",
+          "Convert blocking calls to async/await all the way down",
+          "Tune ThreadPool.SetMinThreads only after removing blocking code"
+        ],
+        "takeaway": "A thread blocked on I/O is wasted capacity. Async/await lets a single thread serve thousands of concurrent requests by releasing it during wait time."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Threading in C#",
+      "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on threading, the thread pool, and async programming in .NET."
+    }
+  ]
 }

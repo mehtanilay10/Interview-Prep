@@ -13,24 +13,53 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a frontend authentication implementation storing sensitive tokens unsafely** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a frontend authentication implementation storing sensitive tokens unsafely."
+        "text": "**Review a frontend authentication implementation storing sensitive tokens unsafely** is a critical security review. Access tokens, refresh tokens, and session secrets must be stored in a way that balances usability with protection against XSS, CSRF, and token theft. A senior review should identify where tokens live, how they are transmitted, and what happens when a user closes the tab."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Where tokens should not live"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a frontend authentication implementation storing sensitive tokens unsafely",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "localStorage: accessible to any script on the page, including injected XSS payloads",
+          "sessionStorage: slightly better because it is cleared on tab close, but still vulnerable to XSS",
+          "window.name: persists across navigation and is trivially readable by any script",
+          "URL query parameters: logged by servers, proxies, and browser history",
+          "Non-HttpOnly cookies without Secure and SameSite flags: vulnerable to CSRF and network interception",
+          "Redux or global state: adds unnecessary exposure and leaks tokens through DevTools"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "XSS",
+            "definition": "Cross-site scripting. An attacker injects script into a trusted page, allowing them to read tokens, cookies, or other sensitive data."
+          },
+          {
+            "term": "CSRF",
+            "definition": "Cross-site request forgery. An attacker tricks a user's browser into sending an authenticated request to your server."
+          },
+          {
+            "term": "HttpOnly cookie",
+            "definition": "A cookie with the HttpOnly flag, which prevents JavaScript from reading it via document.cookie. It is the primary defense against token theft via XSS."
+          },
+          {
+            "term": "SameSite",
+            "definition": "A cookie attribute that controls when the browser sends cookies with cross-site requests. Strict and Lax modes mitigate CSRF."
+          },
+          {
+            "term": "Refresh token rotation",
+            "definition": "Issuing a new refresh token on every use and invalidating the old one. Limits the blast radius of a stolen refresh token."
+          }
         ]
       }
     },
@@ -38,24 +67,175 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The storage trade-offs"
       }
     },
     {
-      "type": "paragraph",
+      "type": "comparison-cards",
       "data": {
-        "text": "Understanding review a frontend authentication implementation storing sensitive tokens unsafely is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Token storage options",
+        "cards": [
+          {
+            "title": "localStorage / sessionStorage",
+            "description": "Client-side storage accessible via JavaScript.",
+            "pros": ["Simple API", "Persists across reloads", "Easy to read in dev"],
+            "cons": ["Vulnerable to XSS", "Accessible to any script", "No built-in CSRF protection"]
+          },
+          {
+            "title": "HttpOnly cookie",
+            "description": "Cookie inaccessible to JavaScript, sent automatically with requests.",
+            "pros": ["Immune to XSS token theft", "Automatic transmission", "Supports Secure and SameSite"],
+            "cons": ["Vulnerable to CSRF without SameSite", "Requires CSRF token for write operations"]
+          },
+          {
+            "title": "In-memory only",
+            "description": "Token stored in a React ref or variable, lost on refresh.",
+            "pros": ["No persistent theft target", "Automatic cleanup on close"],
+            "cons": ["User is logged out on refresh", "Cannot share across tabs", "Poor UX for most apps"]
+          },
+          {
+            "title": "IndexedDB with encryption",
+            "description": "Encrypted storage accessible only through a dedicated bridge.",
+            "pros": ["Large capacity", "Can encrypt at rest", "Not trivially readable"],
+            "cons": ["Complex to implement correctly", "Key management is hard", "Still accessible if encryption key is in JS"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a frontend authentication implementation storing sensitive tokens unsafely, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "localStorage is not a secret vault",
+        "text": "Any JavaScript running on your page can read localStorage. If your site has an XSS vulnerability, the attacker does not need to hack the network—they just call localStorage.getItem('token'). Use HttpOnly cookies for access tokens whenever possible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recommended auth flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The most secure frontend pattern stores the access token in an HttpOnly, Secure, SameSite cookie. The refresh token is also HttpOnly. The backend handles token refresh transparently on 401 responses. CSRF is mitigated by SameSite=Lax and a double-submit CSRF cookie for sensitive write operations."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-auth-flow",
+        "caption": "Recommended authentication flow with HttpOnly cookies",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant C as Client\n    participant S as Server\n    U->>C: Enter credentials\n    C->>S: POST /login (body: email, password)\n    S->>S: Validate credentials\n    S->>C: Set-Cookie: accessToken (HttpOnly, Secure, SameSite=Lax)\n    S->>C: Set-Cookie: refreshToken (HttpOnly, Secure, SameSite=Lax)\n    C->>S: GET /api/data (cookie sent automatically)\n    S->>S: Validate accessToken\n    S->>C: 200 OK + data\n    C->>U: Render data\n    Note over C,S: On 401: POST /refresh with refreshToken cookie\n    S->>C: 200 OK + new accessToken cookie\n    S->>C: 401 Unauthorized (refresh also expired)\n    C->>U: Redirect to /login"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Storing the access token in Redux and logging it to the console for debugging",
+          "Passing the token in URL query parameters for deep links",
+          "Using the same token for API calls and third-party analytics",
+          "Skipping CSRF tokens because 'our API only accepts JSON'",
+          "Setting long-lived access tokens without a refresh mechanism",
+          "Not validating the token audience or issuer on the backend"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Insecure: token in localStorage",
+        "content": "This implementation stores the token in localStorage, making it trivially accessible to any XSS payload:",
+        "code": "function useAuth() {\n  const [token, setToken] = useState(() =>\n    localStorage.getItem('access_token')\n  );\n\n  const login = async (email: string, password: string) => {\n    const res = await fetch('/api/login', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ email, password }),\n    });\n    const data = await res.json();\n    localStorage.setItem('access_token', data.accessToken);\n    setToken(data.accessToken);\n  };\n\n  return { token, login };\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Better: server-managed cookies",
+        "content": "When the server sets HttpOnly cookies, the client never sees the token. The request is authenticated automatically:",
+        "code": "function useAuth() {\n  const login = async (email: string, password: string) => {\n    await fetch('/api/login', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ email, password }),\n      credentials: 'include',\n    });\n  };\n\n  const logout = async () => {\n    await fetch('/api/logout', {\n      method: 'POST',\n      credentials: 'include',\n    });\n  };\n\n  return { login, logout };\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Audit token storage",
+        "description": "Find every place in your project where tokens or secrets are stored or transmitted. Classify each by risk level and propose a safer alternative.",
+        "steps": [
+          "Search for localStorage, sessionStorage, document.cookie, and window.name",
+          "Search for tokens in Redux, Zustand, or other global stores",
+          "Check fetch and axios calls for Authorization headers using client-side tokens",
+          "Review the server's Set-Cookie headers for Secure, HttpOnly, and SameSite",
+          "Document findings and write a remediation plan"
+        ],
+        "expectedOutcome": "You should have a clear map of every token touchpoint, the associated risk, and a prioritized list of fixes."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-ups",
+        "items": [
+          {
+            "question": "What if we need the token for a third-party API?",
+            "answer": "Create a backend proxy endpoint that exchanges the HttpOnly session for a short-lived API key, or use OAuth 2.0 with PKCE so the access token never touches your page storage."
+          },
+          {
+            "question": "Are HttpOnly cookies vulnerable to CSRF?",
+            "answer": "Yes, because the browser sends them automatically with cross-site requests. Mitigate with SameSite=Lax, SameSite=Strict, or a double-submit CSRF cookie pattern for write operations."
+          },
+          {
+            "question": "What about passwordless magic links?",
+            "answer": "Magic links are tokens too. Store the session in an HttpOnly cookie after the magic link callback, and do not store the link token in localStorage."
+          },
+          {
+            "question": "How do I debug auth issues without the token in localStorage?",
+            "answer": "Use the Network tab to inspect Set-Cookie and Cookie headers. Use server logs to verify token issuance. Avoid console.log of sensitive values in production."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Never store access tokens in localStorage or sessionStorage",
+          "Prefer HttpOnly, Secure, SameSite cookies managed by the server",
+          "Implement refresh token rotation and short-lived access tokens",
+          "Mitigate CSRF with SameSite cookies or double-submit tokens",
+          "Treat every token touchpoint as a potential security incident"
+        ],
+        "takeaway": "A senior engineer reviews authentication not as a checkbox, but as an ongoing negotiation between usability and attack surface."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "OWASP: Session Management Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+      "type": "article",
+      "description": "Best practices for secure session management, including token storage and cookie flags."
+    },
+    {
+      "title": "Auth0: Store Tokens Correctly",
+      "url": "https://auth0.com/docs/secure/attack-protection/store-tokens",
+      "type": "article",
+      "description": "Guidance on choosing between localStorage, cookies, and in-memory storage for tokens."
+    }
+  ]
 }

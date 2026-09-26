@@ -4,58 +4,149 @@
   "moduleSlug": "ef-core-performance-orm-trade-offs",
   "courseSlug": "ef-core",
   "title": "When to bypass the ORM",
-  "description": "Learn about When to bypass the ORM. Master the concepts, patterns, and best practices.",
+  "description": "Learn the specific scenarios where dropping down to raw SQL, stored procedures, or Dapper produces measurably better results than staying inside EF Core's abstraction.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["EF Core", "raw SQL", "stored procedures", "performance", "architecture"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When to bypass the ORM** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when to bypass the orm."
+        "text": "EF Core is the right default for most .NET data access, but it is not always the fastest path to the database. Knowing when to bypass the ORM — and how to do so cleanly — separates competent developers from senior engineers who optimize at the right layer."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Signs that the ORM is the bottleneck"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of when to bypass the orm",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "LINQ translation generates a query plan that is measurably slower than hand-written SQL.",
+          "Bulk inserts or updates touch thousands of rows and `SaveChanges()` is the bottleneck.",
+          "A reporting or analytics query requires CTEs, window functions, or database hints that LINQ cannot express cleanly.",
+          "Query profiling shows the translation phase itself consuming meaningful CPU time on hot paths.",
+          "Third-party database features like JSON operators, full-text search, or geospatial queries are not fully supported through EF Core mappings."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Measure before optimizing",
+        "text": "Profile with real production data volumes and realistic concurrency before bypassing the ORM. LINQ translation overhead is rarely the dominant cost. I/O waits, network latency, and missing indexes usually matter more."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Bypassing for bulk writes"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding when to bypass the orm is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "EF Core's `SaveChanges()` is optimized for individual or small-batch writes. For bulk inserts, updates, or deletes, each entity goes through change detection and generates separate SQL statements. EFCore.BulkExtensions or raw `SqlBulkCopy` can insert tens of thousands of rows in a fraction of the time."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when to bypass the orm, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Bulk insert with EFCore.BulkExtensions",
+        "code": "await dbContext.BulkInsertAsync(products);\n\n// Equivalent raw SaveChanges for 10,000 products\n// might produce 10,000 individual INSERT statements.\n// BulkInsert sends them in batches with minimal overhead.",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bypassing for reporting queries"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reporting endpoints often need complex aggregations, grouping, and ranking that are easier to express in SQL than in LINQ. Using `FromSqlRaw` or Dapper lets you write the exact query the database should run, with full access to CTEs, window functions, and database hints."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reporting query with FromSqlRaw",
+        "code": "var monthlyRevenue = await dbContext.MonthlyRevenueReports\n    .FromSqlRaw(@\"\n        WITH MonthlySales AS (\n            SELECT YEAR(OrderDate) AS Year,\n                   MONTH(OrderDate) AS Month,\n                   SUM(TotalAmount) AS Revenue\n            FROM Orders\n            WHERE OrderDate >= @StartDate\n            GROUP BY YEAR(OrderDate), MONTH(OrderDate)\n        )\n        SELECT Year, Month, Revenue,\n               LAG(Revenue) OVER (PARTITION BY Year ORDER BY Month) AS PrevMonthRevenue\n        FROM MonthlySales\",\n        new { StartDate = DateTime.UtcNow.AddYears(-1) })\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bypassing for stored procedures"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some teams maintain stored procedures for mission-critical or heavily optimized operations. EF Core can call stored procedures via `FromSqlRaw` for queries or `ExecuteSqlRaw` for commands. The stored procedure handles the logic inside the database, and EF Core handles the result mapping."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Calling a stored procedure with FromSqlRaw",
+        "code": "var topProducts = await dbContext.TopSellingProducts\n    .FromSqlRaw(\"EXEC GetTopSellingProducts @CategoryId, @TopCount\",\n        new SqlParameter(\"@CategoryId\", categoryId),\n        new SqlParameter(\"@TopCount\", 10))\n    .ToListAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Keeping the boundary clean"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you bypass EF Core, keep the raw SQL isolated in a repository or query class rather than scattering it across controllers and services. This makes it easy to audit, test, and replace. Document why each bypass exists so future maintainers understand the performance justification."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "items": [
+          "Profile the current EF Core query and confirm the bottleneck before bypassing.",
+          "Isolate raw SQL in dedicated repository methods or query types.",
+          "Map raw SQL results to read-only DTOs rather than tracked entities.",
+          "Document the performance justification for each bypass.",
+          "Revisit bypassed queries periodically — newer EF Core versions may support them natively."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "Bypass the ORM for bulk writes, complex reporting, and database-specific features.",
+          "Measure first — I/O and indexing are usually bigger wins than translation speed.",
+          "Isolate raw SQL in repositories and map to DTOs, not tracked entities.",
+          "Document every bypass so the codebase stays maintainable."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["ef-core-vs-dapper-vs-raw-sql", "bulk-operations-and-large-data-changes"],
+  "furtherReading": [
+    { "title": "EF Core raw SQL queries", "url": "https://learn.microsoft.com/en-us/ef/core/querying/raw-sql", "type": "article" },
+    { "title": "EFCore.BulkExtensions", "url": "https://github.com/borisdj/EFCore.BulkExtensions", "type": "article" }
+  ]
 }

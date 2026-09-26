@@ -3,68 +3,237 @@
   "slug": "continuous-monitoring",
   "moduleSlug": "runtime-performance",
   "courseSlug": "frontend-performance-engineering",
-  "title": "continuous-monitoring",
-  "description": "Learn about continuous-monitoring. Master the concepts, patterns, and best practices.",
+  "title": "Continuous Performance Monitoring",
+  "description": "Build a production performance monitoring strategy using Real User Monitoring, synthetic testing, performance budgets, and alerting.",
   "order": 10,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "rum",
+    "synthetic",
+    "performance-budgets",
+    "alerting",
+    "ci"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**continuous-monitoring** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with continuous-monitoring."
+        "text": "Performance does not stay good by accident. It requires continuous measurement: field data from real users, synthetic tests in CI, and alerts when budgets are breached. Without monitoring, regressions ship silently and compound over time."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of continuous-monitoring",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Real User Monitoring (RUM)"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding continuous-monitoring is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "RUM collects performance data from actual visitors across devices, networks, and geographies. It reveals problems that lab tests miss, such as slow 3G experiences, low-end device jank, and regional CDN failures."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Production RUM Implementation",
+        "content": "Send Core Web Vitals and custom timings to analytics.",
+        "language": "javascript",
+        "code": "import { onLCP, onINP, onCLS, onFCP, onTTFB } from 'web-vitals';\n\nfunction sendVital(metric) {\n  const payload = {\n    name: metric.name,\n    value: metric.value,\n    rating: metric.rating,\n    id: metric.id,\n    navigationType: metric.navigationType\n  };\n\n  const body = JSON.stringify(payload);\n  if (navigator.sendBeacon) {\n    navigator.sendBeacon('/api/analytics/vitals', body);\n  } else {\n    fetch('/api/analytics/vitals', { method: 'POST', body, keepalive: true });\n  }\n}\n\nonLCP(sendVital);\nonINP(sendVital);\nonCLS(sendVital);\n\n// Custom interaction timing\nfunction measureInteraction(name, fn) {\n  const start = performance.now();\n  const result = fn();\n  requestAnimationFrame(() => {\n    const duration = performance.now() - start;\n    sendVital({ name, value: duration, rating: duration < 200 ? 'good' : 'needs-improvement' });\n  });\n  return result;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Synthetic Monitoring"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Synthetic tests run on a schedule from fixed locations using controlled hardware and network profiles. They catch regressions before users do. Combine Lighthouse CI, WebPageTest, and custom Playwright scripts for comprehensive coverage."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Lighthouse CI Configuration",
+        "content": "Run Lighthouse in CI with budgets and assertions.",
+        "language": "javascript",
+        "code": "// lighthouserc.js\nmodule.exports = {\n  ci: {\n    collect: {\n      url: [\n        '/',\n        '/courses',\n        '/courses/frontend-performance-engineering/runtime-performance'\n      ],\n      numberOfRuns: 3,\n      settings: {\n        throttlingMethod: 'simulate',\n        throttling: {\n          rttMs: 150,\n          throughputKbps: 1638.4,\n          cpuSlowdownMultiplier: 4,\n          requestLatencyMs: 150,\n          downloadThroughputKbps: 1638.4,\n          uploadThroughputKbps: 675\n        }\n      }\n    },\n    assert: {\n      assertions: {\n        'first-contentful-paint': ['error', { maxNumericValue: 1800 }],\n        'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],\n        'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }],\n        'interactive': ['error', { maxNumericValue: 3500 }],\n        'total-blocking-time': ['error', { maxNumericValue: 300 }]\n      }\n    }\n  }\n};\n\n// package.json script\n// \"lhci\": \"lhci collect && lhci upload && lhci assert\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performance Budgets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A performance budget is a hard limit on a measurable quantity: bundle size, total JS, images, requests, or a Core Web Vital. Budgets stop regressions at the pull-request level. The best budgets are tied to user-facing metrics, not arbitrary byte counts."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bundle and Metric Budgets",
+        "content": "Define and enforce performance budgets in CI.",
+        "language": "javascript",
+        "code": "// performance-budgets.config.js\nmodule.exports = {\n  budgets: [\n    {\n      metric: 'largest-contentful-paint',\n      limit: 2500,\n      unit: 'ms',\n      importance: 'critical'\n    },\n    {\n      metric: 'interaction-to-next-paint',\n      limit: 200,\n      unit: 'ms',\n      importance: 'critical'\n    },\n    {\n      metric: 'cumulative-layout-shift',\n      limit: 0.1,\n      unit: '',\n      importance: 'critical'\n    },\n    {\n      metric: 'javascript-bundle-size',\n      limit: 300000,\n      unit: 'bytes',\n      importance: 'high'\n    },\n    {\n      metric: 'image-size',\n      limit: 500000,\n      unit: 'bytes',\n      importance: 'medium'\n    }\n  ]\n};\n\n// Enforce in CI using bundlesize or size-limit\n// \"size\": \" yarn build && size-limit\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Alerting and Dashboards"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Dashboards show trends; alerts catch sudden regressions. Page oncall or a dedicated performance channel should receive alerts when field metrics cross a threshold. Alert on sustained degradation, not one-off outliers, to avoid noise."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Alerting Strategy",
+        "content": "Design alerts that are actionable but not noisy.",
+        "language": "text",
+        "code": "Recommended alerting rules:\n\nCore Web Vitals degradation:\n- Trigger: p75 LCP or INP increases >20% for 1 hour\n- Severity: page-critical\n- Channel: #web-performance\n- Runbook: link to performance dashboard + last deploy\n\nCLS regression:\n- Trigger: p75 CLS > 0.1 for 30 minutes\n- Severity: high\n- Channel: #web-performance\n\nBundle size regression:\n- Trigger: main bundle exceeds budget by >5%\n- Severity: high\n- Channel: PR comment + engineering channel\n\nThird-party script regression:\n- Trigger: script evaluation time increases >2x\n- Severity: medium\n- Channel: #web-performance\n\nDashboard views:\n- Core Web Vitals by device type and geography\n- Largest contributors to INP\n- LCP element and URL breakdown\n- Deploy marker overlay on metrics timelines"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Monitoring in the Deployment Pipeline"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Gate deploys on performance budgets. Run Lighthouse in CI, compare bundle sizes, and fail the build when budgets are breached. Pair this with post-deploy smoke tests using Playwright to catch render-blocking issues."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CI Performance Gate",
+        "content": "Fail builds on performance regressions.",
+        "language": "text",
+        "code": "# GitHub Actions example\n- name: Lighthouse CI\n  run: |\n    npm install -g @lhci/cli@0.14\n    lhci collect --url=http://localhost:3000\n    lhci upload --target=temporary-public-storage\n    lhci assert --assertions.budget=performance-budgets.config.js\n\n- name: Bundle size check\n  run: |\n    npm run build\n    npx size-limit\n\n- name: Playwright smoke test\n  run: npx playwright test tests/smoke-performance.spec.ts"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with continuous-monitoring, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Start Small, Then Scale",
+        "text": "You do not need every tool on day one. Start with RUM for Core Web Vitals, add a Lighthouse budget in CI, then layer on synthetic tests and alerting. Iterate on coverage rather than trying to instrument everything at once."
       }
     },
     {
-      "type": "example",
+      "type": "key-terms",
       "data": {
-        "title": "Monitoring stack example",
-        "content": "Typical monitoring inputs and outputs.",
-        "code": "text",
-        "language": "Inputs\n- RUM: LCP, INP, CLS, FCP, TTFB\n- Synthetic: Lighthouse, WebPageTest\n- Logs: errors, traffic, deploy markers\n\nOutputs\n- Dashboards\n- Alerts\n- Postmortems"
+        "terms": [
+          {
+            "term": "Real User Monitoring",
+            "definition": "Collecting performance data from real user sessions to measure field performance."
+          },
+          {
+            "term": "Performance Budget",
+            "definition": "A hard limit on a performance metric enforced in CI to prevent regressions."
+          },
+          {
+            "term": "Synthetic Monitoring",
+            "definition": "Automated tests that simulate user interactions and measure performance from controlled environments."
+          }
+        ]
+      }
+    },
+    {
+      "type": "relatedLessons",
+      "data": {
+        "lessons": [
+          "user-centric-metrics",
+          "performance-markers",
+          "debugging-performance"
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": {
+        "items": [
+          {
+            "title": "Web Vitals on web.dev",
+            "url": "https://web.dev/vitals/",
+            "type": "article",
+            "description": "Guide to measuring and improving Core Web Vitals."
+          },
+          {
+            "title": "Lighthouse CI",
+            "url": "https://github.com/GoogleChrome/lighthouse-ci",
+            "type": "tool",
+            "description": "Automate Lighthouse audits and enforce budgets in CI."
+          },
+          {
+            "title": "Performance Budgets",
+            "url": "https://web.dev/performance-budgets/",
+            "type": "article",
+            "description": "How to define and enforce performance budgets."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RUM measures real user experience across devices, networks, and geographies",
+          "Synthetic tests catch regressions before users notice",
+          "Performance budgets stop regressions at the CI level",
+          "Use web-vitals for reliable Core Web Vitals field measurement",
+          "Use Lighthouse CI for automated audits and budget assertions",
+          "Alert on sustained degradation, not outliers",
+          "Start with Core Web Vitals RUM, then add synthetic and CI budgets"
+        ],
+        "takeaway": "Continuous monitoring turns performance into a measurable, maintainable property. Combine RUM, synthetic testing, budgets, and alerting to catch regressions early and keep the user experience predictable."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "user-centric-metrics",
+    "performance-markers",
+    "debugging-performance"
+  ],
+  "furtherReading": [
+    {
+      "title": "Web Vitals on web.dev",
+      "url": "https://web.dev/vitals/",
+      "type": "article",
+      "description": "Guide to measuring and improving Core Web Vitals."
+    },
+    {
+      "title": "Lighthouse CI",
+      "url": "https://github.com/GoogleChrome/lighthouse-ci",
+      "type": "tool",
+      "description": "Automate Lighthouse audits and enforce budgets in CI."
+    },
+    {
+      "title": "Performance Budgets",
+      "url": "https://web.dev/performance-budgets/",
+      "type": "article",
+      "description": "How to define and enforce performance budgets."
+    }
+  ]
 }

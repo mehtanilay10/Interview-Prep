@@ -4,33 +4,41 @@
   "moduleSlug": "advanced-c-runtime-memory-concurrency",
   "courseSlug": "csharp-fundamentals",
   "title": "JIT compilation and tiered compilation",
-  "description": "Learn about JIT compilation and tiered compilation. Master the concepts, patterns, and best practices.",
+  "description": "Understand how the .NET JIT compiler converts CIL to native code and how tiered compilation optimizes method execution over time.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["JIT", "compilation", "tiered-compilation", "optimization", "startup"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**JIT compilation and tiered compilation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with jit compilation and tiered compilation."
+        "text": "The Just-In-Time compiler is the bridge between your managed code and the CPU. When a method is called for the first time, the JIT compiles its CIL into native machine code tailored to the current processor. This is why a .NET application feels slower on first launch: the JIT is working through hot paths and compiling them. Tiered compilation, introduced in .NET Core 2.1 and enabled by default in .NET 6, lets the JIT strike a balance between fast startup and optimized steady-state performance."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without tiered compilation, the JIT compiles every method at tier 1 — a single, fully optimized version. The problem is that high optimization levels take time, and they burn memory keeping track of all the optimization state. Tiered compilation solves this by compiling methods at a lower optimization level first, then recompiling the hottest methods with full optimizations after the application has been running for a few seconds."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "What happens during JIT compilation"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "numbered-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of jit compilation and tiered compilation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "The CLR identifies that a method has been called but has no native code yet.",
+          "The JIT reads the method's CIL bytecodes and metadata.",
+          "The JIT performs validation, then generates native assembly instructions.",
+          "The native code is patched into the method's entry point in memory.",
+          "Future calls jump directly to the native code — no CIL re-reading needed.",
+          "If tiered compilation is enabled, the method may be recompiled later at a higher tier."
         ]
       }
     },
@@ -38,24 +46,102 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Tiered compilation levels"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding jit compilation and tiered compilation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The JIT operates in two tiers. Tier 0 is the quick compilation path: it generates functional native code with minimal optimization, trading execution speed for compilation speed. Tier 1 is the full optimization path: it applies aggressive inlining, vectorization, loop unrolling, and other transformations. The runtime promotes methods from tier 0 to tier 1 based on invocation counters. Methods that are called frequently get the extra optimization attention; cold paths stay at tier 0."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enabling tiered compilation explicitly",
+        "code": "// In Program.cs or a runtimeconfig.json\nvar host = Host.CreateApplicationBuilder(args);\n\n// Explicitly configure tiered compilation\nhost.Configuration.AddJsonFile(\"runtimeconfig.json\");\n\n// runtimeconfig.json snippet:\n// {\n//   \"runtimeOptions\": {\n//     \"configProperties\": {\n//       \"System.Runtime.TieredCompilation\": true,\n//       \"System.Runtime.TieredCompilation.QuickJit\": true,\n//       \"System.Runtime.TieredCompilation.QuickJitForLoops\": false\n//     }\n//   }\n// }",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ReadyToRun: precompiling to reduce JIT work"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ReadyToRun (R2R) is an ahead-of-time compilation feature that converts CIL to native code during the build, not at runtime. When you publish with `PublishReadyToRun=true`, the build produces a native image alongside the assembly. At startup, the runtime loads the precompiled native code directly, skipping or reducing JIT work. This dramatically improves startup time for large applications. The trade-off is larger publish size and slightly slower build times."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Publishing with ReadyToRun",
+        "code": "# Publish a self-contained app with ReadyToRun images\ndotnet publish -c Release -r win-x64 \\\n  -p:PublishReadyToRun=true \\\n  -p:PublishReadyToRunShowWarnings=true\n\n# Result: native images in the publish folder\n# alongside the managed assemblies.",
+        "language": "bash"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with jit compilation and tiered compilation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Profile before optimizing compilation settings",
+        "text": "Do not assume that ReadyToRun or tiered compilation is always the answer. Use `dotnet-trace`, `dotnet-counters`, or PerfView to measure JIT time in your application. If JIT is less than 5% of startup, the benefit of R2R may not justify the larger deployment. If most of your methods are already inlined or trivial, tiered compilation may provide little value."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How inlining works under the hood"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Method inlining is the single most impactful JIT optimization. When the JIT decides to inline a method, it replaces the method call with a copy of the method body. This eliminates the call overhead — pushing arguments, jumping to a new address, popping the return — and exposes more code to subsequent optimizations like constant propagation and dead code elimination. The JIT is conservative about inlining: methods over a certain size, virtual methods, and methods with exception handling blocks are less likely to be inlined at tier 0."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "tiered-compilation-flow",
+        "code": "flowchart TB\n    A[\"Method Called\"] --> B{\"Has native code?\"}\n    B -->|No| C[\"Tier 0: Quick JIT\n(Minimal optimization)\"]\n    C --> D[\"Method executes\nat Tier 0\"]\n    D --> E{\"Hot enough?\n(Invocation threshold)\"}\n    E -->|No| F[\"Continue at Tier 0\"]\n    E -->|Yes| G[\"Tier 1: Full JIT\n(Aggressive optimization)\"]\n    G --> H[\"Method executes\nat Tier 1\"]\n    B -->|Yes| H\n\n    style A fill:#2563eb,color:#fff\n    style C fill:#f59e0b,color:#fff\n    style G fill:#16a34a,color:#fff",
+        "caption": "How tiered compilation promotes a method from tier 0 to tier 1 based on invocation frequency."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "items": [
+          "The JIT converts CIL to native code on first method call; subsequent calls reuse the compiled code.",
+          "Tiered compilation starts methods at tier 0 for fast startup, then recompiles hot methods at tier 1 with full optimizations.",
+          "ReadyToRun precompiles assemblies during build, reducing JIT work at the cost of larger publish size.",
+          "Inlining is the most impactful JIT optimization, but the compiler is conservative about inlining large or virtual methods."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["clr-architecture-and-execution-model", "readytorun-and-native-aot", "managed-heap-and-allocation-lifecycle"],
+  "furtherReading": [
+    {
+      "type": "article",
+      "title": "ReadyToRun compilation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/deploying/ready-to-run"
+    },
+    {
+      "type": "article",
+      "title": "Tiered compilation",
+      "url": "https://devblogs.microsoft.com/dotnet/tiered-compilation-in-net-core-2-1/"
+    },
+    {
+      "type": "article",
+      "title": "JIT compiler improvements",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/runtime/jit/"
+    }
+  ]
 }

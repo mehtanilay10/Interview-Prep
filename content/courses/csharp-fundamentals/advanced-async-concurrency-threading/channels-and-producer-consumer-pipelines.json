@@ -4,58 +4,88 @@
   "moduleSlug": "advanced-async-concurrency-threading",
   "courseSlug": "csharp-fundamentals",
   "title": "Channels and producer-consumer pipelines",
-  "description": "Learn about Channels and producer-consumer pipelines. Master the concepts, patterns, and best practices.",
+  "description": "Build async pipelines with System.Threading.Channels for efficient producer-consumer data flow.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Channels and producer-consumer pipelines** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with channels and producer-consumer pipelines."
+        "text": "`System.Threading.Channels` provides a modern, high-performance way to pass data between producers and consumers asynchronously. Unlike `BlockingCollection`, channels are designed for `async`/`await` and support backpressure out of the box."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Understand the fundamental principles of channels and producer-consumer pipelines",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 2,
-        "text": "Why This Matters"
+        "text": "Core concepts"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding channels and producer-consumer pipelines is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A `Channel<T>` has two ends: a writer and a reader. Producers call `WriteAsync` to push items; consumers call `ReadAsync` to pull them. The channel buffers items up to a capacity you choose. When the buffer is full, `WriteAsync` waits until space opens. This natural backpressure prevents producers from overwhelming consumers."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating and using a channel",
+        "language": "csharp",
+        "code": "private readonly Channel<int> _channel = Channel.CreateBounded<int>(100);\n\npublic async Task ProduceAsync(CancellationToken ct)\n{\n    for (int i = 0; i < 1000; i++)\n    {\n        await _channel.Writer.WriteAsync(i, ct);\n    }\n    _channel.Writer.Complete();\n}\n\npublic async Task ConsumeAsync(CancellationToken ct)\n{\n    await foreach (var item in _channel.Reader.ReadAllAsync(ct))\n    {\n        await ProcessItemAsync(item, ct);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Building a pipeline"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Channels shine when you chain multiple stages. For example, a pipeline that reads files, parses JSON, and writes results to a database can run stages concurrently. Each stage runs in its own task, reading from the previous channel and writing to the next."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Three-stage pipeline",
+        "language": "csharp",
+        "code": "public async Task RunPipelineAsync(string[] filePaths, CancellationToken ct)\n{\n    var stage1 = Channel.CreateBounded<string>(50); // file paths\n    var stage2 = Channel.CreateBounded<JsonNode>(50); // parsed JSON\n    var stage3 = Channel.CreateBounded<Record>(50);   // database records\n\n    var reader = Task.Run(() => ReadFilesAsync(filePaths, stage1.Writer, ct));\n    var parser = Task.Run(() => ParseJsonAsync(stage1.Reader, stage2.Writer, ct));\n    var writer = Task.Run(() => WriteToDatabaseAsync(stage2.Reader, stage3.Writer, ct));\n    var sink = Task.Run(() => ArchiveAsync(stage3.Reader, ct));\n\n    await Task.WhenAll(reader, parser, writer, sink);\n}\n\nprivate async Task ReadFilesAsync(string[] files, ChannelWriter<string> writer, CancellationToken ct)\n{\n    foreach (var file in files)\n    {\n        await writer.WriteAsync(file, ct);\n    }\n    writer.Complete();\n}\n\nprivate async Task ParseJsonAsync(ChannelReader<string> input, ChannelWriter<JsonNode> output, CancellationToken ct)\n{\n    await foreach (var file in input.ReadAllAsync(ct))\n    {\n        var json = await JsonNode.ParseAsync(File.OpenRead(file), ct);\n        await output.WriteAsync(json, ct);\n    }\n    output.Complete();\n}\n\nprivate async Task WriteToDatabaseAsync(ChannelReader<JsonNode> input, ChannelWriter<Record> output, CancellationToken ct)\n{\n    await foreach (var node in input.ReadAllAsync(ct))\n    {\n        var record = MapToRecord(node);\n        await output.WriteAsync(record, ct);\n    }\n    output.Complete();\n}"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with channels and producer-consumer pipelines, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Choose bounded channels for backpressure",
+        "text": "Unbounded channels (`Channel.CreateUnbounded`) can grow without limit if the consumer falls behind. Bounded channels slow the producer automatically, preventing out-of-memory crashes."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Channels pass data between async producers and consumers.",
+          "Bounded channels provide natural backpressure.",
+          "Pipelines chain stages with multiple channels.",
+          "Complete each writer when no more items are coming."
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "semaphoreslim-and-bounded-concurrency",
+    "concurrent-collections",
+    "deadlocks-starvation-and-livelocks"
+  ],
+  "furtherReading": [
+    { "title": "System.Threading.Channels (Microsoft Docs)", "url": "https://learn.microsoft.com/en-us/dotnet/standard/threading/channels" },
+    { "title": "Stephen Toub — Dataflow vs Channels", "url": "https://devblogs.microsoft.com/dotnet/await-using-system-threading-channels/" }
+  ]
 }

@@ -3,34 +3,64 @@
   "slug": "locks-and-blocking",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Locks and blocking",
-  "description": "Learn about Locks and blocking. Master the concepts, patterns, and best practices.",
+  "title": "Locks and Blocking",
+  "description": "Understand how SQL Server uses locks to protect data, why blocking occurs in production, and how to diagnose and resolve blocking chains.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "locks",
+    "blocking",
+    "concurrency",
+    "sql-server",
+    "troubleshooting"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Locks and blocking** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with locks and blocking."
+        "text": "SQL Server is a multi-user system, which means many people and applications can try to read and change data at the same time. To keep data accurate, SQL Server uses **locks** — small placeholders that say, 'I am working with this data right now.' When one session holds a lock that another session needs, the second session must wait. That wait is called **blocking**."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a small test database, blocking is almost invisible. In a busy production system, a single long-running query can block dozens of other queries, cascade across application tiers, and turn a slow day into an outage. Understanding locks and blocking is one of the most practical skills a senior SQL Server professional can have."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "How Locks Work"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of locks and blocking",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Every time SQL Server reads or modifies data, it acquires a lock on that resource. Locks are held for the shortest time possible and are released automatically when the operation completes or the transaction ends. The lock manager in SQL Server tracks which sessions hold which locks and which sessions are waiting for them."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Lock",
+            "definition": "A mechanism SQL Server uses to synchronize access to a resource (row, page, table, or object) so that only one session can modify it at a time."
+          },
+          {
+            "term": "Blocking",
+            "definition": "A situation where one session holds a lock and another session must wait for that lock to be released before it can proceed."
+          },
+          {
+            "term": "Lock Mode",
+            "definition": "The type of access a lock grants — shared (S), exclusive (X), update (U), intent (IS, IX), or schema (Sch-S, Sch-M)."
+          },
+          {
+            "term": "Lock Duration",
+            "definition": "How long a lock is held. Shared locks are often released early; exclusive locks are held until the transaction commits or rolls back."
+          }
         ]
       }
     },
@@ -38,24 +68,176 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Common Lock Modes"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Lock Mode",
+          "Symbol",
+          "Used For",
+          "Compatibility"
+        ],
+        "rows": [
+          [
+            "Shared",
+            "S",
+            "Reading data (SELECT)",
+            "Compatible with other S locks"
+          ],
+          [
+            "Exclusive",
+            "X",
+            "Modifying data (INSERT, UPDATE, DELETE)",
+            "Incompatible with all other modes"
+          ],
+          [
+            "Update",
+            "U",
+            "Resources that may be updated later",
+            "Compatible with S, but not other U or X"
+          ],
+          [
+            "Intent Shared",
+            "IS",
+            "Indicates S locks held on lower-level resources",
+            "Compatible with IS, IX, S"
+          ],
+          [
+            "Intent Exclusive",
+            "IX",
+            "Indicates X locks held on lower-level resources",
+            "Compatible with IS, IX, but not S or X"
+          ],
+          [
+            "Schema",
+            "Sch-S / Sch-M",
+            "Schema dependency during compilation or change",
+            "Sch-S compatible with most; Sch-M exclusive"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detecting Blocking"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding locks and blocking is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "SQL Server exposes blocking information through several system views and built-in reports. The most commonly used tool is `sp_whoisactive`, a popular community stored procedure that captures active sessions, their wait information, and the SQL they are running. You can also use the built-in Activity Monitor or query `sys.dm_tran_locks` and `sys.dm_exec_requests`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Detecting Blocking with Built-in DMVs",
+        "content": "This query shows which sessions are blocking other sessions and what SQL they are executing.",
+        "language": "sql",
+        "code": "SELECT \n    wt.session_id AS blocked_session_id,\n    wt.blocking_session_id,\n    wt.wait_duration_ms,\n    wt.wait_type,\n    wt.resource_description,\n    s_txt.text AS blocked_sql,\n    s_block.text AS blocking_sql\nFROM sys.dm_os_waiting_tasks AS wt\nINNER JOIN sys.dm_exec_requests AS r ON wt.session_id = r.session_id\nCROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS s_txt\nCROSS APPLY sys.dm_exec_sql_text(\n    (SELECT sql_handle FROM sys.dm_exec_requests WHERE session_id = wt.blocking_session_id)\n) AS s_block\nWHERE wt.blocking_session_id IS NOT NULL;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Production Caution",
+        "text": "Never kill a blocking session without understanding what it is doing. If the blocking session is in the middle of a critical transaction, killing it can cause a rollback that takes even longer and creates more chaos. Always identify the root cause first."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Causes of Blocking"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Typical Blocking Scenarios",
+        "items": [
+          "A large update or delete runs under the default READ COMMITTED isolation level while other sessions try to read the same rows.",
+          "A transaction opens, modifies data, and then pauses — for example, waiting for user input or an external API call — while holding exclusive locks.",
+          "An index rebuild or statistics update runs during business hours and acquires schema modification locks (Sch-M) that block all access to the table.",
+          "A bad query plan causes a table scan that locks thousands of rows unnecessarily.",
+          "Connection pool exhaustion causes application timeouts and retry storms that amplify blocking."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with locks and blocking, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Quick Mitigation",
+        "text": "If you need immediate relief in production, you can use `READPAST` or `NOLOCK` hints on non-critical read queries. However, these are band-aids. The real fix is to keep transactions short, index strategically, and tune isolation levels."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Is some blocking normal?",
+            "answer": "Yes. A small amount of blocking is expected and healthy — it means the lock manager is protecting data integrity. Problems arise when blocking is frequent, long-lasting, or cascades across multiple sessions."
+          },
+          {
+            "question": "Does NOLOCK prevent all blocking?",
+            "answer": "NOLOCK (READ UNCOMMITTED) eliminates shared locks for that query, so it will not block other sessions and will not be blocked by them. However, it can read uncommitted (dirty) data, including rows that are later rolled back. Use it only for approximate or non-critical reporting queries."
+          },
+          {
+            "question": "Why does my SELECT cause blocking?",
+            "answer": "Under the default READ COMMITTED isolation level, SELECT statements acquire shared (S) locks on rows or pages. If another session holds an exclusive (X) lock on the same resource, the SELECT will wait. This is normal and expected behavior."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Locks protect data integrity in a multi-user system; blocking is the natural side effect of two sessions competing for the same resource",
+          "Exclusive (X) locks are incompatible with all other locks and are held until the transaction ends — this is the most common cause of severe blocking",
+          "Detect blocking with sys.dm_os_waiting_tasks, sp_whoisactive, or Activity Monitor — always identify the blocker before taking action",
+          "Short transactions, proper indexing, and appropriate isolation levels are the three pillars of blocking prevention",
+          "NOLOCK and READPAST are tactical tools, not permanent solutions — they trade consistency for reduced blocking"
+        ],
+        "takeaway": "Mastering locks and blocking transforms you from someone who reacts to production fires into someone who designs systems that avoid them."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "deadlocks-and-deadlock-graphs",
+    "transaction-isolation-levels"
+  ],
+  "furtherReading": [
+    {
+      "title": "Locking and Row Versioning (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "sp_whoisactive (Adam Machanic)",
+      "url": "https://whoisactive.com",
+      "type": "tool",
+      "author": "Adam Machanic"
+    },
+    {
+      "title": "How to Resolve Blocking Problems Caused by Locking in SQL Server (Microsoft)",
+      "url": "https://learn.microsoft.com/en-us/troubleshoot/sql/database-engine/performance/resolve-blocking-problems-caused-locking",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

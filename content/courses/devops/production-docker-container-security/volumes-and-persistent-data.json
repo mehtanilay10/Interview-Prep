@@ -4,33 +4,54 @@
   "moduleSlug": "production-docker-container-security",
   "courseSlug": "devops",
   "title": "Volumes and persistent data",
-  "description": "Learn about Volumes and persistent data. Master the concepts, patterns, and best practices.",
+  "description": "Choose the right Docker storage strategy for databases, uploads, and configuration, and understand the security implications of bind mounts, named volumes, and tmpfs.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": ["docker", "storage", "volumes", "persistence"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Volumes and persistent data** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with volumes and persistent data."
+        "text": "Containers are ephemeral by design. When a container stops or is replaced, everything written to its writable layer disappears. Persistent storage lets containers keep data across restarts and replacements. Choosing the right storage type also has major security implications."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The three storage options"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of volumes and persistent data",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Docker provides three main ways to persist data: bind mounts, named volumes, and tmpfs mounts. Each is suited to different use cases, and the wrong choice can leak sensitive host files into containers or cause data loss during deployments."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Docker storage options",
+        "cards": [
+          {
+            "title": "Bind mounts",
+            "description": "Mounts a specific file or directory from the host filesystem into the container.",
+            "pros": ["Easy to edit from host", "Useful for development config and source code", "Visible to both host and container"],
+            "cons": ["Tightly couples container to host filesystem", "Host file permissions apply inside the container", "Risk of overwriting host files if container process runs as root"]
+          },
+          {
+            "title": "Named volumes",
+            "description": "Docker-managed storage that lives in a dedicated area of the host filesystem.",
+            "pros": ["Managed by Docker", "Easy to back up and migrate", "Better performance on Docker Desktop for macOS and Windows", "Independent of host directory structure"],
+            "cons": ["Harder to inspect directly on the host", "Backup requires Docker CLI or API"]
+          },
+          {
+            "title": "tmpfs mounts",
+            "description": "Stores data in host memory only. Data never touches the host disk.",
+            "pros": ["Data is never written to disk", "High performance for temporary data", "Automatically removed when the container stops"],
+            "cons": ["Data is lost when the container stops", "Consumes host memory", "Not suitable for anything that must survive a restart"]
+          }
         ]
       }
     },
@@ -38,24 +59,120 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Security risks of bind mounts"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding volumes and persistent data is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Bind mounts are the most dangerous storage option from a security perspective. When you mount `/var/run/docker.sock` into a container, you give that container full control over the Docker daemon. When you mount the host filesystem root or sensitive directories such as `/etc`, a compromised container can read or modify host secrets."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with volumes and persistent data, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "danger",
+        "title": "Never mount the Docker socket in production",
+        "text": "Mounting `/var/run/docker.sock` into a container is equivalent to giving that container root access to the host. Many CI/CD and automation tools request this mount, but it should be treated as a critical security exception with compensating controls."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Named volumes for databases and uploads"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Named volumes are the recommended storage type for databases, file uploads, and any data that must survive container restarts. They are managed by Docker, work consistently across operating systems, and can be backed up with `docker run --rm -v <volume>:/backup alpine tar czf /backup/backup.tar.gz /data`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PostgreSQL with a named volume",
+        "content": "This Compose snippet creates a named volume for PostgreSQL data and exposes the database only to the API service.",
+        "language": "yaml",
+        "code": "services:\n  database:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_PASSWORD_FILE: /run/secrets/db_password\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n    secrets:\n      - db_password\n    networks:\n      - data\n    read_only: true\n    tmpfs:\n      - /tmp\n      - /run/postgresql\n\nvolumes:\n  pgdata:\n\nnetworks:\n  data:\n    internal: true\n\nsecrets:\n  db_password:\n    file: ./secrets/db_password.txt"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Volume permissions and security"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Docker volumes are owned by root on the host by default. When a container runs as a non-root user, it may not have permission to write to a newly created volume. Fix this by `chown`-ing the mount point in the Dockerfile or by using the `userns-remap` feature."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Volume permission guidelines",
+        "items": [
+          "Set the correct ownership on the mount point in the Dockerfile with `RUN mkdir -p /data && chown appuser:appgroup /data`",
+          "Avoid running containers as root just to satisfy volume permissions",
+          "Use `docker volume inspect` to check volume mountpoints and driver options",
+          "Consider `userns-remap` for multi-tenant hosts to namespace UIDs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "tmpfs for sensitive temporary data"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use tmpfs mounts for sensitive temporary files such as decrypted secrets, session tokens, or database credentials that must exist only in memory. A tmpfs mount is never written to disk, so it cannot be recovered from a host disk image or forensic capture."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using tmpfs for temporary runtime files",
+        "content": "Mount a tmpfs volume at /tmp to keep temporary files in memory only.",
+        "language": "yaml",
+        "code": "services:\n  app:\n    image: myapp:latest\n    tmpfs:\n      - /tmp:size=100m"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Containers are ephemeral; use volumes for any data that must survive restarts",
+          "Named volumes are the safest default for databases and uploads",
+          "Avoid bind mounts for production data unless you need tight host integration",
+          "Never mount /var/run/docker.sock or sensitive host paths into production containers",
+          "Use tmpfs for sensitive temporary files that must never touch disk"
+        ],
+        "takeaway": "Persistent data should be isolated from the container runtime, secured with proper ownership, and backed up independently of the image."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["container-networking", "container-secrets", "resource-limits"],
+  "furtherReading": [
+    {
+      "title": "Docker documentation: Storage overview",
+      "url": "https://docs.docker.com/storage/",
+      "type": "article",
+      "author": "Docker"
+    },
+    {
+      "title": "Docker documentation: Volumes",
+      "url": "https://docs.docker.com/engine/storage/volumes/",
+      "type": "article",
+      "author": "Docker"
+    }
+  ]
 }

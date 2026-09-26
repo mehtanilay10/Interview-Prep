@@ -13,24 +13,54 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a component with unnecessary global state** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a component with unnecessary global state."
+        "text": "**Review a component with unnecessary global state** is a state-management smell. When a component lifts local UI state into Redux, Context, or a global store without a real need, it couples unrelated features, makes testing harder, and creates unnecessary re-renders. The question in a senior review is not whether global state is bad, but whether this particular piece of state needs to be global at all."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Common culprits"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "What to look for",
         "items": [
-          "Understand the fundamental principles of review a component with unnecessary global state",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "A modal open flag stored in Redux when only the parent component uses it",
+          "Form input values synced to a global store on every keystroke",
+          "A theme toggle or sidebar collapse state living in Context when it is used by one route",
+          "Selected row ID in a table lifted to global state instead of local component state",
+          "Cached API responses stored in global state instead of a dedicated data-fetching cache",
+          "Derived data stored as separate global state instead of being computed during render"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Lifting state up",
+            "definition": "Moving state to the nearest common ancestor so siblings can share it, without making it global."
+          },
+          {
+            "term": "State colocation",
+            "definition": "Keeping state as close as possible to where it is used, reducing the blast radius of updates."
+          },
+          {
+            "term": "Prop drilling",
+            "definition": "Passing props through intermediate components that do not use them. Often a sign that state should be colocated or a context split."
+          },
+          {
+            "term": "Global state",
+            "definition": "State stored outside the component tree, accessible from anywhere. Examples: Redux, Zustand, Jotai, React Context."
+          },
+          {
+            "term": "Re-render blast radius",
+            "definition": "The number of components that must re-render when a piece of state changes. Global state typically has a large blast radius."
+          }
         ]
       }
     },
@@ -38,24 +68,187 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The state-colocation test"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a component with unnecessary global state is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Before approving a global state decision, ask three questions. First, does more than one sibling or branch need this value? If not, lift it to the nearest shared parent. Second, does the value need to persist across navigation or page refreshes? If not, local state or a URL parameter is simpler. Third, is the value derived from other state? If so, compute it during render instead of storing it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Unnecessary global state",
+        "content": "A modal open flag is stored in Redux even though only the SettingsPage needs it. Every reducer subscription re-renders SettingsPage when unrelated actions dispatch:",
+        "code": "// Bad: modal state lives in global Redux store\nconst open = useSelector((state) => state.settings.modalOpen);\nconst dispatch = useDispatch();\n\nfunction SettingsPage() {\n  return (\n    <>\n      <button onClick={() => dispatch(openModal())}>Settings</button>\n      {open && <SettingsModal onClose={() => dispatch(closeModal())} />}\n    </>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Local state instead",
+        "content": "Moving the flag to local component state removes the global coupling and eliminates unnecessary re-renders from other reducers:",
+        "code": "function SettingsPage() {\n  const [open, setOpen] = useState(false);\n\n  return (\n    <>\n      <button onClick={() => setOpen(true)}>Settings</button>\n      {open && <SettingsModal onClose={() => setOpen(false)} />}\n    </>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When global state is justified"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "The value is needed by deeply nested components that share no closer ancestor",
+          "The value must survive navigation and survive across page refreshes via persistence",
+          "Multiple features need to read and write the same value concurrently",
+          "The value drives URL or meta tags and must be kept in sync with routing",
+          "The value is expensive to compute and caching it globally benefits many consumers"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "State-location trade-offs",
+        "cards": [
+          {
+            "title": "Local state",
+            "description": "useState or useReducer inside the component that owns the data.",
+            "pros": ["Minimal re-render scope", "Easy to test", "No boilerplate"],
+            "cons": ["Cannot share across branches without lifting", "Lost on unmount"]
+          },
+          {
+            "title": "Lifted state",
+            "description": "State lives in the nearest common parent and flows down via props.",
+            "pros": ["Explicit data flow", "Easy to trace", "No external dependency"],
+            "cons": ["Prop drilling for deep trees", "Parent must re-render on every change"]
+          },
+          {
+            "title": "Context",
+            "description": "React Context broadcasts a value to any consumer in the subtree.",
+            "pros": ["Avoids prop drilling", "Built into React", "Works with any state manager"],
+            "cons": ["All consumers re-render on value change", "Can be misused as global state"]
+          },
+          {
+            "title": "Global store",
+            "description": "Redux, Zustand, Jotai, or similar stores with selectors and subscriptions.",
+            "pros": ["Selective subscriptions", "DevTools and time-travel", "Persistence middleware"],
+            "cons": ["Boilerplate and mental overhead", "Global coupling if overused"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a component with unnecessary global state, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Prefer local state",
+        "text": "The best global-state decision is the one you do not make. Start with local state. If prop drilling becomes painful, extract a small context for that feature only. Only reach for a global store when the data genuinely belongs to many unrelated parts of the app."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Refactoring checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Audit unnecessary global state",
+        "items": [
+          {
+            "text": "List every piece of state in the global store and its consumers",
+            "hint": "Search the codebase for the action type or state path"
+          },
+          {
+            "text": "For each item, ask whether more than one sibling needs it",
+            "hint": "If only one route uses it, move it to local state"
+          },
+          {
+            "text": "Check whether derived values are stored instead of computed",
+            "hint": "Use selectors or derived variables instead of duplicating state"
+          },
+          {
+            "text": "Verify the component still passes tests after moving state",
+            "hint": "Local state is easier to mock and assert than global store state"
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Audit and refactor global state",
+        "description": "Pick a component in your current project that reads from Redux or Context. Audit whether that state is truly global or could live locally. Refactor it to the narrowest possible location and verify tests still pass.",
+        "steps": [
+          "Identify a component with global state that feels heavy",
+          "List all consumers of that state across the codebase",
+          "Move the state to the nearest shared parent or convert to local state",
+          "Run the test suite and fix any broken snapshots or mocks",
+          "Measure render count with React DevTools Profiler to confirm the blast radius shrank"
+        ],
+        "expectedOutcome": "You should see fewer re-renders in the profiler and simpler component tests after moving state closer to its consumers."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-ups",
+        "items": [
+          {
+            "question": "Is Context the same as global state?",
+            "answer": "Context is a transport mechanism, not a state manager. You can use Context to provide a small, feature-scoped store without making it global. The problem arises when Context is used as a catch-all for everything."
+          },
+          {
+            "question": "How do I know if prop drilling is real or imagined?",
+            "answer": "Prop drilling becomes a problem when intermediate components receive props only to pass them down, and changing the prop type requires touching many files. That is the signal to extract a context or split the component tree."
+          },
+          {
+            "question": "Should every form use local state?",
+            "answer": "Yes, unless the form value is needed by another route or must survive unmount. For most forms, local state or uncontrolled inputs are simpler and faster than syncing to a global store on every keystroke."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Start with local state and lift only when siblings need to share data",
+          "Use Context for feature-scoped state, not as a global store",
+          "Measure re-render blast radius before and after moving state",
+          "Avoid storing derived values or transient UI flags globally",
+          "Refactor global state when it couples unrelated features"
+        ],
+        "takeaway": "A senior review judges global state by whether it is earned, not by whether it exists. The simplest state location is almost always the best."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "React Docs: State as a Snapshot",
+      "url": "https://react.dev/learn/state-as-a-snapshot",
+      "type": "article",
+      "author": "React Team",
+      "description": "Official explanation of how React state works and when to use it."
+    },
+    {
+      "title": "Aha Moments in React State Management",
+      "url": "https://www.smashingmagazine.com/2023/02/aha-moments-react-state-management/",
+      "type": "article",
+      "description": "Practical guide to choosing the right state location for your data."
+    }
+  ]
 }

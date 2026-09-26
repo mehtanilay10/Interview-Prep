@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Scaling real-time connections** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with scaling real-time connections."
+        "text": "A single server can hold a few thousand WebSocket connections, but real-world products need tens or hundreds of thousands. Scaling real-time connections requires understanding the bottlenecks in memory, CPU, network file descriptors, and the message bus that connects server instances. This lesson covers the patterns that let you grow horizontally without losing the low-latency guarantees users expect."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of scaling real-time connections",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Connection capacity per server depends on available file descriptors and memory per connection",
+          "Stateless application servers let you add instances behind a load balancer without session affinity",
+          "Pub/sub message bus decouples connection managers from message routing",
+          "Room-based broadcasting minimizes unnecessary network traffic",
+          "Horizontal scaling requires consistent routing: which server holds which connection?",
+          "Capacity planning: measure current usage, identify the bottleneck, then scale the constrained resource",
+          "Autoscaling with real-time connections requires careful warm-up and drain policies"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "File descriptor",
+            "definition": "An operating system handle for an open file, socket, or pipe. Each WebSocket connection consumes one file descriptor."
+          },
+          {
+            "term": "Pub/sub",
+            "definition": "A messaging pattern where publishers send messages to channels and subscribers receive messages from channels they have joined, without knowing about each other."
+          },
+          {
+            "term": "Sticky session",
+            "definition": "A load balancer routing strategy that sends all requests from a client to the same server instance, used when server-side state exists."
+          },
+          {
+            "term": "Horizontal scaling",
+            "definition": "Adding more server instances to distribute load, as opposed to vertical scaling which adds more resources to a single server."
+          },
+          {
+            "term": "Drain policy",
+            "definition": "A process that stops accepting new connections on a server instance and waits for existing connections to close before removing it from the pool."
+          }
         ]
       }
     },
@@ -44,18 +74,119 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding scaling real-time connections is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Without a scaling strategy, the first popular feature can exhaust connection limits and crash the server. Scaling real-time systems is not just about adding more machines; it is about choosing the right architecture so that each added machine contributes useful capacity. A pub/sub design with stateless connection managers scales linearly, while a stateful design with sticky sessions requires complex failover and rebalancing."
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with scaling real-time connections, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Know your bottleneck",
+        "text": "Use operating system tools like ss, netstat, and lsof to measure file descriptor usage. Use top and vmstat to measure CPU and memory. Do not scale horizontally until you know which resource is constrained; adding servers to a CPU-bound system does not help if the bottleneck is disk I/O."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling patterns"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Increase file descriptor limits: raise ulimit -n to one hundred thousand or more on Linux",
+          "Tune TCP parameters: enable tcp_tw_reuse and reduce tcp_fin_timeout to reclaim sockets faster",
+          "Use an external message bus like Redis, NATS, or Kafka to route messages between connection manager instances",
+          "Group connections into rooms and broadcast only to the room members served by each instance",
+          "Place a reverse proxy like NGINX or HAProxy in front to terminate TLS and distribute WebSocket upgrades",
+          "Implement autoscaling with warm-up: new instances should not receive traffic until they have joined the message bus"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-scaling-topology",
+        "caption": "Scaled WebSocket architecture with multiple connection managers",
+        "definition": "graph TD\n    A[Client 1] --> B[Load Balancer]\n    C[Client 2] --> B\n    D[Client 3] --> B\n    B --> E[Connection Manager A]\n    B --> F[Connection Manager B]\n    B --> G[Connection Manager C]\n    E --> H[Redis Pub/Sub]\n    F --> H\n    G --> H\n    H --> E\n    H --> F\n    H --> G\n    E --> I[(PostgreSQL)]\n    F --> I\n    G --> I"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: stateful versus stateless connection managers"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Architectural approaches",
+        "cards": [
+          {
+            "title": "Stateful with sticky sessions",
+            "description": "Each server instance stores connection state and the load balancer routes a user to the same instance.",
+            "pros": ["Simple routing", "No message bus required for same-server messages"],
+            "cons": ["Hard to scale horizontally", "Complex failover", "Rebalancing is difficult"]
+          },
+          {
+            "title": "Stateless with pub/sub",
+            "description": "Server instances are interchangeable; a message bus routes messages to the instance holding a given connection.",
+            "pros": ["Linear horizontal scaling", "Simple failover", "No rebalancing needed"],
+            "cons": ["Message bus is a new dependency", "Slightly higher latency for cross-instance messages"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Capacity plan a real-time service",
+        "description": "Given the following targets, design a capacity plan: ten thousand concurrent WebSocket connections per server, fifty messages per second per room, one hundred rooms per server instance. Calculate the total servers needed for one million concurrent users and five hundred thousand messages per second across all rooms.",
+        "steps": [
+          "Calculate file descriptors and memory per connection",
+          "Determine how many connections each server instance can hold",
+          "Calculate the number of server instances required for one million concurrent users",
+          "Determine message bus throughput requirements",
+          "Identify the bottleneck and describe how you would test it before production"
+        ],
+        "expectedOutcome": "You should produce a capacity model with clear assumptions and a plan for load testing each bottleneck."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Stateless connection managers with pub/sub scale linearly",
+          "Increase file descriptor limits before adding servers",
+          "Use rooms to minimize unnecessary broadcast traffic",
+          "Warm up new instances before sending live traffic"
+        ],
+        "takeaway": "Scaling real-time systems is about removing state from individual servers and distributing work through a shared message bus."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "websocket-connection-lifecycle",
+    "message-persistence-and-ordering"
+  ],
+  "furtherReading": [
+    {
+      "title": "Scaling WebSocket with Socket.IO and Redis Adapter",
+      "url": "https://socket.io/docs/v4/redis-adapter/",
+      "type": "article",
+      "author": "Socket.IO",
+      "description": "How to use the Redis adapter to scale Socket.IO across multiple nodes."
+    }
+  ]
 }

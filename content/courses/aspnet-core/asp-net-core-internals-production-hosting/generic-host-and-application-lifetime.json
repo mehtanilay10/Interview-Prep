@@ -3,59 +3,188 @@
   "slug": "generic-host-and-application-lifetime",
   "moduleSlug": "asp-net-core-internals-production-hosting",
   "courseSlug": "aspnet-core",
-  "title": "Generic Host and application lifetime",
-  "description": "Learn about Generic Host and application lifetime. Master the concepts, patterns, and best practices.",
+  "title": "Generic Host and Application Lifetime",
+  "description": "Explore the Generic Host abstraction, application lifetime events, hosted services, and how to run background workloads alongside your web app.",
   "order": 2,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "host",
+    "lifetime",
+    "background",
+    "startup"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Generic Host and application lifetime** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with generic host and application lifetime."
+        "text": "ASP.NET Core is built on top of the **Generic Host**, an abstraction that separates the web server from the application logic. The Generic Host manages dependency injection, logging, configuration, and the application lifecycle. It allows the same code to run in web, console, Windows service, and Kubernetes environments."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before the Generic Host, ASP.NET relied on `WebHost`, which was tightly coupled to HTTP. The Generic Host introduced `Host.CreateApplicationBuilder(args)`, a single entry point for all .NET applications. Your web-specific code adds a web server and HTTP endpoints on top of this shared foundation."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Application Lifetime Events"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Generic Host exposes lifecycle events that let you run code at key moments: when the application starts, when it is shutting down, and when specific services are ready. These events are critical for initializing resources, starting background tasks, and releasing resources cleanly."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Common lifetime events",
         "items": [
-          "Understand the fundamental principles of generic host and application lifetime",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Starting: The host is beginning the startup sequence. Configuration and DI are available, but the server has not started listening yet.",
+          "Started: The server has started listening for requests. This is the earliest safe point to begin external communication.",
+          "Stopping: The host is beginning shutdown. In-flight requests may still be processing. Stop accepting new work here.",
+          "Stopped: The host has fully shut down. All services have been disposed."
         ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering a background task with IHostedService",
+        "content": "IHostedService gives you control over startup and shutdown logic outside the request pipeline.",
+        "language": "csharp",
+        "code": "public class TimestampHostedService : IHostedService, IAsyncDisposable\n{\n    private readonly ILogger<TimestampHostedService> _logger;\n    private Timer? _timer;\n\n    public TimestampHostedService(ILogger<TimestampHostedService> logger)\n    {\n        _logger = logger;\n    }\n\n    public Task StartAsync(CancellationToken cancellationToken)\n    {\n        _logger.LogInformation(\"Timestamp service starting\");\n        _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));\n        return Task.CompletedTask;\n    }\n\n    private void DoWork(object? state)\n    {\n        _logger.LogInformation(\"Current timestamp: {Time}\", DateTimeOffset.Now);\n    }\n\n    public async Task StopAsync(CancellationToken cancellationToken)\n    {\n        _logger.LogInformation(\"Timestamp service stopping\");\n        _timer?.Change(Timeout.Infinite, 0);\n        await Task.Delay(500, cancellationToken);\n        _timer?.Dispose();\n    }\n\n    public async ValueTask DisposeAsync()\n    {\n        await Task.CompletedTask;\n    }\n}\n\n// Registration in Program.cs\nbuilder.Services.AddHostedService<TimestampHostedService>();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "StopAsync May Be Cancelled",
+        "text": "The CancellationToken passed to StopAsync is triggered when the shutdown timeout expires. If your cleanup takes longer than the configured ShutdownTimeout, the host will force exit. Always respect cancellation and complete quickly."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "HostBuilder vs WebApplication Builder"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding generic host and application lifetime is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Modern ASP.NET Core applications use `WebApplication.CreateBuilder`, which is a convenience wrapper around the Generic Host. It pre-configures Kestrel, IIS integration, and content root detection. If you need finer control, you can fall back to `Host.CreateApplicationBuilder` and manually add the web server."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with generic host and application lifetime, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Minimal Generic Host without web server",
+        "content": "Use Host.CreateApplicationBuilder for console or Windows service applications that still need DI and logging.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.DependencyInjection;\nusing Microsoft.Extensions.Hosting;\nusing Microsoft.Extensions.Logging;\n\nvar host = Host.CreateApplicationBuilder(args);\n\nhost.Services.AddHostedService<Worker>();\nhost.Services.AddLogging();\n\nawait host.RunAsync();\n\npublic class Worker : BackgroundService\n{\n    private readonly ILogger<Worker> _logger;\n    public Worker(ILogger<Worker> logger) => _logger = logger;\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            _logger.LogInformation(\"Worker running at: {Time}\", DateTimeOffset.Now);\n            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Graceful Shutdown Timeout"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When the application receives a stop signal (SIGTERM, Ctrl+C, or IIS shutdown), the host begins graceful shutdown. It stops accepting new requests, waits for existing requests to finish, and runs IHostedService.StopAsync. You can configure how long to wait before force-killing the process with `ShutdownTimeout`."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Signal",
+          "Typical Source",
+          "Effect"
+        ],
+        "rows": [
+          [
+            "SIGTERM",
+            "Linux systemd, Kubernetes",
+            "Initiates graceful shutdown with configured timeout"
+          ],
+          [
+            "Ctrl+C",
+            "Developer terminal",
+            "Same as SIGTERM"
+          ],
+          [
+            "IIS Stop",
+            "IIS application pool recycle",
+            "ANCM sends shutdown signal to Out-of-Process host"
+          ],
+          [
+            "docker stop",
+            "Docker daemon",
+            "Sends SIGTERM, then SIGKILL after the container's stop timeout"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What is the difference between IHostedService and BackgroundService?",
+            "answer": "IHostedService is the lower-level interface that exposes StartAsync and StopAsync. BackgroundService is a convenience base class that implements IHostedService and provides an ExecuteAsync loop with automatic cancellation support. Use BackgroundService for most long-running tasks."
+          },
+          {
+            "question": "Can I have multiple IHostedService implementations?",
+            "answer": "Yes. The host runs all registered IHostedService implementations in parallel during startup and shutdown. Be careful with ordering — if one hosted service depends on another, you may need to coordinate manually or use IHostedService dependencies."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Generic Host Summary",
+        "points": [
+          "The Generic Host manages DI, logging, configuration, and lifetime events for all .NET apps.",
+          "WebApplication.CreateBuilder is a convenience wrapper that adds Kestrel and HTTP endpoints.",
+          "IHostedService lets you run background tasks with full access to DI and logging.",
+          "Use BackgroundService for simpler long-running tasks with cancellation support.",
+          "Graceful shutdown gives in-flight requests time to complete before the process exits."
+        ],
+        "takeaway": "The Generic Host is the backbone of every ASP.NET Core application. Mastering its lifecycle and hosted services lets you build applications that start cleanly, run reliably, and shut down gracefully."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "backgroundservice-and-hosted-workloads",
+    "request-cancellation-and-graceful-shutdown"
+  ],
+  "furtherReading": [
+    {
+      "title": "Generic Host in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/generic-host",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official documentation on the Generic Host, HostBuilder, and application lifetime events."
+    },
+    {
+      "title": "Background tasks with hosted services",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Guide to implementing background workloads with IHostedService and BackgroundService."
+    }
+  ]
 }

@@ -4,33 +4,49 @@
   "moduleSlug": "project-1-enterprise-expense-platform",
   "courseSlug": "full-stack-senior-projects",
   "title": "Phase 1: Requirements, domain model and architecture",
-  "description": "Project: Phase 1: Requirements, domain model and architecture. Build and understand this project with step-by-step guidance.",
+  "description": "Define the core requirements, bounded contexts, and layered architecture for the Enterprise Expense Platform. Model the domain with aggregate roots, value objects, and explicit transaction boundaries before writing a single line of infrastructure code.",
   "order": 1,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 30,
+  "tags": [
+    "domain-driven-design",
+    "architecture",
+    "requirements",
+    "expense-platform"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Phase 1: Requirements, domain model and architecture** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with phase 1: requirements, domain model and architecture."
+        "text": "Every senior engineer knows that the cost of architectural mistakes grows exponentially over time. In this phase, you'll resist the temptation to scaffold controllers and jump straight into database tables. Instead, you'll spend quality time understanding the business domain, identifying aggregate boundaries, and locking in the event flow that will drive your system for years."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Business requirements"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The platform must support the following core capabilities. Each maps to an explicit set of user stories and acceptance criteria that you'll validate in later phases."
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Core capabilities",
         "items": [
-          "Understand the fundamental principles of phase 1: requirements, domain model and architecture",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Employees submit expense reports containing multiple line items (meals, travel, lodging, software).",
+          "Each line item may have an attached receipt image stored as a blob.",
+          "A configurable expense policy engine validates submissions against per-category limits, per-project caps, and mandatory receipt rules.",
+          "Multi-level approval: direct manager → department head → finance (configurable per organization).",
+          "Approvers see only reports within their cost center or delegated authority scope.",
+          "Finance can reimburse approved reports and export them to accounting software.",
+          "Employees view their submission history; managers see their team's pending approvals.",
+          "Admins manage organizations, departments, users, and policy rules."
         ]
       }
     },
@@ -38,24 +54,253 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Domain model and aggregates"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding phase 1: requirements, domain model and architecture is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A clear aggregate boundary prevents distributed transactions, race conditions, and overly broad repository methods. In the expense domain, **ExpenseReport** is the natural aggregate root. Everything that must be saved atomically lives inside it."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Aggregate root",
+            "definition": "An entity that controls access to its internal objects. All external references go through the root (e.g., ExpenseReport), never directly to child entities (LineItem, Approval)."
+          },
+          {
+            "term": "Value object",
+            "definition": "An immutable object defined by its attributes rather than identity (e.g., Money, EmailAddress, PolicyRule)."
+          },
+          {
+            "term": "Bounded context",
+            "definition": "A semantic boundary within which a particular domain model is defined and applicable. ExpenseSubmission and PolicyEngine are separate bounded contexts."
+          },
+          {
+            "term": "Domain event",
+            "definition": "A record of something significant that happened in the domain (e.g., ExpenseReportSubmitted, ApprovalGranted), published for other contexts to react."
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-agg-expense",
+        "caption": "Expense aggregate: root and child entities",
+        "definition": "classDiagram\n    class ExpenseReport {\n        +Guid Id\n        +Guid EmployeeId\n        +Guid OrganizationId\n        +ReportStatus Status\n        +decimal TotalAmount\n        +DateTimeOffset SubmittedAt\n        +DateTimeOffset? ApprovedAt\n        +IReadOnlyList<LineItem> LineItems\n        +IReadOnlyList<Approval> Approvals\n        +IReadOnlyList<Receipt> Receipts\n        +void AddLineItem(LineItem)\n        +void Submit(PolicyEngine)\n        +void Approve(Guid approverId)\n        +void Reject(string reason)\n    }\n    class LineItem {\n        +Guid Id\n        +string Category\n        +Money Amount\n        +DateTimeOffset Date\n        +string? Description\n        +bool RequiresReceipt\n        +Receipt? Receipt\n    }\n    class Approval {\n        +Guid Id\n        +Guid ApproverId\n        +ApprovalDecision Decision\n        +string? Comments\n        +DateTimeOffset DecidedAt\n    }\n    class Receipt {\n        +Guid Id\n        +string FileName\n        +long FileSizeBytes\n        +string ContentType\n        +DateTimeOffset UploadedAt\n    }\n    ExpenseReport \"1\" *-- \"*\" LineItem\n    ExpenseReport \"1\" *-- \"*\" Approval\n    ExpenseReport \"1\" *-- \"*\" Receipt\n    LineItem \"1\" --> \"0..1\" Receipt"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Why ExpenseReport is the aggregate root",
+        "text": "If two users concurrently modify LineItems on the same report, you need one transaction, one lock, one validation pass. That coherence boundary is exactly what an aggregate root enforces. Never inject an ILineItemRepository directly — it breaks the aggregate invariant."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Supporting aggregates"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Supporting aggregates",
+        "items": [
+          "PolicyRule: per-organization expense policy (category limit, project cap, receipt requirement). Owned by Admin.",
+          "Organization: tenant boundary; all queries filter by OrganizationId.",
+          "Department: organizational unit within an Organization; links to a CostCenter.",
+          "CostCenter: budget owner; tied to a GL code for accounting export.",
+          "UserProfile: employee record with department, managerId, and role assignments."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-agg-supporting",
+        "caption": "Supporting aggregates and relationships",
+        "definition": "classDiagram\n    class Organization {\n        +Guid Id\n        +string Name\n        +string Slug\n        +string Currency\n        +ApprovalChain ApprovalChain\n    }\n    class Department {\n        +Guid Id\n        +Guid OrganizationId\n        +string Name\n        +Guid CostCenterId\n        +Guid? ManagerUserId\n    }\n    class CostCenter {\n        +Guid Id\n        +Guid OrganizationId\n        +string Code\n        +string Name\n        +decimal MonthlyBudget\n    }\n    class PolicyRule {\n        +Guid Id\n        +Guid OrganizationId\n        +string Category\n        +decimal? MaxAmount\n        +bool RequiresReceipt\n        +bool IsActive\n    }\n    class UserProfile {\n        +Guid Id\n        +Guid OrganizationId\n        +Guid DepartmentId\n        +Guid? ManagerUserId\n        +string DisplayName\n        +string Email\n        +IReadOnlyList<RoleAssignment> Roles\n    }\n    Organization \"1\" *-- \"*\" Department\n    Organization \"1\" *-- \"*\" CostCenter\n    Organization \"1\" *-- \"*\" PolicyRule\n    Department \"*\" --> \"1\" CostCenter\n    Department \"*\" --> \"0..1\" UserProfile : manager\n    UserProfile \"*\" --> \"*\" Department : belongs to"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Layered architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "We use a strict layered architecture enforced by project boundaries. Inner layers never reference outer layers."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Project layers",
+        "items": [
+          "**Expense.Domain**: Entities, value objects, domain events, repository interfaces, business rules. No infrastructure references.",
+          "**Expense.Application**: CQRS handlers (MediatR), validators (FluentValidation), DTOs, application service interfaces.",
+          "**Expense.Infrastructure**: EF Core DbContext, repository implementations, external service clients, outbox publisher.",
+          "**Expense.Api**: ASP.NET Core controllers, middleware, auth, health checks, OpenAPI configuration.",
+          "**Expense.Web**: React 19 + Vite app (separate repo or sibling folder)."
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-architecture",
+        "caption": "Layered architecture with dependency direction",
+        "definition": "graph BT\n    subgraph Expense.Web[Expense.Web (React 19 + Vite)]\n        direction TB\n        W1[Components]\n        W2[Hooks / Services]\n        W3[Pages]\n    end\n    subgraph Expense.Api[Expense.Api (ASP.NET Core)]\n        direction TB\n        A1[Controllers]\n        A2[Middleware]\n        A3[Auth / DI]\n    end\n    subgraph Expense.Infrastructure[Expense.Infrastructure]\n        direction TB\n        I1[DbContext]\n        I2[Repositories]\n        I3[Redis Cache]\n        I4[Outbox Publisher]\n    end\n    subgraph Expense.Application[Expense.Application]\n        direction TB\n        AP1[MediatR Handlers]\n        AP2[Validators]\n        AP3[DTOs]\n    end\n    subgraph Expense.Domain[Expense.Domain]\n        direction TB\n        D1[Entities]\n        D2[Value Objects]\n        D3[Domain Events]\n        D4[Repo Interfaces]\n    end\n\n    Expense.Api --> Expense.Application\n    Expense.Api --> Expense.Infrastructure\n    Expense.Infrastructure --> Expense.Application\n    Expense.Infrastructure --> Expense.Domain\n    Expense.Application --> Expense.Domain"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid the common layering mistake",
+        "text": "It's tempting to let controllers query DbContext directly. Resist. Handlers in Expense.Application own the use-case orchestration. Controllers should be thin (max 15 lines). This separation enables unit-testing handlers without WebApplicationFactory."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# domain model: ExpenseReport as aggregate root",
+        "content": "The aggregate root exposes behavior, not setters. External code cannot arbitrarily change Status or TotalAmount.",
+        "language": "csharp",
+        "code": "public sealed class ExpenseReport : AggregateRoot<ExpenseReport, Guid>\n{\n    private readonly List<LineItem> _lineItems = new();\n    private readonly List<Approval> _approvals = new();\n    private readonly List<DomainEvent> _events = new();\n\n    public Guid EmployeeId { get; private set; }\n    public Guid OrganizationId { get; private set; }\n    public ReportStatus Status { get; private set; } = ReportStatus.Draft;\n    public Money TotalAmount => _lineItems\n        .Select(li => li.Amount)\n        .Aggregate((a, b) => a + b);\n    public DateTimeOffset? SubmittedAt { get; private set; }\n    public IReadOnlyList<LineItem> LineItems => _lineItems.AsReadOnly();\n\n    public void AddLineItem(LineItem item)\n    {\n        if (Status != ReportStatus.Draft)\n            throw new DomainException(\"Cannot modify a submitted report.\");\n        if (_lineItems.Any(li => li.Category == item.Category && li.Date == item.Date))\n            throw new DomainException(\"Duplicate line items are not allowed.\");\n        _lineItems.Add(item);\n    }\n\n    public void Submit(IPolicyEngine policy)\n    {\n        if (!_lineItems.Any())\n            throw new DomainException(\"A report must contain at least one line item.\");\n        if (TotalAmount <= Money.Zero)\n            throw new DomainException(\"Total amount must be positive.\");\n        policy.Validate(this);\n        Status = ReportStatus.Submitted;\n        SubmittedAt = DateTimeOffset.UtcNow;\n        AddDomainEvent(new ExpenseReportSubmitted(this));\n    }\n\n    public void Approve(Guid approverId)\n    {\n        if (Status != ReportStatus.Submitted)\n            throw new DomainException(\"Only submitted reports can be approved.\");\n        Status = ReportStatus.Approved;\n        AddDomainEvent(new ExpenseReportApproved(Id, approverId));\n    }\n\n    public void Reject(Guid approverId, string reason)\n    {\n        if (Status != ReportStatus.Submitted)\n            throw new DomainException(\"Only submitted reports can be rejected.\");\n        if (string.IsNullOrWhiteSpace(reason))\n            throw new DomainException(\"A rejection reason is required.\");\n        Status = ReportStatus.Rejected;\n        AddDomainEvent(new ExpenseReportRejected(Id, approverId, reason));\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# value object: Money",
+        "content": "Value objects enforce invariants at construction time and make currency explicit across the domain.",
+        "language": "csharp",
+        "code": "public sealed record Money(decimal Amount, string Currency)\n{\n    public static Money Zero(string currency) => new(0m, currency);\n\n    public static Money operator +(Money a, Money b)\n    {\n        if (a.Currency != b.Currency)\n            throw new DomainException(\"Cannot add Money with different currencies.\");\n        return new Money(a.Amount + b.Amount, a.Currency);\n    }\n\n    public static bool operator >(Money a, Money b)\n    {\n        if (a.Currency != b.Currency)\n            throw new DomainException(\"Cannot compare Money with different currencies.\");\n        return a.Amount > b.Amount;\n    }\n\n    public static bool operator <(Money a, Money b)\n    {\n        if (a.Currency != b.Currency)\n            throw new DomainException(\"Cannot compare Money with different currencies.\");\n        return a.Amount < b.Amount;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Domain events and eventual consistency"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When an ExpenseReport is approved, several things must happen: the approver's task list must clear, the employee must be notified, and the accounting export job must be scheduled. These side effects do not belong inside the aggregate — they are the responsibility of event handlers in the Application or Infrastructure layer."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Key domain events",
+        "items": [
+          "ExpenseReportSubmitted → trigger policy validation, create approval chain, notify first approver.",
+          "ApprovalGranted → advance chain or mark approved; if all approved, notify employee and finance.",
+          "ExpenseReportRejected → notify submitter with reason; reopen draft status.",
+          "ExpenseReportPaid → trigger accounting export, mark as reimbursed."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with phase 1: requirements, domain model and architecture, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Event naming convention",
+        "text": "Use past-tense names (ExpenseReportSubmitted, not SubmitExpenseReport). This removes ambiguity: the event signals that something already happened, not a command to do something."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Phase 1 deliverables",
+        "items": [
+          {
+            "text": "Documented business requirements mapped to user stories.",
+            "hint": "At least 8 user stories covering employee, manager, finance, and admin roles."
+          },
+          {
+            "text": "Aggregate diagram showing root and child entities for ExpenseReport and supporting aggregates.",
+            "hint": "Include invariants enforced at the root level."
+          },
+          {
+            "text": "Layered project structure defined with dependency direction arrows.",
+            "hint": "Expense.Domain has zero external dependencies."
+          },
+          {
+            "text": "Domain event catalog with at least 4 events.",
+            "hint": "Document publisher and handler responsibilities."
+          },
+          {
+            "text": "ADR (Architecture Decision Record) describing the chosen layering approach and why.",
+            "hint": "Reference vertical slice vs. layered trade-offs."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common questions",
+        "items": [
+          {
+            "question": "Why not use EF Core entities directly as domain models?",
+            "answer": "EF Core entities couple persistence concerns (navigation properties, lazy loading, annotations) to domain logic. Separating them lets you evolve the schema without breaking domain rules and keeps unit tests fast and dependency-free."
+          },
+          {
+            "question": "Should Approval be its own aggregate?",
+            "answer": "No. An Approval is a part of the ExpenseReport aggregate — it cannot exist without the report, and all approvals for a report must be loaded and validated together. If you need to query \"all approvals pending for a user,\" that is a read-model concern (Phase 2+), not a separate aggregate."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Phase 1 summary",
+        "points": [
+          "ExpenseReport is the aggregate root; line items, approvals, and receipts are children.",
+          "Supporting aggregates (Organization, Department, PolicyRule) enforce tenant and policy boundaries.",
+          "Layered architecture: Domain → Application → Infrastructure → Api.",
+          "Domain events drive side effects without polluting aggregate logic.",
+          "Spend extra time here — bad domain boundaries are the hardest thing to refactor later."
+        ],
+        "takeaway": "Domain modeling is not a one-time activity. Revisit the model when requirements shift, but the aggregate boundaries you set in Phase 1 will define your system's integrity guarantees."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "Microsoft: .NET Microservices: Architecture Patterns & Practices",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Martin Fowler: Aggregate",
+      "url": "https://martinfowler.com/bliki/DDD_Aggregate.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "C# record types documentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/record",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ]
 }

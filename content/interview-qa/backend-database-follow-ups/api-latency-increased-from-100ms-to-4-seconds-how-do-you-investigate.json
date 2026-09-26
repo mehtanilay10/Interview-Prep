@@ -4,33 +4,44 @@
   "moduleSlug": "backend-database-follow-ups",
   "courseSlug": "interview-qa",
   "title": "API latency increased from 100ms to 4 seconds: how do you investigate?",
-  "description": "Interview question: API latency increased from 100ms to 4 seconds: how do you investigate?. Learn the answer with detailed explanation and examples.",
+  "description": "Learn a systematic approach to diagnosing sudden latency spikes in production APIs, from metrics to database to infrastructure.",
   "order": 1,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "backend",
+    "latency",
+    "monitoring",
+    "production"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**API latency increased from 100ms to 4 seconds: how do you investigate?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with api latency increased from 100ms to 4 seconds: how do you investigate?."
+        "text": "Sudden latency spikes are among the most stressful production incidents. A healthy API that normally responds in 100 milliseconds jumping to 4 seconds means something changed — and you need to find it fast. The key is to follow a layered investigation rather than guessing."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start by confirming the symptom. Is the latency increase global or limited to a specific endpoint, region, or user segment? Use your monitoring dashboard to compare p50, p95, and p99 latencies. A spike in p99 with a stable p50 usually indicates a subset of slow requests, not a universal degradation."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Investigation layers"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the step-by-step process of api latency increased from 100ms to 4 seconds: do you investigate?",
-          "Identify the key components and their interactions",
-          "Recognize common failure points and how to avoid them",
-          "Apply best practices for reliable implementation"
+          "Layer 1: Check for recent deployments, config changes, or feature flags that flipped on.",
+          "Layer 2: Look at infrastructure — CPU, memory, disk I/O, network, and connection pool saturation.",
+          "Layer 3: Examine downstream dependencies: database query times, external API calls, and message queues.",
+          "Layer 4: Profile the application code path for the affected endpoint to find the exact bottleneck."
         ]
       }
     },
@@ -38,25 +49,140 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Database-first investigation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding api latency increased from 100ms to 4 seconds: how do you investigate? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The database is the most common culprit for sudden latency increases. Begin by comparing the slow query log before and after the regression. Look for queries that changed execution plans, new missing-index warnings, or blocking chains."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Server: Identify the top slow queries since the regression",
+        "language": "sql",
+        "code": "SELECT TOP 20\n    qs.sql_handle,\n    qs.execution_count,\n    qs.total_elapsed_time / 1000000.0 AS total_seconds,\n    qs.avg_elapsed_time / 1000000.0 AS avg_seconds,\n    SUBSTRING(st.text, (qs.statement_start_offset / 2) + 1,\n        (CASE WHEN qs.statement_end_offset = -1\n              THEN LEN(CONVERT(NVARCHAR(MAX), st.text)) * 2\n              ELSE qs.statement_end_offset END - qs.statement_start_offset) / 2 + 1) AS query_text\nFROM sys.dm_exec_query_stats AS qs\nCROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS st\nWHERE qs.last_execution_time >= DATEADD(MINUTE, -30, GETUTCDATE())\nORDER BY qs.total_elapsed_time DESC;"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with api latency increased from 100ms to 4 seconds: how do you investigate?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Do not restart the service to confirm",
+        "text": "Restarting clears symptoms but also destroys evidence — connection pool state, in-flight queries, and deadlock graphs. Investigate first, restart only after you understand the root cause."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Application-side diagnostics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If the database looks healthy, instrument the application. Add structured logging with elapsed milliseconds per step. In ASP.NET Core, use DiagnosticSource or a middleware timer to separate network time from database time from business-logic time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C#: Minimal request-timing middleware",
+        "language": "csharp",
+        "code": "public class RequestTimingMiddleware {\n    private readonly RequestDelegate _next;\n    private readonly ILogger<RequestTimingMiddleware> _logger;\n\n    public RequestTimingMiddleware(RequestDelegate next, ILogger<RequestTimingMiddleware> logger) {\n        _next = next;\n        _logger = logger;\n    }\n\n    public async Task InvokeAsync(HttpContext context) {\n        var sw = Stopwatch.StartNew();\n        context.Request.EnableBuffering();\n        await _next(context);\n        sw.Stop();\n\n        _logger.LogInformation(\n            \"{Method} {Path} responded {StatusCode} in {Elapsed}ms\",\n            context.Request.Method,\n            context.Request.Path,\n            context.Response.StatusCode,\n            sw.ElapsedMilliseconds);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common regression sources"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "New code path that skips caching or executes redundant queries.",
+          "Deployment that changed connection-string settings or timeout values.",
+          "Schema migration that invalidated cached query plans.",
+          "Traffic pattern change combined with undersized connection pools.",
+          "Index corruption or auto-statistics update triggered by large data changes."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "What strong candidates cover",
+        "items": [
+          {
+            "text": "Confirm the symptom with quantitative data before investigating.",
+            "hint": "Mention p50, p95, p99 and endpoint-level breakdown."
+          },
+          {
+            "text": "Rule out recent deployments and feature flags first.",
+            "hint": "Speed of elimination matters in an interview."
+          },
+          {
+            "text": "Separate application, database, and infrastructure concerns.",
+            "hint": "Shows structured thinking."
+          },
+          {
+            "text": "Propose concrete SQL and code-level diagnostics.",
+            "hint": "Demonstrates hands-on experience."
+          },
+          {
+            "text": "Mention observability: metrics, logs, and distributed traces.",
+            "hint": "Modern backends rely on all three."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Start with data, not guesses: confirm the latency spike with monitoring before opening any tool.",
+          "Layer your investigation: deployment, infrastructure, dependencies, then application code.",
+          "The database is the most common source of sudden regressions — check query plans and indexes first.",
+          "Instrumentation is your best long-term defense against latency mysteries."
+        ],
+        "takeaway": "Investigate systematically from metrics to code, preserving evidence before changing anything."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "relatedLessons": [
+    "a-production-query-suddenly-became-slow-after-a-deployment-what-do-you-check",
+    "how-would-you-handle-a-database-deadlock-in-production"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL Server Query Store documentation",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store",
+      "type": "article"
+    },
+    {
+      "title": "ASP.NET Core DiagnosticSource for request timing",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/diagnosticsource",
+      "type": "article"
+    },
+    {
+      "title": "Site Reliability Engineering — Google",
+      "url": "https://sre.google/sre-book/service-level-objectives/",
+      "type": "course"
+    }
+  ],
+  "technology": "Backend & Database"
 }

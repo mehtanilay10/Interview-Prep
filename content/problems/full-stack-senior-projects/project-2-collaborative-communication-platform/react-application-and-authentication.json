@@ -13,7 +13,7 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**React application and authentication** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with react application and authentication."
+        "text": "The React frontend for a real-time communication platform must handle authentication, optimistic UI updates, message state, and connection lifecycle events without blocking the main thread. Senior engineers treat the frontend as a distributed system participant: it has local state, remote state, eventual consistency, and failure modes that must be visible to users."
       }
     },
     {
@@ -27,10 +27,40 @@
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of react application and authentication",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Use server-side session cookies or signed JWTs for WebSocket authentication during the upgrade request",
+          "Store auth state in React context or a state manager and trigger a global re-auth flow on 401 responses",
+          "Apply optimistic updates for message sending to make the UI feel instant, with rollback on failure",
+          "Manage WebSocket connection state with a dedicated hook that exposes readyState and reconnect status",
+          "Use React Query or SWR to cache messages and synchronize with the server on reconnect",
+          "Debounce typing indicators to avoid flooding the message bus with redundant events",
+          "Handle token expiration: silent refresh or redirect to login without losing unsent message drafts"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Optimistic update",
+            "definition": "Updating the local UI state before the server confirms the operation, then rolling back if the request fails."
+          },
+          {
+            "term": "Silent refresh",
+            "definition": "Refreshing an expired auth token in the background using a refresh token without user interaction."
+          },
+          {
+            "term": "Eventual consistency",
+            "definition": "The state of the local UI may temporarily diverge from the server but will converge after synchronization."
+          },
+          {
+            "term": "Ready state",
+            "definition": "The current status of a WebSocket connection: connecting, open, closing, or closed."
+          },
+          {
+            "term": "Debounce",
+            "definition": "Delaying an action until a specified quiet period has elapsed, reducing the rate of repeated events like typing indicators."
+          }
         ]
       }
     },
@@ -44,18 +74,156 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding react application and authentication is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "A frontend that does not handle auth expiration or failed optimistic updates will create a fragmented experience where users see duplicate messages, lost drafts, or frozen UIs. Senior engineers build frontend state machines that handle every connection state and auth edge case, so the application degrades gracefully rather than crashing."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with react application and authentication, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Use a state machine for connection state",
+        "text": "Model the WebSocket connection as a finite state machine with states: idle, connecting, connected, reconnecting, disconnected. Do not use a simple boolean. A state machine makes it easy to render the correct UI and prevents impossible transitions like sending while disconnected."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authentication patterns"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Cookie-based session: server sets an HTTP-only cookie after login; WebSocket upgrade inherits the cookie automatically",
+          "Bearer token in query string: convenient but less secure; tokens may leak in server logs",
+          "Subprotocol token: pass the token in the Sec-WebSocket-Protocol header during upgrade",
+          "Refresh token rotation: issue short-lived access tokens and long-lived refresh tokens; rotate refresh tokens on each use"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "WebSocket upgrade with authentication",
+        "content": "Example of an authenticated WebSocket upgrade using a query parameter token and a Next.js API route handler:",
+        "code": "const wsHandler = async (req: NextRequest) => {\n  const token = req.nextUrl.searchParams.get('token');\n  if (!token) return new Response('Unauthorized', { status: 401 });\n  const session = await verifyToken(token);\n  if (!session) return new Response('Unauthorized', { status: 401 });\n\n  const upgradeHeader = req.headers.get('upgrade');\n  if (upgradeHeader !== 'websocket') {\n    return new Response('Expected Upgrade: websocket', { status: 426 });\n  }\n\n  const pair = new WebSocketPair();\n  const [server, client] = Object.values(pair);\n  const ws = server.accept();\n  ws.userId = session.userId;\n  connectionRegistry.set(ws, session.userId);\n  ws.addEventListener('message', (event) => handleMessage(event, ws));\n  ws.addEventListener('close', () => connectionRegistry.delete(ws));\n  return new Response(null, { status: 101, webSocket: client });\n};",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Frontend state synchronization"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Cache messages in a normalized store keyed by message ID to support fast lookup and updates",
+          "Synchronize on reconnect by requesting missed messages from the server using a last-known message ID cursor",
+          "Handle message ordering conflicts by preferring the server-assigned timestamp or sequence number",
+          "Show a visual indicator when the connection is reconnecting so users understand why new messages are not appearing",
+          "Persist unsent drafts to IndexedDB or localStorage so they survive page refreshes"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "State management approaches",
+        "cards": [
+          {
+            "title": "React Context + useReducer",
+            "description": "Built-in state management without external dependencies.",
+            "pros": ["No extra bundle size", "Simple to learn", "Works with SSR"],
+            "cons": ["Can cause unnecessary re-renders", "Not ideal for complex async flows"]
+          },
+          {
+            "title": "React Query / TanStack Query",
+            "description": "Server state management with caching, background refetching, and optimistic updates.",
+            "pros": ["Handles caching automatically", "Built-in stale-while-revalidate", "Great devtools"],
+            "cons": ["Learning curve", "Extra dependency"]
+          },
+          {
+            "title": "Zustand",
+            "description": "Lightweight state management with a minimal API.",
+            "pros": ["Tiny bundle size", "No provider wrapping", "Simple API"],
+            "cons": ["No built-in devtools", "Less convention"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Exercise"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build an auth-aware WebSocket hook",
+        "description": "Create a useWebSocket hook that manages authentication, reconnection, and message state for a chat application. The hook should expose sendMessage, messages, connectionState, and a readyState getter.",
+        "steps": [
+          "Implement the WebSocket connection with upgrade authentication",
+          "Add heartbeat and reconnect logic with exponential backoff",
+          "Use React Query to cache messages and synchronize on reconnect",
+          "Implement optimistic message sending with rollback on failure",
+          "Handle token expiration by showing a login modal without losing draft messages"
+        ],
+        "expectedOutcome": "You should have a production-ready hook that handles auth, reconnection, and optimistic updates without blocking the UI."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I store the JWT in localStorage?",
+            "answer": "Prefer HTTP-only cookies for access tokens to prevent XSS. If you must use localStorage, ensure you have strict Content Security Policy headers and do not expose the token to third-party scripts."
+          },
+          {
+            "question": "How do I handle message duplication after reconnect?",
+            "answer": "Use a client-generated message ID as an idempotency key. The server should deduplicate based on that key. On reconnect, the client can re-send unacknowledged messages and the server will ignore duplicates."
+          },
+          {
+            "question": "What if React Query cache becomes stale?",
+            "answer": "React Query automatically invalidates stale data on window focus and reconnect. For real-time updates, use the WebSocket message stream to update the cache directly with queryClient.setQueryData."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Treat the frontend as a distributed participant with eventual consistency",
+          "Use optimistic updates with rollback for instant feedback",
+          "Model connection state explicitly with a state machine",
+          "Handle auth expiration without losing user work"
+        ],
+        "takeaway": "A senior frontend engineer designs for failure and recovery first, then adds features. The best real-time UIs feel instant because they handle network latency gracefully."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "requirements-and-real-time-communication-architecture",
+    "websocket-connection-lifecycle"
+  ],
+  "furtherReading": [
+    {
+      "title": "TanStack Query Documentation",
+      "url": "https://tanstack.com/query/latest/docs/framework/react/overview",
+      "type": "article",
+      "author": "TanStack",
+      "description": "Official documentation for React Query, covering caching, optimistic updates, and synchronization strategies."
+    }
+  ]
 }

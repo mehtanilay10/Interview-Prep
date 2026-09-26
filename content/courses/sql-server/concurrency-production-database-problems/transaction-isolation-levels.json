@@ -3,34 +3,51 @@
   "slug": "transaction-isolation-levels",
   "moduleSlug": "concurrency-production-database-problems",
   "courseSlug": "sql-server",
-  "title": "Transaction isolation levels",
-  "description": "Learn about Transaction isolation levels. Master the concepts, patterns, and best practices.",
+  "title": "Transaction Isolation Levels",
+  "description": "Explore SQL Server's isolation levels, from READ UNCOMMITTED to SERIALIZABLE, and learn how each level trades consistency, concurrency, and blocking.",
   "order": 3,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "isolation-levels",
+    "concurrency",
+    "sql-server",
+    "transactions"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Transaction isolation levels** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with transaction isolation levels."
+        "text": "Transaction isolation levels are SQL Server's way of letting you control the trade-off between **data consistency** and **concurrency**. At one extreme, a system that allows only one transaction at a time is perfectly consistent but useless in production. At the other extreme, a system that lets everyone read and write simultaneously is fast but dangerous. Isolation levels let you pick the right balance for each workload."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQL Server supports five isolation levels: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SNAPSHOT, and SERIALIZABLE. Each level prevents different anomalies — dirty reads, non-repeatable reads, and phantom reads — and each imposes different locking behavior."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Three Anomalies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before diving into isolation levels, it helps to understand the problems they solve. The three classic concurrency anomalies are:"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Concurrency Anomalies",
         "items": [
-          "Understand the fundamental principles of transaction isolation levels",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Dirty Read — a transaction reads data that another transaction has modified but not yet committed, which may later be rolled back",
+          "Non-repeatable Read — a transaction reads the same row twice and gets different values because another transaction modified and committed it between the reads",
+          "Phantom Read — a transaction re-executes a query returning rows that satisfy a condition and sees new rows that were inserted by another committed transaction"
         ]
       }
     },
@@ -38,24 +55,182 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Isolation Levels Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Isolation Level",
+          "Dirty Read",
+          "Non-repeatable Read",
+          "Phantom Read",
+          "Locking Behavior"
+        ],
+        "rows": [
+          [
+            "READ UNCOMMITTED",
+            "Allowed",
+            "Allowed",
+            "Allowed",
+            "No shared locks; uses NOLOCK behavior"
+          ],
+          [
+            "READ COMMITTED (default)",
+            "Prevented",
+            "Allowed",
+            "Allowed",
+            "Shared locks held only during read; released immediately after"
+          ],
+          [
+            "REPEATABLE READ",
+            "Prevented",
+            "Prevented",
+            "Allowed",
+            "Shared locks held until transaction ends"
+          ],
+          [
+            "SNAPSHOT",
+            "Prevented",
+            "Prevented",
+            "Prevented",
+            "No shared locks; uses row versioning from tempdb"
+          ],
+          [
+            "SERIALIZABLE",
+            "Prevented",
+            "Prevented",
+            "Prevented",
+            "Range locks (key-range locks) held until transaction ends"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Setting Isolation Levels"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding transaction isolation levels is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "You can set the isolation level at the session level with `SET TRANSACTION ISOLATION LEVEL`, or you can use table hints on individual queries. Session-level settings apply to every query in that connection until changed or the connection closes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Setting Isolation Levels in T-SQL",
+        "content": "Examples of setting different isolation levels and using table hints.",
+        "language": "sql",
+        "code": "-- Set session-level isolation level\nSET TRANSACTION ISOLATION LEVEL READ COMMITTED;\nBEGIN TRAN;\n    SELECT * FROM Orders WHERE Status = 'Pending';\n    -- This SELECT holds shared locks only during the read\nCOMMIT TRAN;\n\n-- Set to REPEATABLE READ for a session\nSET TRANSACTION ISOLATION LEVEL REPEATABLE READ;\nBEGIN TRAN;\n    SELECT * FROM Customers WHERE CustomerId = 42;\n    -- Shared locks held until COMMIT/ROLLBACK\n    SELECT * FROM Customers WHERE CustomerId = 42;\n    -- Re-reading the same row returns the same data\nCOMMIT TRAN;\n\n-- Use table hints for a single query\nSELECT * FROM Orders WITH (NOLOCK) WHERE Status = 'Pending';\nSELECT * FROM Orders WITH (UPDLOCK, ROWLOCK) WHERE OrderId = 1001;\n\n-- Set SNAPSHOT isolation at the database level first\nALTER DATABASE [AdventureWorks] SET ALLOW_SNAPSHOT_ISOLATION ON;\nSET TRANSACTION ISOLATION LEVEL SNAPSHOT;"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with transaction isolation levels, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "READ COMMITTED Is the Default for a Reason",
+        "text": "READ COMMITTED prevents dirty reads while keeping blocking manageable. It is the right choice for the vast majority of OLTP workloads. Only move to higher isolation levels when you have a specific consistency requirement that READ COMMITTED cannot satisfy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing the Right Level"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choosing an isolation level is not about picking the 'safest' option. It is about understanding the consistency requirements of your workload and matching them to the locking and blocking behavior you can tolerate. Over-isolating a high-concurrency OLTP system is just as harmful as under-isolating a financial ledger."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Guidelines for Isolation Level Selection",
+        "items": [
+          "READ COMMITTED — default for most OLTP; prevents dirty reads with minimal blocking",
+          "READ UNCOMMITTED — only for approximate reporting where dirty reads are acceptable",
+          "REPEATABLE READ — use when a transaction must read the same data multiple times without changes",
+          "SNAPSHOT — ideal for high-concurrency reporting and BI workloads; eliminates most reader-writer blocking",
+          "SERIALIZABLE — use only for critical consistency scenarios where phantoms are unacceptable; it has the highest blocking cost"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Snapshot Requires Tempdb",
+        "text": "SNAPSHOT and READ COMMITTED SNAPSHOT isolation store row versions in tempdb. If tempdb is undersized or slow, these isolation levels can become a performance bottleneck rather than a benefit."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I change the isolation level mid-transaction?",
+            "answer": "No. The isolation level is set at the beginning of a transaction and cannot be changed until the transaction ends. You must commit or roll back before switching."
+          },
+          {
+            "question": "Does READ COMMITTED SNAPSHOT change the default isolation level?",
+            "answer": "No. READ COMMITTED SNAPSHOT (RCSI) changes the behavior of the existing READ COMMITTED level to use row versioning instead of shared locks. It does not change the isolation level itself — queries still run under READ COMMITTED, but they no longer acquire shared locks for reads."
+          },
+          {
+            "question": "What is the performance impact of SNAPSHOT isolation?",
+            "answer": "SNAPSHOT reduces blocking significantly for read-heavy workloads, but it increases tempdb I/O because every row modification generates a version copy. In write-heavy systems with frequent updates to the same rows, tempdb can become a bottleneck."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Isolation levels control the trade-off between consistency and concurrency in SQL Server",
+          "READ COMMITTED prevents dirty reads with minimal blocking — it is the right default for most production systems",
+          "SNAPSHOT and RCSI eliminate most reader-writer blocking by using row versioning, but they increase tempdb usage",
+          "SERIALIZABLE provides the strongest guarantees but can cause severe blocking; use it only when phantoms are unacceptable",
+          "You cannot change isolation level mid-transaction — plan your transaction boundaries accordingly"
+        ],
+        "takeaway": "Isolation levels are not about choosing the 'most safe' setting; they are about aligning data consistency guarantees with your workload's blocking tolerance."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "snapshot-isolation-and-row-versioning",
+    "locks-and-blocking"
+  ],
+  "furtherReading": [
+    {
+      "title": "Transaction Isolation Levels (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Read Committed Snapshot Isolation (Microsoft Docs)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Isolation Levels in SQL Server (Kalen Delaney)",
+      "url": "https://www.microsoftpressstore.com/articles/article.aspx?p=2314819",
+      "type": "article",
+      "author": "Kalen Delaney"
+    }
+  ]
 }

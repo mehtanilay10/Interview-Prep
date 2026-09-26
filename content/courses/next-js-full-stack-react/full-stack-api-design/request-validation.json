@@ -3,34 +3,40 @@
   "slug": "request-validation",
   "moduleSlug": "full-stack-api-design",
   "courseSlug": "next-js-full-stack-react",
-  "title": "request-validation",
-  "description": "Learn about request-validation. Master the concepts, patterns, and best practices.",
+  "title": "Request Validation",
+  "description": "Learn how to validate incoming requests with Zod so your APIs only accept safe, well-formed data and return helpful errors when they do not.",
   "order": 3,
-  "difficulty": "beginner",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["validation", "zod", "typescript"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**request-validation** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with request-validation."
+        "text": "Every API endpoint should treat its input as untrusted. Request validation is the practice of checking that incoming data matches the shape, type, and rules your endpoint expects before you use it."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Validation Matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without validation, a missing field, a wrong type, or an extra long string can crash your database query or bypass business rules. Validation catches these problems early and returns a clear message to the client."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of request-validation",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Prevent database errors from bad input",
+          "Return clear error messages instead of 500 crashes",
+          "Document your API contract in code",
+          "Catch type mismatches before they reach your logic"
         ]
       }
     },
@@ -38,24 +44,103 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Using Zod for Schema Validation"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding request-validation is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Zod is a TypeScript-first schema library. You describe the shape of your data once, and Zod infers the TypeScript type while also validating runtime values. This makes it a natural fit for API request bodies."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Zod schema for a create-post request",
+        "code": "// lib/validators/post.ts\nimport { z } from \"zod\";\n\nexport const createPostSchema = z.object({\n  title: z.string().min(3).max(200),\n  content: z.string().min(10),\n  tags: z.array(z.string()).max(5).optional(),\n  published: z.boolean().default(false),\n});\n\nexport type CreatePostInput = z.infer<typeof createPostSchema>;",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `createPostInput` type is now guaranteed to match the schema. You can import it in your Route Handler and feel confident about the data shape."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validating in a Route Handler"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Parse the request body with `createPostSchema.parse()` inside your `POST` handler. If the data is invalid, Zod throws an error you can catch and format into a useful response."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validating a POST body in a Route Handler",
+        "code": "// app/posts/route.ts\nimport { NextResponse } from \"next/server\";\nimport { createPostSchema } from \"@/lib/validators/post\";\n\nexport async function POST(request: Request) {\n  try {\n    const body = await request.json();\n    const input = createPostSchema.parse(body);\n\n    const post = await db.post.create({\n      data: input,\n    });\n\n    return NextResponse.json({ post }, { status: 201 });\n  } catch (error) {\n    if (error instanceof z.ZodError) {\n      return NextResponse.json(\n        {\n          error: \"Validation failed\",\n          issues: error.issues.map((i) => ({\n            field: i.path.join(\".\"),\n            message: i.message,\n          })),\n        },\n        { status: 400 }\n      );\n    }\n\n    return NextResponse.json(\n      { error: \"Internal server error\" },\n      { status: 500 }\n    );\n  }\n}",
+        "language": "typescript"
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with request-validation, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Reuse Schemas Across the Stack",
+        "text": "Define validators in a shared `lib/validators/` folder and import them in Route Handlers, server components, and client forms. This keeps your API contract consistent end to end."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validating Query Parameters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Query parameters are always strings. When validating them, coerce values to the right type and provide sensible defaults for optional filters."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Validating search query params",
+        "code": "// lib/validators/search.ts\nimport { z } from \"zod\";\n\nexport const searchSchema = z.object({\n  q: z.string().default(\"\"),\n  page: z.coerce.number().int().positive().default(1),\n  limit: z.coerce.number().int().positive().max(50).default(10),\n});\n\nexport type SearchInput = z.infer<typeof searchSchema>;\n\n// app/posts/route.ts\nexport async function GET(request: Request) {\n  const { searchParams } = new URL(request.url);\n  const input = searchSchema.parse({\n    q: searchParams.get(\"q\"),\n    page: searchParams.get(\"page\"),\n    limit: searchParams.get(\"limit\"),\n  });\n\n  const posts = await db.post.findMany({\n    skip: (input.page - 1) * input.limit,\n    take: input.limit,\n    where: { title: { contains: input.q } },\n  });\n\n  return NextResponse.json({ posts, page: input.page });\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "items": [
+          "Always validate incoming data before using it in queries or mutations",
+          "Zod gives you runtime validation and TypeScript types from one schema",
+          "Return 400 with structured error details when validation fails",
+          "Share validators between client forms and server handlers"
+        ]
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": ["response-formatting", "error-handling", "route-handlers"],
+  "furtherReading": [
+    {
+      "title": "Zod Documentation",
+      "url": "https://zod.dev/",
+      "type": "article"
+    },
+    {
+      "title": "Next.js Route Handlers - Request Body",
+      "url": "https://nextjs.org/docs/app/building-your-application/routing/route-handlers#request-body",
+      "type": "article"
+    }
+  ]
 }

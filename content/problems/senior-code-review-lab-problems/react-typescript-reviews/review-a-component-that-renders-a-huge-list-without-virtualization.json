@@ -13,24 +13,53 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Review a component that renders a huge list without virtualization** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with review a component that renders a huge list without virtualization."
+        "text": "**Review a component that renders a huge list without virtualization** is a classic frontend performance trap. A component that maps over thousands of items and renders them all at once creates a proportional number of DOM nodes. Each node consumes memory, participates in layout, and adds work to every subsequent render. The symptom is sluggish scrolling, delayed input, and eventually a frozen UI. The fix is almost always the same: render only what is visible."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why huge lists break the UI"
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of review a component that renders a huge list without virtualization",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Every item in the array creates a DOM node, so 10,000 items means 10,000 nodes",
+          "React must diff the entire list on every state change, even for changes far from the viewport",
+          "Layout and paint costs grow linearly with DOM size, not with visible area",
+          "Event handlers attached to thousands of nodes increase memory pressure and GC churn",
+          "Scrolling performance degrades because the browser must composite a massive layer tree",
+          "Mobile browsers hit memory limits faster, causing tab termination"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Virtualization",
+            "definition": "Rendering only the visible subset of a large list so the DOM size stays constant regardless of data length."
+          },
+          {
+            "term": "Window size",
+            "definition": "The number of items visible in the viewport plus a small overscan buffer."
+          },
+          {
+            "term": "Overscan",
+            "definition": "Extra rows rendered above and below the visible window to reduce blank space during fast scrolling."
+          },
+          {
+            "term": "Layout thrashing",
+            "definition": "Interleaving DOM reads and writes, forcing the browser to recalculate layout repeatedly during a single frame."
+          },
+          {
+            "term": "Reconciliation",
+            "definition": "React's algorithm for comparing the new virtual DOM tree with the previous one to determine which DOM nodes to update."
+          }
         ]
       }
     },
@@ -38,24 +67,208 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The code smell"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding review a component that renders a huge list without virtualization is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "The telltale sign is a `.map()` that returns a large chunk of JSX without any slicing, filtering, or pagination. Another smell is an inline object or function inside the map, which creates a new reference on every render and defeats child memoization. In a code review, ask the author: 'What happens when this list grows to 50,000 items?' If they have not considered it, the component is not production-ready."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Unvirtualized list",
+        "content": "This component renders every row at once. Scroll performance degrades as the dataset grows:",
+        "code": "function UserTable({ users }: { users: User[] }) {\n  return (\n    <table>\n      <tbody>\n        {users.map(user => (\n          <tr key={user.id}>\n            <td>{user.name}</td>\n            <td>{user.email}</td>\n            <td>{user.role}</td>\n          </tr>\n        ))}\n      </tbody>\n    </table>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Virtualization options"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Popular approaches",
+        "items": [
+          "react-window: lightweight, fixed or variable size lists with `FixedSizeList` and `VariableSizeList`",
+          "react-virtuoso: automatic size measurement, group support, and smooth scrolling out of the box",
+          "@tanstack/react-virtual: headless utility that gives you the visible range and lets you render it however you like",
+          "Custom windowing: calculate `startIndex` and `endIndex` from `scrollTop` and render a slice with absolute positioning",
+          "Pagination: send chunks from the server and render one page at a time",
+          "Infinite scroll: load more as the user scrolls, but still virtualize the rendered window"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "List rendering strategies",
+        "cards": [
+          {
+            "title": "Full render",
+            "description": "Render every item in the array as a DOM node.",
+            "pros": ["Simple to implement", "No library required"],
+            "cons": ["DOM size grows linearly", "Scroll jank at 500+ items", "High memory usage"]
+          },
+          {
+            "title": "Virtualization",
+            "description": "Render only the visible window plus overscan.",
+            "pros": ["Constant DOM size", "Smooth scrolling at any list length", "Predictable memory"],
+            "cons": ["Complex dynamic heights", "Scroll anchoring requires care"]
+          },
+          {
+            "title": "Pagination",
+            "description": "Load and render one page at a time.",
+            "pros": ["Simple UX", "Server controls page size", "Low memory per page"],
+            "cons": ["Context switching between pages", "Poor UX for exploratory scanning"]
+          },
+          {
+            "title": "Infinite scroll",
+            "description": "Append items as the user scrolls toward the bottom.",
+            "pros": ["Seamless exploration", "Good for feeds"],
+            "cons": ["DOM still grows without virtualization", "Scroll position loss on re-render"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with review a component that renders a huge list without virtualization, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Virtualization is not free",
+        "text": "Virtualization adds complexity around scroll position restoration, dynamic row heights, and keyboard accessibility. If your list is under fifty items, the engineering cost usually outweighs the benefit. Choose virtualization when the dataset regularly exceeds five hundred rows."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How virtualization works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A virtualized list wraps the visible items in a container whose height equals the full dataset height. An inner viewport is translated vertically based on scroll offset, and only the rows inside the visible window are rendered. The outer container preserves the native scrollbar, so the user experience is identical to a full list."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-virtualization-flow",
+        "caption": "Virtualized list render cycle",
+        "definition": "flowchart TD\n    A[Total items: 10,000] --> B[Calculate window height]\n    B --> C[Calculate visible range from scrollTop]\n    C --> D[Render only visible items + overscan]\n    D --> E[Position inner container with translateY]\n    E --> F[Outer container keeps full scroll height]\n    F --> G[Browser paints a constant number of DOM nodes]\n    G --> H[User scrolls smoothly regardless of data size]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation with react-window"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "FixedSizeList with overscan",
+        "content": "Wrap the same rows in react-window. The DOM stays at roughly twenty nodes regardless of list length:",
+        "code": "import { FixedSizeList as List } from 'react-window';\n\nfunction UserTable({ users }: { users: User[] }) {\n  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => (\n    <div style={style} className=\"flex justify-between px-4 py-2 border-b\">\n      <span>{users[index].name}</span>\n      <span>{users[index].email}</span>\n    </div>\n  );\n\n  return (\n    <List\n      height={600}\n      itemCount={users.length}\n      itemSize={48}\n      overscanCount={5}\n      width=\"100%\"\n    >\n      {Row}\n    </List>\n  );\n}",
+        "language": "tsx"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Accessibility and edge cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Ensure keyboard users can scroll the list with arrow keys and Page Up/Down",
+          "Provide a skip-to-content link so screen-reader users do not navigate through thousands of rows",
+          "Preserve scroll position when data updates or filters change",
+          "Handle dynamic row heights by measuring content or using a library that does it for you",
+          "Announce loading states for screen readers when new data is fetched"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Virtualize a large table",
+        "description": "Take an existing table component that renders 2,000 rows. Replace the full render with react-window or react-virtuoso. Measure scroll frames per second before and after with Chrome DevTools Performance panel.",
+        "steps": [
+          "Identify the current full-list render and note the row height",
+          "Install react-window and wrap the rows in FixedSizeList",
+          "Adjust itemSize, height, and overscanCount until scrolling feels smooth",
+          "Profile the scroll interaction and confirm frame rate is above 55fps",
+          "Add keyboard navigation and test with a screen reader"
+        ],
+        "expectedOutcome": "The list should scroll smoothly with a constant DOM node count, and screen-reader users should be able to navigate without traversing every hidden row."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Code review follow-ups",
+        "items": [
+          {
+            "question": "When should I reach for virtualization?",
+            "answer": "When the dataset regularly exceeds five hundred items and the user scrolls through it. For smaller lists, the complexity is rarely worth it."
+          },
+          {
+            "question": "What about dynamic row heights?",
+            "answer": "Use react-virtuoso or @tanstack/react-virtual, which measure content automatically. With react-window, you can use VariableSizeList but must provide accurate heights up front or accept visual jumps."
+          },
+          {
+            "question": "Does virtualization break search indexing or SEO?",
+            "answer": "Not usually. Server-side rendered content is still in the HTML; virtualization only affects the client-side DOM count. If you client-render the entire list, you already have an SEO problem."
+          },
+          {
+            "question": "Should I virtualize a table or just paginate?",
+            "answer": "Paginate when users need to compare rows across pages or export data. Virtualize when users scan sequentially and need fluid scrolling."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Summary",
+        "points": [
+          "Full-list rendering becomes a performance liability above five hundred items",
+          "Virtualization keeps the DOM size constant by rendering only the visible window",
+          "Use a library like react-window, react-virtuoso, or @tanstack/react-virtual",
+          "Profile scroll performance before and after to confirm the improvement",
+          "Address keyboard navigation, screen readers, and scroll restoration"
+        ],
+        "takeaway": "A senior review catches unvirtualized lists not because they are always broken, but because they are a time bomb that grows worse with data."
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": []
+  "furtherReading": [
+    {
+      "title": "react-window",
+      "url": "https://react-window.vercel.app/",
+      "type": "tool",
+      "description": "Lightweight virtualization library for React lists and tabular data."
+    },
+    {
+      "title": "react-virtuoso",
+      "url": "https://virtuoso.dev/",
+      "type": "tool",
+      "description": "Virtualized list with automatic size measurement and grouping support."
+    }
+  ]
 }

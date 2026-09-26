@@ -4,33 +4,51 @@
   "moduleSlug": "react-frontend-follow-ups",
   "courseSlug": "interview-qa",
   "title": "When should a component be a Server Component vs Client Component?",
-  "description": "Interview question: When should a component be a Server Component vs Client Component?. Learn the answer with detailed explanation and examples.",
+  "description": "Master the Server Component mental model in Next.js App Router. Learn boundary placement, data-fetching strategy, and how to avoid common RSC pitfalls.",
   "order": 6,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["React", "Server Components", "Next.js", "RSC", "Architecture"],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When should a component be a Server Component vs Client Component?** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when should a component be a server component vs client component?."
+        "text": "React Server Components (RSC) represent a fundamental shift: components can now render exclusively on the server, producing serialized props for the client without shipping JavaScript. The question every senior React engineer must answer is: **where does each component belong?** Get this wrong and you ship unnecessary JS, block streaming, or create RSC boundaries that leak interactivity."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The server/client boundary"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the core differences between when should a component be a server component and client component?",
-          "Know when to choose when should a component be a server component over client component?",
-          "Recognize the trade-offs involved in each approach",
-          "Apply the right tool for the specific problem context"
+        "text": "In Next.js App Router, components are Server Components by default. Add `'use client'` at the top to opt into Client Component status. This directive creates a **boundary**: everything imported by a Client Component (and everything it renders) becomes part of the client bundle. The boundary is sticky—it flows downward, not upward."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Server Component",
+            "definition": "A component that renders only on the server. Its output is serialized to a special format and streamed to the client. No JavaScript is shipped for its logic."
+          },
+          {
+            "term": "Client Component",
+            "definition": "A component marked with 'use client'. It runs in the browser, can use state/effects/event handlers, and ships its JS to the client."
+          },
+          {
+            "term": "Client boundary",
+            "definition": "The subtree that starts at a Client Component and includes everything it imports and renders. Everything inside ships JS to the browser."
+          },
+          {
+            "term": "Streaming",
+            "definition": "Sending HTML to the browser progressively as Server Components finish rendering, rather than waiting for the entire page."
+          }
         ]
       }
     },
@@ -38,25 +56,204 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Decision framework"
       }
     },
     {
-      "type": "paragraph",
+      "type": "numbered-list",
       "data": {
-        "text": "Understanding when should a component be a server component vs client component? is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "title": "Server or Client?",
+        "items": [
+          "Does the component need `useState`, `useEffect`, or browser APIs? → Client Component",
+          "Does it read from `localStorage`, `window`, or `document`? → Client Component",
+          "Does it add event listeners (`onClick`, `onChange`)? → Client Component",
+          "Does it fetch data or access backend resources directly? → Server Component (default)",
+          "Does it render static UI from database content? → Server Component",
+          "Does it wrap Client Components but has no interactivity itself? → Server Component that imports client children"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pattern: Server Component as layout wrapper"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server Component fetching data, Client Component for interactivity",
+        "content": "The page is a Server Component that fetches data and passes it to a Client Component for the interactive parts.",
+        "code": "// app/dashboard/page.tsx — Server Component (default)\nasync function DashboardPage() {\n  const metrics = await fetchMetrics(); // direct DB access, no API route\n  const recent = await fetchRecentOrders();\n\n  return (\n    <section>\n      <h1>Dashboard</h1>\n      {/* Server-rendered static summary */}\n      <MetricsGrid metrics={metrics} />\n      {/* Interactive controls live in client boundary */}\n      <OrderFilters initialOrders={recent} />\n    </section>\n  );\n}\n\n// app/dashboard/OrderFilters.tsx — Client Component\n'use client';\nimport { useState } from 'react';\n\nfunction OrderFilters({ initialOrders }: { initialOrders: Order[] }) {\n  const [filter, setFilter] = useState('');\n  const [sort, setSort] = useState<'asc' | 'desc'>('desc');\n  // filtering and sorting happen client-side\n  const visible = initialOrders\n    .filter(o => o.status.includes(filter))\n    .sort((a, b) => sort === 'asc'\n      ? a.createdAt.localeCompare(b.createdAt)\n      : b.createdAt.localeCompare(a.createdAt));\n\n  return (\n    <div>\n      <input onChange={e => setFilter(e.target.value)} />\n      <select value={sort} onChange={e => setSort(e.target.value as any)}>\n        <option value=\"desc\">Newest</option>\n        <option value=\"asc\">Oldest</option>\n      </select>\n      <OrderTable orders={visible} />\n    </div>\n  );\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: Server vs Client"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Server Component vs Client Component",
+        "cards": [
+          {
+            "title": "Server Component",
+            "description": "Renders on the server, streams HTML, ships zero JS for its logic.",
+            "pros": [
+              "Zero JavaScript shipped for the component's logic",
+              "Direct access to backend resources (DB, filesystem, env vars)",
+              "Automatic code splitting and streaming",
+              "No client-side bundle size impact"
+            ],
+            "cons": [
+              "Cannot use state, effects, or browser APIs",
+              "Cannot handle user events",
+              "Every request runs server code (cost, latency)"
+            ],
+            "tags": ["default", "SSR", "data fetching"]
+          },
+          {
+            "title": "Client Component",
+            "description": "Opts into browser execution. Use only when interactivity or browser APIs are required.",
+            "pros": [
+              "Full React client capabilities: state, effects, refs",
+              "Can handle events and browser APIs",
+              "Can use React hooks for client-side logic"
+            ],
+            "cons": [
+              "JS ships to the client—impacts bundle size",
+              "Cannot directly access server resources",
+              "Boundary pulls in all children into the client bundle"
+            ],
+            "tags": ["interactive", "events", "hooks"]
+          }
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when should a component be a server component vs client component?, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "important",
+        "title": "Default to Server Components",
+        "text": "The mental model is inverted from classic React. Instead of asking 'should this be a Client Component?', ask 'does this **need** to be a Client Component?' The answer is yes only if it uses state, effects, event handlers, or browser APIs. Everything else should stay on the server."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common pitfalls"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "What goes wrong",
+        "items": [
+          "Adding `'use client'` to a top-level layout pulls the entire app tree into the client bundle",
+          "Importing a Client Component into a Server Component is fine, but importing a Server Component into a Client Component is an error",
+          "Fetching data in a Client Component with `useEffect` instead of letting the Server Component handle it",
+          "Using context providers in Server Components—they require Client Components to consume"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server-to-client data flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rsc-data-flow",
+        "caption": "Data flows from Server Components down to Client Components via props",
+        "definition": "flowchart TD\n    A[\"Server Component\"] -->|fetch data| B[\"Database / API\"]\n    A -->|serialized props| C[\"Client Component\n('use client')\"]\n    C -->|event handlers| D[\"Server Actions\nor API routes\"]\n    C -->|state / effects| E[\"Browser APIs\"]\n    style A fill:#dbeafe,stroke:#2563eb\n    style C fill:#fef3c7,stroke:#d97706"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "FAQ"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common follow-up questions",
+        "items": [
+          {
+            "question": "Can a Server Component import a Client Component?",
+            "answer": "Yes. Server Components can import and render Client Components, passing serialized props. This is the standard pattern: Server Component handles data fetching, Client Component handles interactivity."
+          },
+          {
+            "question": "Can a Client Component import a Server Component?",
+            "answer": "No. Server Components cannot be imported into Client Components because their code never ships to the browser. If you need this pattern, pass the Server Component's output as children or props from the Server Component."
+          },
+          {
+            "question": "What about context providers? Do they need 'use client'?",
+            "answer": "Yes. Any component that uses `createContext` and a provider with state must be a Client Component. Server Components can't maintain client-side state to provide."
+          },
+          {
+            "question": "How does streaming interact with React Suspense?",
+            "answer": "Suspense boundaries in Server Components let you stream content progressively. The shell renders immediately while heavy child components stream in. This improves TTFB and perceived performance without client-side JavaScript."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Default is Server Component. Add 'use client' only when you need state, effects, or events",
+          "Client Component boundaries pull in all children into the JS bundle",
+          "Pass data from Server to Client via serialized props",
+          "Use Server Actions for mutations instead of client-side API calls where possible"
+        ],
+        "takeaway": "RSC is about shipping less JavaScript, not just moving logic to the server. Place boundaries intentionally."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Further reading"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Next.js: [Server Components](https://nextjs.org/docs/app/building-your-application/rendering/server-components)",
+          "React Docs: [Server Components](https://react.dev/reference/rsc/server-components)",
+          "Dan Abramov: [React Server Components](https://github.com/reactwg/server-components)"
+        ]
       }
     }
   ],
   "relatedLessons": [],
-  "furtherReading": [],
-  "technology": "General"
+  "furtherReading": [
+    {
+      "title": "Next.js: Server Components",
+      "url": "https://nextjs.org/docs/app/building-your-application/rendering/server-components",
+      "type": "article"
+    },
+    {
+      "title": "React Docs: Server Components",
+      "url": "https://react.dev/reference/rsc/server-components",
+      "type": "article"
+    }
+  ],
+  "technology": "React"
 }

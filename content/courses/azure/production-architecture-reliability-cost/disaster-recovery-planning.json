@@ -4,33 +4,52 @@
   "moduleSlug": "production-architecture-reliability-cost",
   "courseSlug": "microsoft-azure-for-developers",
   "title": "Disaster recovery planning",
-  "description": "Learn about Disaster recovery planning. Master the concepts, patterns, and best practices.",
+  "description": "Build a disaster recovery plan for Azure workloads using backup, Azure Site Recovery, and multi-region patterns. Learn recovery strategies, test your failover, and document runbooks.",
   "order": 9,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 30,
   "tags": [],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**Disaster recovery planning** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with disaster recovery planning."
+        "text": "Disaster recovery is the process of restoring service after a major incident—whether that incident is a fire in the datacenter, a region-wide outage, or a ransomware attack. A disaster recovery plan defines what to back up, where to replicate it, how to restore it, and who is responsible for each step."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Recovery strategies"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "paragraph",
       "data": {
-        "items": [
-          "Understand the fundamental principles of disaster recovery planning",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+        "text": "Azure supports four common recovery strategies. Backup and restore is the simplest and cheapest: you back up data to Azure Recovery Services and restore it when needed. Pilot light keeps a minimal version of your environment running in the secondary region, so you only need to scale up during recovery. Warm standby runs a scaled-down but functional version in the secondary region. Active-active runs full production in multiple regions simultaneously."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "DR strategies",
+        "cards": [
+          {
+            "title": "Backup and restore",
+            "description": "Lowest cost. Restore from backup when needed. RTO can be hours or days depending on data size."
+          },
+          {
+            "title": "Pilot light",
+            "description": "Core infrastructure always on in secondary region. RTO measured in hours. Good for non-critical workloads."
+          },
+          {
+            "title": "Warm standby",
+            "description": "Scaled-down but functional environment in secondary region. RTO measured in tens of minutes."
+          },
+          {
+            "title": "Active-active",
+            "description": "Full production in multiple regions. Lowest RTO, highest cost. Best for mission-critical applications."
+          }
         ]
       }
     },
@@ -38,24 +57,116 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Azure Site Recovery"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding disaster recovery planning is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Azure Site Recovery (ASR) replicates virtual machines, physical servers, and on-premises workloads to Azure. It captures changes at the block level and stores them in a storage account. During a failover, ASR spins up VMs in the recovery region from the replicated disks. ASR is especially valuable for legacy applications that cannot be rewritten as cloud-native services."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ASR replication policy in Bicep",
+        "content": "Create a replication policy that defines how often data is synchronized and how long recovery points are kept.",
+        "language": "json",
+        "code": "param recoveryVaultName string\nparam location string = resourceGroup().location\n\nresource recoveryVault 'Microsoft.RecoveryServices/vaults@2023-04-01' existing = {\n  name: recoveryVaultName\n}\n\nresource replicationPolicy 'Microsoft.RecoveryServices/vaults/replicationPolicies@2023-04-01' = {\n  name: '${recoveryVaultName}/default-policy'\n  properties: {\n    providerSpecificInput: [\n      {\n        instanceType: 'A2AContainer'\n        recoveryPointObjectiveInMinutes: 30\n        applicationConsistentSnapshotFrequencyInMinutes: 60\n        multiVmSyncEnabled: true\n      }\n    ]\n  }\n}\n"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Backup and retention"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not every workload needs ASR. Azure Backup handles VMs, SQL, Blob, and Kubernetes. Retention policies define how long backups are kept, and soft-delete protects against accidental or malicious deletion. Combine Azure Backup with immutable blob storage for ransomware protection."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Azure Site Recovery (ASR)",
+            "definition": "Azure-native disaster recovery service for replicating and failing over VMs and physical servers."
+          },
+          {
+            "term": "Recovery Services vault",
+            "definition": "A storage and management entity for Azure Backup and ASR."
+          },
+          {
+            "term": "Immutable storage",
+            "definition": "Blob storage with WORM (write once, read many) policies that prevent backup modification or deletion."
+          }
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "DR planning checklist",
+        "items": [
+          "Identify critical workloads and assign RTO and RPO targets.",
+          "Choose a recovery strategy per workload: backup, pilot light, warm standby, or active-active.",
+          "Implement replication using ASR, geo-replication, or Azure Backup.",
+          "Document runbooks with exact steps, dependencies, and responsible teams.",
+          "Test failover quarterly and after every major architecture change."
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with disaster recovery planning, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Documentation is part of the plan",
+        "text": "A disaster recovery plan that no one can find or follow during an incident is useless. Store runbooks in a central wiki, run tabletop exercises, and include contact trees with on-call rotations."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Disaster recovery strategies range from cheap and slow to expensive and fast.",
+          "Azure Site Recovery is ideal for VM and legacy workloads.",
+          "Backup alone is not enough for low-RTO applications.",
+          "Regular failover testing is the only way to validate recovery objectives."
+        ],
+        "takeaway": "A good DR plan is not just technology—it is technology, runbooks, and practiced execution."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "rto-and-rpo-for-azure-applications",
+    "high-availability-and-zone-aware-architecture"
+  ],
+  "furtherReading": [
+    {
+      "title": "Azure Site Recovery documentation",
+      "url": "https://learn.microsoft.com/en-us/azure/site-recovery/site-recovery-overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "How Azure Site Recovery replicates, fails over, and recovers workloads."
+    },
+    {
+      "title": "Azure Backup architecture",
+      "url": "https://learn.microsoft.com/en-us/azure/backup/backup-overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Azure Backup vaults, policies, and supported workloads."
+    },
+    {
+      "title": "Microsoft Learn: Implement DR for Azure workloads",
+      "url": "https://learn.microsoft.com/en-us/training/modules/implement-disaster-recovery/",
+      "type": "course",
+      "author": "Microsoft",
+      "description": "Free module covering Azure Site Recovery, backup, and geo-replication."
+    }
+  ]
 }

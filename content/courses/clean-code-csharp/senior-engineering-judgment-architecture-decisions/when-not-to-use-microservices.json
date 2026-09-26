@@ -3,59 +3,173 @@
   "slug": "when-not-to-use-microservices",
   "moduleSlug": "senior-engineering-judgment-architecture-decisions",
   "courseSlug": "clean-code-csharp",
-  "title": "When not to use microservices",
-  "description": "Learn about When not to use microservices. Master the concepts, patterns, and best practices.",
+  "title": "When Not to Use Microservices",
+  "description": "Understand the real costs of microservices and recognize the situations where a monolith or modular monolith is the wiser architectural choice.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 15,
-  "tags": [],
+  "estimatedMinutes": 25,
+  "tags": [
+    "microservices",
+    "monolith",
+    "architecture",
+    "csharp"
+  ],
   "blocks": [
     {
       "type": "paragraph",
       "data": {
-        "text": "**When not to use microservices** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with when not to use microservices."
+        "text": "Microservices are not free, and they are not universally better. They solve specific problems: independent scaling, team autonomy, and fault isolation. But they introduce new problems: network latency, distributed data consistency, operational complexity, and debugging difficulty. A senior engineer knows that choosing microservices is choosing to manage a distributed system, and that choice should be made only when the benefits genuinely outweigh the costs."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a C# ecosystem, microservices often mean ASP.NET Core services communicating over HTTP or gRPC, deployed to containers and orchestrated with Kubernetes. Each service needs its own database or schema, its own logging pipeline, its own health checks, and its own deployment pipeline. That is a lot of infrastructure for a team that might be better served by a single well-structured web application."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Signs That Microservices Are Wrong"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Red flags for microservice adoption",
         "items": [
-          "Understand the fundamental principles of when not to use microservices",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "The team has fewer than five engineers. Microservices require operational expertise that small teams rarely have.",
+          "The domain boundaries are unclear. Splitting an unclear domain creates distributed monoliths, not microservices.",
+          "Data must be strongly consistent across boundaries. Distributed transactions are hard, expensive, and fragile.",
+          "The product is changing rapidly. Refactoring across service boundaries is much slower than refactoring within a monolith.",
+          "There is no compelling need for independent scaling. Most early-stage applications do not have enough traffic to justify it."
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The distributed monolith trap",
+        "text": "The worst outcome is not a monolith; it is a distributed monolith. This happens when services are split without clear domain boundaries, forcing every change to require coordinated deployments across multiple teams. The system has all the costs of microservices and none of the benefits."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "The Modular Monolith Alternative"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding when not to use microservices is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Before reaching for microservices, consider the modular monolith. A modular monolith is a single deployable unit with clear internal boundaries between modules. Each module owns its data, exposes a public interface, and cannot directly access the internals of another module. In C#, this can be implemented with separate class libraries, internal access modifiers, and MediatR for in-process communication."
       }
     },
     {
-      "type": "callout",
+      "type": "example",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with when not to use microservices, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Modular monolith structure in C#",
+        "content": "A solution structure with separated modules that enforce boundaries without network calls.",
+        "language": "text",
+        "code": "MyApp.sln\n  src/\n    MyApp.Api/           <-- entry point, composition root\n      Program.cs\n    MyApp.Orders/        <-- Orders module\n      Entities/\n      Services/\n      Interfaces/\n    MyApp.Inventory/     <-- Inventory module\n      Entities/\n      Services/\n      Interfaces/\n    MyApp.Shared/        <-- Shared kernel (carefully limited)\n      Events/\n      Extensions/\n  tests/\n    MyApp.Orders.Tests/\n    MyApp.Inventory.Tests/"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With this structure, the Orders module cannot reference the Inventory module directly. Communication happens through shared events or a dedicated mediator. When the team grows large enough to need independent deployment, the modules can be extracted into separate services with relatively modest changes because the boundaries were already enforced."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Code: In-Process Communication vs HTTP"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The difference between a modular monolith and microservices is often just the transport layer. In a monolith, modules communicate through in-memory method calls or MediatR notifications. In microservices, they communicate through HTTP or gRPC. The domain logic is identical. The operational complexity is not."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "In-process communication with MediatR",
+        "content": "A modular monolith using MediatR for decoupled communication between modules.",
+        "language": "csharp",
+        "code": "// In Orders module: publishes an event when an order is placed\npublic record OrderPlacedEvent(Guid OrderId, Guid CustomerId, decimal Total) : INotification;\n\npublic class OrderPlacedHandler : INotificationHandler<OrderPlacedEvent>\n{\n    private readonly IEmailService _emailService;\n\n    public OrderPlacedHandler(IEmailService emailService)\n    {\n        _emailService = emailService;\n    }\n\n    public async Task Handle(OrderPlacedEvent notification, CancellationToken ct)\n    {\n        await _emailService.SendOrderConfirmationAsync(\n            notification.CustomerId, notification.OrderId, ct);\n    }\n}\n\n// In a microservice version, the same event would be published\n// to a message broker (RabbitMQ, Azure Service Bus) and consumed\n// by a separate Email service over the network."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When Microservices Actually Make Sense"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Microservices become the right choice when you have clear domain boundaries, multiple autonomous teams, independent scaling requirements, and the operational maturity to manage distributed systems. This typically means at least ten to fifteen engineers, a dedicated platform or DevOps team, and a product that has stabilized enough that its modules will not need to be reshaped every quarter. If you are not there yet, start with a monolith and design for future extraction."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Can I start with a monolith and move to microservices later?",
+            "answer": "Yes, and this is the recommended path for most teams. Start with a modular monolith that enforces clean boundaries. When you need independent deployment, extract one module at a time. The extraction is much easier when boundaries were already respected."
+          },
+          {
+            "question": "Is a modular monolith just a monolith with extra steps?",
+            "answer": "No. A classic monolith has no enforced boundaries, so any module can reach into any other module's data. A modular monolith enforces boundaries through code structure, access modifiers, and dependency rules. The enforcement is compile-time, not runtime."
+          },
+          {
+            "question": "What about performance? Is not a monolith slower?",
+            "answer": "Usually the opposite. A monolith avoids network overhead, serialization costs, and distributed transaction complexity. For most applications, the monolith is faster. Microservices only make sense when you need to scale a specific module independently of the rest of the system."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Microservices solve specific problems; they are not a default or a goal in themselves.",
+          "Start with a modular monolith and enforce boundaries through code structure.",
+          "Avoid the distributed monolith trap by clarifying domain boundaries before splitting services.",
+          "Microservices require operational maturity, multiple teams, and clear independent scaling needs."
+        ],
+        "takeaway": "The best architecture is the simplest one that solves your actual problems. If a monolith solves them, choose the monolith. Senior engineers default to simplicity and only adopt complexity when the evidence demands it."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "monolith-vs-modular-monolith-vs-microservices",
+    "managing-technical-debt"
+  ],
+  "furtherReading": [
+    {
+      "title": "Monolith First",
+      "url": "https://martinfowler.com/bliki/MonolithFirst.html",
+      "type": "article",
+      "author": "Martin Fowler",
+      "description": "Why starting with a monolith is the safest path for most new systems."
+    },
+    {
+      "title": "Building Microservices",
+      "url": "https://www.oreilly.com/library/view/building-microservices-2nd/9781492034018/",
+      "type": "book",
+      "author": "Sam Newman",
+      "description": "The definitive practical guide to microservices, including when not to use them."
+    }
+  ]
 }
