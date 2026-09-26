@@ -1,5 +1,6 @@
 import type { Module } from "@/types";
 
+import mod01AiBackendTerminologyModule from "../courses/dotnet-ai-backend/01-ai-backend-terminology/content.json";
 import mod01ApolloBasicsModule from "../courses/apollo/01-apollo-basics/content.json";
 import mod01ArrayProblemsModule from "../problems/csharp/01-array-problems/content.json";
 import mod01AuthBasicsModule from "../courses/authentication-authorization/01-auth-basics/content.json";
@@ -51,6 +52,7 @@ import mod02PrismaSchemaDesignModule from "../courses/prisma/02-prisma-schema-de
 import mod02QueriesMutationsModule from "../courses/apollo/02-queries-mutations/content.json";
 import mod02QueryHooksModule from "../courses/react-query/02-query-hooks/content.json";
 import mod02QueryingDataModule from "../courses/sql-server/02-querying-data/content.json";
+import mod02RagImplementationModule from "../courses/dotnet-ai-backend/02-rag-implementation/content.json";
 import mod02RazorViewsProblemsModule from "../problems/aspnet-core/02-razor-views-problems/content.json";
 import mod02ReduxToolkitModule from "../courses/redux/02-redux-toolkit/content.json";
 import mod02SchemaTypesModule from "../courses/graphql-dotnet/02-schema-types/content.json";
@@ -76,6 +78,7 @@ import mod03InheritanceModule from "../courses/oops-concepts/03-inheritance/cont
 import mod03JoinsModule from "../courses/sql-server/03-joins/content.json";
 import mod03KubernetesFundamentalsModule from "../courses/devops/03-kubernetes-fundamentals/content.json";
 import mod03LinkedListProblemsModule from "../problems/csharp/03-linked-list-problems/content.json";
+import mod03McpFundamentalsModule from "../courses/dotnet-ai-backend/03-mcp-fundamentals/content.json";
 import mod03MockingFakesModule from "../courses/unit-testing-dotnet/03-mocking-fakes/content.json";
 import mod03ModelBindingModule from "../courses/aspnet-core-web-api/03-model-binding/content.json";
 import mod03MutationsModule from "../courses/react-query/03-mutations/content.json";
@@ -105,6 +108,7 @@ import mod04FilteringPaginationModule from "../courses/graphql-dotnet/04-filteri
 import mod04FormsInputModule from "../courses/react-fundamentals/04-forms-input/content.json";
 import mod04IntegrationTestingModule from "../courses/unit-testing-dotnet/04-integration-testing/content.json";
 import mod04KubernetesAdvancedModule from "../courses/devops/04-kubernetes-advanced/content.json";
+import mod04McpServersToolsModule from "../courses/dotnet-ai-backend/04-mcp-servers-tools/content.json";
 import mod04MiddlewareModule from "../courses/aspnet-core-web-api/04-middleware/content.json";
 import mod04MiddlewarePipelineProblemsModule from "../problems/aspnet-core/04-middleware-pipeline-problems/content.json";
 import mod04ModelBindingValidationModule from "../courses/aspnet-core/04-model-binding-validation/content.json";
@@ -121,6 +125,7 @@ import mod04StateReducersModule from "../courses/react-advanced-patterns/04-stat
 import mod04TreeGraphProblemsModule from "../problems/csharp/04-tree-graph-problems/content.json";
 import mod05AbstractionModule from "../courses/oops-concepts/05-abstraction/content.json";
 import mod05AdvancedFeaturesModule from "../courses/csharp-fundamentals/05-advanced-features/content.json";
+import mod05AiAgentsDotnetModule from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/content.json";
 import mod05AuthenticationModule from "../courses/graphql-dotnet/05-authentication/content.json";
 import mod05AzureDatabasesProblemsModule from "../problems/azure/05-azure-databases-problems/content.json";
 import mod05CachingStrategiesModule from "../courses/react-query/05-caching-strategies/content.json";
@@ -171,6 +176,7 @@ import mod06OfflineSupportPersistenceModule from "../courses/react-query/06-offl
 import mod06PerformanceModule from "../courses/graphql-dotnet/06-performance/content.json";
 import mod06PerformancePatternsModule from "../courses/react-advanced-patterns/06-performance-patterns/content.json";
 import mod06PrismaAdvancedFeaturesModule from "../courses/prisma/06-prisma-advanced-features/content.json";
+import mod06ProductionPatternsModule from "../courses/dotnet-ai-backend/06-production-patterns/content.json";
 import mod06RapidFireModule from "../interview-qa/06-rapid-fire/content.json";
 import mod06ReactPatternsModule from "../courses/typescript-for-react/06-react-patterns/content.json";
 import mod06ReduxTestingModule from "../courses/redux/06-redux-testing/content.json";
@@ -332,6 +338,7 @@ import devopsModule from "../courses/devops/content.json";
 import devopsSystemDesignModule from "../problems/system-design/devops-system-design/content.json";
 import distributedSystemsFundamentalsModule from "../problems/system-design-problems/distributed-systems-fundamentals/content.json";
 import dockerComposeModule from "../cheatsheet/docker-compose/content.json";
+import dotnetAiBackendModule from "../courses/dotnet-ai-backend/content.json";
 import dotnetNugetPackagesModule from "../courses/dotnet-nuget-packages/content.json";
 import dropboxStorageModule from "../problems/hld/dropbox-storage/content.json";
 import ecommerceHldModule from "../problems/hld/ecommerce-hld/content.json";
@@ -481,6 +488,7 @@ import zoomConferencingModule from "../problems/lld/zoom-conferencing/content.js
 import zoomConferencingHldModule from "../problems/hld/zoom-conferencing-hld/content.json";
 
 const rawModulesPart1 = [
+	mod01AiBackendTerminologyModule,
 	mod01ApolloBasicsModule,
 	mod01ArrayProblemsModule,
 	mod01AuthBasicsModule,
@@ -532,6 +540,7 @@ const rawModulesPart1 = [
 	mod02QueriesMutationsModule,
 	mod02QueryHooksModule,
 	mod02QueryingDataModule,
+	mod02RagImplementationModule,
 	mod02RazorViewsProblemsModule,
 	mod02ReduxToolkitModule,
 	mod02SchemaTypesModule,
@@ -557,6 +566,7 @@ const rawModulesPart1 = [
 	mod03JoinsModule,
 	mod03KubernetesFundamentalsModule,
 	mod03LinkedListProblemsModule,
+	mod03McpFundamentalsModule,
 	mod03MockingFakesModule,
 	mod03ModelBindingModule,
 	mod03MutationsModule,
@@ -586,6 +596,7 @@ const rawModulesPart1 = [
 	mod04FormsInputModule,
 	mod04IntegrationTestingModule,
 	mod04KubernetesAdvancedModule,
+	mod04McpServersToolsModule,
 	mod04MiddlewareModule,
 	mod04MiddlewarePipelineProblemsModule,
 	mod04ModelBindingValidationModule,
@@ -602,6 +613,7 @@ const rawModulesPart1 = [
 	mod04TreeGraphProblemsModule,
 	mod05AbstractionModule,
 	mod05AdvancedFeaturesModule,
+	mod05AiAgentsDotnetModule,
 	mod05AuthenticationModule,
 	mod05AzureDatabasesProblemsModule,
 	mod05CachingStrategiesModule,
@@ -652,6 +664,7 @@ const rawModulesPart1 = [
 	mod06PerformanceModule,
 	mod06PerformancePatternsModule,
 	mod06PrismaAdvancedFeaturesModule,
+	mod06ProductionPatternsModule,
 	mod06RapidFireModule,
 	mod06ReactPatternsModule,
 	mod06ReduxTestingModule,
@@ -813,6 +826,7 @@ const rawModulesPart1 = [
 	devopsSystemDesignModule,
 	distributedSystemsFundamentalsModule,
 	dockerComposeModule,
+	dotnetAiBackendModule,
 	dotnetNugetPackagesModule,
 	dropboxStorageModule,
 	ecommerceHldModule,

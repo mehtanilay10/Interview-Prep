@@ -1,0 +1,94 @@
+{
+  "id": "lesson-dotnet-ai-backend-04-mcp-servers-tools-registering-and-describing-tools",
+  "slug": "registering-and-describing-tools",
+  "moduleSlug": "04-mcp-servers-tools",
+  "courseSlug": "dotnet-ai-backend",
+  "title": "Registering and Describing Tools",
+  "description": "Define tools with clear names, descriptions, typed inputs, and examples so AI clients can call them correctly.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 22,
+  "tags": [
+    "mcp",
+    "tools",
+    "csharp",
+    "schemas"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "text": "Tool registration is where backend logic becomes AI-callable. A well-described tool is easier for the model to select and easier for the client to validate. Bad descriptions are a leading cause of failed or misused tool calls."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Tool Description Best Practices"
+    },
+    {
+      "type": "bullet-list",
+      "title": "What to include in each tool description",
+      "items": [
+        "**Behavior** — what the tool does and when it should be used.",
+        "**Parameters** — names, types, required fields, and allowed values.",
+        "**Return shape** — what the tool returns on success and error.",
+        "**Examples** — one or two example invocations with expected results.",
+        "**Side effects** — whether the tool mutates data, sends emails, or triggers external systems."
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Well-described tool in C#",
+      "content": "A tool with rich metadata and validation.",
+      "language": "csharp",
+      "code": "public sealed class GetOrderStatusTool : McpTool\n{\n    public override string Name => \"get_order_status\";\n    public override string Description => \"Return the fulfillment status of an order by ID. Use this when the user asks where their order is.\";\n\n    public override McpParameterSchema Parameters => new(\n        McpType.Object,\n        new Dictionary<string, McpParameterSchema>(StringComparer.OrdinalIgnoreCase)\n        {\n            [\"orderId\"] = new McpParameterSchema(McpType.String)\n            {\n                Description = \"The order identifier returned after checkout.\",\n                Required = true\n            },\n            [\"includeTracking\"] = new McpParameterSchema(McpType.Boolean)\n            {\n                Description = \"Include tracking numbers if available.\",\n                Required = false,\n                Default = false\n            }\n        });\n\n    public async Task<McpToolResult> ExecuteAsync(\n        McpParameterBag args,\n        CancellationToken ct = default)\n    {\n        var orderId = args.GetString(\"orderId\");\n        var includeTracking = args.GetBool(\"includeTracking\") ?? false;\n\n        if (string.IsNullOrWhiteSpace(orderId))\n            return McpToolResult.Error(\"orderId is required.\");\n\n        var order = await _orders.GetByPublicIdAsync(orderId, ct);\n        if (order is null)\n            return McpToolResult.NotFound(\"Order not found.\");\n\n        var payload = new\n        {\n            order.Status,\n            order.EstimatedDelivery,\n            Tracking = includeTracking ? order.TrackingNumbers : null\n        };\n\n        return McpToolResult.Success(JsonSerializer.Serialize(payload));\n    }\n}"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "Validation is non-negotiable",
+      "text": "Validate inputs before executing business logic. Reject missing or invalid parameters with structured errors so the client can correct course."
+    },
+    {
+      "type": "checklist",
+      "title": "Tool Registration Checklist",
+      "items": [
+        {
+          "text": "My tool description explains when to use the tool",
+          "hint": "Include behavior, parameters, return shape, examples, and side effects"
+        },
+        {
+          "text": "I validate inputs before executing the tool",
+          "hint": "Use schema validation or manual checks before business logic runs"
+        },
+        {
+          "text": "My tool returns structured success and error results",
+          "hint": "Separate success payloads from error messages with codes where useful"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Tool descriptions are part of the public API for AI clients.",
+        "Rich descriptions, typed schemas, and examples improve tool selection and execution.",
+        "Validation and structured errors make failures recoverable."
+      ],
+      "takeaway": "Treat tool metadata as seriously as REST documentation. The model and client depend on it to use your backend correctly."
+    }
+  ],
+  "relatedLessons": [
+    "mcp-server-lifecycle",
+    "error-handling-and-validation"
+  ],
+  "technology": null,
+  "furtherReading": [
+    {
+      "title": "MCP tool specification",
+      "url": "https://modelcontextprotocol.io/specification/latest/tools",
+      "type": "article",
+      "author": "Model Context Protocol",
+      "description": "Official tool specification."
+    }
+  ]
+}

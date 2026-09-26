@@ -15,6 +15,7 @@ import csharpCourse from "../problems/csharp/content.json";
 import csharpFundamentalsCourse from "./csharp-fundamentals/content.json";
 import designPatternsCourse from "./design-patterns/content.json";
 import devopsCourse from "./devops/content.json";
+import dotnetAiBackendCourse from "./dotnet-ai-backend/content.json";
 import dotnetNugetPackagesCourse from "./dotnet-nuget-packages/content.json";
 import efCoreCourse from "./ef-core/content.json";
 import frontendPerformanceEngineeringCourse from "./frontend-performance-engineering/content.json";
@@ -63,6 +64,7 @@ const rawCoursesPart1 = [
 	csharpFundamentalsCourse,
 	designPatternsCourse,
 	devopsCourse,
+	dotnetAiBackendCourse,
 	dotnetNugetPackagesCourse,
 	efCoreCourse,
 	frontendPerformanceEngineeringCourse,
