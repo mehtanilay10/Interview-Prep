@@ -4,7 +4,7 @@
   "moduleSlug": "distributed-systems-fundamentals",
   "courseSlug": "system-design-problems",
   "title": "Inbox/deduplication pattern",
-  "description": "Learn about Inbox/deduplication pattern. Master the concepts, patterns, and best practices.",
+  "description": "Learn the inbox pattern for idempotent message processing. Understand how to handle duplicate messages reliably by tracking processed messages.",
   "order": 20,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
@@ -13,24 +13,102 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Inbox/deduplication pattern** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with inbox/deduplication pattern."
+        "text": "The inbox pattern provides idempotency for message consumers by tracking processed messages in an inbox table. This ensures that duplicate messages don't cause incorrect state changes."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Problem: Duplicate Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With at-least-once delivery, consumers must handle duplicates. Without deduplication, duplicates can cause incorrect state."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of inbox/deduplication pattern",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Message retries cause duplicate processing",
+          "Consumer crashes after processing but before ack",
+          "Network failures cause redelivery",
+          "Non-idempotent operations fail on duplicates",
+          "Data corruption from repeated operations"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Assume Duplicates",
+        "text": "Design consumers assuming duplicates will occur. The inbox pattern makes handling duplicates safe and explicit."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Inbox Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The inbox pattern stores processed message IDs in a table to detect and skip duplicates."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Before processing, check if message ID exists in inbox",
+          "If exists, skip processing—already handled",
+          "If not exists, process the message",
+          "Insert message ID into inbox after successful processing",
+          "Use a transaction to ensure atomicity"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Key Benefit",
+        "text": "The inbox pattern provides explicit deduplication that's easy to understand and debug. Unlike hidden idempotency, it's visible in the data model."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "Separate Inbox Table",
+            "description": "Dedicated table for tracking processed message IDs. Simple, clear separation. Requires additional query per message."
+          },
+          {
+            "title": "Inbox Column on Business Table",
+            "description": "Add processed_message_ids column to business tables. Fewer queries but pollutes business schema."
+          },
+          {
+            "title": "Unique Constraint on Message ID",
+            "description": "Use database unique constraint for deduplication. Atomic, efficient. Requires message ID in business data."
+          },
+          {
+            "title": "Redis-based Deduplication",
+            "description": "Use Redis for fast deduplication checks. High performance, but not durable like database inbox."
+          }
         ]
       }
     },
@@ -38,21 +116,96 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Best Practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use a unique constraint on message ID for atomic deduplication",
+          "Include message metadata (timestamp, payload hash) in inbox",
+          "Set TTL on inbox entries to prevent unbounded growth",
+          "Monitor inbox size and cleanup old entries",
+          "Use the same transaction for inbox insert and business logic",
+          "Consider batch processing for efficiency"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cleanup Strategy"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding inbox/deduplication pattern is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Inbox tables grow without bound. Implement cleanup to prevent database bloat."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Time-based cleanup—delete entries older than N days",
+          "Size-based cleanup—delete oldest entries when table exceeds size",
+          "TTL on inbox entries—automatic expiration if supported",
+          "Archive old entries—move to cold storage for audit",
+          "Partition by time—easier cleanup of old partitions"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with inbox/deduplication pattern, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "variant": "warning",
+        "title": "Cleanup Trade-off",
+        "text": "Aggressive cleanup saves space but may lose deduplication for very old duplicate messages. Choose TTL based on your message redelivery window."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use the inbox pattern when you need explicit, reliable deduplication."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "When message delivery is at-least-once",
+          "When operations are not naturally idempotent",
+          "When you need audit trail of processed messages",
+          "When duplicates would cause serious problems",
+          "When you want visible, debuggable deduplication"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Trade-offs"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Pros: Explicit deduplication, easy to debug, works with any message system",
+          "Cons: Additional database writes, storage overhead, cleanup complexity",
+          "Performance: Extra query per message can impact throughput",
+          "Complexity: Requires careful transaction handling"
+        ]
       }
     }
   ],

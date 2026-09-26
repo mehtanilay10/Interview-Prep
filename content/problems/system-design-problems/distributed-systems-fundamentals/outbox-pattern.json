@@ -4,7 +4,7 @@
   "moduleSlug": "distributed-systems-fundamentals",
   "courseSlug": "system-design-problems",
   "title": "Outbox pattern",
-  "description": "Learn about Outbox pattern. Master the concepts, patterns, and best practices.",
+  "description": "Learn the outbox pattern for reliable event publishing. Understand how to guarantee that database updates and message publishing happen atomically.",
   "order": 19,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
@@ -13,24 +13,137 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Outbox pattern** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with outbox pattern."
+        "text": "The outbox pattern solves the problem of reliably publishing events when database updates occur. It ensures that a message is published for every database transaction, preventing lost events."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "The Problem: Dual Write"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Updating a database and publishing a message are two separate operations. Without coordination, failures can cause inconsistency."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of outbox pattern",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Update succeeds, publish fails—event lost",
+          "Publish succeeds, update fails—invalid event",
+          "Both succeed—correct state",
+          "Network failures cause either scenario",
+          "Distributed transactions are expensive"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "No Atomic Operations",
+        "text": "You can't atomically update a database and publish to a message queue. They're separate systems with separate transactions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Outbox Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The outbox pattern stores events in an outbox table within the same database transaction as the business data."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Write business data and outbox entry in same transaction",
+          "Both succeed or both fail—atomic within the database",
+          "Separate process reads outbox and publishes to message queue",
+          "Delete outbox entry after successful publish",
+          "Guarantees event delivery if the database update succeeds"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Key Benefit",
+        "text": "The outbox pattern converts a distributed transaction problem into a local transaction problem, which databases handle reliably."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Step 1: Write to Outbox"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In the same transaction as your business logic, insert an event into the outbox table."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Step 2: Poll Outbox"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A background process polls the outbox table for unpublished events."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Step 3: Publish Message"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Publish the event to the message queue, then mark it as published in the outbox."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation Considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use idempotent message publishing to handle duplicates",
+          "Implement transactional outbox reader for cleaner implementation",
+          "Consider CDC (Change Data Capture) as an alternative",
+          "Clean up processed outbox entries to prevent table bloat",
+          "Monitor outbox size and processing lag"
         ]
       }
     },
@@ -38,21 +151,76 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Transactional Outbox"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding outbox pattern is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Some databases support transactional outbox patterns natively or through extensions."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "PostgreSQL: LISTEN/NOTIFY for real-time notification",
+          "SQL Server: Service Broker integration",
+          "Debezium: CDC-based outbox pattern",
+          "Oracle: Advanced Queuing",
+          "Extension libraries for transactional messaging"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with outbox pattern, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "CDC Alternative",
+        "text": "Change Data Capture can read the transaction log and publish events automatically. This eliminates the need for an explicit outbox table."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Trade-offs"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Pros: Reliable event delivery, no distributed transactions, simple to understand",
+          "Cons: Additional database table, background process needed, eventual consistency",
+          "Database load: Outbox table adds read/write load",
+          "Complexity: Requires careful implementation of the polling process"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use the outbox pattern when event delivery is critical and you can't tolerate lost events."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Critical business events that must be published",
+          "Systems with strong consistency requirements",
+          "When you need to guarantee event ordering",
+          "When message delivery failures are unacceptable",
+          "As an alternative to distributed transactions"
+        ]
       }
     }
   ],

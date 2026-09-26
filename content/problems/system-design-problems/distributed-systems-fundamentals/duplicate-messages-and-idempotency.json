@@ -4,7 +4,7 @@
   "moduleSlug": "distributed-systems-fundamentals",
   "courseSlug": "system-design-problems",
   "title": "Duplicate messages and idempotency",
-  "description": "Learn about Duplicate messages and idempotency. Master the concepts, patterns, and best practices.",
+  "description": "Learn how to handle duplicate messages in distributed systems through idempotency. Understand patterns for making operations safe to retry.",
   "order": 13,
   "difficulty": "advanced",
   "estimatedMinutes": 15,
@@ -13,24 +13,64 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "**Duplicate messages and idempotency** is an essential topic for senior engineers. In this lesson, you will learn the core concepts, practical applications, and common pitfalls associated with duplicate messages and idempotency."
+        "text": "In distributed systems, message delivery is at-least-once, meaning duplicates are inevitable. Idempotency ensures that processing the same message multiple times produces the same result as processing it once."
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Concepts"
+        "text": "Why Duplicates Occur"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Network failures and retries are the primary causes of duplicate messages."
       }
     },
     {
       "type": "bullet-list",
       "data": {
         "items": [
-          "Understand the fundamental principles of duplicate messages and idempotency",
-          "Learn practical applications and use cases",
-          "Identify common pitfalls and how to avoid them",
-          "Apply best practices in your daily work"
+          "Producer retries when acknowledgment is lost",
+          "Consumer crashes after receiving but before acknowledging",
+          "Network partitions cause message redelivery",
+          "Queue redelivery policies on timeout",
+          "Producer redrives messages from dead-letter queue"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Assume Duplicates",
+        "text": "Design your consumers assuming duplicates will occur. Don't try to prevent them—handle them safely through idempotency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Idempotency?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An operation is idempotent if applying it multiple times has the same effect as applying it once."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "GET requests are idempotent—reading doesn't change state",
+          "PUT with same data is idempotent—result is the same",
+          "POST is typically not idempotent—creates new resources",
+          "DELETE is idempotent—deleting twice has same result",
+          "Mathematical: x = 5 is idempotent, x++ is not"
         ]
       }
     },
@@ -38,21 +78,143 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Why This Matters"
+        "text": "Idempotency Patterns"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Deduplication Table"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Understanding duplicate messages and idempotency is critical for building robust systems. It helps you make better architectural decisions, write cleaner code, and troubleshoot issues more effectively in production environments."
+        "text": "Track processed message IDs to detect and skip duplicates."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Store message ID in a table before processing",
+          "Check table on each message—skip if exists",
+          "Use unique constraints for atomic deduplication",
+          "Add TTL for cleanup of old IDs",
+          "Simple but requires additional storage"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Conditional Updates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use database constraints to make updates idempotent."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "INSERT with unique constraint—fails on duplicate",
+          "UPDATE with WHERE clause—only changes if condition met",
+          "Upsert operations—insert or update atomically",
+          "Use natural keys rather than auto-increment IDs",
+          "Leverage database-level idempotency"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Idempotent Business Logic"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design operations that are safe to repeat."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "SET value = X rather than increment",
+          "Use absolute values rather than deltas",
+          "Check current state before applying changes",
+          "Make operations commutative when possible",
+          "Document idempotency guarantees"
+        ]
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Pro Tip",
-        "text": "When working with duplicate messages and idempotency, always consider the trade-offs. The right approach depends on your specific context, team expertise, and system requirements."
+        "title": "Example",
+        "text": "Instead of \"increment balance by 10\", use \"set balance to calculated new value\". The first approach fails on duplicates, the second succeeds safely."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Implementation"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "items": [
+          {
+            "title": "Database-Level",
+            "description": "Use unique constraints, upserts, conditional updates. Best when you control the database schema and can design for idempotency."
+          },
+          {
+            "title": "Application-Level",
+            "description": "Deduplication tables, state tracking, idempotent logic. More flexible but requires careful implementation and testing."
+          },
+          {
+            "title": "Message-Level",
+            "description": "Deduplication IDs in message metadata. Works when the messaging system supports it (e.g., SQS deduplication ID)."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Trade-offs"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Deduplication adds overhead to every operation",
+          "Storage and cleanup of deduplication data",
+          "Complexity in business logic",
+          "May impact performance due to additional checks",
+          "Necessary for reliability in distributed systems"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't Skip It",
+        "text": "The cost of not handling duplicates is data corruption and bugs that are extremely hard to debug. Idempotency is worth the complexity."
       }
     }
   ],
