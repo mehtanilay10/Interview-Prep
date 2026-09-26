@@ -609,7 +609,7 @@ const routingBasics = mkLesson({
       ['{controller=Home}/{action=Index}/{id?}', '/Products/Details/5', 'Products', 'Details', '5'],
       ['{controller=Home}/{action=Index}/{id?}', '/', 'Home', 'Index', null],
       ['{controller=Home}/{action=Index}/{id?}', '/Products', 'Products', 'Index', null],
-      ['Products/{id}', '/Products/5', null', 'null', '5']
+      ['Products/{id}', '/Products/5', 'null', 'null', '5']
     ]),
     h(2, 'Attribute Routing'),
     p('Attribute routing defines routes directly on controller actions using attributes. This gives you full control over the URL structure and is ideal for APIs.'),

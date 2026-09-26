@@ -573,11 +573,12 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
       } as ContentBlock;
     }
     if (block.type === 'summary-box' && (block.data as any).text && !(block.data as any).points) {
+      const text = (block.data as any).text;
       return {
         ...block,
         data: {
           title: block.data.title,
-          points: (block.data as any).text as string[],
+          points: Array.isArray(text) ? text : [text],
           takeaway: block.data.takeaway,
         },
       } as ContentBlock;
