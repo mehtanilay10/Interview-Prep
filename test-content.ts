@@ -1,4 +1,12 @@
-import { searchAll, getCourseStats, getAllCourses, getProblemCourses, getLessonsForCourse } from './lib/content';
+import { searchAll, getCourseStats, getAllCourses, getProblemCourses, getLessonsForCourse, getAllModules, getAllLessons } from './lib/content';
+import type { Module, Lesson } from './types';
+import fs from 'fs';
+import path from 'path';
+
+const contentDir = path.join(process.cwd(), 'content');
+
+const MODULE_FIELDS = new Set(['id', 'slug', 'courseSlug', 'title', 'description', 'longDescription', 'order', 'difficulty', 'estimatedHours', 'icon', 'tags', 'lessonSlugs', 'isOptional', 'skipLabel', 'prerequisites', 'whatYouLearn']);
+const LESSON_FIELDS = new Set(['id', 'slug', 'moduleSlug', 'courseSlug', 'title', 'description', 'order', 'difficulty', 'estimatedMinutes', 'tags', 'blocks', 'technology', 'relatedLessons', 'furtherReading', 'prerequisites']);
 
 let passed = 0;
 let failed = 0;
@@ -13,7 +21,151 @@ function assert(condition: boolean, message: string) {
   }
 }
 
+function isJSONFile(filePath: string): boolean {
+  return filePath.endsWith('.json');
+}
+
+function getCourseSlugFromPath(filePath: string): string | null {
+  const relative = path.relative(contentDir, filePath);
+  const parts = relative.split(path.sep);
+  if (parts[0] === 'courses' || parts[0] === 'problems') {
+    return parts[1] || null;
+  }
+  if (parts[0] === 'interview-qa') {
+    return 'interview-qa';
+  }
+  return null;
+}
+
+function validateContentFiles() {
+  console.log('Validating content schema...\n');
+
+  const validLessonSlugs = new Map<string, Set<string>>();
+  const validModuleSlugs = new Map<string, Set<string>>();
+
+  function ensureCourseMap(map: Map<string, Set<string>>, courseSlug: string) {
+    if (!map.has(courseSlug)) map.set(courseSlug, new Set());
+  }
+
+  function scanCourse(coursePath: string, courseSlug: string) {
+    ensureCourseMap(validLessonSlugs, courseSlug);
+    ensureCourseMap(validModuleSlugs, courseSlug);
+    if (!fs.existsSync(coursePath) || !fs.statSync(coursePath).isDirectory()) return;
+    for (const mod of fs.readdirSync(coursePath)) {
+      const modPath = path.join(coursePath, mod);
+      if (!fs.statSync(modPath).isDirectory()) continue;
+      validModuleSlugs.get(courseSlug)!.add(mod);
+      for (const file of fs.readdirSync(modPath)) {
+        if (file.endsWith('.json') && file !== 'content.json') {
+          validLessonSlugs.get(courseSlug)!.add(file.replace('.json', ''));
+        }
+      }
+    }
+  }
+
+  const coursesDir = path.join(contentDir, 'courses');
+  const problemsDir = path.join(contentDir, 'problems');
+  const interviewDir = path.join(contentDir, 'interview-qa');
+
+  if (fs.existsSync(coursesDir)) {
+    for (const course of fs.readdirSync(coursesDir)) {
+      const p = path.join(coursesDir, course);
+      if (fs.statSync(p).isDirectory()) scanCourse(p, course);
+    }
+  }
+  if (fs.existsSync(problemsDir)) {
+    for (const course of fs.readdirSync(problemsDir)) {
+      const p = path.join(problemsDir, course);
+      if (fs.statSync(p).isDirectory()) scanCourse(p, course);
+    }
+  }
+  if (fs.existsSync(interviewDir)) {
+    scanCourse(interviewDir, 'interview-qa');
+  }
+
+  let moduleSchemaErrors = 0;
+  let lessonSchemaErrors = 0;
+  let brokenRelatedLessons = 0;
+  let missingLessonRefs = 0;
+
+  function validateFile(filePath: string) {
+    if (!isJSONFile(filePath)) return;
+    try {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const courseSlug = getCourseSlugFromPath(filePath);
+      const fileName = path.basename(filePath);
+
+      if (fileName === 'content.json') {
+        const modPath = path.dirname(filePath);
+        const parentPath = path.dirname(modPath);
+        const grandparentPath = path.dirname(parentPath);
+        const grandparentName = path.basename(grandparentPath);
+        const isModuleContent = fs.statSync(modPath).isDirectory() && ['courses', 'problems', 'interview-qa'].includes(grandparentName);
+
+        if (isModuleContent) {
+          for (const key of Object.keys(data)) {
+            if (!MODULE_FIELDS.has(key)) {
+              console.error(`  Invalid module field: ${key} in ${filePath}`);
+              moduleSchemaErrors++;
+            }
+          }
+          if (data.lessonSlugs && Array.isArray(data.lessonSlugs) && courseSlug) {
+            const valid = validLessonSlugs.get(courseSlug) || new Set();
+            for (const slug of data.lessonSlugs) {
+              if (!valid.has(slug)) {
+                console.error(`  Missing lesson ref: ${filePath} -> ${slug}`);
+                missingLessonRefs++;
+              }
+            }
+          }
+        }
+      } else {
+        for (const key of Object.keys(data)) {
+          if (!LESSON_FIELDS.has(key)) {
+            console.error(`  Invalid lesson field: ${key} in ${filePath}`);
+            lessonSchemaErrors++;
+          }
+        }
+        if (data.relatedLessons && Array.isArray(data.relatedLessons) && courseSlug) {
+          const valid = validLessonSlugs.get(courseSlug) || new Set();
+          for (const slug of data.relatedLessons) {
+            if (!valid.has(slug)) {
+              console.error(`  Broken relatedLessons: ${filePath} -> ${slug}`);
+              brokenRelatedLessons++;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`  Invalid JSON: ${filePath}`);
+    }
+  }
+
+  function walkDir(dir: string) {
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
+    for (const entry of fs.readdirSync(dir)) {
+      const fullPath = path.join(dir, entry);
+      if (fs.statSync(fullPath).isDirectory()) {
+        walkDir(fullPath);
+      } else if (isJSONFile(entry)) {
+        validateFile(fullPath);
+      }
+    }
+  }
+
+  walkDir(coursesDir);
+  walkDir(problemsDir);
+  walkDir(interviewDir);
+
+  assert(moduleSchemaErrors === 0, `Module schema violations: ${moduleSchemaErrors} (expected 0)`);
+  assert(lessonSchemaErrors === 0, `Lesson schema violations: ${lessonSchemaErrors} (expected 0)`);
+  assert(brokenRelatedLessons === 0, `Broken relatedLessons references: ${brokenRelatedLessons} (expected 0)`);
+  assert(missingLessonRefs === 0, `Missing lesson file references: ${missingLessonRefs} (expected 0)`);
+}
+
 console.log('Running content helper tests...\n');
+
+validateContentFiles();
 
 // Test searchAll
 const searchResults = searchAll('two sum');

@@ -173,7 +173,7 @@ function renderExampleBlock(block: ContentBlock & { type: 'example' }, idx: numb
     >
       <div className="border-b border-border bg-canvas-inset px-4 py-2">
         <span className="text-xs font-semibold text-fg-muted">
-          📌 {title ?? 'Example'}
+          📌 {title || 'Example'}
         </span>
       </div>
       <div className="p-3">
