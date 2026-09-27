@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GitBranch, ExternalLink, ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
@@ -82,6 +82,12 @@ function FooterLinkGroup({ col }: { col: typeof FOOTER_LINKS[0] }) {
 }
 
 export function Footer() {
+  const [year, setYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   return (
     <footer className="border-t border-border bg-canvas-subtle transition-theme">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
@@ -111,7 +117,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-fg-subtle sm:flex-row">
-          <p>© {new Date().getFullYear()} Interview Prep. Open knowledge for everyone.</p>
+          <p>© {year ?? '2026'} Interview Prep. Open knowledge for everyone.</p>
           <a
             href="https://github.com/mehtanilay10/Interview-Prep/"
             target="_blank"

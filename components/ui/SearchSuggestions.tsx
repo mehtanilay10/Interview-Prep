@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, X, ArrowRight } from 'lucide-react';
-import { searchAll, getSearchResultHref } from '@/lib/content';
 import type { SearchResult } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +44,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
     const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [isOpen, setIsOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -61,10 +61,36 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
         return;
       }
 
-      const results = searchAll(value.trim());
-      setSuggestions(results);
-      setIsOpen(results.length > 0);
-      setSelectedIndex(-1);
+      let cancelled = false;
+      setLoading(true);
+      const url = `/api/search?q=${encodeURIComponent(value.trim())}`;
+
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error('Search failed');
+          return res.json();
+        })
+        .then((data) => {
+          if (!cancelled) {
+            const results = (data.results ?? []) as SearchResult[];
+            setSuggestions(results);
+            setIsOpen(results.length > 0);
+            setSelectedIndex(-1);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSuggestions([]);
+            setIsOpen(false);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
     }, [value]);
 
     useEffect(() => {
@@ -88,7 +114,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
 
     const navigateToResult = useCallback(
       (result: SearchResult) => {
-        const href = getSearchResultHref(result);
+        const href = `/search?q=${encodeURIComponent(result.title)}`;
         onChange('');
         setIsOpen(false);
         setSelectedIndex(-1);
@@ -196,7 +222,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
             className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-border bg-canvas shadow-lg"
           >
             {suggestions.map((result, index) => {
-              const href = getSearchResultHref(result);
+              const href = `/search?q=${encodeURIComponent(result.title)}`;
               const label = TYPE_LABEL[result.type] || result.type;
               const isSelected = index === selectedIndex;
 
@@ -233,7 +259,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
                 </li>
               );
             })}
-            {value.trim() && (
+            {value.trim() && !loading && (
               <li
                 role="option"
                 aria-selected={selectedIndex === suggestions.length}

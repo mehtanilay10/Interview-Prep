@@ -1,24 +1,19 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Bookmark,
   CheckCircle2,
-  LogOut,
   TrendingUp,
   Award,
   Target,
-  BookOpen,
   BarChart3,
   ClipboardList,
-  StickyNote,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
-import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, modules, isProblemCourseSlug } from '@/lib/content';
-import type { Lesson, Course, Module } from '@/types';
+import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, isProblemCourseSlug } from '@/lib/content';
+import type { Lesson, Course } from '@/types';
 
 interface LessonProgress {
   lessonSlug: string;
@@ -34,24 +29,6 @@ interface CategoryProgress {
   startedAt?: string;
 }
 
-interface BookmarkItem {
-  id: string;
-  type: string;
-  slug: string;
-  title: string;
-  courseSlug: string;
-  moduleSlug: string;
-  addedAt: string;
-}
-
-interface LessonNote {
-  courseSlug: string;
-  moduleSlug: string;
-  lessonSlug: string;
-  content: string;
-  updatedAt: string;
-}
-
 interface CourseProgressInfo {
   courseSlug: string;
   courseTitle: string;
@@ -61,44 +38,13 @@ interface CourseProgressInfo {
   estimatedMinutesRemaining: number;
 }
 
-type TabId = 'overview' | 'completed' | 'bookmarks' | 'notes' | 'courses';
+type TabId = 'overview' | 'completed' | 'courses';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'completed', label: 'Completed', icon: ClipboardList },
-  { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
-  { id: 'notes', label: 'Notes', icon: StickyNote },
   { id: 'courses', label: 'Course Progress', icon: Target },
 ];
-
-function bookmarkHref(item: BookmarkItem): string {
-  if (item.type === 'interview') {
-    return `/interview-questions/${item.moduleSlug}/${item.slug}`;
-  }
-  if (item.type === 'problem') {
-    return `/problems/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
-  }
-  return `/courses/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
-}
-
-function resolveLesson(note: LessonNote): { title: string; href: string } {
-  const lesson = getLessonBySlug(note.lessonSlug, note.courseSlug);
-  if (lesson) {
-    if (note.courseSlug === 'interview-qa') {
-      return { title: lesson.title, href: `/interview-questions/${note.moduleSlug}/${note.lessonSlug}` };
-    }
-    if (isProblemCourseSlug(note.courseSlug)) {
-      return { title: lesson.title, href: `/problems/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
-    }
-    return { title: lesson.title, href: `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
-  }
-  return {
-    title: note.lessonSlug.replace(/-/g, ' '),
-    href: note.courseSlug === 'interview-qa'
-      ? `/interview-questions/${note.moduleSlug}/${note.lessonSlug}`
-      : `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}`,
-  };
-}
 
 function getCourseForModule(moduleSlug: string): { courseSlug: string; courseTitle: string } | null {
   const mod = getModuleBySlug(moduleSlug);
@@ -122,20 +68,15 @@ function getProgressColor(percent: number) {
 
 export function ProgressDashboardClient({ user }: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } }) {
   const router = useRouter();
-  const { data: session } = useSession();
   const [progress, setProgress] = useState<Record<string, CategoryProgress>>({});
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
-  const [notes, setNotes] = useState<LessonNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [progressRes, bookmarksRes, notesRes] = await Promise.all([
+        const [progressRes] = await Promise.all([
           fetch('/api/progress'),
-          fetch('/api/bookmarks'),
-          fetch('/api/user/notes'),
         ]);
 
         if (progressRes.ok) {
@@ -155,16 +96,6 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
             };
           }
           setProgress(mapped);
-        }
-
-        if (bookmarksRes.ok) {
-          const bookmarksData = await bookmarksRes.json();
-          setBookmarks(bookmarksData.items || []);
-        }
-
-        if (notesRes.ok) {
-          const notesData = await notesRes.json();
-          setNotes(notesData.notes || []);
         }
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
@@ -296,20 +227,6 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
       .slice(0, 10);
   }, [progress, totalCompleted]);
 
-  const bookmarkLinks = useMemo(() => bookmarks.slice(0, 50).map((bookmark) => ({
-    ...bookmark,
-    href: bookmarkHref(bookmark),
-  })), [bookmarks]);
-
-  const resolvedNotes = useMemo(() => notes.slice(0, 50).map((note) => ({
-    ...note,
-    ...resolveLesson(note),
-  })), [notes]);
-
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
@@ -320,20 +237,11 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-fg-default">Progress Dashboard</h1>
-          <p className="mt-2 text-fg-muted">
-            Track your learning journey across all content types.
-          </p>
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default transition-colors hover:border-accent-fg hover:text-accent-fg"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          Sign out
-        </button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-fg-default">Progress Dashboard</h1>
+        <p className="mt-2 text-fg-muted">
+          Track your learning journey across all content types.
+        </p>
       </div>
 
       <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-border bg-canvas p-1">
@@ -393,36 +301,6 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                   <p className="mt-1 text-3xl font-bold text-fg-default">{completionRate}%</p>
                 </div>
                 <Award className="h-8 w-8 text-accent-fg" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Bookmarks</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{bookmarks.length}</p>
-                </div>
-                <Bookmark className="h-8 w-8 text-accent-fg" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Notes</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{notes.length}</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-accent-fg" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Total Completed</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{totalCompleted}</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-success-fg" aria-hidden="true" />
               </div>
             </div>
           </div>
@@ -490,60 +368,6 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                 );
               })}
             </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'bookmarks' && (
-        <div className="rounded-xl border border-border bg-canvas p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Bookmark className="h-5 w-5 text-accent-fg" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-fg-default">Your Bookmarks</h2>
-          </div>
-          {bookmarkLinks.length === 0 ? (
-            <p className="text-sm text-fg-muted">No bookmarks yet. Save lessons to access them quickly.</p>
-          ) : (
-            <ul className="space-y-2">
-              {bookmarkLinks.map((bookmark) => (
-                <li
-                  key={bookmark.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-canvas-subtle px-3 py-2 transition-colors hover:border-accent-fg"
-                >
-                  <Link href={bookmark.href} className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-fg-default">{bookmark.title}</p>
-                    <p className="text-xs text-fg-muted capitalize">{bookmark.type}</p>
-                  </Link>
-                  <span className="text-xs text-fg-subtle">{formatRelativeTime(bookmark.addedAt)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'notes' && (
-        <div className="rounded-xl border border-border bg-canvas p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <StickyNote className="h-5 w-5 text-accent-fg" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-fg-default">Your Notes</h2>
-          </div>
-          {resolvedNotes.length === 0 ? (
-            <p className="text-sm text-fg-muted">No notes yet. Take notes while learning to remember key concepts.</p>
-          ) : (
-            <ul className="space-y-2">
-              {resolvedNotes.map((note, idx) => (
-                <li
-                  key={`${note.courseSlug}-${note.moduleSlug}-${note.lessonSlug}-${idx}`}
-                  className="rounded-lg border border-border bg-canvas-subtle px-3 py-2 transition-colors hover:border-accent-fg"
-                >
-                  <Link href={note.href} className="flex flex-col gap-1">
-                    <p className="text-sm font-medium text-fg-default">{note.title}</p>
-                    <p className="text-xs text-fg-muted line-clamp-2">{note.content}</p>
-                    <span className="text-xs text-fg-subtle">{formatRelativeTime(note.updatedAt)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
           )}
         </div>
       )}

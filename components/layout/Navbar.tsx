@@ -4,8 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, Search, LogOut, User } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
@@ -105,7 +104,7 @@ export function Navbar() {
         </Link>
 
         {searchMode ? (
-          <div className="hidden flex-1 items-center md:flex">
+          <div className="hidden flex-1 items-center justify-center md:flex">
             <div className="relative w-full max-w-2xl transition-all duration-300 ease-in-out">
               <SearchSuggestions
                 ref={searchInputRef}
@@ -149,7 +148,6 @@ export function Navbar() {
         )}
 
         <div className="flex items-center gap-1">
-          <ThemeToggle />
           {isLoggedIn && session?.user ? (
             <div className="relative" ref={userMenuRef}>
               <button
@@ -169,10 +167,35 @@ export function Navbar() {
                 <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-canvas shadow-lg py-1">
                   <Link
                     href="/progress"
-                    className="block px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                     onClick={() => setUserMenuOpen(false)}
                   >
+                    <BarChart3 className="h-4 w-4" aria-hidden="true" />
                     Progress Dashboard
+                  </Link>
+                  <Link
+                    href="/bookmarks"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <Bookmark className="h-4 w-4" aria-hidden="true" />
+                    Bookmarks
+                  </Link>
+                  <Link
+                    href="/notes"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <StickyNote className="h-4 w-4" aria-hidden="true" />
+                    Notes
+                  </Link>
+                  <Link
+                    href="/personalization"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <Settings2 className="h-4 w-4" aria-hidden="true" />
+                    Personalization
                   </Link>
                   <button
                     onClick={() => {
@@ -233,18 +256,15 @@ export function Navbar() {
             })}
             {isLoggedIn ? (
               <>
-                <Link href="/progress" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
-                  Progress Dashboard
+                <Link href="/bookmarks" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
+                  Bookmarks
                 </Link>
-                <button
-                  onClick={() => {
-                    setMobileOpen(false);
-                    handleSignOut();
-                  }}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-left text-fg-muted hover:bg-canvas hover:text-fg-default"
-                >
-                  Sign out
-                </button>
+                <Link href="/notes" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
+                  Notes
+                </Link>
+                <Link href="/personalization" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
+                  Personalization
+                </Link>
               </>
             ) : (
               <Link href="/login" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
