@@ -7,8 +7,10 @@ import aspnetCoreCourse1 from "../problems/aspnet-core/content.json";
 import aspnetCoreWebApiCourse from "./aspnet-core-web-api/content.json";
 import authenticationAuthorizationCourse from "./authentication-authorization/content.json";
 import awsCourse from "./aws/content.json";
+import awsForAspnetCourse from "./aws-for-aspnet/content.json";
 import azureCourse from "./azure/content.json";
 import azureCourse1 from "../problems/azure/content.json";
+import azureForAspnetCourse from "./azure-for-aspnet/content.json";
 import cheatsheetCourse from "../cheatsheet/content.json";
 import cleanCodeCsharpCourse from "./clean-code-csharp/content.json";
 import csharpCourse from "../problems/csharp/content.json";
@@ -56,8 +58,10 @@ const rawCoursesPart1 = [
 	aspnetCoreWebApiCourse,
 	authenticationAuthorizationCourse,
 	awsCourse,
+	awsForAspnetCourse,
 	azureCourse,
 	azureCourse1,
+	azureForAspnetCourse,
 	cheatsheetCourse,
 	cleanCodeCsharpCourse,
 	csharpCourse,

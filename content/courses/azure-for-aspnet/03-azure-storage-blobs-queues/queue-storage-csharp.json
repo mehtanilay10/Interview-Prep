@@ -1,0 +1,112 @@
+{
+  "id": "lesson-azure-for-aspnet-queue-storage-csharp",
+  "slug": "queue-storage-csharp",
+  "moduleSlug": "03-azure-storage-blobs-queues",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Queue Storage from C#",
+  "description": "Use Azure Queue Storage to offload work from an ASP.NET Core request into a background consumer.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 24,
+  "tags": ["azure", "storage", "queue", "csharp", "background"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Queue Storage provides simple FIFO messaging. In ASP.NET Core, queues are useful for offloading slow work like email, image processing, or report generation out of the HTTP request path."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Queue Basics"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Messages are up to 64 KB in size",
+          "Queues are scoped to a storage account",
+          "Visibility timeout prevents other consumers from reading the same message"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Send and Receive Messages"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Add a message and process it",
+        "content": "Use `QueueClient` from the `Azure.Storage.Queues` package.",
+        "language": "csharp",
+        "code": "using Azure.Storage.Queues;\n\nvar queueUri = new Uri(\"https://demostorageaccount.queue.core.windows.net/email-jobs\");\nvar queueClient = new QueueClient(queueUri, new DefaultAzureCredential());\n\nawait queueClient.CreateIfNotExistsAsync();\n\n// Send a message\nawait queueClient.SendMessageAsync(\"order-1234\");\n\n// Receive messages\nQueueMessage[] messages = await queueClient.ReceiveMessagesAsync(maxMessages: 10);\nforeach (var message in messages)\n{\n    Console.WriteLine($\"Process: {message.MessageText}\");\n    await queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pattern: Web API + Queue Worker"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A common pattern is an ASP.NET Core API that enqueues work and a background worker that processes it. You can host the worker in the same app using `IHostedService`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Background queue worker",
+        "content": "This worker runs inside the same ASP.NET Core host.",
+        "language": "csharp",
+        "code": "public class QueueWorker : BackgroundService\n{\n    private readonly QueueClient _queue;\n\n    public QueueWorker(QueueClient queue) => _queue = queue;\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            var messages = await _queue.ReceiveMessagesAsync(maxMessages: 1, cancellationToken: stoppingToken);\n            foreach (var message in messages.Value)\n            {\n                Console.WriteLine($\"Processing: {message.MessageText}\");\n                // TODO: send email, generate PDF, etc.\n                await _queue.DeleteMessageAsync(message.MessageId, message.PopReceipt, stoppingToken);\n            }\n            await Task.Delay(1000, stoppingToken);\n        }\n    }\n}\n\n// Registration\nbuilder.Services.AddAzureClients(c =>\n{\n    c.AddQueueServiceClient(builder.Configuration[\"Azure:Storage:QueueUri\"]!);\n});\nbuilder.Services.AddHostedService<QueueWorker>();"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Queue an email job",
+        "description": "When a user registers, enqueue a welcome email job instead of sending it synchronously.",
+        "steps": [
+          "Create an endpoint `POST /api/users`",
+          "Save the user to a database or in-memory list",
+          "Serialize an email job to JSON and send it to the queue",
+          "Log the enqueued message and return 202 Accepted"
+        ],
+        "expectedOutcome": "The API returns immediately while the email job waits in the queue."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Queue Storage decouples slow work from HTTP requests",
+          "Messages are simple strings; pass JSON for structured data",
+          "Always delete messages after successful processing",
+          "Use `IHostedService` for queue workers inside ASP.NET Core"
+        ],
+        "takeaway": "Queues make your API faster and more reliable by moving non-critical work outside the request pipeline."
+      }
+    }
+  ],
+  "relatedLessons": ["file-share-csharp"],
+  "furtherReading": [
+    {
+      "title": "Azure Queue Storage documentation",
+      "url": "https://learn.microsoft.com/en-us/azure/storage/queues/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Queue concepts and C# quickstarts."
+    }
+  ]
+}

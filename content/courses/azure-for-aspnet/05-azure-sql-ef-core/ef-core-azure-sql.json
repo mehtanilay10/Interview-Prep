@@ -1,0 +1,104 @@
+{
+  "id": "lesson-azure-for-aspnet-ef-core-azure-sql",
+  "slug": "ef-core-azure-sql",
+  "moduleSlug": "05-azure-sql-ef-core",
+  "courseSlug": "azure-for-aspnet",
+  "title": "EF Core with Azure SQL",
+  "description": "Connect EF Core to Azure SQL Database and apply migrations in ASP.NET Core.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 26,
+  "tags": ["azure", "sql", "efcore", "csharp", "aspnet-core"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core works with Azure SQL Database using the same `UseSqlServer` provider as on-premises SQL Server. The main differences are connection security, retry behavior, and migration workflows in a managed environment."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configure the Connection"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Use Azure SQL with EF Core in Program.cs",
+        "content": "Pull the connection string from configuration loaded by Key Vault or App Configuration.",
+        "language": "csharp",
+        "code": "using Azure.Identity;\nusing Microsoft.EntityFrameworkCore;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nvar connectionString = builder.Configuration.GetConnectionString(\"Default\");\n\nbuilder.Services.AddDbContext<BlogContext>(options =>\n    options.UseSqlServer(connectionString, sql =>\n    {\n        sql.EnableRetryOnFailure(\n            maxRetryCount: 5,\n            maxRetryDelay: TimeSpan.FromSeconds(10),\n            errorNumbersToAdd: null);\n    }));\n\nvar app = builder.Build();\napp.MapGet(\"/posts\", async (BlogContext db) =>\n    await db.Posts.ToListAsync());\napp.Run();\n\npublic class BlogContext : DbContext\n{\n    public BlogContext(DbContextOptions<BlogContext> options)\n        : base(options) { }\n\n    public DbSet<Post> Posts => Set<Post>();\n}\n\npublic class Post\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string Content { get; set; } = string.Empty;\n    public DateTime PublishedAt { get; set; }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Apply Migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In development, use `dotnet ef database update` to apply migrations. In production, use `context.Database.Migrate()` at startup or a deploy script."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auto-apply migrations at startup",
+        "content": "Apply pending migrations automatically when the app starts.",
+        "language": "csharp",
+        "code": "using (var scope = app.Services.CreateScope())\n{\n    var db = scope.ServiceProvider.GetRequiredService<BlogContext>();\n    db.Database.Migrate();\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Production migrations",
+        "text": "Auto-migration at startup is convenient but can fail under concurrent instances. For production, use a controlled deployment step or the `dotnet ef` CLI in your pipeline."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a posts API with EF Core and Azure SQL",
+        "description": "Create a minimal API that stores posts in Azure SQL using EF Core.",
+        "steps": [
+          "Add `Microsoft.EntityFrameworkCore.SqlServer` and `Microsoft.EntityFrameworkCore.Tools`",
+          "Create `Post` entity and `BlogContext`",
+          "Add a connection string from Key Vault or local settings",
+          "Create the initial migration with `dotnet ef migrations add Initial`",
+          "Apply the migration and test CRUD endpoints"
+        ],
+        "expectedOutcome": "You can create and list posts through HTTP endpoints backed by Azure SQL."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use `UseSqlServer` for Azure SQL connections",
+          "Enable retry policies for transient Azure SQL failures",
+          "Store connection strings in Key Vault or App Configuration",
+          "Use `Migrate()` in development; prefer controlled migrations in production"
+        ],
+        "takeaway": "Azure SQL and EF Core integrate cleanly when you separate connection configuration, retry behavior, and migration strategy."
+      }
+    }
+  ],
+  "relatedLessons": ["connection-resilience"],
+  "furtherReading": [
+    {
+      "title": "EF Core with Azure SQL",
+      "url": "https://learn.microsoft.com/en-us/ef/core/providers/sql-server/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "EF Core SQL Server provider documentation."
+    }
+  ]
+}

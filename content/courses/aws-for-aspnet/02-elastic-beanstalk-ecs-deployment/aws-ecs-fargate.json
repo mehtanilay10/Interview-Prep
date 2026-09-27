@@ -1,0 +1,118 @@
+{
+  "id": "lesson-aws-for-aspnet-aws-ecs-fargate",
+  "slug": "aws-ecs-fargate",
+  "moduleSlug": "02-elastic-beanstalk-ecs-deployment",
+  "courseSlug": "aws-for-aspnet",
+  "title": "Run ASP.NET Core on ECS Fargate",
+  "description": "Containerize an ASP.NET Core app and run it on AWS ECS Fargate without managing servers.",
+  "order": 3,
+  "difficulty": "beginner",
+  "estimatedMinutes": 24,
+  "tags": ["aws", "ecs", "fargate", "containers", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Amazon ECS Fargate lets you run containers without managing EC2 instances. You define a task, a container image, and the resources needed; AWS runs it for you."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Containerize the ASP.NET Core App"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dockerfile for ASP.NET Core",
+        "content": "Create a multi-stage Dockerfile to build and run the app.",
+        "language": "dockerfile",
+        "code": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY *.csproj .\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o /app/publish\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY --from=build /app/publish .\nENTRYPOINT [\"dotnet\", \"WeatherApi.dll\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Push the Image to Amazon ECR"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Amazon ECR is a managed container registry. Push your Docker image there so ECS can pull it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Build and push to ECR",
+        "content": "Use the AWS CLI to authenticate Docker and push the image.",
+        "language": "powershell",
+        "code": "$accountId = aws sts get-caller-identity --query Account --output text\n$region = \"us-east-1\"\n$repoName = \"weather-api\"\n\naws ecr get-login-password --region $region | docker login --username AWS --password-stdin $accountId.dkr.ecr.$region.amazonaws.com\n\naws ecr create-repository --repository-name $repoName --region $region\n\ndocker build -t $repoName .\ndocker tag $repoName:latest $accountId.dkr.ecr.$region.amazonaws.com/$repoName:latest\n\ndocker push $accountId.dkr.ecr.$region.amazonaws.com/$repoName:latest"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create the ECS Task and Service"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Define a task that runs your container and a service that keeps it running."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Register a task definition",
+        "content": "Create a task definition JSON and register it with ECS.",
+        "language": "json",
+        "code": "{\n  \"family\": \"weather-api-task\",\n  \"networkMode\": \"awsvpc\",\n  \"requiresCompatibilities\": [\"FARGATE\"],\n  \"cpu\": \"256\",\n  \"memory\": \"512\",\n  \"containerDefinitions\": [\n    {\n      \"name\": \"weather-api\",\n      \"image\": \"<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/weather-api:latest\",\n      \"portMappings\": [\n        {\n          \"containerPort\": 80,\n          \"protocol\": \"tcp\"\n        }\n      ]\n    }\n  ]\n}"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Run the API on Fargate",
+        "description": "Containerize and deploy the WeatherApi to ECS Fargate.",
+        "steps": [
+          "Add a Dockerfile to the WeatherApi project",
+          "Build and push the image to ECR",
+          "Register a task definition",
+          "Create an ECS cluster and service",
+          "Test the public endpoint"
+        ],
+        "expectedOutcome": "The API is accessible through a public load balancer URL."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "ECS Fargate runs containers without managing EC2 instances",
+          "Push container images to ECR for ECS to pull",
+          "Task definitions describe CPU, memory, and container settings",
+          "Services keep the desired number of tasks running"
+        ],
+        "takeaway": "ECS Fargate is the AWS equivalent of running containers in the cloud with minimal infrastructure overhead."
+      }
+    }
+  ],
+  "relatedLessons": ["monitoring-elastic-beanstalk"],
+  "furtherReading": [
+    {
+      "title": "ECS for .NET developers",
+      "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-gsg-for-asp.net.html",
+      "type": "article",
+      "author": "AWS",
+      "description": "Getting started with ECS and ASP.NET Core."
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "id": "lesson-aws-for-aspnet-rds-csharp",
+  "slug": "rds-csharp",
+  "moduleSlug": "05-rds-dynamodb",
+  "courseSlug": "aws-for-aspnet",
+  "title": "Connect to RDS from C#",
+  "description": "Connect an ASP.NET Core app to RDS using EF Core, Dapper, or ADO.NET.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 24,
+  "tags": ["aws", "rds", "csharp", "efcore", "database"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Connecting to RDS from C# is the same as connecting to any SQL Server or PostgreSQL database. The main difference is that the connection string comes from Secrets Manager or Parameter Store rather than appsettings.json."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configure the Connection"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Use RDS with EF Core in Program.cs",
+        "content": "Pull the connection string from configuration loaded by Secrets Manager.",
+        "language": "csharp",
+        "code": "using Microsoft.EntityFrameworkCore;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nvar connectionString = builder.Configuration.GetConnectionString(\"Default\");\n\nbuilder.Services.AddDbContext<BlogContext>(options =>\n    options.UseSqlServer(connectionString));\n\nvar app = builder.Build();\napp.MapGet(\"/posts\", async (BlogContext db) =>\n    await db.Posts.ToListAsync());\napp.Run();\n\npublic class BlogContext : DbContext\n{\n    public BlogContext(DbContextOptions<BlogContext> options)\n        : base(options) { }\n\n    public DbSet<Post> Posts => Set<Post>();\n}\n\npublic class Post\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string Content { get; set; } = string.Empty;\n    public DateTime PublishedAt { get; set; }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configure Firewall Rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RDS instances are not publicly accessible by default. You must create a security group rule to allow your app's IP or VPC to reach the database."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Allow access from Elastic Beanstalk",
+        "content": "Use the AWS CLI to create a security group rule.",
+        "language": "powershell",
+        "code": "$vpcId = aws elasticbeanstalk describe-environment-resources --environment-name aspnet-aws-env --query EnvironmentResources.EnvironmentResources.VpcId --output text\n$sgId = aws rds describe-db-instances --db-instance-identifier aspnet-db --query 'DBInstances[0].VpcSecurityGroups[0].VpcSecurityGroupId' --output text\n\naws ec2 authorize-security-group-ingress --group-id $sgId --protocol tcp --port 1433 --source-group $vpcId"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Apply Migrations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In development, use `dotnet ef database update` to apply migrations. In production, use `context.Database.Migrate()` or a deployment script."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auto-apply migrations at startup",
+        "content": "Apply pending migrations automatically when the app starts.",
+        "language": "csharp",
+        "code": "using (var scope = app.Services.CreateScope())\n{\n    var db = scope.ServiceProvider.GetRequiredService<BlogContext>();\n    db.Database.Migrate();\n}"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a posts API with EF Core and RDS",
+        "description": "Create a minimal API that stores posts in RDS using EF Core.",
+        "steps": [
+          "Create an RDS SQL Server or PostgreSQL instance",
+          "Add `Microsoft.EntityFrameworkCore.SqlServer` and `Microsoft.EntityFrameworkCore.Tools`",
+          "Create `Post` entity and `BlogContext`",
+          "Add a connection string from Secrets Manager",
+          "Create the initial migration and apply it",
+          "Test CRUD endpoints"
+        ],
+        "expectedOutcome": "You can create and list posts through HTTP endpoints backed by RDS."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use `UseSqlServer` for SQL Server or `UseNpgsql` for PostgreSQL",
+          "Store connection strings in Secrets Manager or Parameter Store",
+          "Configure security groups to allow app-to-database traffic",
+          "Use `Migrate()` in development; prefer controlled migrations in production"
+        ],
+        "takeaway": "RDS and EF Core integrate cleanly when you separate connection configuration, security groups, and migration strategy."
+      }
+    }
+  ],
+  "relatedLessons": ["dynamodb-csharp"],
+  "furtherReading": [
+    {
+      "title": "EF Core with SQL Server",
+      "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html",
+      "type": "article",
+      "author": "AWS",
+      "description": "Using SQL Server on RDS with .NET applications."
+    }
+  ]
+}

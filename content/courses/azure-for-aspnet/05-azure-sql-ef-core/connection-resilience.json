@@ -1,0 +1,107 @@
+{
+  "id": "lesson-azure-for-aspnet-connection-resilience",
+  "slug": "connection-resilience",
+  "moduleSlug": "05-azure-sql-ef-core",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Connection Resilience",
+  "description": "Handle transient Azure SQL failures with retry policies, circuit breakers, and execution strategies.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "sql", "resilience", "csharp", "production"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cloud databases occasionally fail transiently due to maintenance, failovers, or throttling. EF Core and ADO.NET provide built-in retry mechanisms that make your ASP.NET Core app resilient without manual error handling everywhere."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transient Errors in Azure SQL"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Database failover during maintenance",
+          "Throttling from exceeded DTU or vCore limits",
+          "Network blips between App Service and Azure SQL",
+          "Connection pool exhaustion under load"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enable Retries in EF Core"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Exponential retry with Azure SQL",
+        "content": "Use `EnableRetryOnFailure` for automatic retries on transient failures.",
+        "language": "csharp",
+        "code": "options.UseSqlServer(connectionString, sql =>\n{\n    sql.EnableRetryOnFailure(\n        maxRetryCount: 5,\n        maxRetryDelay: TimeSpan.FromSeconds(10),\n        errorNumbersToAdd: null);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Custom Execution Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For complex operations, you can wrap multiple database calls in an explicit execution strategy."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Execute a transaction with retries",
+        "content": "Use `CreateExecutionStrategy` to retry an entire transaction.",
+        "language": "csharp",
+        "code": "var strategy = dbContext.Database.CreateExecutionStrategy();\n\nawait strategy.ExecuteAsync(async () =>\n{\n    await using var transaction = await dbContext.Database.BeginTransactionAsync();\n    try\n    {\n        dbContext.Posts.Add(new Post { Title = \"Azure SQL Resiliency\" });\n        await dbContext.SaveChangesAsync();\n\n        dbContext.Authors.Add(new Author { Name = \"C# Developer\" });\n        await dbContext.SaveChangesAsync();\n\n        await transaction.CommitAsync();\n    }\n    catch\n    {\n        await transaction.RollbackAsync();\n        throw;\n    }\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Idempotency matters",
+        "text": "Retried operations must be idempotent. Avoid side effects outside the transaction, such as sending emails or enqueueing background jobs, inside the retried block."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Azure SQL transient failures are normal and expected",
+          "`EnableRetryOnFailure` handles most retry scenarios automatically",
+          "Use `CreateExecutionStrategy` for multi-step transactional work",
+          "Keep retried operations idempotent"
+        ],
+        "takeaway": "Resilience is a requirement in cloud databases, not an afterthought. EF Core makes it easy to add retries with minimal code."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "EF Core resilience guidance",
+      "url": "https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "EF Core execution strategies and retry patterns."
+    }
+  ]
+}

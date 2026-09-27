@@ -1,0 +1,119 @@
+{
+  "id": "lesson-azure-for-aspnet-redis-cache-csharp",
+  "slug": "redis-cache-csharp",
+  "moduleSlug": "06-monitoring-caching-cicd",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Azure Cache for Redis from C#",
+  "description": "Speed up ASP.NET Core responses by caching data in Azure Cache for Redis.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 22,
+  "tags": ["azure", "redis", "cache", "csharp", "performance"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure Cache for Redis is a managed Redis cache. It is commonly used for session state, frequently queried reference data, rate limiting, and pub/sub messaging."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create the Cache"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a Redis cache with Azure CLI",
+        "content": "Choose Basic or Standard depending on SLA needs.",
+        "language": "powershell",
+        "code": "az redis create \\\n  --name aspnet-redis-cache \\\n  --resource-group azure-for-aspnet-rg \\\n  --location eastus \\\n  --sku Basic \\\n  --vm-size c0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Connect with StackExchange.Redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`StackExchange.Redis` is the standard C# Redis client. Use it directly or through the ASP.NET Core distributed cache abstraction."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache a database query result",
+        "content": "Use `IDistributedCache` with the Redis backend.",
+        "language": "csharp",
+        "code": "using Microsoft.Extensions.Caching.Distributed;\n\npublic class PostService\n{\n    private readonly BlogContext _db;\n    private readonly IDistributedCache _cache;\n\n    public PostService(BlogContext db, IDistributedCache cache)\n    {\n        _db = db;\n        _cache = cache;\n    }\n\n    public async Task<List<Post>> GetTopPostsAsync()\n    {\n        var cached = await _cache.GetStringAsync(\"top-posts\");\n        if (cached is not null)\n            return System.Text.Json.JsonSerializer.Deserialize<List<Post>>(cached)!;\n\n        var posts = await _db.Posts.OrderByDescending(p => p.PublishedAt).Take(10).ToListAsync();\n        var json = System.Text.Json.JsonSerializer.Serialize(posts);\n        await _cache.SetStringAsync(\"top-posts\", json, new DistributedCacheEntryOptions\n        {\n            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)\n        });\n        return posts;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Dependencies and Invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Always plan how cached data becomes stale. Common invalidation strategies include time-to-live, event-driven invalidation, and cache-aside writes."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Set a reasonable absolute or sliding expiration",
+          "Remove or update cache entries when the underlying data changes",
+          "Do not cache sensitive user data without encryption or short TTLs"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Cache the top posts endpoint",
+        "description": "Reduce database load by caching the top posts for five minutes.",
+        "steps": [
+          "Create an Azure Cache for Redis instance",
+          "Add `Microsoft.Extensions.Caching.StackExchangeRedis` to the project",
+          "Register Redis in Program.cs with the cache connection string",
+          "Cache the result of the top-posts query",
+          "Update a post and verify the cache eventually reflects the change"
+        ],
+        "expectedOutcome": "Repeated calls to the endpoint return cached results until expiration."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Azure Cache for Redis is a managed Redis service",
+          "Use `IDistributedCache` for ASP.NET Core caching abstractions",
+          "Cache hot, read-heavy, or expensive-to-compute data",
+          "Plan invalidation before caching mutable data"
+        ],
+        "takeaway": "Redis caching can dramatically reduce database load and response time with a small amount of C# code."
+      }
+    }
+  ],
+  "relatedLessons": ["azure-devops-github-actions"],
+  "furtherReading": [
+    {
+      "title": "Azure Cache for Redis documentation",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Redis cache concepts and .NET samples."
+    }
+  ]
+}

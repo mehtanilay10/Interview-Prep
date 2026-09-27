@@ -1,0 +1,120 @@
+{
+  "id": "lesson-azure-for-aspnet-create-azure-sql-csharp",
+  "slug": "create-azure-sql-csharp",
+  "moduleSlug": "05-azure-sql-ef-core",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Create Azure SQL from C#",
+  "description": "Provision an Azure SQL Database server and database programmatically with the Azure.ResourceManager.Sql package.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 24,
+  "tags": ["azure", "sql", "csharp", "automation"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can create Azure SQL resources from C# using the Azure management SDK. This is useful for automated provisioning in setup scripts, tests, or multi-tenant applications."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Install the Management Package"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Install Azure.ResourceManager.Sql",
+        "content": "Add the NuGet package for Azure SQL management.",
+        "language": "powershell",
+        "code": "dotnet add package Azure.ResourceManager.Sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create Server and Database"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Provision an Azure SQL server and database",
+        "content": "Use the Azure management SDK with DefaultAzureCredential.",
+        "language": "csharp",
+        "code": "using Azure.Identity;\nusing Azure.ResourceManager;\nusing Azure.ResourceManager.Sql;\nusing Azure.ResourceManager.Sql.Models;\n\nvar armClient = new ArmClient(new DefaultAzureCredential());\nvar subscription = await armClient.GetDefaultSubscriptionAsync();\nvar resourceGroup = await subscription.GetResourceGroups()\n    .GetAsync(\"azure-for-aspnet-rg\");\n\n// Create SQL server\nvar serverData = new SqlServerData(AzureLocation.EastUS)\n{\n    Administrators = new ServerExternalAdministratorProperties\n    {\n        AdministratorType = ServerExternalAdministratorType.ActiveDirectory,\n        Login = \"azure-admin\",\n        Sid = Guid.Parse(\"your-guid-here\"),\n        TenantId = Guid.Parse(\"your-tenant-guid-here\"),\n        AzureADOnlyAuthentication = true\n    }\n};\n\nvar serverLro = await resourceGroup.Value.GetSqlServers()\n    .CreateOrUpdateAsync(WaitUntil.Completed, \"aspnet-sql-server-001\", serverData);\nvar server = serverLro.Value;\n\n// Create database\nvar dbData = new SqlDatabaseData(AzureLocation.EastUS)\n{\n    Sku = new SqlSku(\"GP_S_Gen5_2\")\n};\n\nvar dbLro = await server.GetSqlDatabases()\n    .CreateOrUpdateAsync(WaitUntil.Completed, \"BlogDb\", dbData);\nvar database = dbLro.Value;\nConsole.WriteLine($\"Database {database.Data.Name} created\");"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Authentication",
+        "text": "For management-plane operations, your identity needs the Contributor role on the resource group. For data-plane operations like connecting from EF Core, use a database user or managed identity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configure Firewall Rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure SQL blocks external connections by default. Create a firewall rule to allow your IP or Azure services."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a firewall rule",
+        "content": "Allow Azure services to reach the SQL server.",
+        "language": "csharp",
+        "code": "var firewallRule = await server.GetSqlFirewallRules()\n    .CreateOrUpdateAsync(\n        WaitUntil.Completed,\n        \"AllowAzureServices\",\n        new SqlFirewallRuleData()\n        {\n            StartIpAddress = \"0.0.0.0\",\n            EndIpAddress = \"0.0.0.0\"\n        });"
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Provision a database from a setup script",
+        "description": "Write a small C# console app that creates an Azure SQL server and database.",
+        "steps": [
+          "Create a console app and add `Azure.ResourceManager.Sql`",
+          "Authenticate with `DefaultAzureCredential`",
+          "Create a SQL server with admin credentials",
+          "Create a database with serverless General Purpose SKU",
+          "Print the fully qualified database name"
+        ],
+        "expectedOutcome": "A new SQL server and database appear in the Azure portal."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use `Azure.ResourceManager.Sql` for management-plane provisioning",
+          "Firewall rules control network access to Azure SQL",
+          "Prefer Azure AD authentication for management operations",
+          "Management SDK operations are async and long-running"
+        ],
+        "takeaway": "Automating database creation with C# removes manual portal steps and keeps infrastructure aligned with your application lifecycle."
+      }
+    }
+  ],
+  "relatedLessons": ["ef-core-azure-sql"],
+  "furtherReading": [
+    {
+      "title": "Azure SQL management with Azure SDK for .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/overview/azure/resource-manager-sql-readme",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Azure.ResourceManager.Sql samples and API reference."
+    }
+  ]
+}

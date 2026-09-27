@@ -4,8 +4,10 @@ import mod01AiBackendTerminologyModule from "../courses/dotnet-ai-backend/01-ai-
 import mod01ApolloBasicsModule from "../courses/apollo/01-apollo-basics/content.json";
 import mod01ArrayProblemsModule from "../problems/csharp/01-array-problems/content.json";
 import mod01AuthBasicsModule from "../courses/authentication-authorization/01-auth-basics/content.json";
+import mod01AwsForDotnetOverviewModule from "../courses/aws-for-aspnet/01-aws-for-dotnet-overview/content.json";
 import mod01AwsFundamentalsCloudConceptsModule from "../courses/aws/01-aws-fundamentals-cloud-concepts/content.json";
 import mod01AzureDeveloperFoundationsModule from "../courses/azure/01-azure-developer-foundations/content.json";
+import mod01AzureForDotnetOverviewModule from "../courses/azure-for-aspnet/01-azure-for-dotnet-overview/content.json";
 import mod01AzureFoundationsProblemsModule from "../problems/azure/01-azure-foundations-problems/content.json";
 import mod01BeginnerQuestionsModule from "../interview-qa/01-beginner-questions/content.json";
 import mod01CorsConfigurationModule from "../courses/fullstack-security/01-cors-configuration/content.json";
@@ -31,6 +33,7 @@ import mod01SqlBasicsModule from "../problems/sql/01-sql-basics/content.json";
 import mod01TestingFundamentalsModule from "../courses/react-testing/01-testing-fundamentals/content.json";
 import mod01TestingFundamentalsModule1 from "../courses/unit-testing-dotnet/01-testing-fundamentals/content.json";
 import mod01TypescriptBasicsModule from "../courses/typescript-for-react/01-typescript-basics/content.json";
+import mod02AzureAppServiceDeploymentModule from "../courses/azure-for-aspnet/02-azure-app-service-deployment/content.json";
 import mod02AzureComputeProblemsModule from "../problems/azure/02-azure-compute-problems/content.json";
 import mod02ComponentsPropsModule from "../courses/react-fundamentals/02-components-props/content.json";
 import mod02ComputeAndAppHostingModule from "../courses/azure/02-compute-and-app-hosting/content.json";
@@ -39,6 +42,7 @@ import mod02CoreExtensionsModule from "../courses/dotnet-nuget-packages/02-core-
 import mod02CreationalPatternsModule from "../courses/clean-code-csharp/02-creational-patterns/content.json";
 import mod02DbcontextConfigurationModule from "../courses/ef-core/02-dbcontext-configuration/content.json";
 import mod02DockerAdvancedModule from "../courses/devops/02-docker-advanced/content.json";
+import mod02ElasticBeanstalkEcsDeploymentModule from "../courses/aws-for-aspnet/02-elastic-beanstalk-ecs-deployment/content.json";
 import mod02EncapsulationDataHidingModule from "../courses/oops-concepts/02-encapsulation-data-hiding/content.json";
 import mod02HigherOrderComponentsModule from "../courses/react-advanced-patterns/02-higher-order-components/content.json";
 import mod02IdentityAccessGovernanceModule from "../courses/aws/02-identity-access-governance/content.json";
@@ -66,6 +70,7 @@ import mod03AdvancedQuestionsModule from "../interview-qa/03-advanced-questions/
 import mod03ApiDesignProblemsModule from "../problems/aspnet-core/03-api-design-problems/content.json";
 import mod03AspnetWebModule from "../courses/dotnet-nuget-packages/03-aspnet-web/content.json";
 import mod03AzureServerlessProblemsModule from "../problems/azure/03-azure-serverless-problems/content.json";
+import mod03AzureStorageBlobsQueuesModule from "../courses/azure-for-aspnet/03-azure-storage-blobs-queues/content.json";
 import mod03BehavioralPatternsModule from "../courses/design-patterns/03-behavioral-patterns/content.json";
 import mod03CachingModule from "../courses/apollo/03-caching/content.json";
 import mod03CompoundComponentsModule from "../courses/react-advanced-patterns/03-compound-components/content.json";
@@ -87,6 +92,7 @@ import mod03QueriesMutationsModule from "../courses/graphql-dotnet/03-queries-mu
 import mod03ReactReduxModule from "../courses/redux/03-react-redux/content.json";
 import mod03ReactTestingLibraryModule from "../courses/react-testing/03-react-testing-library/content.json";
 import mod03RoutingUrlsModule from "../courses/aspnet-core/03-routing-urls/content.json";
+import mod03S3StorageCsharpModule from "../courses/aws-for-aspnet/03-s3-storage-csharp/content.json";
 import mod03ServerlessAndAzureFunctionsModule from "../courses/azure/03-serverless-and-azure-functions/content.json";
 import mod03SqlAdvancedModule from "../problems/sql/03-sql-advanced/content.json";
 import mod03StateEventsModule from "../courses/react-fundamentals/03-state-events/content.json";
@@ -97,6 +103,8 @@ import mod04AdvancedFeaturesModule from "../courses/react-query/04-advanced-feat
 import mod04AdvancedPatternsModule from "../courses/apollo/04-advanced-patterns/content.json";
 import mod04AdvancedTypesModule from "../courses/typescript-for-react/04-advanced-types/content.json";
 import mod04ApiSecurityRateLimitingModule from "../courses/fullstack-security/04-api-security-rate-limiting/content.json";
+import mod04AwsSecretsManagerModule from "../courses/aws-for-aspnet/04-aws-secrets-manager/content.json";
+import mod04AzureKeyVaultSecretsModule from "../courses/azure-for-aspnet/04-azure-key-vault-secrets/content.json";
 import mod04AzureStorageProblemsModule from "../problems/azure/04-azure-storage-problems/content.json";
 import mod04BehavioralPatternsModule from "../courses/clean-code-csharp/04-behavioral-patterns/content.json";
 import mod04ComponentTestingModule from "../courses/react-testing/04-component-testing/content.json";
@@ -128,6 +136,7 @@ import mod05AdvancedFeaturesModule from "../courses/csharp-fundamentals/05-advan
 import mod05AiAgentsDotnetModule from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/content.json";
 import mod05AuthenticationModule from "../courses/graphql-dotnet/05-authentication/content.json";
 import mod05AzureDatabasesProblemsModule from "../problems/azure/05-azure-databases-problems/content.json";
+import mod05AzureSqlEfCoreModule from "../courses/azure-for-aspnet/05-azure-sql-ef-core/content.json";
 import mod05CachingStrategiesModule from "../courses/react-query/05-caching-strategies/content.json";
 import mod05CiCdFundamentalsModule from "../courses/devops/05-ci-cd-fundamentals/content.json";
 import mod05CleanCodePracticesModule from "../courses/clean-code-csharp/05-clean-code-practices/content.json";
@@ -146,6 +155,7 @@ import mod05LifecycleEffectsModule from "../courses/react-fundamentals/05-lifecy
 import mod05Oauth2FlowsDeepDiveModule from "../courses/authentication-authorization/05-oauth2-flows-deep-dive/content.json";
 import mod05PrismaMigrationsModule from "../courses/prisma/05-prisma-migrations/content.json";
 import mod05RazorViewsModule from "../courses/aspnet-core/05-razor-views/content.json";
+import mod05RdsDynamodbModule from "../courses/aws-for-aspnet/05-rds-dynamodb/content.json";
 import mod05ReduxPatternsModule from "../courses/redux/05-redux-patterns/content.json";
 import mod05SecureApiDesignModule from "../courses/fullstack-security/05-secure-api-design/content.json";
 import mod05SerializationMappingModule from "../courses/dotnet-nuget-packages/05-serialization-mapping/content.json";
@@ -160,6 +170,7 @@ import mod06ArchitecturePatternsModule from "../courses/clean-code-csharp/06-arc
 import mod06AzureNetworkingProblemsModule from "../problems/azure/06-azure-networking-problems/content.json";
 import mod06ChangeTrackingModule from "../courses/ef-core/06-change-tracking/content.json";
 import mod06CiCdModernToolsModule from "../courses/devops/06-ci-cd-modern-tools/content.json";
+import mod06CloudwatchCicdModule from "../courses/aws-for-aspnet/06-cloudwatch-cicd/content.json";
 import mod06ContextRefsModule from "../courses/react-fundamentals/06-context-refs/content.json";
 import mod06DataModificationDmlModule from "../courses/sql-server/06-data-modification-dml/content.json";
 import mod06DatabasesModule from "../courses/aws/06-databases/content.json";
@@ -172,6 +183,7 @@ import mod06ErrorHandlingOptimisticModule from "../courses/apollo/06-error-handl
 import mod06ErrorHandlingValidationModule from "../courses/aspnet-core-web-api/06-error-handling-validation/content.json";
 import mod06InterfacesAbstractClassesModule from "../courses/oops-concepts/06-interfaces-abstract-classes/content.json";
 import mod06MessagingEventsModule from "../courses/dotnet-nuget-packages/06-messaging-events/content.json";
+import mod06MonitoringCachingCicdModule from "../courses/azure-for-aspnet/06-monitoring-caching-cicd/content.json";
 import mod06OfflineSupportPersistenceModule from "../courses/react-query/06-offline-support-persistence/content.json";
 import mod06PerformanceModule from "../courses/graphql-dotnet/06-performance/content.json";
 import mod06PerformancePatternsModule from "../courses/react-advanced-patterns/06-performance-patterns/content.json";
@@ -306,9 +318,11 @@ import atmMachineModule from "../problems/lld/atm-machine/content.json";
 import authenticationAuthorizationModule from "../courses/authentication-authorization/content.json";
 import awsModule from "../courses/aws/content.json";
 import awsModule1 from "../cheatsheet/aws/content.json";
+import awsForAspnetModule from "../courses/aws-for-aspnet/content.json";
 import azureModule from "../courses/azure/content.json";
 import azureModule1 from "../problems/azure/content.json";
 import azureModule2 from "../cheatsheet/azure/content.json";
+import azureForAspnetModule from "../courses/azure-for-aspnet/content.json";
 import backendDatabaseFollowUpsModule from "../interview-qa/backend-database-follow-ups/content.json";
 import backendIncidentsModule from "../problems/production-incident-lab-problems/backend-incidents/content.json";
 import bankingAppModule from "../problems/lld/banking-app/content.json";
@@ -492,8 +506,10 @@ const rawModulesPart1 = [
 	mod01ApolloBasicsModule,
 	mod01ArrayProblemsModule,
 	mod01AuthBasicsModule,
+	mod01AwsForDotnetOverviewModule,
 	mod01AwsFundamentalsCloudConceptsModule,
 	mod01AzureDeveloperFoundationsModule,
+	mod01AzureForDotnetOverviewModule,
 	mod01AzureFoundationsProblemsModule,
 	mod01BeginnerQuestionsModule,
 	mod01CorsConfigurationModule,
@@ -519,6 +535,7 @@ const rawModulesPart1 = [
 	mod01TestingFundamentalsModule,
 	mod01TestingFundamentalsModule1,
 	mod01TypescriptBasicsModule,
+	mod02AzureAppServiceDeploymentModule,
 	mod02AzureComputeProblemsModule,
 	mod02ComponentsPropsModule,
 	mod02ComputeAndAppHostingModule,
@@ -527,6 +544,7 @@ const rawModulesPart1 = [
 	mod02CreationalPatternsModule,
 	mod02DbcontextConfigurationModule,
 	mod02DockerAdvancedModule,
+	mod02ElasticBeanstalkEcsDeploymentModule,
 	mod02EncapsulationDataHidingModule,
 	mod02HigherOrderComponentsModule,
 	mod02IdentityAccessGovernanceModule,
@@ -554,6 +572,7 @@ const rawModulesPart1 = [
 	mod03ApiDesignProblemsModule,
 	mod03AspnetWebModule,
 	mod03AzureServerlessProblemsModule,
+	mod03AzureStorageBlobsQueuesModule,
 	mod03BehavioralPatternsModule,
 	mod03CachingModule,
 	mod03CompoundComponentsModule,
@@ -575,6 +594,7 @@ const rawModulesPart1 = [
 	mod03ReactReduxModule,
 	mod03ReactTestingLibraryModule,
 	mod03RoutingUrlsModule,
+	mod03S3StorageCsharpModule,
 	mod03ServerlessAndAzureFunctionsModule,
 	mod03SqlAdvancedModule,
 	mod03StateEventsModule,
@@ -585,6 +605,8 @@ const rawModulesPart1 = [
 	mod04AdvancedPatternsModule,
 	mod04AdvancedTypesModule,
 	mod04ApiSecurityRateLimitingModule,
+	mod04AwsSecretsManagerModule,
+	mod04AzureKeyVaultSecretsModule,
 	mod04AzureStorageProblemsModule,
 	mod04BehavioralPatternsModule,
 	mod04ComponentTestingModule,
@@ -616,6 +638,7 @@ const rawModulesPart1 = [
 	mod05AiAgentsDotnetModule,
 	mod05AuthenticationModule,
 	mod05AzureDatabasesProblemsModule,
+	mod05AzureSqlEfCoreModule,
 	mod05CachingStrategiesModule,
 	mod05CiCdFundamentalsModule,
 	mod05CleanCodePracticesModule,
@@ -634,6 +657,7 @@ const rawModulesPart1 = [
 	mod05Oauth2FlowsDeepDiveModule,
 	mod05PrismaMigrationsModule,
 	mod05RazorViewsModule,
+	mod05RdsDynamodbModule,
 	mod05ReduxPatternsModule,
 	mod05SecureApiDesignModule,
 	mod05SerializationMappingModule,
@@ -648,6 +672,7 @@ const rawModulesPart1 = [
 	mod06AzureNetworkingProblemsModule,
 	mod06ChangeTrackingModule,
 	mod06CiCdModernToolsModule,
+	mod06CloudwatchCicdModule,
 	mod06ContextRefsModule,
 	mod06DataModificationDmlModule,
 	mod06DatabasesModule,
@@ -660,6 +685,7 @@ const rawModulesPart1 = [
 	mod06ErrorHandlingValidationModule,
 	mod06InterfacesAbstractClassesModule,
 	mod06MessagingEventsModule,
+	mod06MonitoringCachingCicdModule,
 	mod06OfflineSupportPersistenceModule,
 	mod06PerformanceModule,
 	mod06PerformancePatternsModule,
@@ -794,9 +820,11 @@ const rawModulesPart1 = [
 	authenticationAuthorizationModule,
 	awsModule,
 	awsModule1,
+	awsForAspnetModule,
 	azureModule,
 	azureModule1,
 	azureModule2,
+	azureForAspnetModule,
 	backendDatabaseFollowUpsModule,
 	backendIncidentsModule,
 	bankingAppModule,
