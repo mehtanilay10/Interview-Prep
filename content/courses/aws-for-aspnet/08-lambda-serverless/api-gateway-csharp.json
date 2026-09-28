@@ -1,0 +1,98 @@
+{
+  "id": "lesson-aws-for-aspnet-api-gateway-csharp",
+  "slug": "api-gateway-csharp",
+  "moduleSlug": "08-lambda-serverless",
+  "courseSlug": "aws-for-aspnet",
+  "title": "API Gateway with Lambda",
+  "description": "Build serverless APIs with API Gateway and Lambda in C#.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["aws", "api-gateway", "lambda", "csharp", "serverless"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "API Gateway exposes HTTP endpoints that trigger Lambda functions. This replaces traditional web servers for many backend APIs, giving you auto-scaling and pay-per-request billing."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a REST API Endpoint"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create an API Gateway route and deploy",
+        "content": "Package: AWSSDK.ApiGateway\nUse the AWS SDK to create REST APIs, resources, methods, and deployments.",
+        "language": "csharp",
+        "code": "// Package: AWSSDK.ApiGateway\nusing Amazon.ApiGatewayManagement;\nusing Amazon.APIGateway;\nusing Amazon.APIGateway.Model;\n\nvar apiClient = new AmazonAPIGatewayClient(RegionEndpoint.USEast1);\n\nvar createApiRequest = new CreateRestApiRequest\n{\n    Name = \"aspnet-orders-api\",\n    Description = \"Serverless orders API\"\n};\nvar createApiResponse = await apiClient.CreateRestApiAsync(createApiRequest);\nstring restApiId = createApiResponse.Id;\nConsole.WriteLine($\"API ID: {restApiId}\");\n\nvar createResourceRequest = new CreateResourceRequest\n{\n    RestApiId = restApiId,\n    ParentId = (await apiClient.GetRootResourcesAsync(new GetResourcesRequest\n    {\n        RestApiId = restApiId\n    })).Items[0].Id,\n    PathPart = \"orders\",\n    Name = \"Orders\"\n};\nvar resourceResponse = await apiClient.CreateResourceAsync(createResourceRequest);\nstring resourceId = resourceResponse.Id;\n\nvar putMethodRequest = new PutMethodRequest\n{\n    RestApiId = restApiId,\n    ResourceId = resourceId,\n    HttpMethod = HttpMethod.GET,\n    AuthorizationType = \"NONE\"\n};\nawait apiClient.PutMethodAsync(putMethodRequest);\n\nvar integrationRequest = new PutIntegrationRequest\n{\n    RestApiId = restApiId,\n    ResourceId = resourceId,\n    HttpMethod = HttpMethod.GET,\n    Type = IntegrationType.AWS,\n    IntegrationHttpMethod = HttpMethod.POST,\n    Uri = $\"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:aspnet-process-order/invocations\"\n};\nawait apiClient.PutIntegrationAsync(integrationRequest);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handle the Request in Lambda"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Parse an API Gateway request in C#",
+        "content": "Use Amazon.Lambda.APIGatewayEvents to receive HTTP events.",
+        "language": "csharp",
+        "code": "// Package: AWSSDK.Lambda\n// Install Amazon.Lambda.APIGatewayEvents\nusing Amazon.Lambda.APIGatewayEvents;\nusing Amazon.Lambda.Core;\n\n[assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]\n\npublic class Function\n{\n    public APIGatewayProxyResponse FunctionHandler(\n        APIGatewayProxyRequest request,\n        ILambdaContext context)\n    {\n        context.Logger.LogLine($\"Received {request.HttpMethod} {request.Path}\");\n\n        string orderId = request.PathParameters?[\"orderId\"] ?? string.Empty;\n        var order = new { Id = orderId, Total = 59.99m, Status = \"Shipped\" };\n\n        return new APIGatewayProxyResponse\n        {\n            StatusCode = 200,\n            Body = System.Text.Json.JsonSerializer.Serialize(order),\n            Headers = new Dictionary<string, string>\n            {\n                [\"Content-Type\"] = \"application/json\"\n            }\n        };\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "CORS",
+        "text": "If your API is called from a browser, enable CORS in API Gateway. Add an OPTIONS method and Access-Control-Allow-Origin headers so the browser allows the request."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Deploy a serverless orders API",
+        "description": "Create a GET /orders/{orderId} endpoint backed by Lambda.",
+        "steps": [
+          "Create an API Gateway REST API",
+          "Add a GET method on /orders/{orderId}",
+          "Integrate the method with a Lambda function",
+          "Deploy the API to a stage",
+          "Test the endpoint with curl"
+        ],
+        "expectedOutcome": "A publicly accessible endpoint returns JSON from the Lambda function."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "API Gateway maps HTTP requests to Lambda invocations",
+          "Lambda handles the business logic in C#",
+          "Deploy stages separate dev, test, and prod",
+          "CORS must be configured for browser clients"
+        ],
+        "takeaway": "API Gateway + Lambda replaces traditional controllers and servers with a fully managed HTTP tier."
+      }
+    }
+  ],
+  "relatedLessons": ["lambda-csharp", "cognito-csharp"],
+  "furtherReading": [
+    {
+      "title": "Amazon API Gateway Developer Guide",
+      "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/",
+      "type": "article",
+      "author": "AWS",
+      "description": "REST and HTTP API patterns, integrations, and security."
+    }
+  ]
+}

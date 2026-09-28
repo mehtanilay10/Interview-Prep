@@ -28,10 +28,10 @@
       "type": "bullet-list",
       "title": "Hosting choices",
       "items": [
-        "**ASP.NET Core minimal API** — expose MCP over HTTP with standard middleware.",
-        "**Background worker** — run MCP server as a hosted service inside an existing app.",
-        "**Container deployment** — package the server for Kubernetes or container apps.",
-        "**Serverless function** — possible for lightweight tools, but cold start can hurt UX."
+        "**ASP.NET Core minimal API** - expose MCP over HTTP with standard middleware.",
+        "**Background worker** - run MCP server as a hosted service inside an existing app.",
+        "**Container deployment** - package the server for Kubernetes or container apps.",
+        "**Serverless function** - possible for lightweight tools, but cold start can hurt UX."
       ]
     },
     {
@@ -39,7 +39,7 @@
       "title": "Conceptual ASP.NET Core MCP endpoint",
       "content": "High-level integration pattern.",
       "language": "csharp",
-      "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddMcpServer(options =>\n{\n    options.ServerName = \"order-service-mcp\";\n    options.ServerVersion = \"1.0.0\";\n});\n\nbuilder.Services.AddToolsFromAssembly(typeof(OrderTools).Assembly);\n\nvar app = builder.Build();\n\napp.UseHttpsRedirection();\napp.UseAuthorization();\napp.MapMcp(\"/mcp\");\n\napp.MapGet(\"/health\", () => Results.Ok(new { status = \"ok\" }));\n\napp.Run();"
+      "code": "// Packages:\n// - ModelContextProtocol\n// - Microsoft.Extensions.DependencyInjection\n// - Microsoft.Extensions.Logging\n// - Microsoft.AspNetCore.Authentication.JwtBearer (optional)\n\nusing Microsoft.Extensions.DependencyInjection;\nusing Microsoft.Extensions.Hosting;\nusing Microsoft.Extensions.Logging;\nusing ModelContextProtocol;\n\nvar builder = WebApplication.CreateBuilder(args);\n\n// Configuration from appsettings.json and environment variables\nbuilder.Services.AddMcpServer(options =>\n{\n    options.ServerName = builder.Configuration[\"Mcp:ServerName\"] ?? \"order-service-mcp\";\n    options.ServerVersion = builder.Configuration[\"Mcp:ServerVersion\"] ?? \"1.0.0\";\n    options.SessionTimeout = TimeSpan.FromMinutes(5);\n})\n.AddToolsFromAssembly(typeof(OrderTools).Assembly)\n.AddToolsFromAssembly(typeof(CustomerTools).Assembly)\n.WithHttpTransport(options =>\n{\n    options.Path = \"/mcp\";\n    options.RequireHttps = !builder.Environment.IsDevelopment();\n});\n\n// Structured logging\nbuilder.Logging.ClearFilters();\nbuilder.Logging.AddConsole();\nbuilder.Logging.SetMinimumLevel(LogLevel.Information);\n\n// Health checks for production readiness\nbuilder.Services.AddHealthChecks()\n    .AddCheck(\"mcp\", new McpServerHealthCheck());\n\nvar app = builder.Build();\n\n// Middleware pipeline\napp.UseHttpsRedirection();\napp.UseAuthentication();\napp.UseAuthorization();\n\napp.MapMcp(\"/mcp\");\n\n// Health and readiness endpoints\napp.MapHealthChecks(\"/health/live\");\napp.MapHealthChecks(\"/health/ready\");\n\n// Expected startup logs:\n// [INFO] MCP server 'order-service-mcp' v1.0.0 started\n// [INFO] Tools loaded from assemblies: OrderTools, CustomerTools\n// [INFO] HTTP transport listening on /mcp (HTTPS required)\napp.Run();\n"
     },
     {
       "type": "callout",

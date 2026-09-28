@@ -1,0 +1,168 @@
+{
+  "id": "lesson-azure-for-aspnet-event-grid-csharp",
+  "slug": "event-grid-csharp",
+  "moduleSlug": "08-service-bus-events",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Event Grid from C#",
+  "description": "Use Event Grid for event routing — publish events from C# and subscribe with webhooks, Service Bus, or Azure Functions.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 22,
+  "tags": ["azure", "event-grid", "events", "pub-sub", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure Event Grid is a fully managed event routing service. You publish events to a topic, and Event Grid pushes them to subscribed handlers — webhooks, Azure Functions, Service Bus queues, Logic Apps, and more — using a push-based model."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Event Grid vs Service Bus"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Feature", "Event Grid", "Azure Service Bus"],
+        "rows": [
+          ["Delivery model", "Push (HTTP)", "Pull (receiver polls)"],
+          ["Retry policy", "Built-in exponential backoff", "Configurable via queue/subscription"],
+          ["Dead-lettering", "After 24 hours or 30 attempts", "Manual via dead-letter queue"],
+          ["Ordering", "Best-effort per resource", "FIFO with sessions"],
+          ["Best for", "Fan-out event routing", "Reliable point-to-point queues"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "NuGet Package"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Install the Azure.Messaging.EventGrid package",
+        "content": "// Package: Azure.Messaging.EventGrid\ndotnet add package Azure.Messaging.EventGrid"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Publishing Events"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use EventGridPublisherClient to send events to a custom topic or a system topic. Each event has a required subject, event type, data version, and a JSON data payload."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BlogEventPublisher.cs — publish blog-post events to Event Grid",
+        "content": "// Package: Azure.Messaging.EventGrid\nusing Azure.Messaging.EventGrid;\nusing System.Text.Json;\n\nnamespace BlogApi.Events;\n\npublic class BlogEventPublisher : IAsyncDisposable\n{\n    private readonly EventGridPublisherClient _client;\n    private readonly JsonSerializerOptions _jsonOptions;\n\n    public BlogEventPublisher(string topicEndpoint, string accessKey)\n    {\n        _client = new EventGridPublisherClient(\n            new Uri(topicEndpoint),\n            new AzureKeyCredential(accessKey));\n        _jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };\n    }\n\n    public async Task PublishPostPublishedAsync(\n        Guid postId,\n        string title,\n        string author,\n        DateTime publishedAt,\n        CancellationToken cancellationToken = default)\n    {\n        var gridEvent = new EventGridEvent(\n            subject: \"/blog/posts/postId\",\n            eventType: \"Blog.PostPublished\",\n            dataVersion: \"1.0\",\n            data: new\n            {\n                postId = postId,\n                title = title,\n                author = author,\n                publishedAt = publishedAt\n            })\n        {\n            // Custom metadata for filtering subscribers\n            DataVersion = \"1.0\"\n        };\n\n        await _client.SendEventAsync(gridEvent, cancellationToken);\n    }\n\n    public async Task PublishBatchAsync(\n        IEnumerable<PostPublishedEvent> events,\n        CancellationToken cancellationToken = default)\n    {\n        var gridEvents = events.Select(e => new EventGridEvent(\n            subject: $\"/blog/posts/{e.PostId}\",\n            eventType: \"Blog.PostPublished\",\n            dataVersion: \"1.0\",\n            data: e)).ToList();\n\n        await _client.SendEventsAsync(gridEvents, cancellationToken);\n    }\n\n    public ValueTask DisposeAsync() => _client.DisposeAsync();\n}\n\n// --- Event record ---\npublic record PostPublishedEvent(Guid PostId, string Title, string Author, DateTime PublishedAt);\n\n// --- Azure KeyCredential ---\n// Package: Azure.Security.KeyVault.Keys.Cryptography (included in Azure.Messaging.EventGrid)\n// Usage:\n// var publisher = new BlogEventPublisher(topicEndpoint, accessKey);\n// await publisher.PublishPostPublishedAsync(postId, title, author, publishedAt);\n//\n// Event Grid subscription filter (Azure portal or ARM template):\n// Subject begins with: /blog/posts/\n// Event types: Blog.PostPublished\n// Endpoint: https://<function-app>.azurewebsites.net/api/HandleBlogEvent"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Event Schema and Naming Conventions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "CloudEvent schema (recommended for new projects)",
+        "items": [
+          "**source** — the origin resource URI (e.g., \"/blog\")",
+          "**type** — namespaced event type (e.g., \"Blog.PostPublished\")",
+          "**subject** — the specific resource (e.g., \"/posts/abc-123\")",
+          "**id** — unique event ID (Event Grid generates one if omitted)",
+          "**time** — UTC event timestamp",
+          "**data** — the event payload (schema-free JSON)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Subscribing with an Azure Function Webhook"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest subscriber is an HTTP-triggered Azure Function. Event Grid delivers events via POST and validates the endpoint on subscription using a validation handshake."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "HandleBlogEvent.cs — Event Grid webhook subscriber",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\n// Package: Azure.Messaging.EventGrid\nusing System.Text.Json;\nusing Microsoft.Azure.Functions.Worker;\nusing Microsoft.Azure.Functions.Worker.Http;\nusing Microsoft.Extensions.Logging;\n\nnamespace BlogApi.Functions;\n\npublic class HandleBlogEventFunction\n{\n    private readonly IBlogNotificationService _notificationService;\n    private readonly ILogger<HandleBlogEventFunction> _logger;\n\n    public HandleBlogEventFunction(\n        IBlogNotificationService notificationService,\n        ILogger<HandleBlogEventFunction> logger)\n    {\n        _notificationService = notificationService;\n        _logger = logger;\n    }\n\n    [Function(\"handle-blog-event\")]\n    public async Task<HttpResponseData> RunAsync(\n        [HttpTrigger(AuthorizationLevel.Function, \"post\", Route = \"blog/events\")]\n        HttpRequestData req,\n        CancellationToken cancellationToken)\n    {\n        // Event Grid subscription validation\n        var body = await new StreamReader(req.Body).ReadToEndAsync(cancellationToken);\n        using var doc = JsonDocument.Parse(body);\n        var root = doc.RootElement;\n\n        if (root.TryGetProperty(\"data\", out var data) &&\n            data.TryGetProperty(\"validationCode\", out var code))\n        {\n            _logger.LogInformation(\"Validating Event Grid subscription...\");\n            var validationResponse = new\n            {\n                validationResponse = code.GetString()\n            };\n            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);\n            await response.WriteAsJsonAsync(validationResponse, cancellationToken);\n            return response;\n        }\n\n        // Normal event processing — array of events\n        if (root.TryGetProperty(\"data\", out var eventData) &&\n            root.TryGetProperty(\"eventType\", out var eventType))\n        {\n            var type = eventType.GetString();\n            _logger.LogInformation(\"Received event: {EventType}\", type);\n\n            if (type == \"Blog.PostPublished\")\n            {\n                var postEvent = eventData.Deserialize<PostPublishedEvent>();\n                if (postEvent != null)\n                {\n                    await _notificationService.NotifySubscribersAsync(postEvent, cancellationToken);\n                }\n            }\n        }\n\n        return req.CreateResponse(System.Net.HttpStatusCode.OK);\n    }\n}\n\n// --- Supporting types ---\n// Package: Azure.Messaging.EventGrid\npublic record PostPublishedEvent(Guid PostId, string Title, string Author, DateTime PublishedAt);\n\npublic interface IBlogNotificationService\n{\n    Task NotifySubscribersAsync(PostPublishedEvent evt, CancellationToken ct);\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Event Grid retries aggressively",
+        "text": "Event Grid retries failed deliveries with exponential backoff for up to 24 hours. Ensure your subscriber returns 200 quickly for the validation handshake and handles all event types gracefully — an unhandled exception causes repeated redeliveries."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Publish and subscribe to a custom event",
+        "description": "Create an Event Grid custom topic, publish a BlobUploaded event, and route it to a Function webhook.",
+        "steps": [
+          "Create an Event Grid custom topic in the Azure portal",
+          "Write a BlogEventPublisher that publishes BlobUploaded events",
+          "Deploy a HandleBlogEvent Azure Function webhook",
+          "Create an Event Grid subscription pointing to the function URL",
+          "Send three blob events and confirm the function receives and logs them"
+        ],
+        "expectedOutcome": "All three events appear in the function log with correct event type and payload."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Event Grid is push-based — subscribers receive events over HTTP webhooks",
+          "Use custom topics for application events; system topics for Azure resource events",
+          "Handle the validation handshake for new webhook subscriptions",
+          "Retry aggressively — return 200 and process events asynchronously"
+        ],
+        "takeaway": "Event Grid removes the polling overhead from pub-sub architectures, letting you react to Azure and custom events in near real-time."
+      }
+    }
+  ],
+  "relatedLessons": ["service-bus-csharp", "cosmos-db-csharp"],
+  "furtherReading": [
+    {
+      "title": "Azure.Messaging.EventGrid — .NET API reference",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/azure.messaging.eventgrid",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete API reference for the Event Grid .NET SDK."
+    },
+    {
+      "title": "Event Grid concepts and architecture",
+      "url": "https://learn.microsoft.com/en-us/azure/event-grid/overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Concepts, event schemas, and delivery and retry policies."
+    }
+  ]
+}

@@ -164,7 +164,7 @@ export function Navbar() {
                 <span className="hidden text-sm font-medium sm:block">{session.user.name}</span>
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-canvas shadow-lg py-1">
+                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
                   <Link
                     href="/progress"
                     className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"

@@ -47,7 +47,7 @@
         "title": "Exponential retry with Azure SQL",
         "content": "Use `EnableRetryOnFailure` for automatic retries on transient failures.",
         "language": "csharp",
-        "code": "options.UseSqlServer(connectionString, sql =>\n{\n    sql.EnableRetryOnFailure(\n        maxRetryCount: 5,\n        maxRetryDelay: TimeSpan.FromSeconds(10),\n        errorNumbersToAdd: null);\n});"
+        "code": "// Package: Microsoft.EntityFrameworkCore.SqlServer\n// Install: dotnet add package Microsoft.EntityFrameworkCore.SqlServer\n\nusing Microsoft.EntityFrameworkCore;\n\n// Configure exponential retry for transient Azure SQL failures\noptions.UseSqlServer(connectionString, sql =>\n{\n    sql.EnableRetryOnFailure(\n        maxRetryCount: 5,\n        maxRetryDelay: TimeSpan.FromSeconds(10),\n        errorNumbersToAdd: null);\n    sql.CommandTimeout(30);\n});\n\n// Common transient error numbers handled automatically:\n// 4060 - Cannot open database\n// 10928 - Resource ID limit reached\n// 10929 - Resource limit reached\n// 40197 - Service encountered error processing request\n// 40501 - Service busy\n// 40613 - Database unavailable"
       }
     },
     {
@@ -69,7 +69,7 @@
         "title": "Execute a transaction with retries",
         "content": "Use `CreateExecutionStrategy` to retry an entire transaction.",
         "language": "csharp",
-        "code": "var strategy = dbContext.Database.CreateExecutionStrategy();\n\nawait strategy.ExecuteAsync(async () =>\n{\n    await using var transaction = await dbContext.Database.BeginTransactionAsync();\n    try\n    {\n        dbContext.Posts.Add(new Post { Title = \"Azure SQL Resiliency\" });\n        await dbContext.SaveChangesAsync();\n\n        dbContext.Authors.Add(new Author { Name = \"C# Developer\" });\n        await dbContext.SaveChangesAsync();\n\n        await transaction.CommitAsync();\n    }\n    catch\n    {\n        await transaction.RollbackAsync();\n        throw;\n    }\n});"
+        "code": "// Package: Microsoft.EntityFrameworkCore.SqlServer\n// Install: dotnet add package Microsoft.EntityFrameworkCore.SqlServer\n\nusing Microsoft.EntityFrameworkCore;\nusing Microsoft.EntityFrameworkCore.Storage;\n\npublic async Task ExecuteResilientTransactionAsync(BlogContext dbContext, CancellationToken ct = default)\n{\n    var strategy = dbContext.Database.CreateExecutionStrategy();\n\n    await strategy.ExecuteAsync(async () =>\n    {\n        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);\n        try\n        {\n            // Both operations are idempotent - safe to retry as a unit\n            dbContext.Posts.Add(new Post { Title = \"Azure SQL Resiliency\", Content = \"Testing retries\", PublishedAt = DateTime.UtcNow });\n            await dbContext.SaveChangesAsync(ct);\n\n            dbContext.Authors.Add(new Author { Name = \"C# Developer\" });\n            await dbContext.SaveChangesAsync(ct);\n\n            await transaction.CommitAsync(ct);\n            Console.WriteLine(\"Transaction committed successfully\");\n        }\n        catch (Exception ex)\n        {\n            Console.WriteLine($\"Transaction failed: {ex.Message}\");\n            await transaction.RollbackAsync(ct);\n            throw;\n        }\n    });\n}\n\n// Expected output:\n// Transaction committed successfully"
       }
     },
     {

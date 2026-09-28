@@ -91,8 +91,8 @@ export async function POST(request: Request) {
     }
   }
 
-  if (validItems.length === 0) {
-    return NextResponse.json({ error: 'Invalid bookmark payload' }, { status: 400 });
+  if (validItems.length === 0 && items.length !== 0) {
+    return NextResponse.json({ error: 'Invalid bookmark payload', received: body && typeof body === 'object' ? Object.keys(body as any) : typeof body }, { status: 400 });
   }
 
   await prisma.userBookmark.createMany({

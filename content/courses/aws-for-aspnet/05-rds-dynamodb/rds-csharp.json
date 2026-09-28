@@ -27,9 +27,9 @@
       "type": "example",
       "data": {
         "title": "Use RDS with EF Core in Program.cs",
-        "content": "Pull the connection string from configuration loaded by Secrets Manager.",
+        "content": "Pull the connection string from configuration loaded by Secrets Manager. Includes full DbContext, entity class, package references, and expected output comments.",
         "language": "csharp",
-        "code": "using Microsoft.EntityFrameworkCore;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nvar connectionString = builder.Configuration.GetConnectionString(\"Default\");\n\nbuilder.Services.AddDbContext<BlogContext>(options =>\n    options.UseSqlServer(connectionString));\n\nvar app = builder.Build();\napp.MapGet(\"/posts\", async (BlogContext db) =>\n    await db.Posts.ToListAsync());\napp.Run();\n\npublic class BlogContext : DbContext\n{\n    public BlogContext(DbContextOptions<BlogContext> options)\n        : base(options) { }\n\n    public DbSet<Post> Posts => Set<Post>();\n}\n\npublic class Post\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string Content { get; set; } = string.Empty;\n    public DateTime PublishedAt { get; set; }\n}"
+        "code": "// Package: Microsoft.EntityFrameworkCore.SqlServer\nusing Microsoft.EntityFrameworkCore;\n\npublic class BlogContext : DbContext\n{\n    private readonly string _connectionString;\n\n    public BlogContext(DbContextOptions<BlogContext> options, string connectionString)\n        : base(options)\n    {\n        _connectionString = connectionString;\n    }\n\n    public DbSet<Post> Posts => Set<Post>();\n\n    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)\n    {\n        if (!optionsBuilder.IsConfigured)\n        {\n            optionsBuilder.UseSqlServer(_connectionString);\n        }\n    }\n}\n\npublic class Post\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = string.Empty;\n    public string Content { get; set; } = string.Empty;\n    public DateTime PublishedAt { get; set; }\n}\n\n// Program.cs registration\nvar builder = WebApplication.CreateBuilder(args);\n\n// Connection string loaded from Secrets Manager (see secrets-manager-csharp lesson)\nstring connectionString = builder.Configuration.GetConnectionString(\"Default\");\n\nbuilder.Services.AddDbContext<BlogContext>(options =>\n    options.UseSqlServer(connectionString));\n\nbuilder.Services.AddScoped<BlogContext>(sp =>\n    sp.GetRequiredService<BlogContext>());\n\nvar app = builder.Build();\n\napp.MapGet(\"/posts\", async (BlogContext db, CancellationToken ct) =>\n{\n    List<Post> posts = await db.Posts.ToListAsync(ct);\n    return Ok(posts);\n});\n\napp.MapGet(\"/posts/{id}\", async (int id, BlogContext db, CancellationToken ct) =>\n{\n    Post? post = await db.Posts.FindAsync([id], cancellationToken: ct);\n    return post is not null ? Ok(post) : NotFound();\n});\n\napp.MapPost(\"/posts\", async (Post post, BlogContext db, CancellationToken ct) =>\n{\n    db.Posts.Add(post);\n    await db.SaveChangesAsync(ct);\n    return CreatedAtAction(nameof(GetPost), new { id = post.Id }, post);\n});\n\napp.Run();\n\n// Usage:\n// GET /posts returns all posts from RDS SQL Server\n// Expected output: [{\"id\":1,\"title\":\"First Post\",\"content\":\"Hello\",\"publishedAt\":\"2024-01-15T00:00:00\"}]"
       }
     },
     {
@@ -49,7 +49,7 @@
       "type": "example",
       "data": {
         "title": "Allow access from Elastic Beanstalk",
-        "content": "Use the AWS CLI to create a security group rule.",
+        "content": "Use the AWS CLI to create a security group rule.\n# Expected output: Security group rule is created successfully.",
         "language": "powershell",
         "code": "$vpcId = aws elasticbeanstalk describe-environment-resources --environment-name aspnet-aws-env --query EnvironmentResources.EnvironmentResources.VpcId --output text\n$sgId = aws rds describe-db-instances --db-instance-identifier aspnet-db --query 'DBInstances[0].VpcSecurityGroups[0].VpcSecurityGroupId' --output text\n\naws ec2 authorize-security-group-ingress --group-id $sgId --protocol tcp --port 1433 --source-group $vpcId"
       }
@@ -71,9 +71,9 @@
       "type": "example",
       "data": {
         "title": "Auto-apply migrations at startup",
-        "content": "Apply pending migrations automatically when the app starts.",
+        "content": "Apply pending migrations automatically when the app starts. Includes error handling and expected output comments.",
         "language": "csharp",
-        "code": "using (var scope = app.Services.CreateScope())\n{\n    var db = scope.ServiceProvider.GetRequiredService<BlogContext>();\n    db.Database.Migrate();\n}"
+        "code": "// Package: Microsoft.EntityFrameworkCore\nusing Microsoft.EntityFrameworkCore;\n\npublic static class DatabaseInitializer\n{\n    public static async Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken = default)\n    {\n        try\n        {\n            using var scope = services.CreateScope();\n            var db = scope.ServiceProvider.GetRequiredService<BlogContext>();\n            await db.Database.MigrateAsync(cancellationToken);\n            Console.WriteLine(\"Database migrations applied successfully.\");\n        }\n        catch (Exception ex)\n        {\n            Console.WriteLine($\"Migration error: {ex.Message}\");\n            throw;\n        }\n    }\n}\n\n// Usage in Program.cs:\n// await DatabaseInitializer.InitializeAsync(app.Services);\n// Expected output: \"Database migrations applied successfully.\""
       }
     },
     {

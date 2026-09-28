@@ -198,6 +198,7 @@ import mod06TestingPatternsModule from "../courses/unit-testing-dotnet/06-testin
 import mod07AggregationOperatorsModule from "../courses/linq/07-aggregation-operators/content.json";
 import mod07AuthenticationAuthorizationProblemsModule from "../problems/aspnet-core/07-authentication-authorization-problems/content.json";
 import mod07AuthenticationBasicsModule from "../courses/aspnet-core-web-api/07-authentication-basics/content.json";
+import mod07AzureFunctionsModule from "../courses/azure-for-aspnet/07-azure-functions/content.json";
 import mod07AzureSecurityProblemsModule from "../problems/azure/07-azure-security-problems/content.json";
 import mod07CodeCoverageModule from "../courses/unit-testing-dotnet/07-code-coverage/content.json";
 import mod07CustomHooksArchitectureModule from "../courses/react-advanced-patterns/07-custom-hooks-architecture/content.json";
@@ -217,6 +218,7 @@ import mod07ReactRouterModule from "../courses/react-fundamentals/07-react-route
 import mod07RecursionProblemsModule from "../problems/csharp/07-recursion-problems/content.json";
 import mod07ReduxAdvancedConceptsModule from "../courses/redux/07-redux-advanced-concepts/content.json";
 import mod07RefreshTokenStrategiesModule from "../courses/authentication-authorization/07-refresh-token-strategies/content.json";
+import mod07SqsSnsEventsModule from "../courses/aws-for-aspnet/07-sqs-sns-events/content.json";
 import mod07SubscriptionsRealtimeModule from "../courses/apollo/07-subscriptions-realtime/content.json";
 import mod07TestingBestPracticesModule from "../courses/typescript-for-react/07-testing-best-practices/content.json";
 import mod07TestingQualityModule from "../courses/dotnet-nuget-packages/07-testing-quality/content.json";
@@ -226,6 +228,7 @@ import mod08BitwiseProblemsModule from "../problems/csharp/08-bitwise-problems/c
 import mod08DataTypesModule from "../courses/sql-server/08-data-types/content.json";
 import mod08EntityFrameworkCoreModule from "../courses/aspnet-core/08-entity-framework-core/content.json";
 import mod08InheritanceStrategiesModule from "../courses/ef-core/08-inheritance-strategies/content.json";
+import mod08LambdaServerlessModule from "../courses/aws-for-aspnet/08-lambda-serverless/content.json";
 import mod08LocalStateManagementModule from "../courses/apollo/08-local-state-management/content.json";
 import mod08LoggingConfigurationModule from "../courses/aspnet-core-web-api/08-logging-configuration/content.json";
 import mod08NetworkingAndApiPlatformsModule from "../courses/azure/08-networking-and-api-platforms/content.json";
@@ -236,6 +239,7 @@ import mod08ReduxRealWorldModule from "../courses/redux/08-redux-real-world/cont
 import mod08SecurityCryptographyModule from "../courses/dotnet-nuget-packages/08-security-cryptography/content.json";
 import mod08SecurityTestingModule from "../courses/fullstack-security/08-security-testing/content.json";
 import mod08ServerlessModule from "../courses/aws/08-serverless/content.json";
+import mod08ServiceBusEventsModule from "../courses/azure-for-aspnet/08-service-bus-events/content.json";
 import mod08SsoIdentityProvidersModule from "../courses/authentication-authorization/08-sso-identity-providers/content.json";
 import mod08StateMachinesXstateModule from "../courses/react-advanced-patterns/08-state-machines-xstate/content.json";
 import mod08StylingModule from "../courses/react-fundamentals/08-styling/content.json";
@@ -700,6 +704,7 @@ const rawModulesPart1 = [
 	mod07AggregationOperatorsModule,
 	mod07AuthenticationAuthorizationProblemsModule,
 	mod07AuthenticationBasicsModule,
+	mod07AzureFunctionsModule,
 	mod07AzureSecurityProblemsModule,
 	mod07CodeCoverageModule,
 	mod07CustomHooksArchitectureModule,
@@ -719,6 +724,7 @@ const rawModulesPart1 = [
 	mod07RecursionProblemsModule,
 	mod07ReduxAdvancedConceptsModule,
 	mod07RefreshTokenStrategiesModule,
+	mod07SqsSnsEventsModule,
 	mod07SubscriptionsRealtimeModule,
 	mod07TestingBestPracticesModule,
 	mod07TestingQualityModule,
@@ -728,6 +734,7 @@ const rawModulesPart1 = [
 	mod08DataTypesModule,
 	mod08EntityFrameworkCoreModule,
 	mod08InheritanceStrategiesModule,
+	mod08LambdaServerlessModule,
 	mod08LocalStateManagementModule,
 	mod08LoggingConfigurationModule,
 	mod08NetworkingAndApiPlatformsModule,
@@ -738,6 +745,7 @@ const rawModulesPart1 = [
 	mod08SecurityCryptographyModule,
 	mod08SecurityTestingModule,
 	mod08ServerlessModule,
+	mod08ServiceBusEventsModule,
 	mod08SsoIdentityProvidersModule,
 	mod08StateMachinesXstateModule,
 	mod08StylingModule,
@@ -998,14 +1006,16 @@ const rawModulesPart1 = [
 	whatsappChatHldModule,
 	yarnNpmFundamentalsModule,
 	yarnNpmPackagesModule,
+];
+
+const rawModulesPart2 = [
 	youtubeStreamingModule,
 	youtubeVideoModule,
 	zoomConferencingModule,
 	zoomConferencingHldModule,
 ];
 
-
-const rawModules: any[] = [...rawModulesPart1];
+const rawModules: any[] = [...rawModulesPart1, ...rawModulesPart2];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 

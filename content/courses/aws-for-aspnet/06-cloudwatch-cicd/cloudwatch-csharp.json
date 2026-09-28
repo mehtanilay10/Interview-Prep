@@ -27,9 +27,9 @@
       "type": "example",
       "data": {
         "title": "Track a custom metric",
-        "content": "Use `AmazonCloudWatchClient` to publish metrics.",
+        "content": "Use `AmazonCloudWatchClient` to publish metrics. Includes a service class with error handling, cancellation token, and expected output comments.",
         "language": "csharp",
-        "code": "using Amazon.CloudWatch;\nusing Amazon.CloudWatch.Model;\n\nvar cloudWatch = new AmazonCloudWatchClient(RegionEndpoint.USEast1);\n\nvar putMetricRequest = new PutMetricDataRequest\n{\n    Namespace = \"AspNetCore/MyApp\",\n    MetricData = new List<MetricDatum>\n    {\n        new MetricDatum\n        {\n            MetricName = \"OrderCount\",\n            Value = 1,\n            Unit = StandardUnit.Count,\n            Timestamp = DateTime.UtcNow\n        }\n    }\n};\n\nawait cloudWatch.PutMetricDataAsync(putMetricRequest);"
+        "code": "// Packages: AWSSDK.CloudWatch, Amazon.CloudWatch\nusing Amazon.CloudWatch;\nusing Amazon.CloudWatch.Model;\n\npublic class CloudWatchMetricsService\n{\n    private readonly IAmazonCloudWatch _cloudWatch;\n    private const string Namespace = \"AspNetCore/MyApp\";\n\n    public CloudWatchMetricsService(IAmazonCloudWatch cloudWatch)\n    {\n        _cloudWatch = cloudWatch;\n    }\n\n    public async Task PublishOrderCountAsync(int orderCount, string environment, CancellationToken cancellationToken = default)\n    {\n        try\n        {\n            var putMetricRequest = new PutMetricDataRequest\n            {\n                Namespace = Namespace,\n                MetricData = new List<MetricDatum>\n                {\n                    new MetricDatum\n                    {\n                        MetricName = \"OrderCount\",\n                        Value = orderCount,\n                        Unit = StandardUnit.Count,\n                        Timestamp = DateTime.UtcNow,\n                        Dimensions = new List<Dimension>\n                        {\n                            new Dimension { Name = \"Environment\", Value = environment }\n                        }\n                    }\n                }\n            };\n\n            PutMetricDataResponse response = await _cloudWatch.PutMetricDataAsync(putMetricRequest, cancellationToken);\n            Console.WriteLine($\"Published {orderCount} orders to CloudWatch (RequestId: {response.ResponseMetadata.RequestId})\");\n        }\n        catch (AmazonCloudWatchException ex)\n        {\n            Console.WriteLine($\"CloudWatch error: {ex.Message}\");\n            throw;\n        }\n    }\n}\n\n// Usage:\n// var metricsService = new CloudWatchMetricsService(new AmazonCloudWatchClient(RegionEndpoint.USEast1));\n// await metricsService.PublishOrderCountAsync(5, \"Production\");\n// Expected output: \"Published 5 orders to CloudWatch (RequestId: ...)\""
       }
     },
     {
@@ -49,9 +49,9 @@
       "type": "example",
       "data": {
         "title": "Structured logging for CloudWatch Logs Insights",
-        "content": "Use structured message templates so you can filter in CloudWatch Logs Insights.",
+        "content": "Use structured message templates so you can filter in CloudWatch Logs Insights. Includes try/catch and expected output comments.",
         "language": "csharp",
-        "code": "public class PostsController : ControllerBase\n{\n    private readonly ILogger<PostsController> _logger;\n    private readonly BlogContext _db;\n\n    public PostsController(ILogger<PostsController> logger, BlogContext db)\n    {\n        _logger = logger;\n        _db = db;\n    }\n\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<Post>> Get(int id)\n    {\n        _logger.LogInformation(\"Fetching post {PostId} from RDS\", id);\n        var post = await _db.Posts.FindAsync(id);\n\n        if (post is null)\n        {\n            _logger.LogWarning(\"Post {PostId} not found\", id);\n            return NotFound();\n        }\n\n        return Ok(post);\n    }\n}"
+        "code": "// Packages: AWSSDK.CloudWatch, Amazon.CloudWatch (for direct log sending if needed)\nusing Microsoft.Extensions.Logging;\n\npublic class PostsController : ControllerBase\n{\n    private readonly ILogger<PostsController> _logger;\n    private readonly BlogContext _db;\n\n    public PostsController(ILogger<PostsController> logger, BlogContext db)\n    {\n        _logger = logger;\n        _db = db;\n    }\n\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<Post>> Get(int id, CancellationToken cancellationToken)\n    {\n        using var _ = _logger.BeginScope(new Dictionary<string, object>\n        {\n            [\"PostId\"] = id,\n            [\"Controller\"] = nameof(PostsController)\n        });\n\n        _logger.LogInformation(\"Fetching post {PostId} from RDS\", id);\n\n        Post? post;\n        try\n        {\n            post = await _db.Posts.FindAsync([id], cancellationToken: cancellationToken);\n        }\n        catch (Exception ex)\n        {\n            _logger.LogError(ex, \"Database error fetching post {PostId}\", id);\n            throw;\n        }\n\n        if (post is null)\n        {\n            _logger.LogWarning(\"Post {PostId} not found\", id);\n            return NotFound();\n        }\n\n        _logger.LogInformation(\"Returning post {PostId}: {Title}\", id, post.Title);\n        return Ok(post);\n    }\n}\n\n// Usage:\n// GET /posts/1\n// Logs appear in CloudWatch Logs with structured fields: PostId=1, Controller=PostsController\n// CloudWatch Logs Insights query: fields @timestamp, PostId, @message | filter PostId = 1"
       }
     },
     {
@@ -65,7 +65,7 @@
       "type": "example",
       "data": {
         "title": "Create an alarm for high CPU",
-        "content": "Use the AWS CLI to create an alarm that triggers when CPU exceeds 80%.",
+        "content": "Use the AWS CLI to create an alarm that triggers when CPU exceeds 80%.\n# Expected output: Alarm is created and transitions to OK state.",
         "language": "powershell",
         "code": "aws cloudwatch put-metric-alarm --alarm-name aspnet-high-cpu --alarm-description \"CPU exceeds 80%\" --metric-name CPUUtilization --namespace AWS/ElasticBeanstalk --statistic Average --period 300 --threshold 80 --comparison-operator GreaterThanThreshold --evaluation-periods 2 --alarm-actions arn:aws:sns:us-east-1:123456789012:aspnet-alerts"
       }

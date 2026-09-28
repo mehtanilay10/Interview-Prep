@@ -1,0 +1,128 @@
+{
+  "id": "lesson-azure-for-aspnet-functions-csharp",
+  "slug": "functions-csharp",
+  "moduleSlug": "07-azure-functions",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Azure Functions from C#",
+  "description": "Create HTTP-triggered and timer-triggered Azure Functions in C# with the isolated worker model.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "functions", "csharp", "http-trigger", "timer-trigger"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In the isolated worker model, every function is a method on a class decorated with a [Function] attribute. The method signature declares its trigger and any bindings, and the DI container provides services like ILogger and IHostEnvironment."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Project Structure"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — register Functions worker and services",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\nusing Microsoft.Extensions.Hosting;\nusing Microsoft.Extensions.DependencyInjection;\nusing Microsoft.Azure.Functions.Worker;\n\nvar host = new HostBuilder()\n    .ConfigureFunctionsWorkerDefaults(builder =>\n    {\n        // Apply JSON source-generated serialization (recommended)\n        builder.UseMasaAotSerialization();\n    })\n    .ConfigureServices(services =>\n    {\n        services.AddSingleton<IWeatherCache, WeatherCache>();\n        services.AddHttpClient<IWeatherClient, WeatherClient>(c =>\n        {\n            c.BaseAddress = new Uri(\"https://api.weather.example.com\");\n        });\n    })\n    .Build();\n\nawait host.RunAsync();\n\n// Output: Worker started and listening for function invocations"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "HTTP-Triggered Function"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An HTTP-triggered function is the serverless equivalent of a minimal API endpoint. You control the response type, status code, and body directly from C#."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "WeatherFunction.cs — HTTP-triggered GET endpoint",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\nusing System.Net;\nusing Microsoft.Azure.Functions.Worker;\nusing Microsoft.Azure.Functions.Worker.Http;\nusing Microsoft.Extensions.Logging;\n\nnamespace MyFunctionApp;\n\npublic class WeatherFunction\n{\n    private readonly IWeatherCache _cache;\n    private readonly ILogger<WeatherFunction> _logger;\n    private readonly IWeatherClient _weatherClient;\n\n    public WeatherFunction(\n        IWeatherCache cache,\n        ILogger<WeatherFunction> logger,\n        IWeatherClient weatherClient)\n    {\n        _cache = cache;\n        _logger = logger;\n        _weatherClient = weatherClient;\n    }\n\n    [Function(\"get-weather\")]\n    public async Task<HttpResponseData> GetWeatherAsync(\n        [HttpTrigger(AuthorizationLevel.Function, \"get\", Route = \"weather/{city}\")]\n        HttpRequestData req,\n        string city,\n        CancellationToken cancellationToken)\n    {\n        _logger.LogInformation(\"Fetching weather for {City}\", city);\n\n        if (string.IsNullOrWhiteSpace(city))\n        {\n            var bad = req.CreateResponse(HttpStatusCode.BadRequest);\n            await bad.WriteStringAsync(\"City name is required.\", cancellationToken);\n            return bad;\n        }\n\n        // Try cache first\n        if (_cache.TryGet(city, out var cached))\n        {\n            _logger.LogInformation(\"Cache hit for {City}\", city);\n            var cachedResponse = req.CreateResponse(HttpStatusCode.OK);\n            await cachedResponse.WriteAsJsonAsync(cached, cancellationToken);\n            return cachedResponse;\n        }\n\n        try\n        {\n            var weather = await _weatherClient.GetCurrentAsync(city, cancellationToken);\n            _cache.Set(city, weather);\n\n            var response = req.CreateResponse(HttpStatusCode.OK);\n            await response.WriteAsJsonAsync(new\n            {\n                city = weather.City,\n                temperatureC = weather.TemperatureC,\n                condition = weather.Condition\n            }, cancellationToken);\n            return response;\n        }\n        catch (HttpRequestException ex)\n        {\n            _logger.LogError(ex, \"Weather service failed for {City}\", city);\n            var errorResponse = req.CreateResponse(HttpStatusCode.BadGateway);\n            await errorResponse.WriteStringAsync(\n                \"Weather service temporarily unavailable.\", cancellationToken);\n            return errorResponse;\n        }\n    }\n}\n\n// --- Supporting interfaces and types ---\n\npublic interface IWeatherCache\n{\n    bool TryGet(string city, out WeatherSummary? summary);\n    void Set(string city, WeatherSummary summary);\n}\n\npublic interface IWeatherClient\n{\n    Task<WeatherSummary> GetCurrentAsync(string city, CancellationToken ct);\n}\n\npublic record WeatherSummary(string City, int TemperatureC, string Condition);\n\npublic class WeatherCache : IWeatherCache\n{\n    private readonly Dictionary<string, (WeatherSummary Data, DateTime ExpiresAt)> _store\n        = new();\n\n    public bool TryGet(string city, out WeatherSummary? summary)\n    {\n        lock (_store)\n        {\n            if (_store.TryGetValue(city, out var entry) && entry.ExpiresAt > DateTime.UtcNow)\n            {\n                summary = entry.Data;\n                return true;\n            }\n            _store.Remove(city);\n        }\n        summary = null;\n        return false;\n    }\n\n    public void Set(string city, WeatherSummary summary)\n    {\n        lock (_store)\n        {\n            _store[city] = (summary, DateTime.UtcNow.AddMinutes(10));\n        }\n    }\n}\n\n// Usage (deployed to Azure):\n// GET https://<app>.azurewebsites.net/api/weather/london\n// Response 200: { \"city\": \"London\", \"temperatureC\": 14, \"condition\": \"Cloudy\" }\n// Response 400: { message: \"City name is required.\" } if city is blank"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Timer-Triggered Function"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Timer triggers use a CRON expression to run on a schedule. The TimerInfo parameter gives you access to schedule status and last run details."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CleanupFunction.cs — timer-triggered scheduled job",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\nusing Microsoft.Azure.Functions.Worker;\nusing Microsoft.Extensions.Logging;\n\nnamespace MyFunctionApp;\n\npublic class CleanupFunction\n{\n    private readonly ILogger<CleanupFunction> _logger;\n    private readonly ICleanupService _cleanupService;\n\n    public CleanupFunction(ILogger<CleanupFunction> logger, ICleanupService cleanupService)\n    {\n        _logger = logger;\n        _cleanupService = cleanupService;\n    }\n\n    // Runs every day at 02:00 UTC\n    // CRON: {second} {minute} {hour} {day} {month} {day-of-week}\n    [Function(\"daily-cleanup\")]\n    public async Task RunAsync(\n        [TimerTrigger(\"0 0 2 * * *\")] TimerInfo timer,\n        CancellationToken cancellationToken)\n    {\n        _logger.LogInformation(\n            \"Cleanup started at: {Time}. Last run status: {Status}\",\n            DateTime.UtcNow,\n            timer.ScheduleStatus?.LastReason ?? \"unknown\");\n\n        try\n        {\n            var removed = await _cleanupService.PurgeExpiredSessionsAsync(cancellationToken);\n            _logger.LogInformation(\"Cleanup complete. Removed {Count} expired sessions.\", removed);\n        }\n        catch (Exception ex)\n        {\n            _logger.LogError(ex, \"Cleanup job failed.\");\n            throw; // Re-throw to signal failure to the Functions runtime\n        }\n    }\n}\n\n// --- Supporting service ---\n\npublic interface ICleanupService\n{\n    Task<int> PurgeExpiredSessionsAsync(CancellationToken ct);\n}\n\npublic class CleanupService : ICleanupService\n{\n    public async Task<int> PurgeExpiredSessionsAsync(CancellationToken ct)\n    {\n        // Implementation: query expired sessions, delete them, return count\n        await Task.CompletedTask;\n        return 0;\n    }\n}\n\n// host.json schedule configuration (alternative to attribute):\n// {\n//   \"extensions\": {\n//     \"timers\": {\n//       \"scheduleMonitor\": { \"enabled\": true }\n//     }\n//   }\n// }\n//\n// Expected log output:\n// [Information] Cleanup started at: 2026-01-15T02:00:00Z. Last run status: Timer fired\n// [Information] Cleanup complete. Removed 142 expired sessions."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always handle CancellationToken",
+        "text": "Azure Functions pass a CancellationToken to every invocation. Respect it in async operations so Azure can gracefully shut down your function during scale-in or deployment events."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build an HTTP-triggered health-check function",
+        "description": "Create a new Functions project and add an HTTP-triggered function that returns a JSON health status object.",
+        "steps": [
+          "Create a new isolated-worker Functions project with dotnet new worker",
+          "Add the Microsoft.Azure.Functions.Worker.Extensions.Http package",
+          "Write a [Function(\"health-check\")] method with [HttpTrigger(AuthorizationLevel.Anonymous, \"get\")]",
+          "Return a JSON object with status \"Healthy\", the UTC timestamp, and the environment name",
+          "Register any needed services in Program.cs"
+        ],
+        "expectedOutcome": "GET /api/health-check returns 200 with { status: \"Healthy\", timestamp: \"2026-01-15T...\", environment: \"Development\" }"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use the isolated worker model for new Functions projects",
+          "Decorate methods with [Function] and a trigger attribute (HttpTrigger, TimerTrigger)",
+          "Inject ILogger<T> and other services via constructor DI",
+          "Always accept and respect CancellationToken in async function code",
+          "Return HttpResponseData for HTTP triggers; re-throw on timer failures"
+        ],
+        "takeaway": "The isolated worker model gives Azure Functions the same clean architecture patterns you already use in ASP.NET Core."
+      }
+    }
+  ],
+  "relatedLessons": ["functions-dependency-injection"],
+  "furtherReading": [
+    {
+      "title": "Azure Functions C# developer guide",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Full reference for the .NET isolated worker programming model."
+    },
+    {
+      "title": "Azure Functions triggers and bindings",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-functions/functions-triggers-bindings",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "List of all available triggers and bindings for Azure Functions."
+    }
+  ]
+}

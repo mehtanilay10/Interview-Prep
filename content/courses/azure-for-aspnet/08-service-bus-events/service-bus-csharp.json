@@ -1,0 +1,145 @@
+{
+  "id": "lesson-azure-for-aspnet-service-bus-csharp",
+  "slug": "service-bus-csharp",
+  "moduleSlug": "08-service-bus-events",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Service Bus from C#",
+  "description": "Use Azure Service Bus for enterprise messaging — queues, topics, and subscriptions from C#.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["azure", "service-bus", "messaging", "queue", "topic", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure Service Bus is a fully managed enterprise message broker. It supports **queues** (point-to-point) and **topics with subscriptions** (publish-subscribe), making it suitable for decoupling microservices, implementing the outbox pattern, and handling background workloads."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Queues vs Topics"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Pattern", "Use Case", "Consumers"],
+        "rows": [
+          ["Queue", "One consumer per message, FIFO order", "Single receiver or competing consumers"],
+          ["Topic + Subscriptions", "Broadcast to multiple consumer groups", "Many independent subscribers"],
+          ["Sessions", "Ordered message groups per session ID", "Stateful conversations, order processing"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "NuGet Package"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Install the Azure.Messaging.ServiceBus package",
+        "content": "// Package: Azure.Messaging.ServiceBus\ndotnet add package Azure.Messaging.ServiceBus"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sending a Message to a Queue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use ServiceBusSender to send messages to a queue or topic. Messages are JSON-serialized by default, and you can set properties like ContentType, Subject, and MessageId for tracking."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OrderQueueSender.cs — send order events to a Service Bus queue",
+        "content": "// Package: Azure.Messaging.ServiceBus\nusing Azure.Messaging.ServiceBus;\nusing System.Text.Json;\n\nnamespace OrderApi.Messaging;\n\npublic class OrderQueueSender : IAsyncDisposable\n{\n    private readonly ServiceBusSender _sender;\n    private readonly JsonSerializerOptions _jsonOptions;\n\n    public OrderQueueSender(string connectionString, string queueName)\n    {\n        var client = new ServiceBusClient(connectionString);\n        _sender = client.CreateSender(queueName);\n        _jsonOptions = new JsonSerializerOptions\n        {\n            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,\n            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull\n        };\n    }\n\n    public async Task SendOrderCreatedAsync(\n        OrderCreatedEvent evt,\n        CancellationToken cancellationToken = default)\n    {\n        var json = JsonSerializer.Serialize(evt, _jsonOptions);\n        var message = new ServiceBusMessage(new BinaryData(json))\n        {\n            MessageId = evt.OrderId.ToString(),\n            Subject = \"OrderCreated\",\n            ContentType = \"application/json\",\n            ApplicationProperties =\n            {\n                [\"CustomerId\"] = evt.CustomerId,\n                [\"TotalAmount\"] = evt.TotalAmount\n            }\n        };\n\n        // SendAndDeleteTransaction ensures exactly-once if a session is used\n        await _sender.SendMessageAsync(message, cancellationToken);\n    }\n\n    public async ValueTask DisposeAsync()\n    {\n        await _sender.DisposeAsync();\n    }\n}\n\n// --- Event record ---\npublic record OrderCreatedEvent(\n    Guid OrderId,\n    Guid CustomerId,\n    DateTime CreatedAt,\n    decimal TotalAmount,\n    List<OrderItem> Items);\n\npublic record OrderItem(Guid ProductId, int Quantity, decimal UnitPrice);\n\n// --- Usage in ASP.NET Core ---\n// builder.Services.AddSingleton<IOrderQueueSender>(sp =>\n//     new OrderQueueSender(connectionString, \"orders-queue\"));\n//\n// In a controller:\n// await _orderQueueSender.SendOrderCreatedAsync(new OrderCreatedEvent(...));\n//\n// Expected Service Bus message body (JSON):\n// { \"orderId\": \"uuid\", \"customerId\": \"uuid\", \"createdAt\": \"2026-01-15T...\", \"totalAmount\": 59.99, \"items\": [...] }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Receiving Messages from a Queue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use ServiceBusProcessor for continuous message processing. The processor handles prefetching, concurrent calls, and automatic settlement (complete, abandon, dead-letter)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OrderProcessor.cs — process messages from a Service Bus queue",
+        "content": "// Package: Azure.Messaging.ServiceBus\nusing Azure.Messaging.ServiceBus;\nusing System.Text.Json;\n\nnamespace OrderApi.Messaging;\n\npublic class OrderProcessor : IHostedService, IAsyncDisposable\n{\n    private readonly ServiceBusProcessor _processor;\n    private readonly IOrderService _orderService;\n    private readonly ILogger<OrderProcessor> _logger;\n    private readonly JsonSerializerOptions _jsonOptions;\n\n    public OrderProcessor(\n        string connectionString,\n        string queueName,\n        IOrderService orderService,\n        ILogger<OrderProcessor> logger)\n    {\n        _orderService = orderService;\n        _logger = logger;\n        _jsonOptions = new() { PropertyNameCaseInsensitive = true };\n\n        var client = new ServiceBusClient(connectionString);\n        _processor = client.CreateProcessor(queueName, new ServiceBusProcessorOptions\n        {\n            // Auto-complete is OFF — we settle explicitly\n            AutoCompleteMessages = false,\n            // Max concurrent calls — tune based on throughput needs\n            MaxConcurrentCalls = 4,\n            // Prefetch improves throughput by reducing round-trips\n            PrefetchCount = 20,\n            // Dead-letter after 3 delivery attempts\n            MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)\n        });\n\n        _processor.ProcessMessageAsync += OnMessageReceivedAsync;\n        _processor.ProcessErrorAsync += OnErrorAsync;\n    }\n\n    private async Task OnMessageReceivedAsync(ProcessMessageEventArgs args)\n    {\n        try\n        {\n            var body = args.Message.Body.ToString();\n            var evt = JsonSerializer.Deserialize<OrderCreatedEvent>(body, _jsonOptions);\n\n            if (evt is null)\n            {\n                _logger.LogWarning(\"Received null event. Dead-lettering.\");\n                await args.DeadLetterMessageAsync(args.Message, \"NullBody\", \"Message body deserialized to null.\");\n                return;\n            }\n\n            _logger.LogInformation(\"Processing OrderCreated: {OrderId}\", evt.OrderId);\n            await _orderService.FulfillOrderAsync(evt, args.CancellationToken);\n\n            // Explicitly complete — removes from the queue\n            await args.CompleteMessageAsync(args.Message, args.CancellationToken);\n            _logger.LogInformation(\"Completed: {OrderId}\", evt.OrderId);\n        }\n        catch (JsonException ex)\n        {\n            _logger.LogError(ex, \"Deserialization failed. Dead-lettering message {MessageId}.\", args.Message.MessageId);\n            await args.DeadLetterMessageAsync(args.Message, \"DeserializationError\", ex.Message);\n        }\n        catch (Exception ex)\n        {\n            _logger.LogError(ex, \"Processing failed for {MessageId}. Abandoning.\", args.Message.MessageId);\n            await args.AbandonMessageAsync(args.Message, cancellationToken: args.CancellationToken);\n        }\n    }\n\n    private Task OnErrorAsync(ProcessErrorEventArgs args)\n    {\n        _logger.LogError(args.Exception, \"Service Bus error in {EntityPath}: {Reason}\",\n            args.EntityPath, args.ErrorSource);\n        return Task.CompletedTask;\n    }\n\n    public Task StartAsync(CancellationToken ct) => _processor.StartProcessingAsync(ct);\n    public Task StopAsync(CancellationToken ct) => _processor.StopProcessingAsync(ct);\n\n    public async ValueTask DisposeAsync()\n    {\n        await _processor.DisposeAsync();\n    }\n}\n\n// --- Usage ---\n// builder.Services.AddHostedService<OrderProcessor>();\n// builder.Services.AddSingleton<IOrderService, OrderService>();\n//\n// Expected log output:\n// [Information] Processing OrderCreated: 3fa85f64-5717-4562-b3fc-2c963f66afa6\n// [Information] Completed: 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always use explicit settlement",
+        "text": "Keep AutoCompleteMessages = false. Complete, abandon, or dead-letter each message explicitly so you never lose a message due to an unhandled exception."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Send and process an order event",
+        "description": "Build a sender and processor for an OrderCreated event using Service Bus.",
+        "steps": [
+          "Provision a Service Bus namespace and queue in the Azure portal",
+          "Create an OrderCreatedEvent record",
+          "Implement IOrderQueueSender and send a test event",
+          "Implement a hosted OrderProcessor that logs and fulfills the order",
+          "Send three events and confirm all three appear in the processor logs"
+        ],
+        "expectedOutcome": "Three OrderCreated messages are sent, processed, and completed in order."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use queues for one-way point-to-point messaging; topics for publish-subscribe",
+          "Use ServiceBusSender for sending; ServiceBusProcessor for continuous receiving",
+          "Set AutoCompleteMessages = false and settle messages explicitly",
+          "Dead-letter unprocessable messages; use ApplicationProperties for metadata routing"
+        ],
+        "takeaway": "Service Bus gives you reliable enterprise messaging with exactly-once delivery guarantees, dead-lettering, and sessions for ordered message groups."
+      }
+    }
+  ],
+  "relatedLessons": ["event-grid-csharp"],
+  "furtherReading": [
+    {
+      "title": "Azure.Messaging.ServiceBus — .NET API reference",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/azure.messaging.servicebus",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Complete API reference for the Azure Service Bus .NET SDK."
+    },
+    {
+      "title": "Service Bus queues, topics, and subscriptions",
+      "url": "https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-queues-topics-subscriptions",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Concepts and guidance for choosing queues versus topics."
+    }
+  ]
+}

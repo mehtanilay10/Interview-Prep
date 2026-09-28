@@ -68,8 +68,11 @@ export function useLessonNotes() {
   }, [isLoggedIn]); // intentionally ignore serverNotes to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverNotesRef.current || isInitialLoad) return;
-    syncNoteToServer(serverNotesRef.current[serverNotesRef.current.length - 1] as LessonNote);
+    if (!isLoggedIn || !serverNotesRef.current) return;
+    const lastNote = serverNotesRef.current[serverNotesRef.current.length - 1];
+    if (lastNote) {
+      syncNoteToServer(lastNote);
+    }
     setSyncedToServer(true);
   }, [isLoggedIn, serverNotes, isInitialLoad]);
 

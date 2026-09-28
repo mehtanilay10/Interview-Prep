@@ -1,0 +1,182 @@
+{
+  "id": "lesson-azure-for-aspnet-cosmos-db-csharp",
+  "slug": "cosmos-db-csharp",
+  "moduleSlug": "08-service-bus-events",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Cosmos DB from C#",
+  "description": "Use Cosmos DB for NoSQL document storage — create containers, insert and query documents, and handle consistency from C#.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 26,
+  "tags": ["azure", "cosmos-db", "nosql", "document-db", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure Cosmos DB is a globally distributed, multi-model NoSQL database. For C# developers, the Azure Cosmos DB SDK for NoSQL (formerly SQL API) provides a natural, LINQ-friendly way to store and query JSON documents with single-digit-millisecond latency at any scale."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core Concepts"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Cosmos DB terms you will use",
+        "items": [
+          "**Account** — the top-level namespace, with a unique endpoint and key",
+          "**Database** — a logical container for multiple containers",
+          "**Container** — where documents live; equivalent to a SQL table",
+          "**Item** — a single JSON document stored in a container",
+          "**Partition key** — the property used to distribute items across physical partitions"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "NuGet Package"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Install the Azure.Cosmos package",
+        "content": "// Package: Azure.Cosmos\ndotnet add package Azure.Cosmos"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Creating a Container"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CosmosSetup.cs — create database and container",
+        "content": "// Package: Azure.Cosmos\nusing Azure.Cosmos;\n\nnamespace BlogApi.Data;\n\npublic class CosmosSetup : IAsyncDisposable\n{\n    private readonly CosmosClient _client;\n\n    public CosmosContainer PostsContainer { get; private set; } = null!;\n\n    public CosmosSetup(string connectionString)\n    {\n        _client = new CosmosClient(connectionString, new CosmosClientOptions\n        {\n            // ConnectionMode.Gateway is recommended for most serverless and VNet scenarios\n            ConnectionMode = ConnectionMode.Gateway,\n            // Enable bulk execution for high-throughput batch operations\n            AllowBulkExecution = true,\n            // Request timeout per operation\n            RequestTimeout = TimeSpan.FromSeconds(30)\n        });\n    }\n\n    public async Task InitializeAsync(CancellationToken cancellationToken = default)\n    {\n        var databaseId = \"BlogDb\";\n        var containerId = \"Posts\";\n        var partitionKeyPath = \"/blogId\";\n\n        // Create database if it does not exist (throughput: 400 RU/s manual or autoscale)\n        var databaseResponse = await _client.CreateDatabaseIfNotExistsAsync(\n            id: databaseId,\n            throughput: 400,\n            cancellationToken: cancellationToken);\n\n        // Create container with a partition key\n        var containerProperties = new ContainerProperties(\n            id: containerId,\n            partitionKeyPath: partitionKeyPath)\n        {\n            // Unique key enforces uniqueness per logical partition\n            UniqueKeyPolicy = new UniqueKeyPolicy\n            {\n                UniqueKeys =\n                {\n                    new UniqueKey { Paths = { \"/slug\" } }\n                }\n            }\n        };\n\n        var containerResponse = await databaseResponse.Database.CreateContainerIfNotExistsAsync(\n            containerProperties,\n            throughput: 400,\n            cancellationToken: cancellationToken);\n\n        PostsContainer = containerResponse.Container;\n    }\n}\n\n// --- Output after initialization ---\n// Database: BlogDb (id: BlogDb)\n// Container: Posts (partitionKey: /blogId, unique key on /slug)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Inserting and Upserting Documents"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PostRepository.cs — insert and upsert a blog post document",
+        "content": "// Package: Azure.Cosmos\nusing Azure.Cosmos;\nusing System.Text.Json;\n\nnamespace BlogApi.Data;\n\npublic class PostRepository\n{\n    private readonly Container _container;\n    private readonly JsonSerializerOptions _jsonOptions;\n\n    public PostRepository(Container container)\n    {\n        _container = container;\n        _jsonOptions = new JsonSerializerOptions\n        {\n            PropertyNamingPolicy = JsonNamingPolicy.CamelCase\n        };\n    }\n\n    public async Task<PostDocument> CreatePostAsync(\n        PostDocument post,\n        CancellationToken cancellationToken = default)\n    {\n        // Partition key is required for all point operations\n        var response = await _container.CreateItemAsync(\n            item: post,\n            partitionKey: new PartitionKey(post.BlogId),\n            cancellationToken: cancellationToken);\n\n        return response.Resource;\n    }\n\n    public async Task<PostDocument?> UpsertPostAsync(\n        PostDocument post,\n        CancellationToken cancellationToken = default)\n    {\n        // Upsert creates if missing, updates if present (uses id + partition key)\n        var response = await _container.UpsertItemAsync(\n            item: post,\n            partitionKey: new PartitionKey(post.BlogId),\n            cancellationToken: cancellationToken);\n\n        return response.Resource;\n    }\n\n    public async Task<PostDocument?> GetPostAsync(\n        string blogId,\n        string postId,\n        CancellationToken cancellationToken = default)\n    {\n        try\n        {\n            var response = await _container.ReadItemAsync<PostDocument>(\n                id: postId,\n                partitionKey: new PartitionKey(blogId),\n                cancellationToken: cancellationToken);\n            return response.Resource;\n        }\n        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)\n        {\n            return null;\n        }\n    }\n}\n\n// --- Document model ---\n// Package: Azure.Cosmos\npublic class PostDocument\n{\n    // 'id' is the required unique identifier in Cosmos DB\n    [JsonPropertyName(\"id\")]\n    public string Id { get; set; } = Guid.NewGuid().ToString();\n\n    // Partition key — groups related items on the same physical partition\n    [JsonPropertyName(\"blogId\")]\n    public string BlogId { get; set; } = string.Empty;\n\n    [JsonPropertyName(\"title\")]\n    public string Title { get; set; } = string.Empty;\n\n    [JsonPropertyName(\"slug\")]\n    public string Slug { get; set; } = string.Empty;\n\n    [JsonPropertyName(\"content\")]\n    public string Content { get; set; } = string.Empty;\n\n    [JsonPropertyName(\"authorId\")]\n    public string AuthorId { get; set; } = string.Empty;\n\n    [JsonPropertyName(\"publishedAt\")]\n    public DateTime? PublishedAt { get; set; }\n\n    [JsonPropertyName(\"tags\")]\n    public List<string> Tags { get; set; } = new();\n\n    [JsonPropertyName(\"_etag\")]\n    public string? ETag { get; set; }\n\n    [JsonPropertyName(\"_ts\")]\n    public long? Timestamp { get; set; }\n}\n\n// --- Usage ---\n// var repo = new PostRepository(postsContainer);\n// var post = await repo.CreatePostAsync(new PostDocument { BlogId = \"blog-1\", Title = \"Hello Cosmos\", Slug = \"hello-cosmos\", Content = \"...\", AuthorId = \"user-1\", Tags = [\"azure\", \"cosmos\"] });\n//\n// Output: PostDocument with Id, BlogId, Title, Content, _etag, _ts populated by Cosmos DB"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Querying with LINQ and SQL"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cosmos DB supports both LINQ (preferred in C#) and raw SQL queries. LINQ is type-safe and integrates with async streams for efficient pagination."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "PostRepository.cs — LINQ and SQL query examples",
+        "content": "// Package: Azure.Cosmos\nusing Azure.Cosmos;\n\nnamespace BlogApi.Data;\n\npublic class PostRepository\n{\n    private readonly Container _container;\n\n    public PostRepository(Container container)\n    {\n        _container = container;\n    }\n\n    // --- LINQ query with Where, OrderBy, Take ---\n    public async IAsyncEnumerable<PostDocument> GetPublishedPostsAsync(\n        string blogId,\n        [System.Runtime.CompilerServices.EnumeratorCancellation]\n        CancellationToken cancellationToken = default)\n    {\n        var query = _container.GetItemLinqQueryable<PostDocument>(allowSynchronousQueryExecution: false)\n            .Where(p => p.BlogId == blogId && p.PublishedAt != null)\n            .OrderByDescending(p => p.PublishedAt)\n            .Take(20);\n\n        var iterator = query.ToFeedIterator();\n\n        while (iterator.HasMoreResults)\n        {\n            foreach (var post in await iterator.ReadNextAsync(cancellationToken))\n            {\n                yield return post;\n            }\n        }\n    }\n\n    // --- SQL query for cross-partition search ---\n    public async IAsyncEnumerable<PostDocument> SearchPostsByTagAsync(\n        string tag,\n        [System.Runtime.CompilerServices.EnumeratorCancellation]\n        CancellationToken cancellationToken = default)\n    {\n        // Cross-partition: set PartitionKey to PartitionKey.None (requires appropriate indexing)\n        var query = _container.GetItemQueryIterator<PostDocument>(\n            queryText: \"SELECT * FROM Posts p WHERE ARRAY_CONTAINS(p.tags, @tag)\",\n            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKey.None },\n            parameters: new[] { new QueryParameter(\"@tag\", tag) });\n\n        while (query.HasMoreResults)\n        {\n            foreach (var post in await query.ReadNextAsync(cancellationToken))\n            {\n                yield return post;\n            }\n        }\n    }\n\n    // --- Count documents in a partition ---\n    public async Task<long> CountPostsAsync(string blogId, CancellationToken ct)\n    {\n        var query = _container.GetItemLinqQueryable<PostDocument>(allowSynchronousQueryExecution: false)\n            .Where(p => p.BlogId == blogId)\n            .ToFeedIterator();\n\n        long count = 0;\n        while (query.HasMoreResults)\n        {\n            var response = await query.ReadNextAsync(ct);\n            count += response.Count;\n        }\n        return count;\n    }\n}\n\n// --- Expected query output (published posts for blog-1): ---\n// [ { \"id\": \"...\", \"blogId\": \"blog-1\", \"title\": \"Getting Started\", \"publishedAt\": \"2026-01-10T...\", \"tags\": [\"azure\", \"cosmos\"] }, ... ]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Optimistic Concurrency and ETags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cosmos DB supports optimistic concurrency control via ETags. Include the ETag in the ItemRequestOptions to prevent lost updates when two clients update the same document simultaneously."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Upsert with ETag — optimistic concurrency control",
+        "content": "// Package: Azure.Cosmos\nusing Azure.Cosmos;\n\npublic async Task<PostDocument?> UpdateTitleAsync(\n    string blogId,\n    string postId,\n    string newTitle,\n    string knownETag,\n    CancellationToken ct)\n{\n    var existing = await _container.ReadItemAsync<PostDocument>(\n        id: postId,\n        partitionKey: new PartitionKey(blogId),\n        cancellationToken: ct);\n\n    existing.Resource.Title = newTitle;\n\n    try\n    {\n        var response = await _container.ReplaceItemAsync(\n            item: existing.Resource,\n            id: postId,\n            partitionKey: new PartitionKey(blogId),\n            new ItemRequestOptions { IfMatchEtag = knownETag },\n            cancellationToken: ct);\n\n        return response.Resource;\n    }\n    catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)\n    {\n        // Another writer updated the document first — handle conflict\n        throw new InvalidOperationException(\n            $\"Post {postId} was modified by another writer. Please reload and retry.\", ex);\n    }\n}\n\n// --- Upsert without ETag check (overwrites unconditionally) ---\n// await _container.UpsertItemAsync(updatedPost, new PartitionKey(blogId));"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Choose your partition key carefully",
+        "text": "The partition key cannot be changed after the container is created. Pick a property with high cardinality and even write distribution — for blog posts, blogId is usually a good choice because posts for the same blog are often queried together."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Cosmos DB-backed post repository",
+        "description": "Create a Cosmos DB container and implement a post repository with insert, upsert, query, and count operations.",
+        "steps": [
+          "Create a Cosmos DB account and BlogDb database in the Azure portal",
+          "Add the Azure.Cosmos NuGet package",
+          "Define a PostDocument class with Id, BlogId, Title, Content, Tags, PublishedAt",
+          "Implement CreatePostAsync, UpsertPostAsync, GetPublishedPostsAsync (LINQ), and CountPostsAsync",
+          "Seed three posts and query them — verify the results"
+        ],
+        "expectedOutcome": "Three posts are stored and retrieved from Cosmos DB; the LINQ query returns only published posts sorted by date."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cosmos DB stores JSON documents in containers partitioned by a chosen key",
+          "Use CreateItemAsync for inserts; UpsertItemAsync when the document may already exist",
+          "Query with LINQ via GetItemLinqQueryable or raw SQL via GetItemQueryIterator",
+          "Use ETags with ReplaceItemAsync for optimistic concurrency control"
+        ],
+        "takeaway": "Cosmos DB provides globally distributed NoSQL with a C# SDK that feels native — LINQ queries, async streams, and strong typing make it a natural fit for ASP.NET Core document workloads."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Azure Cosmos DB for NoSQL — .NET SDK v4 guide",
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/sql-api-sdk-dotnet",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Getting started with the Azure.Cosmos .NET SDK for NoSQL."
+    },
+    {
+      "title": "Choose a partition key in Azure Cosmos DB",
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/partitioning-overview",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Best practices for selecting and evaluating partition keys."
+    },
+    {
+      "title": "Azure Cosmos DB .NET API reference",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/azure.cosmos",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Full API reference for the Azure.Cosmos package."
+    }
+  ]
+}

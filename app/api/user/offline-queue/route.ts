@@ -49,12 +49,13 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (
     !body ||
+    typeof body !== 'object' ||
     typeof body.courseSlug !== 'string' ||
     typeof body.moduleSlug !== 'string' ||
     typeof body.lessonSlug !== 'string' ||
     typeof body.title !== 'string'
   ) {
-    return NextResponse.json({ error: 'Invalid offline queue payload' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid offline queue payload', received: body && typeof body === 'object' ? Object.keys(body as any) : typeof body }, { status: 400 });
   }
 
   await prisma.offlineReadingQueue.createMany({

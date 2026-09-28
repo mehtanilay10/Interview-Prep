@@ -69,7 +69,10 @@ export function useOfflineQueue() {
 
   useEffect(() => {
     if (!isLoggedIn || !serverQueueRef.current || isInitialLoad) return;
-    syncQueueToServer(serverQueueRef.current[serverQueueRef.current.length - 1] as OfflineQueueItem);
+    const lastItem = serverQueueRef.current[serverQueueRef.current.length - 1];
+    if (lastItem) {
+      syncQueueToServer(lastItem);
+    }
     setSyncedToServer(true);
   }, [isLoggedIn, serverQueue, isInitialLoad]);
 

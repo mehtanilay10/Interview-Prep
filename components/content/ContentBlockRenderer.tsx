@@ -398,31 +398,32 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       );
 
     case 'checklist':
-      return (
-        <div key={idx} className="my-4 rounded-xl border border-border bg-canvas-subtle p-4">
-          {block.data.title && (
-            <h4 className="mb-3 font-semibold text-fg-default">{block.data.title}</h4>
-          )}
-          <ul className="space-y-2">
-            {block.data.items.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border bg-canvas text-fg-subtle"
-                  aria-hidden="true"
-                >
-                  ✓
-                </span>
-                <div>
-                  <span className="text-fg-default">{renderInlineMarkdown(item.text)}</span>
-                  {item.hint && (
-                    <span className="ml-1 text-xs text-fg-muted">— {renderInlineMarkdown(item.hint)}</span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
+        return null;
+        //   return (
+        //     <div key={idx} className="my-4 rounded-xl border border-border bg-canvas-subtle p-4">
+        //       {block.data.title && (
+        //         <h4 className="mb-3 font-semibold text-fg-default">{block.data.title}</h4>
+        //       )}
+        //       <ul className="space-y-2">
+        //         {block.data.items.map((item, i) => (
+        //           <li key={i} className="flex items-start gap-2 text-sm">
+        //             <span
+        //               className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border bg-canvas text-fg-subtle"
+        //               aria-hidden="true"
+        //             >
+        //               ✓
+        //             </span>
+        //             <div>
+        //               <span className="text-fg-default">{renderInlineMarkdown(item.text)}</span>
+        //               {item.hint && (
+        //                 <span className="ml-1 text-xs text-fg-muted">— {renderInlineMarkdown(item.hint)}</span>
+        //               )}
+        //             </div>
+        //           </li>
+        //         ))}
+        //       </ul>
+        //     </div>
+        //   );
 
     case 'mermaid':
       return (

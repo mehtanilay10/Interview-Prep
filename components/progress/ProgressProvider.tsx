@@ -76,11 +76,15 @@ async function syncProgressToServer(progress: ProgressState): Promise<void> {
         allEntries.push({ category, lessonSlug: entry.lessonSlug, moduleSlug: entry.moduleSlug });
       }
     }
-    await fetch('/api/progress', {
+    const res = await fetch('/api/progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries: allEntries }),
     });
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn('[ProgressProvider] Failed to sync to server', res.status, text);
+    }
   } catch (err) {
     console.warn('[useProgress] Failed to sync to server', err);
   }
@@ -136,7 +140,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || serverProgress) return;
+    if (!isLoggedIn) return;
     setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
@@ -150,10 +154,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, serverProgress]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
-    if (!isLoggedIn || !serverProgressRef.current || isInitialLoad) return;
+    if (!isLoggedIn || !serverProgressRef.current) return;
     syncProgressToServer(serverProgressRef.current);
   }, [isLoggedIn, serverProgress, isInitialLoad]);
 

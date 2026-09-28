@@ -29,6 +29,13 @@
       "text": "A resource is data that the client can read. It often maps to a database record, file, or API response. Resources are identified by a URI and can return structured content such as text or JSON."
     },
     {
+      "type": "example",
+      "title": "MCP resource provider",
+      "content": "Expose customer records as a readable resource with URI-based access.",
+      "language": "csharp",
+      "code": "// Package: ModelContextProtocol\nusing ModelContextProtocol.Server;\n\npublic class CustomerResource\n{\n    private readonly ICustomerRepository _repository;\n\n    public CustomerResource(ICustomerRepository repository)\n    {\n        _repository = repository;\n    }\n\n    public IReadOnlyList<McpResource> ListResources()\n    {\n        return _repository.GetAllCustomers()\n            .Select(c => new McpResource\n            {\n                Uri = $\"customer://{c.Id}\",\n                Name = c.Name,\n                Description = $\"Customer record for {c.Name}\",\n                MimeType = \"application/json\"\n            })\n            .ToList();\n    }\n\n    public async Task<McpResourceContent> ReadResourceAsync(string uri, CancellationToken cancellationToken)\n    {\n        var customer = await _repository.GetByIdAsync(uri.Replace(\"customer://\", \"\"), cancellationToken);\n        return new McpResourceContent\n        {\n            Uri = uri,\n            MimeType = \"application/json\",\n            Text = JsonSerializer.Serialize(customer)\n        };\n    }\n}\n// Client request sample:\n//   resource: customer://123\n// Expected response: JSON representation of customer #123"
+    },
+    {
       "type": "heading",
       "level": 2,
       "text": "Prompts"
@@ -39,10 +46,10 @@
     },
     {
       "type": "example",
-      "title": "Conceptual MCP prompt definition",
-      "content": "Prompt templates are defined on the server and invoked by the client.",
+      "title": "Full MCP prompt definition",
+      "content": "Prompt templates with arguments and a rendered prompt builder for the model.",
       "language": "csharp",
-      "code": "public record SupportTriagePrompt : McpPrompt\n{\n    public override string Name => \"support_triage\";\n    public override string Description => \"Summarize a support ticket and suggest next steps.\";\n\n    public override IReadOnlyList<McpPromptArgument> Arguments =>\n    [\n        new McpPromptArgument(\"ticket\", \"The support ticket text\", required: true),\n        new McpPromptArgument(\"customer_tier\", \"Customer tier such as free, pro, or enterprise\", required: false)\n    ];\n}"
+      "code": "// Package: ModelContextProtocol\nusing ModelContextProtocol.Server;\n\npublic record SupportTriagePrompt : McpPrompt\n{\n    public override string Name => \"support_triage\";\n    public override string Description => \"Summarize a support ticket and suggest next steps.\";\n\n    public override IReadOnlyList<McpPromptArgument> Arguments =>\n    [\n        new McpPromptArgument(\"ticket\", \"The support ticket text\", required: true),\n        new McpPromptArgument(\"customer_tier\", \"Customer tier such as free, pro, or enterprise\", required: false)\n    ];\n\n    // Build the prompt template that the client will fill and send to the model\n    public override string BuildPrompt(IReadOnlyDictionary<string, object?> arguments)\n    {\n        var tier = arguments.GetValueOrDefault(\"customer_tier\")?.ToString() ?? \"standard\";\n        var ticket = arguments.GetValueOrDefault(\"ticket\")?.ToString() ?? \"\";\n        return $\"You are a support triage assistant.\\nCustomer tier: {tier}\\nTicket: {ticket}\\nSummarize the issue and suggest next steps.\";\n    }\n}\n// Client invocation sample:\n//   prompt: support_triage\n//   arguments: { ticket: \"API returns 500 on /users\", customer_tier: \"enterprise\" }\n// Expected: model receives the rendered prompt text and generates a structured response"
     },
     {
       "type": "heading",
@@ -52,6 +59,13 @@
     {
       "type": "paragraph",
       "text": "Tools are the most powerful MCP primitive. They represent backend functions the client can execute. Each tool has a name, description, and typed input schema. Strong descriptions improve tool selection and reduce invalid arguments."
+    },
+    {
+      "type": "example",
+      "title": "MCP tool with full implementation",
+      "content": "A search tool with typed input schema, async execution, cancellation support, and error handling.",
+      "language": "csharp",
+      "code": "// Package: ModelContextProtocol\nusing ModelContextProtocol.Server;\nusing System.Text.Json;\n\npublic class SearchProductsTool\n{\n    private readonly IProductRepository _repository;\n\n    public SearchProductsTool(IProductRepository repository)\n    {\n        _repository = repository;\n    }\n\n    public string Name => \"search_products\";\n    public string Description => \"Search products by keyword or category with pagination.\";\n\n    public object InputSchema => new\n    {\n        type = \"object\",\n        properties = new\n        {\n            query = new { type = \"string\", description = \"Search keyword\" },\n            category = new { type = \"string\", description = \"Optional category filter\" },\n            page = new { type = \"integer\", description = \"Page number (1-based)\" }\n        },\n        required = new[] { \"query\" }\n    };\n\n    public async Task<string> ExecuteAsync(\n        IReadOnlyDictionary<string, object?> arguments,\n        CancellationToken cancellationToken)\n    {\n        try\n        {\n            var query = arguments.GetValueOrDefault(\"query\")?.ToString() ?? string.Empty;\n            var category = arguments.GetValueOrDefault(\"category\")?.ToString();\n            var page = arguments.GetValueOrDefault(\"page\") is int p ? p : 1;\n\n            var results = await _repository.SearchAsync(query, category, page, cancellationToken);\n            return JsonSerializer.Serialize(results);\n        }\n        catch (OperationCanceledException)\n        {\n            return \"Request was cancelled.\";\n        }\n        catch (Exception ex)\n        {\n            return $\"Error: {ex.Message}\";\n        }\n    }\n}\n// Sample invocation:\n//   tool: search_products\n//   arguments: { query: \"wireless headphones\", category: \"electronics\", page: 1 }\n// Expected result: JSON array of matching products with pagination metadata"
     },
     {
       "type": "callout",

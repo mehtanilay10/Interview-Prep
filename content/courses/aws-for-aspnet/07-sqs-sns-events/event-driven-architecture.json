@@ -1,0 +1,118 @@
+{
+  "id": "lesson-aws-for-aspnet-event-driven-architecture",
+  "slug": "event-driven-architecture",
+  "moduleSlug": "07-sqs-sns-events",
+  "courseSlug": "aws-for-aspnet",
+  "title": "Event-Driven Architecture",
+  "description": "Combine SQS and SNS for decoupled, scalable communication in ASP.NET Core.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["aws", "sqs", "sns", "events", "architecture", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Event-driven architecture lets services communicate asynchronously. SNS delivers events, and SQS buffers them so consumers can process at their own pace."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fan-Out Pattern"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fan out events to multiple SQS queues",
+        "content": "Combine SNS topic subscriptions with SQS for parallel processing.",
+        "language": "csharp",
+        "code": "// Package: AWSSDK.SimpleNotificationation\nusing Amazon.SimpleNotificationation;\nusing Amazon.SimpleNotificationation.Model;\n\nvar snsClient = new AmazonSimpleNotificationServiceClient(RegionEndpoint.USEast1);\nstring topicArn = \"arn:aws:sns:us-east-1:123456789012:aspnet-order-events\";\n\n// Subscribe two SQS queues to the same topic\nvar analyticsQueueArn = \"arn:aws:sqs:us-east-1:123456789012:analytics-queue\";\nvar emailQueueArn = \"arn:aws:sqs:us-east-1:123456789012:email-queue\";\n\nawait snsClient.SubscribeAsync(new SubscribeRequest\n{\n    TopicArn = topicArn,\n    Protocol = \"sqs\",\n    Endpoint = analyticsQueueArn\n});\n\nawait snsClient.SubscribeAsync(new SubscribeRequest\n{\n    TopicArn = topicArn,\n    Protocol = \"sqs\",\n    Endpoint = emailQueueArn\n});\n\n// Each queue receives a copy of the message"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Handling and Dead-Letter Queues"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Move failed messages to a DLQ",
+        "content": "Configure a redrive policy so messages that exceed maxReceiveCount go to a dead-letter queue.",
+        "language": "csharp",
+        "code": "using Amazon.SQS;\nusing Amazon.SQS.Model;\n\nvar sqsClient = new AmazonSQSClient(RegionEndpoint.USEast1);\nstring sourceQueueUrl = \"https://sqs.us-east-1.amazonaws.com/123456789012/analytics-queue\";\nstring dlqUrl = \"https://sqs.us-east-1.amazonaws.com/123456789012/analytics-dlq\";\n\nvar redrivePolicy = new RedrivePolicy\n{\n    deadLetterTargetArn = \"arn:aws:sqs:us-east-1:123456789012:analytics-dlq\",\n    maxReceiveCount = 5\n};\n\nawait sqsClient.SetQueueAttributesAsync(new SetQueueAttributesRequest\n{\n    QueueUrl = sourceQueueUrl,\n    Attributes = { [QueueAttributeName.RedrivePolicy] = redrivePolicy.ToJson() }\n});\n\nConsole.WriteLine(\"DLQ configured for analytics-queue.\");"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "When to Use SNS vs SQS",
+        "text": "Use SNS when you need to push the same event to multiple destinations. Use SQS when consumers need to pull work at their own pace. Together they give you both broadcast and buffering."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "SQS vs SNS",
+        "cards": [
+          {
+            "title": "SQS",
+            "description": "Managed message queue for point-to-point communication.",
+            "pros": ["At-least-once delivery", "Visibility timeout", "Dead-letter queues", "Long polling"],
+            "cons": ["No native pub/sub", "One consumer per message"]
+          },
+          {
+            "title": "SNS",
+            "description": "Managed pub/sub for broadcast notifications.",
+            "pros": ["Multiple protocols", "Fan-out to SQS/Lambda/HTTP", "Message filtering"],
+            "cons": ["No persistence by default", "No built-in retry for all protocols"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design an order processing pipeline",
+        "description": "Use SNS and SQS to decouple order creation from fulfillment.",
+        "steps": [
+          "Create an SNS topic for order events",
+          "Create SQS queues for billing, shipping, and analytics",
+          "Subscribe each queue to the topic with a filter policy",
+          "Configure DLQs for each queue",
+          "Publish a test order event and verify it reaches all three queues"
+        ],
+        "expectedOutcome": "A single order event fans out to three independent workers without blocking the API."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "SNS + SQS provides a robust event-driven foundation",
+          "Fan-out lets one event trigger multiple workflows",
+          "DLQs isolate poison messages for later investigation",
+          "Filter policies reduce unnecessary work for downstream services"
+        ],
+        "takeaway": "Combining SNS and SQS gives you broadcast, buffering, and reliability in one AWS-native pattern."
+      }
+    }
+  ],
+  "relatedLessons": ["sqs-csharp", "sns-csharp"],
+  "furtherReading": [
+    {
+      "title": "Event-driven architectures on AWS",
+      "url": "https://aws.amazon.com/architecture/event-driven-architecture/",
+      "type": "article",
+      "author": "AWS",
+      "description": "Patterns and guidance for event-driven architectures."
+    }
+  ]
+}

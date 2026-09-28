@@ -1,0 +1,166 @@
+{
+  "id": "lesson-azure-for-aspnet-functions-dependency-injection",
+  "slug": "functions-dependency-injection",
+  "moduleSlug": "07-azure-functions",
+  "courseSlug": "azure-for-aspnet",
+  "title": "Dependency Injection in Functions",
+  "description": "Use dependency injection in isolated-process Azure Functions to keep function code clean and testable.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": ["azure", "functions", "dependency-injection", "testing", "csharp"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The isolated worker model uses the standard Microsoft.Extensions.DependencyInjection container. This means you can register services the same way you do in ASP.NET Core — with AddSingleton, AddScoped, or AddTransient — and inject them into your function classes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Service Lifetimes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because Functions are stateless, Singleton and Transient are the most common lifetimes. Scoped services are only useful when you explicitly create a scope (for example, per-request in an HTTP function)."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Service lifetimes in Azure Functions",
+        "cards": [
+          {
+            "title": "Singleton",
+            "description": "One instance per Functions host process. Good for caches, HTTP clients, and read-only config.",
+            "pros": ["Shared state across invocations", "Efficient for expensive resources"],
+            "cons": ["Must be thread-safe", "State persists for the life of the host"]
+          },
+          {
+            "title": "Transient",
+            "description": "A new instance every time it is requested. Good for lightweight stateless services.",
+            "pros": ["No shared state", "Simple mental model"],
+            "cons": ["Overhead for expensive objects"]
+          },
+          {
+            "title": "Scoped",
+            "description": "One instance per explicit scope. Use with CreateScope() inside an HTTP function.",
+            "pros": ["Useful for per-request DbContext"],
+            "cons": ["Requires manual scope creation"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Registering Services"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Program.cs — configure DI in Functions worker",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\n// Package: Microsoft.Extensions.Http\nusing Microsoft.Extensions.DependencyInjection;\nusing Microsoft.Extensions.Hosting;\nusing Microsoft.Azure.Functions.Worker;\nusing Microsoft.Extensions.Http;\n\nvar host = new HostBuilder()\n    .ConfigureFunctionsWorkerDefaults()\n    .ConfigureServices(services =>\n    {\n        // Singleton — shared across the host process\n        services.AddSingleton<IWeatherCache, WeatherCache>();\n\n        // Named or typed HttpClient via IHttpClientFactory\n        services.AddHttpClient<IWeatherClient, WeatherClient>(client =>\n        {\n            client.BaseAddress = new Uri(\"https://api.weather.example.com\");\n            client.DefaultRequestHeaders.Add(\"Accept\", \"application/json\");\n            client.Timeout = TimeSpan.FromSeconds(10);\n        });\n\n        // Transient — new instance each time\n        services.AddTransient<IReportGenerator, CsvReportGenerator>();\n\n        // Configuration from appsettings.json\n        services.Configure<WeatherOptions>(\n            hostContext.Configuration.GetSection(\"Weather\"));\n    })\n    .Build();\n\nawait host.RunAsync();\n\n// appsettings.json:\n// {\n//   \"Weather\": {\n//     \"ApiKey\": \"your-api-key\",\n//     \"CacheDurationMinutes\": 10\n//   }\n// }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using Scoped Services in HTTP Functions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you inject a DbContext or similar scoped service, create a scope at the top of your HTTP function using the IServiceProvider that the runtime provides."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OrdersFunction.cs — scoped DbContext per HTTP request",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\n// Package: Microsoft.EntityFrameworkCore\nusing System.Data;\nusing Microsoft.Azure.Functions.Worker;\nusing Microsoft.Azure.Functions.Worker.Http;\nusing Microsoft.EntityFrameworkCore;\nusing Microsoft.Extensions.DependencyInjection;\nusing Microsoft.Extensions.Logging;\n\nnamespace MyFunctionApp;\n\npublic class OrdersFunction\n{\n    private readonly ILogger<OrdersFunction> _logger;\n\n    public OrdersFunction(ILogger<OrdersFunction> logger)\n    {\n        _logger = logger;\n    }\n\n    [Function(\"list-orders\")]\n    public async Task<HttpResponseData> ListOrdersAsync(\n        [HttpTrigger(AuthorizationLevel.Function, \"get\", Route = \"orders\")]\n        HttpRequestData req,\n        FunctionContext context,\n        CancellationToken cancellationToken)\n    {\n        // Create a scope for scoped services like DbContext\n        var sp = context.InstanceServices.CreateScope().ServiceProvider;\n        await using var db = sp.GetRequiredService<AppDbContext>();\n\n        var orders = await db.Orders\n            .AsNoTracking()\n            .OrderByDescending(o => o.OrderDate)\n            .Take(100)\n            .ToListAsync(cancellationToken);\n\n        var response = req.CreateResponse(System.Net.HttpStatusCode.OK);\n        await response.WriteAsJsonAsync(orders, cancellationToken);\n        return response;\n    }\n}\n\n// --- DbContext registration ---\n// services.AddDbContext<AppDbContext>(options =>\n//     options.UseSqlServer(Environment.GetEnvironmentVariable(\"SqlConnectionString\")));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Unit-Testing Functions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because functions are plain classes with constructor-injected dependencies, you can test them with any test framework — no Azure runtime needed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "WeatherFunctionTests.cs — unit test with mocked dependencies",
+        "content": "// Package: Microsoft.Azure.Functions.Worker\n// Package: Microsoft.Azure.Functions.Worker.Extensions.Http\n// Package: Moq\n// Package: FluentAssertions\nusing System.Net;\nusing Moq;\nusing Xunit;\nusing MyFunctionApp;\n\npublic class WeatherFunctionTests\n{\n    [Fact]\n    public async Task GetWeatherAsync_ReturnsOk_WithCityData()\n    {\n        // Arrange\n        var cache = new Mock<IWeatherCache>();\n        cache.Setup(c => c.TryGet(\"London\", out It.Ref<WeatherSummary?>.IsAny))\n            .Returns(false);\n\n        var weatherClient = new Mock<IWeatherClient>();\n        weatherClient.Setup(c => c.GetCurrentAsync(\"London\", It.IsAny<CancellationToken>()))\n            .ReturnsAsync(new WeatherSummary(\"London\", 14, \"Cloudy\"));\n\n        var logger = Mock.Of<ILogger<WeatherFunction>>();\n        var function = new WeatherFunction(cache.Object, logger, weatherClient.Object);\n\n        var req = new DefaultHttpRequestData(new DefaultHttpRequest());\n\n        // Act\n        var response = await function.GetWeatherAsync(req, \"London\", CancellationToken.None);\n\n        // Assert\n        response.StatusCode.Should().Be(HttpStatusCode.OK);\n    }\n}\n\n// Output: Test passes — function returns 200 OK with mocked weather data"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep functions thin",
+        "text": "Put all business logic in separate services injected via DI. Functions should only handle trigger orchestration and response building. This makes your code testable and reusable outside Azure."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Refactor a function to use injected services",
+        "description": "Take a function that has inline data access logic and refactor it to use DI.",
+        "steps": [
+          "Create an IReportService interface with a GenerateCsvAsync method",
+          "Implement ReportService as a singleton",
+          "Register it in Program.cs",
+          "Refactor the function method to inject IReportService instead of building the CSV inline",
+          "Write a unit test that mocks IReportService and verifies the HTTP response"
+        ],
+        "expectedOutcome": "The function body is under 15 lines and delegates all business logic to the injected service."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use the standard Microsoft.Extensions.DependencyInjection container",
+          "Prefer Singleton for caches and HTTP clients; create scopes manually for DbContext",
+          "Keep functions thin — inject services and test them in isolation",
+          "Use IHttpClientFactory for outbound HTTP instead of new HttpClient()"
+        ],
+        "takeaway": "DI in Azure Functions follows the same patterns as ASP.NET Core, so your existing service architecture transfers directly."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Dependency injection in .NET isolated functions",
+      "url": "https://learn.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide#dependency-injection",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official guide to DI patterns in Azure Functions isolated worker."
+    },
+    {
+      "title": "IHttpClientFactory in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Best practices for outbound HTTP in .NET applications including Functions."
+    }
+  ]
+}

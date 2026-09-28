@@ -27,9 +27,9 @@
       "type": "example",
       "data": {
         "title": "Create a presigned PUT URL",
-        "content": "Use `GetPreSignedURL` with a `PutObjectRequest`.",
+        "content": "Use `GetPreSignedURL` with a `PutObjectRequest`. Includes error handling and expected output comments.",
         "language": "csharp",
-        "code": "var request = new GetPreSignedUrlRequest\n{\n    BucketName = \"aspnet-aws-demo-bucket\",\n    Key = \"uploads/user-123/photo.jpg\",\n    Verb = HttpVerb.PUT,\n    Expires = DateTime.UtcNow.AddMinutes(15)\n};\n\nstring uploadUrl = s3Client.GetPreSignedURL(request);\nConsole.WriteLine($\"Upload URL: {uploadUrl}\");"
+        "code": "// Packages: AWSSDK.S3, Amazon.S3\nusing Amazon.S3;\nusing Amazon.S3.Model;\n\npublic static string GenerateUploadPresignedUrl(string key, TimeSpan? expiresIn = null)\n{\n    try\n    {\n        var s3Client = new AmazonS3Client(RegionEndpoint.USEast1);\n\n        var request = new GetPreSignedUrlRequest\n        {\n            BucketName = \"aspnet-aws-demo-bucket\",\n            Key = key,\n            Verb = HttpVerb.PUT,\n            Expires = DateTime.UtcNow.Add(expiresIn ?? TimeSpan.FromMinutes(15)),\n            ContentType = \"image/jpeg\"\n        };\n\n        string uploadUrl = s3Client.GetPreSignedURL(request);\n        Console.WriteLine($\"Upload URL: {uploadUrl}\");\n        return uploadUrl;\n    }\n    catch (AmazonS3Exception ex)\n    {\n        Console.WriteLine($\"Error generating upload URL: {ex.Message}\");\n        throw;\n    }\n}\n\n// Usage:\n// string url = GenerateUploadPresignedUrl(\"uploads/user-123/photo.jpg\", TimeSpan.FromMinutes(10));\n// Expected output: \"Upload URL: https://aspnet-aws-demo-bucket.s3.amazonaws.com/uploads/user-123/photo.jpg?...\""
       }
     },
     {
@@ -49,9 +49,9 @@
       "type": "example",
       "data": {
         "title": "Upload with HttpClient",
-        "content": "Use `HttpClient` to PUT the file to the presigned URL.",
+        "content": "Use `HttpClient` to PUT the file to the presigned URL. Includes error handling and expected output comments.",
         "language": "csharp",
-        "code": "using var httpClient = new HttpClient();\nusing var fileStream = File.OpenRead(\"photo.jpg\");\nusing var content = new StreamContent(fileStream)\n{\n    Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(\"image/jpeg\") }\n};\n\nvar response = await httpClient.PutAsync(uploadUrl, content);\nConsole.WriteLine($\"Status: {response.StatusCode}\");"
+        "code": "// Packages: AWSSDK.S3, Amazon.S3\nusing System.Net.Http.Headers;\n\npublic static async Task UploadToPresignedUrlAsync(string presignedUrl, string filePath, string contentType)\n{\n    try\n    {\n        using var httpClient = new HttpClient();\n        using var fileStream = File.OpenRead(filePath);\n        using var content = new StreamContent(fileStream)\n        {\n            Headers = { ContentType = new MediaTypeHeaderValue(contentType) }\n        };\n\n        HttpResponseMessage response = await httpClient.PutAsync(presignedUrl, content);\n        Console.WriteLine($\"Status: {response.StatusCode}\");\n\n        if (!response.IsSuccessStatusCode)\n        {\n            string errorBody = await response.Content.ReadAsStringAsync();\n            Console.WriteLine($\"Error body: {errorBody}\");\n            response.EnsureSuccessStatusCode();\n        }\n    }\n    catch (HttpRequestException ex)\n    {\n        Console.WriteLine($\"HTTP upload error: {ex.Message}\");\n        throw;\n    }\n}\n\n// Usage:\n// await UploadToPresignedUrlAsync(uploadUrl, \"photo.jpg\", \"image/jpeg\");\n// Expected output: \"Status: 200 OK\""
       }
     },
     {

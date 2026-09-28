@@ -58,6 +58,13 @@
       ]
     },
     {
+      "type": "example",
+      "title": "Simple RAG query flow in C#",
+      "content": "A minimal RAG pipeline using Microsoft.Extensions.AI abstractions.",
+      "language": "csharp",
+      "code": "// Package: Microsoft.Extensions.AI\n// Install: dotnet add package Microsoft.Extensions.AI.OpenAI --version 9.*\n\nusing Microsoft.Extensions.AI;\nusing OpenAI;\n\npublic sealed class RagPipeline\n{\n    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;\n    private readonly IChatClient _chatClient;\n    private const int MaxContextChunks = 3;\n\n    public RagPipeline(OpenAIClient openAIClient)\n    {\n        _embeddingGenerator = openAIClient.AsEmbeddingGenerator(\"text-embedding-3-small\");\n        _chatClient = openAIClient.AsChatClient(\"gpt-4o-mini\");\n    }\n\n    public async Task<string> QueryAsync(\n        string question,\n        string context,\n        CancellationToken cancellationToken = default)\n    {\n        // 1. Embed the question (for real vector-store search)\n        Embedding<float> queryEmbedding = await _embeddingGenerator.GenerateAsync(\n            question,\n            cancellationToken: cancellationToken);\n\n        // 2. Build the augmented prompt with retrieved context\n        var messages = new List<ChatMessage>\n        {\n            new SystemMessage(\"Answer using ONLY the provided context. \"\n                            + \"If the answer is not in the context, say 'I don't know.'\"),\n            new UserMessage($\"Context:\\n{context}\\n\\nQuestion: {question}\")\n        };\n\n        // 3. Generate the grounded answer\n        ChatResponse response = await _chatClient.GetResponseAsync(\n            messages,\n            cancellationToken: cancellationToken);\n\n        return response.Text;\n    }\n}\n\n// Usage example\nvar pipeline = new RagPipeline(new OpenAIClient(Environment.GetEnvironmentVariable(\"OPENAI_API_KEY\")!));\n\nstring answer = await pipeline.QueryAsync(\n    \"What causes a 500 error?\",\n    context: \"A 500 error indicates an unexpected condition on the server. \"\n           + \"Common causes include unhandled exceptions, database failures, and resource exhaustion.\");\n\nConsole.WriteLine(answer);\n// Expected output: A 500 error indicates an unexpected condition on the server..."
+    },
+    {
       "type": "callout",
       "variant": "important",
       "title": "Rule of thumb",

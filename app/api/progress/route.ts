@@ -105,11 +105,11 @@ export async function POST(request: Request) {
     }
   }
 
-  if (validEntries.length === 0) {
+  if (validEntries.length === 0 && entries.length !== 0) {
     return NextResponse.json({ error: 'Invalid progress payload' }, { status: 400 });
   }
 
-  await prisma.userProgress.createMany({
+  const result = await prisma.userProgress.createMany({
     data: validEntries.map((entry) => ({
       userId: databaseUser.id,
       category: entry.category,
