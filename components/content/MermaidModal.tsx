@@ -11,7 +11,7 @@ interface MermaidModalProps {
 }
 
 const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 3;
+const MAX_ZOOM = 5;
 const ZOOM_STEP = 0.25;
 
 function getDiagramBackground(svgHtml: string, theme: 'light' | 'dark'): string {

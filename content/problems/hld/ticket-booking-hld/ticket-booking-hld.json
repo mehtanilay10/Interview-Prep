@@ -4,14 +4,18 @@
   "moduleSlug": "ticket-booking-hld",
   "courseSlug": "hld-problems",
   "title": "Ticket Booking System: Complete Architecture",
-  "description": "Design a scalable ticket booking system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a concert and event ticket booking platform (Ticketmaster / BookMyShow) with virtual waiting rooms, distributed seat locking, and flash-sale concurrency control.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "ticketbookinghld"
+    "ticket-booking",
+    "ticketmaster",
+    "flash-sale",
+    "distributed-locks",
+    "virtual-queue"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a high-scale ticket booking system that supports events like concerts, sports, and theatre shows. The system must handle seat selection, hold seat reservations, process payments, issue e-tickets, and support event search — all while preventing overselling during high-demand flash sales with millions of concurrent users."
+        "text": "Design an event and concert ticketing platform like Ticketmaster or BookMyShow. The system hosts stadium-scale concerts (80,000 seats) and movie theaters. During high-demand flash sales (e.g. Taylor Swift Eras Tour), 5+ million concurrent fans attempt to reserve the same finite pool of seats within seconds. The central engineering challenge is extreme write contention: the system must prevent overselling with 100% strict consistency, maintain an interactive real-time seat map, enforce a temporary 10-minute seat hold while users enter payment details, and protect core databases using a Virtual Waiting Room queue."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Virtual Waiting Room",
+            "definition": "A front-door admission queue that throttles incoming traffic, issuing signed JWT queue tokens to let users enter seat selection at a controlled rate (e.g. 1,000 users/sec)."
+          },
+          {
+            "term": "Distributed Seat Lock (Soft Hold)",
+            "definition": "An atomic lock placed on specific seat IDs in an in-memory Redis cluster with a 10-minute TTL, reserving them while the customer checks out."
+          },
+          {
+            "term": "Two-Phase Booking Commit",
+            "definition": "Phase 1: Reserve seat in Redis (Soft Hold). Phase 2: Authorize payment and write immutable booking record to PostgreSQL (Hard Commit)."
+          },
+          {
+            "term": "Seat Map Bitset / Sparse Matrix",
+            "definition": "Representing stadium seat availability as compressed bit arrays in memory for ultra-fast rendering on user browsers."
+          },
+          {
+            "term": "Dead Letter Expiration Daemon",
+            "definition": "A background scheduler monitoring expired Redis seat holds to release abandoned seats back into the available pool."
+          }
+        ]
       }
     },
     {
@@ -39,14 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Users can search events by name, city, date, venue, and category",
-          "Users can view a real-time seat map with available/occupied/held indicators",
-          "Users can temporarily hold seats for a configurable timeout window (e.g. 10 minutes)",
-          "Users can complete booking with payment and receive a confirmation and e-ticket",
-          "Users can cancel bookings within the allowed refund window and get seats released",
-          "Organizers can create and manage events with pricing tiers (VIP, Premium, Regular)",
-          "Waitlist auto-promotion when held seats expire and are released",
-          "Booking history and downloadable e-ticket (PDF)"
+          "Event Discovery: Search and browse events by artist, venue, city, date, and price category",
+          "Interactive Seat Map: Display real-time visual seat availability (Available, Held, Booked)",
+          "Seat Hold (10-Minute Lock): Allow users to hold up to 6 seats for 10 minutes while completing checkout",
+          "Checkout & Payment: Process payment securely and atomically transition seats from Held to Confirmed",
+          "Automatic Hold Expiration: Release held seats immediately if the 10-minute timer lapses or payment fails",
+          "E-Ticket Delivery: Generate cryptographically signed digital tickets with dynamic fraud-resistant QR codes"
         ]
       }
     },
@@ -55,14 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-100ms response time for seat map queries during a sale",
-          "Sub-500ms end-to-end booking confirmation under 10x peak load",
-          "Exactly-once booking semantics: no double-booking of any seat",
-          "Strong consistency on seat inventory — no phantom reads of sold seats",
-          "System survives a 100x traffic spike (e.g., Taylor Swift flash sale) without data loss",
-          "Horizontal scalability of booking, search, and payment components independently",
-          "Idempotent payment processing — duplicate payment requests must not charge twice",
-          "99.99% uptime for the booking path; search and admin can tolerate brief degradation"
+          "Zero Double-Booking: Absolute 100% guarantee that no single seat is ever sold to more than one customer",
+          "Flash-Sale Concurrency: Absorb 100,000+ seat reservation attempts per second during peak drops",
+          "Seat Map Latency: <100ms P99 latency for seat map status queries",
+          "Hold Precision: Seat hold timers must expire accurately within 1 second of the 10-minute mark",
+          "Availability: 99.999% uptime for the front-door queue; 99.99% for payment checkout"
         ]
       }
     },
@@ -70,433 +96,153 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application where all bounded contexts — event catalog, seat inventory, booking, payment, and notifications — run in a single process. Use a single SQL Server database with well-defined schemas per bounded context. A background hosted service handles seat hold expiration. This validates the core seat-locking and booking-flow logic before splitting."
+        "text": "To protect backend databases from being crushed by millions of simultaneous requests, the architecture places a Virtual Waiting Room at the edge. Only admitted users with valid cryptographically signed tokens can access the Seat Selection and Checkout services."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ticketbookingsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Ticket Booking System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core Monolith)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API controllers per bounded context",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core with SQL Server",
-            "definition": ""
-          },
-          {
-            "term": "- Redis (StackExchange.Redis) for seat-hold cache with TTL",
-            "definition": ""
-          },
-          {
-            "term": "- Background IHostedService for seat hold expiration sweeper",
-            "definition": ""
-          },
-          {
-            "term": "- SignalR for live seat-map updates to connected clients",
-            "definition": ""
-          },
-          {
-            "term": "- Stripe SDK for payment processing with idempotency keys",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS ECS single-service deployment",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL or AWS RDS SQL Server",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Cache for Redis or ElastiCache for seat holds",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage / S3 for e-ticket PDF generation (via PuppeteerSharp)",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with schemas",
-            "definition": "dbo.Events, dbo.Seats, dbo.Bookings, dbo.Payments"
-          }
-        ]
+        "id": "hld-ticket-booking-arch",
+        "caption": "Ticket Booking Architecture: Virtual Waiting Room, Edge CDN, In-Memory Seat Lock Engine (Redis), SAGA Checkout, and Ticket Generator",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 Fans & Customers\"]\n        Web[\"🌐 Web Client (Interactive SVG Seatmap)\"]\n        Mobile[\"📱 Mobile App (iOS / Android)\"]\n    end\n\n    subgraph EdgeLayer[\"🌍 Edge & Traffic Control\"]\n        CDN[\"CloudFront / Cloudflare Edge\\nCached Event Details & Venue Schemas\"]\n        WaitingRoom[\"⏳ Virtual Waiting Room (Queue Gate)\\nAssigns Queue Position & JWT Access Token\"]\n    end\n\n    subgraph Gateway[\"🚪 API Gateway Tier\"]\n        APIGW[\"Envoy API Gateway\\nToken Verification & Rate Limiting\"]\n    end\n\n    subgraph CoreServices[\"⚙️ Domain Services\"]\n        SearchSvc[\"🔍 Event Search Service\\nElasticsearch Cluster\"]\n        SeatMapSvc[\"💺 Real-Time Seat Map Service\\nSSE / WebSocket Push\"]\n        SeatLockEngine[\"🔒 Distributed Seat Lock Engine\\nRedis Cluster with Atomic Lua Scripts\"]\n        CheckoutOrch[\"⚡ Checkout SAGA Orchestrator\\nCoordinates payment & seat commit\"]\n        TicketIssuer[\"🎫 Ticket Minting Service\\nDynamic QR Code Generation\"]\n    end\n\n    subgraph Datastores[\"🗄️ Persistence Tier\"]\n        SeatLockCache[(\"⚡ Seat Lock Cache (Redis Cluster)\\nseat:event:venue:seat_id -> user_id\\nTTL: 600s\")]\n        BookingDB[(\"📋 Booking & Seat DB (PostgreSQL / Aurora)\\nStrict SERIALIZABLE or row-level locks\")]\n        EventDB[(\"📄 Event Catalog DB (PostgreSQL)\")]\n        TicketVault[\"🗄️ S3 Object Storage (PDF E-Tickets)\"]\n    end\n\n    subgraph EventStream[\"📨 Async Event Backbone\"]\n        Kafka[\"📨 Apache Kafka (ticket-events)\\nseat-held | booking-confirmed | hold-expired\"]\n        ExpirationDaemon[\"⏱️ Hold Expiration Daemon\\nMonitors expired Redis keys\"]\n        NotificationSvc[\"🔔 Push / Email Service (SendGrid / FCM)\"]\n    end\n\n    Web & Mobile --> CDN\n    CDN --> WaitingRoom\n    WaitingRoom -->|Queue Turn Arrives: JWT Issued| APIGW\n\n    APIGW --> SearchSvc --> EventDB\n    APIGW --> SeatMapSvc\n    SeatMapSvc --> SeatLockCache\n\n    APIGW --> SeatLockEngine\n    SeatLockEngine -->|Atomic Lua SETNX| SeatLockCache\n    SeatLockEngine -->|Publish SeatHeld| Kafka\n\n    APIGW --> CheckoutOrch\n    CheckoutOrch --> BookingDB\n    CheckoutOrch -->|Release Lock / Hard Commit| SeatLockCache\n    CheckoutOrch --> TicketIssuer --> TicketVault\n\n    Kafka --> ExpirationDaemon\n    ExpirationDaemon -->|Release Stale Seats| SeatLockCache\n    Kafka --> NotificationSvc"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Seat Hold & Checkout Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Split the monolith into six independently scalable microservices. Seat inventory is the hardest part — the Inventory Service uses Redis compare-and-swap (CAS) and SQL row-level locking to guarantee no overselling. The Booking Service runs a distributed Saga (Orchestration pattern via MassTransit) to coordinate hold → pay → confirm without a global transaction. Search scales independently via Azure Cognitive Search or Elasticsearch."
+        "text": "The booking sequence enforces an atomic soft-hold in Redis. Only if the seat lock succeeds does the user advance to payment. A payment timeout or card decline automatically releases the lock."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ticketbookingsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Ticket Booking System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "title": "",
-        "items": [
-          "Search Service: Owns event and venue search via Azure Cognitive Search / Elasticsearch. Indexes events by name, city, date, category. Handles geo-distance queries for \"events near me\". Redis caches top-selling event result pages.",
-          "Inventory Service: The most critical service. Manages seat maps, holds (with Redis SET EX for TTL expiry), and inventory counters. Uses SQL row-level locking and Redis Lua CAS scripts to atomically move a seat from AVAILABLE → HELD → BOOKED. Emits SeatHeld, SeatReleased, SeatBooked events.",
-          "Booking Service: Orchestrates the booking Saga. Accepts a seat-hold token from Inventory Service, invokes Payment Service, and on success confirms the booking. Compensates (cancels hold) on payment failure or timeout. Stores booking state machine: Created → Held → Confirmed / Cancelled / Expired.",
-          "Payment Service: Processes payments via Stripe or Razorpay. Enforces idempotency using the booking ID as idempotency key. Emits PaymentSucceeded / PaymentFailed events consumed by Booking and Notification services.",
-          "Notification Service: Sends booking confirmations via email (SendGrid / SES) and SMS (Twilio / SNS). Sends seat-hold expiry warnings 2 minutes before timeout. Sends in-app push notifications via SignalR.",
-          "Review Service: Allows post-event ratings and reviews. Queries Booking Service to verify the user attended before allowing a review. Indexed by Search Service for event detail pages."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "TicketBookingHld/",
-            "definition": ""
-          },
-          {
-            "term": "api/               # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "SeatMap/         # Interactive SVG/Canvas seat grid",
-            "definition": ""
-          },
-          {
-            "term": "EventSearch/     # Search filters, geo-map, date picker",
-            "definition": ""
-          },
-          {
-            "term": "BookingFlow/     # Seat select → hold → payment → confirmation",
-            "definition": ""
-          },
-          {
-            "term": "ETicket/         # QR code ticket viewer",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useSeatMap.ts    # WebSocket subscription for live seat updates",
-            "definition": ""
-          },
-          {
-            "term": "useBookingSaga.ts # React Query mutation + optimistic seat hold",
-            "definition": ""
-          },
-          {
-            "term": "pages/",
-            "definition": ""
-          },
-          {
-            "term": "EventsPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "EventDetailPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "CheckoutPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "MyBookingsPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "booking-store.ts # Zustand",
-            "definition": "hold tokens, selected seats, state machine"
-          },
-          {
-            "term": "types/",
-            "definition": ""
-          },
-          {
-            "term": "booking.ts       # Seat, Hold, Booking, PaymentResult interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- SeatMap subscribes to SignalR for live seat status (AVAILABLE/HELD/BOOKED)",
-            "definition": ""
-          },
-          {
-            "term": "- BookingFlow uses React Query mutations with rollback on failure",
-            "definition": ""
-          },
-          {
-            "term": "- useSeatMap re-renders only changed seat cells via keyed subscription",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries on payment step with automatic hold extension on retry",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Inventory Service — Atomic Seat Lock with Redis CAS",
-        "language": "text",
-        "code": "// Lua script executed atomically via Redis Lua EVAL\n// Checks seat status and transitions AVAILABLE -> HELD in one round-trip\nconst holdSeatLua = `\nlocal seatKey = KEYS[1]          -- seats:{eventId}:{seatId}\nlocal userKey = ARGV[1]          -- userId\nlocal ttl = tonumber(ARGV[2])    -- hold TTL in seconds\nlocal holdId = ARGV[3]           -- idempotency holdId\n\nlocal current = redis.call('HGET', seatKey, 'status')\nif current == 'BOOKED' then\n  return { 'ERR', 'Seat already booked' }\nend\nif current == 'HELD' then\n  local heldBy = redis.call('HGET', seatKey, 'heldBy')\n  if heldBy == userKey then\n    -- extend existing hold of same user (idempotent re-hold)\n    redis.call('EXPIRE', seatKey, ttl)\n    return { 'OK', 'extended' }\n  end\n  return { 'ERR', 'Seat held by another user' }\nend\n\nredis.call('HSET', seatKey, 'status', 'HELD', 'heldBy', userKey, 'holdId', holdId)\nredis.call('EXPIRE', seatKey, ttl)\nreturn { 'OK', 'held' }\n`;\n\n// Usage in InventoryService\npublic async Task<SeatHoldResult> HoldSeatAsync(string eventId, string seatId, string userId, int ttlSeconds)\n{\n    var seatKey = string.Format(\"seats:{0}:{1}\", eventId, seatId);\n    var result = await _redis.ExecuteAsync(LuaScript.Prepare(holdSeatLua), seatKey, userId, ttlSeconds, Guid.NewGuid().ToString());\n    // ... parse Lua result, emit SeatHeld event via MassTransit\n}\n\n// MassTransit state machine for booking Saga\npublic class BookingStateMachine : MassTransitStateMachine<BookingSaga>\n{\n    public State Held     { get; private set; }\n    public State Paid     { get; private set; }\n    public State Confirmed { get; private set; }\n    public State Expired  { get; private set; }\n\n    public Event<SeatHoldRequested> SeatHoldRequested   { get; private set; }\n    public Event<PaymentSucceeded> PaymentSucceeded     { get; private set; }\n    public Event<PaymentFailed>    PaymentFailed        { get; private set; }\n    public Event<HoldExpired>      HoldExpired          { get; private set; }\n\n    public void Configure()\n    {\n        InstanceState(x => x.CurrentState);\n\n        Event(() => SeatHoldRequested, x => x.CorrelateById(m => m.Message.BookingId));\n        Event(() => PaymentSucceeded, x => x.CorrelateById(m => m.Message.BookingId));\n        Event(() => PaymentFailed,    x => x.CorrelateById(m => m.Message.BookingId));\n        Event(() => HoldExpired,      x => x.CorrelateById(m => m.Message.BookingId));\n\n        Initially(\n            When(SeatHoldRequested)\n                .Then(context =>\n                {\n                    context.Saga.HoldId = context.Message.HoldId;\n                    context.Saga.Seats = context.Message.Seats;\n                    context.Saga.HoldExpiresAt = DateTime.UtcNow.AddMinutes(10);\n                })\n                .TransitionTo(Held)\n                .SendAsync(x => x.Initiate<PaymentRequested>(new PaymentRequestedMessage\n                {\n                    BookingId = x.Message.BookingId,\n                    Amount = x.Message.Amount,\n                    PaymentMethod = x.Message.PaymentMethod\n                }))\n        );\n\n        During(Held,\n            When(PaymentSucceeded)\n                .TransitionTo(Confirmed)\n                .Then(context =>\n                {\n                    context.Saga.BookingConfirmedAt = DateTime.UtcNow;\n                    context.Saga.Status = \"Confirmed\";\n                })\n                .Publish(context => new BookingConfirmed\n                {\n                    BookingId = context.Saga.CorrelationId,\n                    Seats = context.Saga.Seats\n                })\n                .Finalize(),\n            When(PaymentFailed)\n                .TransitionTo(Expired)\n                .Publish(context => new BookingCancelled\n                {\n                    BookingId = context.Saga.CorrelationId,\n                    Reason = \"Payment failed\"\n                })\n                .Finalize(),\n            When(HoldExpired)\n                .TransitionTo(Expired)\n                .Publish(context => new BookingCancelled\n                {\n                    BookingId = context.Saga.CorrelationId,\n                    Reason = \"Hold expired\"\n                })\n                .Finalize()\n        );\n    }\n}"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Search / Index",
-            "description": "Full-text search across events, venues, and cities with geo-distance ranking",
-            "tags": [
-              "Azure Cognitive Search",
-              "Amazon OpenSearch Service"
-            ],
-            "pros": [
-              "Built-in AI enrichers for event categories",
-              "Handles synonyms and scoring profiles out-of-the-box"
-            ],
-            "cons": [
-              "Indexer cold-start on schema change"
-            ]
-          },
-          {
-            "title": "Event Streaming",
-            "description": "Ingest seat-state change events at high throughput for analytics and cache invalidation",
-            "tags": [
-              "Azure Event Hubs",
-              "Amazon Kinesis Data Streams"
-            ],
-            "pros": [
-              "Millions of events/sec per partition",
-              "Auto-inflate partitions during flash sales"
-            ],
-            "cons": [
-              "Retention window planning required"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "Seat holds with TTL expiry and Lua CAS scripts for atomic state transitions",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond Lua script execution",
-              "Keyspace notifications for hold expiry events"
-            ],
-            "cons": [
-              "Redis Cluster resharding during extreme spikes"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Strongly consistent booking and payment records with ACID guarantees",
-            "tags": [
-              "Azure SQL Database",
-              "Amazon RDS SQL Server / Aurora"
-            ],
-            "pros": [
-              "Row-level locking prevents phantom seat reads",
-              "Point-in-time restore for audit compliance"
-            ],
-            "cons": [
-              "Vertical scaling ceiling for write-heavy peaks"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Saga orchestration events, payment confirmations, and notification triggers",
-            "tags": [
-              "Azure Service Bus (Topics)",
-              "Amazon SNS + SQS"
-            ],
-            "pros": [
-              "Saga orchestration with MassTransit out-of-the-box",
-              "Dead-letter queues for failed payment retries"
-            ],
-            "cons": [
-              "Topic subscription management overhead"
-            ]
-          },
-          {
-            "title": "Object Storage",
-            "description": "E-ticket PDF generation and archival, venue image CDN",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "SAS URL / pre-signed URL for secure e-ticket access",
-              "CDN integration for fast ticket download globally"
-            ],
-            "cons": [
-              "Eventual consistency on overwrite must be handled"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-ticket-hold-sequence",
+        "caption": "Seat reservation sequence: Redis atomic Lua hold, checkout payment authorization, and permanent DB commit",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Fan as 👤 Fan\n    participant Gate as ⏳ Virtual Waiting Room\n    participant API as 🚪 API Gateway\n    participant LockEngine as 🔒 Seat Lock Engine\n    participant Redis as ⚡ Redis Cluster\n    participant Orch as ⚡ Checkout Orchestrator\n    participant Pay as 💳 Payment Gateway\n    participant DB as 📋 PostgreSQL Booking DB\n\n    Fan->>Gate: Wait in queue (Position: 1,420)\n    Gate-->>Fan: Token Granted: JWT(event: 99, validUntil: 10:15)\n    Fan->>API: POST /seats/hold {event: 99, seatIds: [\"A-12\", \"A-13\"]}\n    API->>LockEngine: AcquireSeatHold(eventId, seatIds, userId, TTL: 600s)\n\n    LockEngine->>Redis: Execute Atomic Lua Script\n    alt All Seats Available\n        Redis-->>LockEngine: Lock Acquired (HoldID: H-882, ExpiresIn: 600s)\n        LockEngine-->>API: 200 OK (Seats Held for 10 Minutes)\n        API-->>Fan: Show Countdown Timer: 09:59\n    else Any Seat Already Held / Sold\n        Redis-->>LockEngine: Lock Failed (Conflict on A-12)\n        LockEngine-->>API: 409 Conflict (Seats no longer available)\n        API-->>Fan: Prompt to select alternative seats\n    end\n\n    Note over Fan, Orch: User enters payment details within 10 minutes\n    Fan->>API: POST /checkout/pay {holdId: H-882, paymentToken: tok_visa}\n    API->>Orch: Process Checkout SAGA\n    Orch->>Pay: Authorize $180.00\n    Pay-->>Orch: Payment Success (TxnID: TX-4491)\n\n    Orch->>DB: INSERT Booking & Mark Seats SOLD (Transaction)\n    DB-->>Orch: Booking Confirmed (BookingID: B-771)\n    Orch->>Redis: DEL lock:seat:A-12 & DEL lock:seat:A-13\n    Orch-->>API: 201 Created (Booking Confirmed)\n    API-->>Fan: Render Confirmed Tickets with QR Code"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Seat Lock Strategies Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Locking Mechanism",
+          "Throughput Capacity",
+          "Double-Booking Risk",
+          "Database Load",
+          "Evaluation"
+        ],
+        "rows": [
+          [
+            "Pessimistic SQL Lock (SELECT FOR UPDATE)",
+            "Low (<2,000 req/sec)",
+            "Zero",
+            "Catastrophic during flash sales (Connection exhaustion)",
+            "Works fine for small cinema bookings, crashes on stadium tour sales"
+          ],
+          [
+            "Optimistic SQL Lock (Version Number)",
+            "Moderate",
+            "Zero (Rolls back conflicts)",
+            "High (Massive query aborts and CPU waste)",
+            "Inefficient when 10,000 users click the exact same front-row seat"
+          ],
+          [
+            "Redis Atomic Lua Hold (Token Bucket + SETNX)",
+            "Extremely High (>100,000 ops/sec)",
+            "Zero (Single-threaded in-memory execution)",
+            "Near Zero on relational DB",
+            "Industry standard (Ticketmaster / BookMyShow core engine)"
+          ],
+          [
+            "Queue-Based FIFO Booking",
+            "High (Serialized per seat/section)",
+            "Zero",
+            "Minimal",
+            "Fair admission; used inside Virtual Waiting Room stage"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why is a Virtual Waiting Room mandatory for concert flash sales?",
+            "answer": "Without a waiting room, 5 million users clicking \"Refresh\" at 10:00:00 AM hits origin servers with tens of gigabits of un-cacheable write traffic, crashing API gateways and connection pools. The waiting room acts as a traffic dam at the edge (Cloudflare/AWS CloudFront), queuing requests and admitting only 1,000 users per second — exactly matching the downstream processing capacity."
+          },
+          {
+            "question": "How does an atomic Redis Lua script prevent race conditions during seat holds?",
+            "answer": "Redis executes Lua scripts atomically in a single-threaded event loop. The script verifies that none of the requested seat keys exist: `for i, seat in ipairs(KEYS) do if redis.call(\"exists\", seat) == 1 then return 0 end end`. If all are free, it sets all keys with a 600-second TTL. Because no other command can interleave, two concurrent requests for the same seat can never both succeed."
+          },
+          {
+            "question": "What happens if a user closes the browser or their phone dies during a 10-minute hold?",
+            "answer": "The held seats in Redis have a strict 600-second TTL. When the key expires, Redis emits an expiration event via Keyspace Notifications (or an Expiration Daemon scans expired leases). A worker releases the seats back to available status on the live seat map, allowing waitlisted fans to select them."
+          },
+          {
+            "question": "How do you prevent fraudulent ticket scalping and barcode duplication?",
+            "answer": "Ticketmaster uses rotating dynamic barcodes (SafeTix). The client application displays a QR code generated from a rolling cryptographic TOTP (Time-Based One-Time Password) that refreshes every 15 seconds. Screenshots and printouts cannot be scanned at venue turnstiles."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Seat inventory is the hardest problem — overselling is a business-critical bug",
-          "Use Redis Lua CAS for atomic seat transitions and SQL row locking as a durable guard",
-          "The Booking Saga must be idempotent: payment idempotency key = booking ID",
-          "Search must be decoupled from booking so flash-sale traffic never breaks search",
-          "Flash sales require pre-warming caches, auto-scaling seat-hold Redis, and a CDN for event pages",
-          "SignalR live seat-map updates dramatically improve UX but require a sticky-session gateway"
+          "Virtual Waiting Rooms at the edge throttle millions of fans into a controlled downstream flow",
+          "Redis atomic Lua scripts lock multiple seat keys simultaneously with zero race conditions",
+          "Two-phase reservation: fast in-memory soft hold (10-minute TTL) precedes durable SQL hard commit",
+          "TTL expiration daemons ensure abandoned seats return to the available inventory pool automatically",
+          "Dynamic rotating QR codes (TOTP) protect digital tickets from unauthorized duplication and scalping"
         ],
-        "takeaway": "Ticket booking systems succeed or fail on inventory accuracy under concurrency. Atomic seat locking via Redis CAS, a distributed booking Saga with exactly-once payment semantics, and a decoupled search tier are the three non-negotiable architectural decisions."
+        "takeaway": "Ticket booking systems survive extreme flash-sale spikes by shielding transactional databases behind edge waiting rooms and utilizing atomic in-memory Redis locks to enforce absolute zero double-booking."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "airbnb-booking-hld",
+    "payment-gateway-hld",
+    "rate-limiter"
+  ],
+  "furtherReading": [
+    {
+      "title": "How Ticketmaster Handles Flash Sales with Distributed Caching",
+      "url": "https://tech.ticketmaster.com/",
+      "type": "article"
+    },
+    {
+      "title": "Redis Lua Scripting and Distributed Locking",
+      "url": "https://redis.io/docs/manual/programmability/eval-intro/",
+      "type": "article"
+    }
+  ]
 }

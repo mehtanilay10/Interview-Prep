@@ -4,14 +4,17 @@
   "moduleSlug": "amazon-ecommerce-hld",
   "courseSlug": "hld-problems",
   "title": "Amazon E-Commerce: Complete Architecture",
-  "description": "Design a scalable Amazon-style e-commerce platform with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design an Amazon-scale global e-commerce platform with distributed inventory, shopping cart, SAGA checkout orchestration, and search.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "amazonecommercehld"
+    "ecommerce",
+    "saga-pattern",
+    "distributed-inventory",
+    "caching"
   ],
   "blocks": [
     {
@@ -24,7 +27,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a scalable Amazon-style e-commerce marketplace. The system must support browsing a massive product catalog with faceted search, managing a shopping cart, processing checkout and orders, tracking inventory across warehouses, generating personalized recommendations, and handling returns and refunds. Sellers must be able to list products, manage inventory, and fulfill orders. The platform must survive Black Friday-level traffic spikes while maintaining accurate stock levels."
+        "text": "Design a global e-commerce platform at Amazon scale. The system serves 300+ million active customers browsing a catalog of over 350 million products across thousands of categories. During peak flash sales and events like Prime Day, the platform handles over 100,000 order placements per second. Core engineering challenges include zero overselling of scarce inventory, sub-100ms catalog search and browsing, fault-tolerant multi-step checkout via distributed transactions, and decoupled fulfillment logistics."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SAGA Orchestrator",
+            "definition": "A coordinator that executes a series of local transactions across microservices, executing compensating actions if any step fails."
+          },
+          {
+            "term": "Two-Phase Inventory Hold",
+            "definition": "Reserving stock with an expiration TTL during checkout (Soft Hold) and finalizing deduction upon successful payment (Hard Commit)."
+          },
+          {
+            "term": "CQRS (Command Query Responsibility Segregation)",
+            "definition": "Separating read and write models: writes hit transactional DBs; reads query optimized Elasticsearch clusters and Redis caches."
+          },
+          {
+            "term": "Idempotency Key",
+            "definition": "A unique client-supplied token (UUID) ensuring duplicate payment or order submission requests execute exactly once."
+          },
+          {
+            "term": "Distributed Lock (Redlock)",
+            "definition": "Locking mechanisms across Redis nodes ensuring only one process modifies a high-demand SKU stock counter simultaneously."
+          }
+        ]
       }
     },
     {
@@ -39,16 +69,13 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Product catalog with categories, brands, attributes, and faceted search/filtering",
-          "Shopping cart with add/remove/update quantity and persistent cross-device carts",
-          "Checkout flow with shipping address, billing, payment method selection, and order review",
-          "Order placement with inventory reservation, payment capture, and order confirmation",
-          "Inventory management with real-time stock tracking across multiple warehouses",
-          "Order tracking with shipment status, carrier integration, and delivery estimates",
-          "Personalized product recommendations based on browsing and purchase history",
-          "Seller dashboard for product listing, inventory updates, and order fulfillment",
-          "Return and refund processing with restocking logic",
-          "Wishlist and save-for-later functionality"
+          "Product Catalog: Browse, filter by attributes, and full-text search across 350M+ items with facet counts",
+          "Shopping Cart: Fast add/update/remove items, sync across guest and logged-in states, persist for 30+ days",
+          "Inventory Management: Real-time stock visibility, reservation lock during checkout, stock decrement on payment",
+          "Order & Checkout: Multi-step checkout (address, shipping speed, payment), discount vouchers, order tracking",
+          "Payment Processing: Integration with card networks, wallets, gift cards, and third-party payment gateways with retry mechanisms",
+          "Personalized Recommendations: \"Customers who bought this also bought...\", recently viewed items",
+          "Post-Order Fulfillment: Warehouse dispatching, tracking updates, invoice generation, and refunds"
         ]
       }
     },
@@ -57,13 +84,12 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Product search must return results in under 200ms even with 100M+ products",
-          "Cart operations must be strongly consistent to prevent overselling",
-          "Checkout must handle 10x traffic spikes on Black Friday and Prime Day",
-          "Inventory counts must be accurate to prevent overselling across warehouses",
-          "Recommendation engine must update user profiles within 15 minutes of activity",
-          "99.9% availability for checkout and order placement flows",
-          "Product images must be optimized and served via CDN for fast page loads"
+          "Traffic: 100,000 orders/second peak (Prime Day); 500,000 search queries/second",
+          "Latency: <100ms P99 for catalog search & product detail pages; <1.5s for checkout completion",
+          "Data Consistency: Strict consistency for inventory and payments (zero double-deductions); eventual consistency for reviews and recommendations",
+          "Availability: 99.999% for product browsing and cart; 99.99% for order placement",
+          "Durability: Zero lost orders once payment is authorized (write-ahead event logs)",
+          "Security: PCI-DSS compliance for payment card processing, end-to-end data encryption"
         ]
       }
     },
@@ -71,404 +97,157 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application where product catalog, cart, orders, payments, and inventory share a single deployment and database. This validates the e-commerce domain model and transactional workflows before introducing distributed complexity."
+        "text": "The architecture decouples high-throughput read operations (Catalog, Search, Product Display) from transactional write operations (Cart, Order, Payment, Inventory). An event-driven backbone powered by Kafka ensures asynchronous downstream processing for shipping, notifications, and analytics."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-amazonecommercecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Amazon E-commerce: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CatalogService[Catalog Service]\n        MS_CartService[Cart Service]\n        MS_OrderService[Order Service]\n        MS_PaymentService[Payment Service]\n        MS_InventoryService[Inventory Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CatalogService\n        MS_CatalogService --> MS_DB\n        MS_CatalogService --> MS_Queue\n        MS_CatalogService --> MS_Cache\n        MS_LB --> MS_CartService\n        MS_CartService --> MS_DB\n        MS_CartService --> MS_Queue\n        MS_CartService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for product images",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for Products, Categories, Cart, Orders, Payments, Inventory",
-            "definition": ""
-          }
-        ]
+        "id": "hld-amazon-arch",
+        "caption": "Amazon E-Commerce Architecture: Multi-region Edge CDN, API Gateway, Domain Microservices, Caching tiers, and Event Backbone",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 Clients\"]\n        Web[\"Web\"]\n        Mobile[\"Mobile\"]\n        Sellers[\"Seller API\"]\n    end\n\n    subgraph Edge[\"🌍 Edge Layer\"]\n        CDN[\"CDN\"]\n        WAF[\"WAF\"]\n    end\n\n    subgraph Gateway[\"🚪 API Gateway\"]\n        APIGW[\"Kong / Envoy\"]\n    end\n\n    subgraph Read[\"📖 Read Path\"]\n        Search[\"Search Service\"]\n        Catalog[\"Catalog Service\"]\n        Rec[\"Recommendations\"]\n    end\n\n    subgraph Write[\"✍️ Write Path\"]\n        Cart[\"Cart Service\"]\n        Order[\"Order Orchestrator\"]\n        Inventory[\"Inventory Service\"]\n        Payment[\"Payment Service\"]\n    end\n\n    subgraph Storage[\"🗄️ Storage\"]\n        ES[(\"Elasticsearch\")]\n        Cache[(\"Redis Cache\")]\n        CatalogDB[(\"Catalog DB\")]\n        OrderDB[(\"Order DB\")]\n        InvDB[(\"Inventory DB\")]\n        CartDB[(\"Cart DB\")]\n    end\n\n    subgraph Events[\"📨 Events\"]\n        Kafka[\"Kafka\"]\n        Workers[\"Async Workers\"]\n    end\n\n    Web & Mobile & Sellers --> CDN --> WAF --> APIGW\n    APIGW --> Search & Catalog & Rec\n    APIGW --> Cart & Order & Inventory & Payment\n\n    Search --> ES\n    Catalog --> CatalogDB & Cache\n    Rec --> ES\n    Cart --> CartDB\n    Order --> OrderDB\n    Inventory --> InvDB\n    Payment --> OrderDB\n\n    Order --> Kafka --> Workers"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Order Placement: SAGA Distributed Transaction Flow"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "As traffic grows, split the monolith into independently scalable microservices. The Catalog and Cart services are read-heavy and can scale horizontally. The Order and Inventory services require strong consistency. The Recommendation service uses offline batch processing."
+        "text": "To maintain high availability without holding distributed two-phase commit (2PC) locks across independent databases, checkout uses an Orchestrated SAGA pattern. If payment authorization fails or inventory runs out, compensating transactions rollback previous reservations."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-amazonecommercecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Amazon E-commerce: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CatalogService[Catalog Service]\n        MS_CartService[Cart Service]\n        MS_OrderService[Order Service]\n        MS_PaymentService[Payment Service]\n        MS_InventoryService[Inventory Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CatalogService\n        MS_CatalogService --> MS_DB\n        MS_CatalogService --> MS_Queue\n        MS_CatalogService --> MS_Cache\n        MS_LB --> MS_CartService\n        MS_CartService --> MS_DB\n        MS_CartService --> MS_Queue\n        MS_CartService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Catalog Service: Indexes products with attributes, categories, and brands. Exposes faceted search APIs and product detail endpoints. Uses Elasticsearch for full-text search and filtering.",
-          "Cart Service: Manages per-user shopping carts with add/remove/update operations. Persists carts in Redis for fast reads and writes. Publishes CartUpdated events.",
-          "Order Service: Orchestrates checkout, creates order records, manages order states (pending/shipped/delivered), and handles returns/refunds. Uses the Saga pattern for distributed transactions with Payment and Inventory.",
-          "Payment Service: Processes charges via Stripe or Braintree, handles refunds, and stores transaction history. Webhooks confirm payment success or failure asynchronously.",
-          "Inventory Service: Tracks stock across warehouses and fulfillment centers. Reserves inventory during checkout and releases it on cancellation or timeout. Uses database transactions for atomic stock updates.",
-          "Recommendation Service: Generates personalized product suggestions using collaborative filtering. Runs offline batch jobs to compute recommendations and stores them in Redis for fast lookup.",
-          "User Service: Manages customer profiles, addresses, authentication, and order history. Acts as the source of truth for user identity across services."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "amazon-ecommerce/",
-            "definition": ""
-          },
-          {
-            "term": "product-list/      # Product grid with infinite scroll and faceted filters",
-            "definition": ""
-          },
-          {
-            "term": "product-detail/    # Image gallery, specs, reviews, add-to-cart",
-            "definition": ""
-          },
-          {
-            "term": "cart/              # Cart drawer, quantity controls, remove items",
-            "definition": ""
-          },
-          {
-            "term": "checkout/          # Multi-step checkout",
-            "definition": "address, shipping, payment"
-          },
-          {
-            "term": "order-confirmation/# Order success page with tracking",
-            "definition": ""
-          },
-          {
-            "term": "order-history/     # Past orders list with reorder and return actions",
-            "definition": ""
-          },
-          {
-            "term": "search/            # Search bar with autocomplete and suggestions",
-            "definition": ""
-          },
-          {
-            "term": "seller/            # Seller dashboard for product and order management",
-            "definition": ""
-          },
-          {
-            "term": "api/               # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/        # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/             # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "store/             # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/             # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/                 # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/                 # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/               # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Infinite scroll with Intersection Observer for product lists",
-            "definition": ""
-          },
-          {
-            "term": "- Debounced search input with autocomplete dropdown",
-            "definition": ""
-          },
-          {
-            "term": "- Optimistic cart updates with server reconciliation",
-            "definition": ""
-          },
-          {
-            "term": "- Image lazy-loading and srcset for responsive product photos",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching catalog results and stale-while-revalidate",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket for real-time order status updates",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Inventory Service (ASP.NET Core)",
-        "language": "text",
-        "code": "// Inventory Service: manages stock across warehouses with atomic reservations\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddDbContext<InventoryDbContext>(opt =>\n    opt.UseSqlServer(builder.Configuration.GetConnectionString(\"InventoryDb\"))\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\n\nvar app = builder.Build();\n\napp.MapPost(\"/inventory/reserve\", async (ReserveStockRequest req, InventoryDbContext db) => {\n    // Atomic stock reservation using pessimistic locking\n    var stock = await db.InventoryItems\n        .FirstOrDefaultAsync(s => s.ProductId == req.ProductId && s.WarehouseId == req.WarehouseId);\n    if (stock == null || stock.AvailableQuantity < req.Quantity)\n        return Results.Conflict(\"Insufficient stock\");\n\n    stock.AvailableQuantity -= req.Quantity;\n    stock.ReservedQuantity += req.Quantity;\n    await db.SaveChangesAsync();\n\n    // Set TTL for auto-release if order is not completed\n    await cache.SetStringAsync(\n        $\"reservation:{req.OrderId}\",\n        req.ProductId,\n        new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15) }\n    );\n\n    return Results.Ok(new { stock.AvailableQuantity });\n})\n.WithName(\"ReserveStock\");\n\napp.MapPost(\"/inventory/commit\", async (CommitStockRequest req, InventoryDbContext db) => {\n    var stock = await db.InventoryItems\n        .FirstOrDefaultAsync(s => s.ProductId == req.ProductId);\n    if (stock != null)\n    {\n        stock.ReservedQuantity -= req.Quantity;\n        await db.SaveChangesAsync();\n    }\n    await cache.RemoveAsync($\"reservation:{req.OrderId}\");\n    return Results.Ok();\n})\n.WithName(\"CommitStock\");\n\napp.MapGet(\"/health\", () => Results.Ok());\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Host catalog, cart, and order API containers",
-            "tags": [
-              "Azure App Service / AKS",
-              "Amazon ECS / EKS / EC2"
-            ],
-            "pros": [
-              "Auto-scaling for seasonal traffic spikes",
-              "Managed infrastructure with health monitoring"
-            ],
-            "cons": [
-              "Scaling databases requires separate configuration"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Route search, cart, checkout, and seller requests",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Rate limiting to protect checkout from abuse",
-              "Request throttling during flash sales"
-            ],
-            "cons": [
-              "Extra hop adds latency to checkout flow"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "Cache product details, cart sessions, and recommendation lists",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond access to top-selling products",
-              "Pub/sub for real-time inventory updates"
-            ],
-            "cons": [
-              "Cache invalidation complexity for dynamic pricing"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary store for orders, inventory, and user data",
-            "tags": [
-              "Azure SQL Database",
-              "Amazon RDS (SQL Server / PostgreSQL)"
-            ],
-            "pros": [
-              "Strong ACID guarantees for orders and payments",
-              "Read replicas to offload catalog browsing traffic"
-            ],
-            "cons": [
-              "Reserved instances needed for predictable costs"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Store product images, seller documents, and media",
-            "tags": [
-              "Azure Blob Storage with CDN",
-              "Amazon S3 with CloudFront"
-            ],
-            "pros": [
-              "Cheap, durable storage for millions of product photos",
-              "CDN integration for fast page loads globally"
-            ],
-            "cons": [
-              "Cache invalidation for updated product images"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async events for order lifecycle and inventory sync",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS / EventBridge"
-            ],
-            "pros": [
-              "Decouples checkout from payment and fulfillment",
-              "Buffers order spikes during sales events"
-            ],
-            "cons": [
-              "Exactly-once processing requires deduplication logic"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-amazon-saga-flow",
+        "caption": "SAGA Orchestration sequence for order placement with inventory lock and compensating rollback upon payment failure",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Customer as 👤 Customer\n    participant GW as 🚪 API Gateway\n    participant Orch as ⚡ SAGA Orchestrator\n    participant Inv as 🏷️ Inventory\n    participant Pay as 💳 Payment\n    participant Order as 📋 Order DB\n    participant Kafka as 📨 Kafka\n\n    Customer->>GW: POST /checkout\n    GW->>Orch: Start SAGA\n    Orch->>Order: Create Order (PENDING)\n    Order-->>Orch: OrderCreated\n\n    Orch->>Inv: ReserveStock\n    alt Stock Available\n        Inv-->>Orch: StockReserved\n    else Stock Insufficient\n        Inv-->>Orch: Failed\n        Orch->>Order: Cancel (OUT_OF_STOCK)\n        Orch-->>GW: 409 Error\n        GW-->>Customer: Out of stock\n    end\n\n    Orch->>Pay: AuthorizePayment\n    alt Payment Success\n        Pay-->>Orch: Authorized\n        Orch->>Inv: CommitStock\n        Inv-->>Orch: Committed\n        Orch->>Order: Confirm Order\n        Orch->>Kafka: Publish OrderConfirmed\n        Orch-->>GW: 201 Created\n        GW-->>Customer: Order confirmed\n    else Payment Failed\n        Pay-->>Orch: Failed\n        Note over Orch, Inv: Compensating Transaction\n        Orch->>Inv: ReleaseStock\n        Inv-->>Orch: Released\n        Orch->>Order: Mark Failed\n        Orch-->>GW: 402 Error\n        GW-->>Customer: Payment failed\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Inventory Reservation & Concurrency Management"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Strategy",
+          "Mechanism",
+          "Pros",
+          "Cons",
+          "Recommended Use Case"
+        ],
+        "rows": [
+          [
+            "Pessimistic Locking",
+            "SELECT FOR UPDATE in SQL DB",
+            "Guarantees 100% precision, zero oversell",
+            "Causes row locking contention; slow for flash sales",
+            "Low-velocity or high-value items"
+          ],
+          [
+            "Optimistic Locking",
+            "Version column check (WHERE version = @v)",
+            "High read throughput, no DB lock delays",
+            "Frequent aborts/retries under extreme write contention",
+            "Standard daily shopping velocity"
+          ],
+          [
+            "In-Memory Redis Token Bucket",
+            "DECRBY key in Redis with Lua Script",
+            "Super high throughput (>100k ops/sec)",
+            "Requires synchronization with cold database",
+            "Flash sales & lightning deals (Prime Day)"
+          ],
+          [
+            "Two-Phase Reservation",
+            "Hold stock with Redis TTL, commit after payment",
+            "Customer gets guaranteed hold window (15 mins)",
+            "Requires TTL expiration daemon to recycle abandoned carts",
+            "Amazon standard checkout experience"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How to prevent overselling when 50,000 users buy the same limited item simultaneously?",
+            "answer": "Store real-time available stock in Redis using an atomic Lua script that checks and decrements the balance: `if redis.call(\"get\", KEYS[1]) >= ARGV[1] then return redis.call(\"decrby\", KEYS[1], ARGV[1]) else return -1 end`. Only users who receive a non-negative response advance to checkout. Failed requests fail instantly in <5ms without touching relational databases."
+          },
+          {
+            "question": "Why use an Orchestrated SAGA instead of 2-Phase Commit (2PC)?",
+            "answer": "2PC requires holding locks across multiple microservice databases (Inventory, Order, Payment) until the entire transaction concludes. If any network partition or service latency occurs, locks hang and cascade into system-wide failure. SAGA replaces distributed locks with local ACID transactions coupled with asynchronous compensating rollbacks, ensuring resilience and horizontal scale."
+          },
+          {
+            "question": "How is the shopping cart designed for cross-device consistency and high availability?",
+            "answer": "Use Amazon DynamoDB partitioned by `UserID`. For anonymous users, the cart is tied to a session cookie. When the user logs in, a Cart Merge Service reconciles guest items with their persistent user cart. DynamoDB provides single-digit millisecond latency and scales automatically with zero maintenance."
+          },
+          {
+            "question": "How is catalog search kept fast and fresh with 350M items and frequent price updates?",
+            "answer": "Search uses Elasticsearch clusters separated from write databases. Price and stock availability change constantly and bypass search indexing; they are queried in real time from a distributed Redis cache layer when rendering product listings, avoiding the indexing overhead of millions of Elasticsearch document updates per second."
+          },
+          {
+            "question": "How does the platform handle idempotent payments?",
+            "answer": "Every checkout request generates a unique client-side `Idempotency-Key` (UUIDv4) stored in Redis with a 24-hour TTL alongside transaction state. If a user double-clicks \"Place Order\" or a network timeout prompts an automatic retry, the payment gateway detects the active or completed key and returns the original response without double-charging."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "E-commerce systems require strong consistency for inventory and orders, but can tolerate eventual consistency for recommendations and reviews",
-          "Inventory reservation with TTL-based auto-release prevents overselling during abandoned checkouts",
-          "The Saga pattern manages distributed transactions across Order, Payment, and Inventory services",
-          "Catalog search is the primary scalability bottleneck—invest in Elasticsearch or Azure Cognitive Search early",
-          "Start with a monolith on Azure SQL or AWS RDS, then extract Catalog, Cart, and Order as the first microservices"
+          "CQRS separates catalog reads (Elasticsearch + Redis) from transactional writes (PostgreSQL + DynamoDB)",
+          "SAGA Orchestration coordinates checkout across Order, Inventory, and Payment services with automatic compensation",
+          "Two-phase inventory reservation with Redis atomic Lua scripts protects against overselling during flash sales",
+          "Idempotency keys on checkout prevent duplicate payments from network retries or user double-submissions",
+          "Event-driven Kafka architecture handles downstream shipping, notifications, and analytics asynchronously"
         ],
-        "takeaway": "Amazon E-commerce is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Amazon-scale e-commerce relies on decoupling high-frequency browsing from strict ACID transactions. Fast in-memory atomic locks guard stock allocation while SAGA state machines ensure resilient, fault-tolerant checkout workflows."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "payment-gateway-hld",
+    "rate-limiter",
+    "search-autocomplete"
+  ],
+  "furtherReading": [
+    {
+      "title": "Amazon DynamoDB Paper",
+      "url": "https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf",
+      "type": "article"
+    },
+    {
+      "title": "Saga Distributed Transactions Pattern",
+      "url": "https://microservices.io/patterns/data/saga.html",
+      "type": "article"
+    }
+  ]
 }

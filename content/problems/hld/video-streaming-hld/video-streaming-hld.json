@@ -3,15 +3,20 @@
   "slug": "video-streaming-hld",
   "moduleSlug": "video-streaming-hld",
   "courseSlug": "hld-problems",
-  "title": "Video Streaming Service: Complete Architecture",
-  "description": "Design a video streaming service with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Video Streaming Platform (Netflix / OTT): Complete Architecture",
+  "description": "Design a global video-on-demand (VOD) streaming service (Netflix scale) with Open Connect CDN, per-title encoding, DRM licensing, and adaptive bitrate delivery.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "videostreaminghld"
+    "video-streaming",
+    "netflix",
+    "open-connect",
+    "hls-dash",
+    "drm",
+    "per-title-encoding"
   ],
   "blocks": [
     {
@@ -24,7 +29,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a video-on-demand and live streaming platform that accepts uploads from creators, transcodes videos into multiple bitrates and resolutions (HLS and DASH), stores content durably, and streams to millions of viewers with adaptive bitrate selection. The system must generate thumbnails, ingest closed captions, enforce DRM for premium content, and serve playback events for analytics."
+        "text": "Design a global Video-on-Demand (VOD) streaming platform like Netflix or Disney+ serving 250+ million subscribers streaming over 100 million hours of premium video daily. The system must ingest high-resolution studio master files (ProRes), execute distributed per-title and per-shot encoding into hundreds of video/audio/subtitle permutations, enforce multi-DRM content protection (Widevine, FairPlay, PlayReady), and stream 4K HDR streams with sub-second startup using custom edge appliances (Open Connect) embedded directly within Internet Service Provider (ISP) networks."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Open Connect Appliance (OCA)",
+            "definition": "Custom hardware caching servers deployed by Netflix directly inside ISP networks and internet exchange points (IXPs), serving 95%+ of video traffic locally."
+          },
+          {
+            "term": "Per-Title & Per-Shot Encoding",
+            "definition": "Dynamically tailoring compression bitrates based on visual complexity (e.g. an animated cartoon needs 1.5 Mbps for 1080p, while an action movie requires 6 Mbps)."
+          },
+          {
+            "term": "Multi-DRM & License Exchange",
+            "definition": "Encrypting video segments with Common Encryption (CENC) and exchanging decryption keys via platform-specific DRM license servers (Apple FairPlay, Google Widevine, Microsoft PlayReady)."
+          },
+          {
+            "term": "Dynamic Adaptive Streaming (DASH / HLS)",
+            "definition": "Segmenting video into 2-6 second chunks; client media players monitor buffer health and download speed to switch bitrate levels without rebuffering."
+          },
+          {
+            "term": "Mezzanine Master File",
+            "definition": "The uncompressed, pristine studio master file (often 500GB+ per movie) used as the source for all downstream transcoding profiles."
+          }
+        ]
       }
     },
     {
@@ -39,15 +71,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Upload raw video files up to 10 GB with resumable multipart transfer",
-          "Transcode uploads into HLS and DASH renditions at 480p, 720p, 1080p, and 4K",
-          "Generate and cache thumbnail images at multiple timestamps",
-          "Serve adaptive bitrate streams with automatic quality switching based on bandwidth",
-          "Support live streaming with low latency (HLS LL or WebRTC ingest)",
-          "Ingest and burn closed captions (WebVTT and SRT) into video renditions",
-          "Apply DRM for premium content using Widevine and FairPlay",
-          "Track watch history, watch percentage, and playback errors for analytics",
-          "Enable search across titles, descriptions, and auto-generated transcripts"
+          "Studio Ingestion & Quality Control: Ingest massive master files, validate color spaces, audio channels, and subtitles",
+          "Distributed Transcoding Pipeline: Encode videos across AV1, HEVC, and H.264 codecs at resolutions from 360p up to 4K HDR",
+          "Adaptive Bitrate Playback: Stream audio and video seamlessly adapting to fluctuating cellular and Wi-Fi speeds",
+          "Multi-DRM Content Protection: Enforce license verification, device revocation, and hardware-backed decryption",
+          "Watch Progress Synchronization: Save playback position (to the second) to enable instant cross-device resume",
+          "Personalized Content Hub: Curate personalized movie carousels, genre recommendations, and localized artwork"
         ]
       }
     },
@@ -56,14 +85,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "99.9% availability for playback endpoints; uploads tolerate intermittent drops",
-          "Sub-500ms HLS manifest delivery from edge cache",
-          "Transcode 1-hour 1080p video within 15 minutes of upload",
-          "Store petabytes of video and images with 99.999999999% durability",
-          "Scale to 1 million concurrent viewers per popular title",
-          "Support 10,000 simultaneous live streams",
-          "End-to-end encryption for premium content in transit and at rest",
-          "Analytics pipeline processes playback events in under 60 seconds"
+          "Scale: 250M+ paying subscribers; 100M+ concurrent hours streamed daily; Terabits/sec peak egress",
+          "Playback Startup Latency: <1 second time-to-first-frame from pressing Play to video playback",
+          "Rebuffering Ratio: Under 0.25% of total watch time spent rebuffering or stalled",
+          "DRM Security: Zero tolerance for key leaks; full hardware DRM support on Smart TVs and mobile chipsets",
+          "Availability: 99.999% uptime for the playback authorization and license delivery cluster"
         ]
       }
     },
@@ -71,370 +97,154 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that handles upload, metadata storage, transcoding job orchestration, and video serving. Use Azure Blob Storage or AWS S3 for raw and processed video files. The monolith keeps the content pipeline simple while you validate encoding profiles and streaming URLs."
+        "text": "Netflix separates control plane operations (User Auth, Recommendations, Billing, DRM Licensing) hosted in AWS Cloud from the massive data delivery plane (Video Bit Streaming) handled by ISP-embedded Open Connect Appliances (OCAs)."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-videostreamingservicecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Video Streaming Service: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
-        ]
+        "id": "hld-video-streaming-arch",
+        "caption": "Netflix VOD Architecture: Cloud Control Plane (AWS), Transcoding Pipeline, DRM Licensing, and Embedded Open Connect CDN (OCAs)",
+        "definition": "flowchart TD\n    subgraph Clients[\"📺 Subscriber Client Devices\"]\n        SmartTV[\"📺 Smart TV (Living Room)\"]\n        Mobile[\"📱 Mobile App (iOS / Android)\"]\n        Web[\"🌐 Web Browser (Chrome / Safari)\"]\n    end\n\n    subgraph CloudControlPlane[\"☁️ Cloud Control Plane (AWS Microservices)\"]\n        APIGW[\"Zuul / Envoy API Gateway\\nAuth, Rate Limiting, Geo-Routing\"]\n        PlaybackSvc[\"🎬 Playback Authorization Service\\nSelects optimal OCA & DRM profile\"]\n        LicenseSvc[\"🔑 DRM Key & License Server\\n(Widevine / FairPlay / PlayReady)\"]\n        BookmarkSvc[\"📍 Bookmark & State Service\\nLast-viewed timestamp sync\"]\n        CatalogDB[(\"📄 Catalog & Metadata DB (Cassandra / Aurora)\")]\n    end\n\n    subgraph IngestionPipeline[\"📼 Studio Ingest & Transcoding Pipeline\"]\n        StudioIngest[\"Studio Master Ingest (S3)\"]\n        ShotChunker[\"✂️ Shot Splitter & Task Coordinator\"]\n        TranscodeFleet[\"⚙️ Transcoding Worker Fleet (EC2 / Spot)\\nAV1 / HEVC / H.264 Encoding\"]\n        Packager[\"📦 DRM Packager & Manifest Builder\\n(m3u8 / mpd playlists)\"]\n    end\n\n    subgraph OpenConnectCDN[\"🌍 Open Connect CDN (Data Plane)\"]\n        OCA_Comcast[\"📍 OCA Server (Comcast IXP)\\nPre-positioned popular content\"]\n        OCA_Vodafone[\"📍 OCA Server (Vodafone IXP)\\nPre-positioned popular content\"]\n        OriginStorage[(\"🗄️ Master Content Storage (AWS S3)\")]\n    end\n\n    Clients -->|1. Request Playback| APIGW\n    APIGW --> PlaybackSvc\n    PlaybackSvc --> CatalogDB\n    PlaybackSvc --> BookmarkSvc\n\n    PlaybackSvc -->|2. Direct to Nearest OCA| Clients\n    Clients -->|3. Request DRM License| LicenseSvc\n    LicenseSvc -->> Clients: Decryption Key Token\n\n    Clients -->|4. Stream 4K Chunks over HTTP/2| OCA_Comcast & OCA_Vodafone\n\n    StudioIngest --> ShotChunker --> TranscodeFleet --> Packager\n    Packager --> OriginStorage\n    OriginStorage -->|Nightly Pre-Warming Sync| OCA_Comcast & OCA_Vodafone"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Playback Startup & DRM License Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "When upload volume and concurrent viewership grow, split into microservices. Upload Service handles multipart uploads and generates presigned URLs. Transcoding Service consumes jobs from a queue and runs FFmpeg in isolated containers or serverless functions. Streaming Service serves HLS playlists and video segments from a CDN with DRM license enforcement. Metadata Service manages titles, descriptions, and search. Media Service owns the media library and watch history."
+        "text": "When a user presses Play, the client validates account rights, resolves the nearest ISP-embedded caching appliance (OCA), retrieves the hardware DRM decryption key, and begins streaming chunks."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-videostreamingservicecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Video Streaming Service: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_MediaService[Media Service]\n        MS_TranscodingService[Transcoding Service]\n        MS_UploadService[Upload Service]\n        MS_StreamingService[Streaming Service]\n        MS_MetadataService[Metadata Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_TranscodingService\n        MS_TranscodingService --> MS_DB\n        MS_TranscodingService --> MS_Queue\n        MS_TranscodingService --> MS_Cache\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_StreamingService\n        MS_StreamingService --> MS_DB\n        MS_StreamingService --> MS_Queue\n        MS_StreamingService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Upload Service: Accepts resumable multipart uploads, generates presigned URLs, validates file size and format, and emits TranscodeJob events to the queue.",
-          "Transcoding Service: Consumes transcode jobs, runs FFmpeg to produce HLS and DASH renditions, and stores segments and manifests in blob storage.",
-          "Streaming Service: Generates signed playback URLs, enforces DRM licenses (Widevine, FairPlay), serves HLS playlists, and emits watch events.",
-          "Metadata Service: Manages video metadata, titles, descriptions, tags, categories, and watch history. Powers search and recommendations.",
-          "Thumbnail Service: Extracts frames from videos at configured timestamps, generates sprite sheets for previews, and stores images in blob storage."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "VideoStreamingHld/",
-            "definition": ""
-          },
-          {
-            "term": "api/           # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/     # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/          # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "pages/          # Route pages",
-            "definition": ""
-          },
-          {
-            "term": "store/          # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/          # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching and background refetch",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket / SSE for real-time updates",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries and retry logic",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"VideoStreamingHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapVideoStreamingHldEndpoints();\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run containerized or serverless workloads",
-            "tags": [
-              "Azure App Service",
-              "Amazon EC2 / ECS / EKS"
-            ],
-            "pros": [
-              "Auto-scaling",
-              "Managed infrastructure"
-            ],
-            "cons": [
-              "Cold start latency"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limiting, auth, and request routing",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Built-in policies",
-              "Developer portal"
-            ],
-            "cons": [
-              "Additional latency"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "In-memory caching for hot data",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond latency",
-              "Automatic eviction"
-            ],
-            "cons": [
-              "Memory cost"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary data store for services",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Global distribution",
-              "Auto-scaling throughput"
-            ],
-            "cons": [
-              "Consistency model learning curve"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Blob storage for media and files",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Infinite scale",
-              "Cheap archival tiers"
-            ],
-            "cons": [
-              "Eventual consistency for listings"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async communication between services",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS"
-            ],
-            "pros": [
-              "Decoupling",
-              "Buffering spikes"
-            ],
-            "cons": [
-              "Debugging async flows"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-video-license-sequence",
+        "caption": "Playback session authorization sequence: Cloud metadata check, DRM license exchange, and OCA edge chunk streaming",
+        "definition": "sequenceDiagram\n    autonumber\n    actor User as 👤 Viewer\n    participant App as 📺 Smart TV App\n    participant PlaySvc as 🎬 Playback Service\n    participant DRM as 🔑 DRM License Server\n    participant OCA as 📍 Open Connect (Local ISP)\n\n    User->>App: Clicks \"Play\" on Movie\n    App->>PlaySvc: POST /playback/auth {movieId: 10482, profileId: 88, device: \"Samsung-TV\"}\n    PlaySvc->>PlaySvc: Check subscription active & parental pin\n    PlaySvc-->>App: Playback Grant {ManifestURL: \"https://oca-nyc.netflix.com/manifest.mpd\", LicenseChallengeToken}\n\n    App->>DRM: POST /drm/license (LicenseChallengeToken + Encrypted EME Key)\n    DRM->>DRM: Verify hardware signature & entitlement\n    DRM-->>App: Issue Decryption Key to Hardware Secure Enclave\n\n    App->>OCA: GET /manifest.mpd\n    OCA-->>App: Return DASH Manifest (Bitrate ladders: 480p up to 4K HDR)\n\n    App->>OCA: GET /video_segment_001.mp4 (HTTP Range: bytes 0-524288)\n    OCA-->>App: Video chunk delivered in <15ms\n    Note over App: Video frames render in <800ms!<br/>Continuous streaming begins"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Streaming Protocols & DRM Ecosystem"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Component",
+          "Technology / Standard",
+          "Target Platform",
+          "Key Advantage"
+        ],
+        "rows": [
+          [
+            "DASH (Dynamic Adaptive Streaming)",
+            "ISO/IEC 23009-1 (XML MPD manifest)",
+            "Android, Windows, Smart TVs, Web",
+            "International open standard with codec neutrality"
+          ],
+          [
+            "HLS (HTTP Live Streaming)",
+            "Apple RFC 8216 (.m3u8 manifest)",
+            "iOS, macOS, Apple TV, Safari",
+            "Mandatory for iOS ecosystem; native hardware support"
+          ],
+          [
+            "Google Widevine (Modular)",
+            "CENC (Common Encryption) + AES-128",
+            "Android, Chrome, Smart TVs",
+            "Hardware Security Level 1 (L1) enforces 4K security on chip"
+          ],
+          [
+            "Apple FairPlay",
+            "CBCS encryption + AVFoundation",
+            "Apple devices (iOS/tvOS/macOS)",
+            "Native integration with Apple Secure Enclave"
+          ],
+          [
+            "Microsoft PlayReady",
+            "CENC CTR/CBCS mode",
+            "Windows, Xbox, Smart TV chipsets",
+            "Widely adopted in legacy and modern TV hardware"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why did Netflix build Open Connect instead of relying exclusively on commercial CDNs (Akamai/CloudFront)?",
+            "answer": "Commercial CDNs charge per gigabyte delivered. At Netflix scale (tens of petabytes every hour), commercial CDN transit fees would run into billions of dollars annually. By manufacturing custom appliances (OCAs) loaded with hundreds of terabytes of NVMe/HDDs and installing them for free inside ISP data centers, traffic never leaves the ISP's internal network. This saves transit costs for both Netflix and the ISP while guaranteeing sub-10ms delivery latency."
+          },
+          {
+            "question": "What is Per-Shot Encoding and why does it revolutionize bandwidth efficiency?",
+            "answer": "Traditional encoders apply uniform compression settings across an entire 2-hour movie. But a static conversation in a cafe requires very few bits, whereas an explosion scene in a superhero movie requires massive bitrate to avoid pixelation. Per-shot encoding breaks a film into individual camera cuts (shots) and calculates the optimal rate-distortion curve (using VMAF metric) for each shot, slashing bandwidth consumption by 30-40% without sacrificing perceptual quality."
+          },
+          {
+            "question": "How is watch progress synchronized across multiple devices without database lag?",
+            "answer": "Every 5-10 seconds of active playback, the client emits a lightweight UDP/HTTP heartbeat containing `{profile_id, movie_id, timestamp_seconds}`. A stateless ingestion layer writes this to a write-back Redis cache and Kafka. If a viewer turns off their TV and opens their tablet, the tablet reads the bookmark directly from Redis in <5ms, resuming playback at the exact second."
+          },
+          {
+            "question": "How are new TV shows distributed to thousands of OCAs before a midnight premiere?",
+            "answer": "New releases are never pulled on-demand during premiere hour (which would cause a cache stampede). Instead, during off-peak night hours (2:00 AM - 5:00 AM), Netflix's proactive replication engine pre-positions and copies new episodes from AWS S3 to every OCA worldwide via peer-to-peer and unicast distribution. When users click Play at midnight, the video is already sitting on local ISP disks."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "A Video Streaming Service system requires both simple and scalable designs",
-          "Monolith is fastest to validate; microservices are for scale",
-          "React + ASP.NET Core provides a robust full-stack foundation",
-          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
-          "Always design for failure: retries, circuit breakers, and fallbacks"
+          "Decoupled architecture: AWS cloud handles metadata and licensing; ISP-embedded OCAs deliver raw video",
+          "Per-shot encoding dynamically optimizes bitrate per camera cut, saving 30%+ network bandwidth",
+          "Multi-DRM integration (Widevine, FairPlay, PlayReady) pairs with Common Encryption for premium 4K security",
+          "Pre-positioning off-peak replication ensures blockbuster premieres never trigger origin cache stampedes",
+          "Sub-second watch bookmarks synchronize across devices via fast in-memory Redis caches"
         ],
-        "takeaway": "Video Streaming Service is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Global OTT streaming platforms scale by pushing media bits directly into local ISP networks through dedicated caching appliances, using advanced per-shot compression and cloud orchestration to deliver pristine 4K video."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "youtube-streaming",
+    "spotify-music-hld",
+    "video-streaming-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Open Connect Overview — Netflix Technology Blog",
+      "url": "https://openconnect.netflix.com/en/",
+      "type": "article"
+    },
+    {
+      "title": "Per-Title and Dynamic Optimizer Encoding at Netflix",
+      "url": "https://netflixtechblog.com/per-title-encode-optimization-7e99442b62a2",
+      "type": "article"
+    }
+  ]
 }

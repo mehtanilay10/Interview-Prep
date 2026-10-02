@@ -267,6 +267,7 @@ import aggregationSumLesson from "../courses/linq/07-aggregation-operators/aggre
 import aiAgentsAndToolCallingLesson from "../courses/dotnet-ai-backend/01-ai-backend-terminology/ai-agents-and-tool-calling.json";
 import aiBackendEcosystemLesson from "../courses/dotnet-ai-backend/01-ai-backend-terminology/ai-backend-ecosystem.json";
 import aiSearchIndexesAndVectorSearchLesson from "../courses/azure/13-ai-services-for-azure-developers/ai-search-indexes-and-vector-search.json";
+import aifunctionfactoryStructuredToolsLesson from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/aifunctionfactory-structured-tools.json";
 import airbnbBookingLesson from "../problems/lld/airbnb-booking/airbnb-booking.json";
 import airbnbBookingHldLesson from "../problems/hld/airbnb-booking-hld/airbnb-booking-hld.json";
 import aksConfigurationAndSecretsLesson from "../courses/azure/04-containers-and-container-platforms/aks-configuration-and-secrets.json";
@@ -429,6 +430,7 @@ import axiosReactLesson from "../courses/yarn-npm-packages/react-data-fetching/a
 import azureAccountSetupLesson from "../courses/azure-for-aspnet/01-azure-for-dotnet-overview/azure-account-setup.json";
 import azureAdIntegrationLesson from "../courses/authentication-authorization/08-sso-identity-providers/azure-ad-integration.json";
 import azureAiFoundryAndModelBasedDevelopmentLesson from "../courses/azure/13-ai-services-for-azure-developers/azure-ai-foundry-and-model-based-development.json";
+import azureAiSearchAndAzureInferenceLesson from "../courses/dotnet-ai-backend/02-rag-implementation/azure-ai-search-and-azure-inference.json";
 import azureAiSearchOverviewLesson from "../courses/azure/13-ai-services-for-azure-developers/azure-ai-search-overview.json";
 import azureAiServicesOverviewLesson from "../courses/azure/13-ai-services-for-azure-developers/azure-ai-services-overview.json";
 import azureAiServicesVisionLanguageAndSpeechLesson from "../courses/azure/13-ai-services-for-azure-developers/azure-ai-services-vision-language-and-speech.json";
@@ -1603,6 +1605,7 @@ import offlineHandlingAndReconnectBehaviorLesson from "../problems/full-stack-se
 import offlineSupportLesson from "../courses/next-js-full-stack-react/data-fetching-patterns/offline-support.json";
 import offlineSupportLesson1 from "../courses/redux/08-redux-real-world/offline-support.json";
 import oftypeFilteringOperatorLesson from "../courses/linq/03-filtering-projection/oftype-filtering-operator.json";
+import ollamaLocalAiLesson from "../courses/dotnet-ai-backend/02-rag-implementation/ollama-local-ai.json";
 import oneDatabaseQueryCauses90OfProductionDatabaseCpuLesson from "../problems/production-incident-lab-problems/backend-incidents/one-database-query-causes-90-of-production-database-cpu.json";
 import oneToManyRelationsLesson from "../courses/prisma/04-prisma-relations/one-to-many-relations.json";
 import oneToManyRelationshipsConventionsLesson from "../courses/ef-core/03-conventions-relationships/one-to-many-relationships-conventions.json";
@@ -2038,6 +2041,7 @@ import selectAndIncludeLesson from "../courses/prisma/03-prisma-queries-mutation
 import selectStatementLesson from "../courses/postgresql/querying-data/select-statement.json";
 import selectiveFetchingLesson from "../courses/react-query/08-performance-optimization/selective-fetching.json";
 import semanticKernelAgentsAndPlannersLesson from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/semantic-kernel-agents-and-planners.json";
+import semanticKernelProcessFrameworkLesson from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/semantic-kernel-process-framework.json";
 import semaphoreslimAndBoundedConcurrencyLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/semaphoreslim-and-bounded-concurrency.json";
 import sendgridLesson from "../courses/dotnet-nuget-packages/09-utilities-helpers/sendgrid.json";
 import seqLesson from "../courses/dotnet-nuget-packages/logging-monitoring/seq.json";
@@ -2274,6 +2278,7 @@ import timeoutsAndCircuitBreakersLesson from "../problems/system-design-problems
 import timeoutsRetriesAndCancellationLesson from "../courses/aspnet-core-web-api/production-api-design-reliability/timeouts-retries-and-cancellation.json";
 import timescaledbTimeSeriesLesson from "../courses/postgresql/modern-data-tools/timescaledb-time-series.json";
 import toastMvccLesson from "../courses/postgresql/advanced-topics/toast-mvcc.json";
+import tokenCountingAndUsageLesson from "../courses/dotnet-ai-backend/06-production-patterns/token-counting-and-usage.json";
 import tokenRevocationLesson from "../courses/authentication-authorization/07-refresh-token-strategies/token-revocation.json";
 import tokenRotationLesson from "../courses/authentication-authorization/07-refresh-token-strategies/token-rotation.json";
 import toolUseAndFunctionCallingLesson from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/tool-use-and-function-calling.json";
@@ -2754,6 +2759,7 @@ const rawLessonsPart1 = [
 	aiAgentsAndToolCallingLesson,
 	aiBackendEcosystemLesson,
 	aiSearchIndexesAndVectorSearchLesson,
+	aifunctionfactoryStructuredToolsLesson,
 	airbnbBookingLesson,
 	airbnbBookingHldLesson,
 	aksConfigurationAndSecretsLesson,
@@ -2916,6 +2922,7 @@ const rawLessonsPart1 = [
 	azureAccountSetupLesson,
 	azureAdIntegrationLesson,
 	azureAiFoundryAndModelBasedDevelopmentLesson,
+	azureAiSearchAndAzureInferenceLesson,
 	azureAiSearchOverviewLesson,
 	azureAiServicesOverviewLesson,
 	azureAiServicesVisionLanguageAndSpeechLesson,
@@ -2985,11 +2992,11 @@ const rawLessonsPart1 = [
 	backupArchivingLesson,
 	backupRestoreStrategiesLesson,
 	backwardCompatibleDeploymentsLesson,
-	bankingAppLesson,
-	barrierPatternLesson,
 ];
 
 const rawLessonsPart2 = [
+	bankingAppLesson,
+	barrierPatternLesson,
 	baselineHealthyApplicationAndTelemetryLesson,
 	basicTypesLesson,
 	bcryptLesson,
@@ -3488,11 +3495,11 @@ const rawLessonsPart2 = [
 	environmentConfigurationLesson,
 	environmentPromotionLesson,
 	errorBoundariesLesson,
-	errorBoundariesAndFailureIsolationLesson,
-	errorBoundariesLoadingLesson,
 ];
 
 const rawLessonsPart3 = [
+	errorBoundariesAndFailureIsolationLesson,
+	errorBoundariesLoadingLesson,
 	errorBoundariesTypedLesson,
 	errorBudgetsLesson,
 	errorHandlingLesson,
@@ -3991,11 +3998,11 @@ const rawLessonsPart3 = [
 	migrationPatternsLesson,
 	migrationStrategiesLesson,
 	migrationStrategiesLesson1,
-	migrationStrategiesLesson2,
-	migrationsLesson,
 ];
 
 const rawLessonsPart4 = [
+	migrationStrategiesLesson2,
+	migrationsLesson,
 	migrationsBestPracticesLesson,
 	migrationsInEntityFrameworkCoreLesson,
 	migrationsOverviewLesson,
@@ -4099,6 +4106,7 @@ const rawLessonsPart4 = [
 	offlineSupportLesson,
 	offlineSupportLesson1,
 	oftypeFilteringOperatorLesson,
+	ollamaLocalAiLesson,
 	oneDatabaseQueryCauses90OfProductionDatabaseCpuLesson,
 	oneToManyRelationsLesson,
 	oneToManyRelationshipsConventionsLesson,
@@ -4493,12 +4501,12 @@ const rawLessonsPart4 = [
 	s3PresignedUrlsLesson,
 	sagaPatternLesson,
 	sameTreeLesson,
-	saml2BasicsLesson,
-	sampleLinqQueriesLesson,
-	sassLesson,
 ];
 
 const rawLessonsPart5 = [
+	saml2BasicsLesson,
+	sampleLinqQueriesLesson,
+	sassLesson,
 	scalableAspnetApiDesignLesson,
 	scalableReactStateArchitectureLesson,
 	scalarsCustomTypesLesson,
@@ -4537,6 +4545,7 @@ const rawLessonsPart5 = [
 	selectStatementLesson,
 	selectiveFetchingLesson,
 	semanticKernelAgentsAndPlannersLesson,
+	semanticKernelProcessFrameworkLesson,
 	semaphoreslimAndBoundedConcurrencyLesson,
 	sendgridLesson,
 	seqLesson,
@@ -4773,6 +4782,7 @@ const rawLessonsPart5 = [
 	timeoutsRetriesAndCancellationLesson,
 	timescaledbTimeSeriesLesson,
 	toastMvccLesson,
+	tokenCountingAndUsageLesson,
 	tokenRevocationLesson,
 	tokenRotationLesson,
 	toolUseAndFunctionCallingLesson,

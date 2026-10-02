@@ -163,7 +163,7 @@ export function MermaidRenderer({ definition, caption, className }: MermaidRende
             theme: mermaidTheme,
             securityLevel: 'loose',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            fontSize: 13,
+            fontSize: 16,
           });
           mermaidCurrentTheme = mermaidTheme;
         }
@@ -212,14 +212,14 @@ export function MermaidRenderer({ definition, caption, className }: MermaidRende
       <figure className={cn('my-8', className)}>
         <div
           className={cn(
-            'relative rounded-xl border border-border overflow-x-auto',
-            status === 'loading' && 'min-h-[160px] animate-pulse',
-            'flex items-center justify-center'
+            'relative rounded-xl border border-border overflow-auto',
+            status === 'loading' && 'min-h-[200px] animate-pulse',
+            'flex items-start justify-center'
           )}
           style={diagramBg ? { backgroundColor: diagramBg } : undefined}
         >
           <div
-            className="mermaid mermaid-diagram max-w-full p-6 md:p-8"
+            className="mermaid mermaid-diagram min-w-max p-4 md:p-6"
             ref={containerRef}
             aria-label={caption ?? 'Diagram'}
           />

@@ -3,15 +3,19 @@
   "slug": "ecommerce-hld",
   "moduleSlug": "ecommerce-hld",
   "courseSlug": "hld-problems",
-  "title": "E-commerce Platform: Complete Architecture",
-  "description": "Design an e-commerce platform with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Modern Headless E-Commerce Architecture (Shopify Scale)",
+  "description": "Design a high-scale headless e-commerce platform with multi-tenant storefronts, GraphQL APIs, distributed flash-sale inventory, and SAGA checkout.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "ecommercehld"
+    "ecommerce",
+    "headless-commerce",
+    "graphql",
+    "flash-sale",
+    "inventory"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design an e-commerce platform that supports browsing a product catalog, searching and filtering products, adding items to a cart, checkout with multiple payment methods, order tracking, inventory management, and personalized recommendations. The system must handle seasonal traffic spikes, maintain consistent inventory counts during flash sales, and provide an admin dashboard for managing products, orders, and customer data."
+        "text": "Design a multi-tenant, headless e-commerce platform similar to Shopify or BigCommerce. The platform powers hundreds of thousands of independent merchant storefronts serving hundreds of millions of consumers. Headless architecture decouples frontend presentation layers (web, mobile, social commerce, smart devices) from core commerce backend engines (Catalog, Inventory, Cart, Checkout, and Order Fulfillment) via high-performance GraphQL and REST APIs. The platform must absorb extreme merchant flash sales without cross-tenant noisy neighbor impact while offering sub-100ms catalog browsing."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Headless Commerce Architecture",
+            "definition": "Separating the frontend presentation layer (Storefront UI built with Next.js/Hydrogen) from backend commerce engines via standardized GraphQL/REST APIs."
+          },
+          {
+            "term": "Multi-Tenant Data Sharding",
+            "definition": "Partitioning merchant catalog, orders, and customer databases by `tenant_id` (Store ID) to ensure data isolation and prevent cross-store performance contention."
+          },
+          {
+            "term": "CDC (Change Data Capture)",
+            "definition": "Streaming database row mutations (via Debezium/Kafka) from the primary transactional database directly into Elasticsearch search clusters in near-real-time."
+          },
+          {
+            "term": "Cart Session Reconciliation",
+            "definition": "Merging anonymous guest shopping carts (stored in browser cookies/Redis) with persistent customer accounts upon login without dropping items."
+          },
+          {
+            "term": "Flash-Sale Rate Limiter & Token Queue",
+            "definition": "Shielding merchant checkout engines during sudden product drops by queueing buyers in an edge admission buffer."
+          }
+        ]
       }
     },
     {
@@ -39,15 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Browse products by category, brand, price range, and attributes with faceted search",
-          "Manage a shopping cart with quantity updates, discounts, and saved carts",
-          "Checkout flow with address selection, shipping calculation, and multiple payment options",
-          "Track order status from placement through shipment and delivery",
-          "Reserve inventory during checkout to prevent overselling",
-          "Restock and manage product inventory with low-stock alerts",
-          "Generate product recommendations based on browsing history and purchases",
-          "Admin interface to manage products, categories, orders, and customer support tickets",
-          "Customer reviews, ratings, and wishlist functionality"
+          "Multi-Storefront Support: Headless APIs powering web, mobile apps, social commerce (Instagram/TikTok Shop), and POS terminals",
+          "Dynamic Product Catalog: Multi-variant items (size, color, material) with rich attributes and fast faceted search",
+          "High-Speed Cart: Persistent cart management supporting anonymous browsing, discount codes, and seamless login reconciliation",
+          "Flash-Sale Inventory Protection: Atomic stock decrement with zero overselling during limited product drops",
+          "Checkout & Payment SAGA: Multi-step checkout with address validation, tax calculation, and payment authorization",
+          "Merchant Admin Backoffice: Product creation, inventory replenishment, order fulfillment workflows, and analytics"
         ]
       }
     },
@@ -56,14 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "99.9% availability during normal and peak traffic",
-          "Sub-200ms product listing and search results",
-          "Sub-2-second checkout completion after payment authorization",
-          "Inventory updates visible across all channels within 100ms",
-          "Shopping cart syncs across devices without conflicts",
-          "Search handles 10,000+ queries per second during sales",
-          "Product images served from CDN with 99.99% cache hit ratio",
-          "Database sharding for orders table at 100 million records"
+          "Multi-Tenant Scale: Support 1M+ active merchant stores; 50,000 global checkout transactions/sec during Black Friday",
+          "Storefront Browsing Latency: Sub-100ms P99 latency for catalog pages and search via edge caching",
+          "Isolation Guarantee: A flash sale on Store A must never degrade API latency or throughput for Store B (Noisy Neighbor isolation)",
+          "Data Consistency: Strict consistency for inventory allocation and payments; eventual consistency for reviews and search",
+          "Availability: 99.99% uptime for the storefront browsing and checkout APIs"
         ]
       }
     },
@@ -71,372 +96,148 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application with MVC or Razor Pages for the storefront and an API for cart and checkout operations. Entity Framework Core manages the product catalog, cart, orders, and inventory in a relational database. The monolith is the fastest path to launch a full-featured e-commerce site with consistent ACID transactions for orders and inventory."
+        "text": "Headless Storefronts run at the edge (Vercel / Cloudflare Workers) talking to a Storefront API Gateway (GraphQL). Multi-tenant isolation is enforced at the gateway and database sharding layers."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ecommerceplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for E-commerce Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CatalogService[Catalog Service]\n        MS_CartService[Cart Service]\n        MS_OrderService[Order Service]\n        MS_PaymentService[Payment Service]\n        MS_InventoryService[Inventory Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CatalogService\n        MS_CatalogService --> MS_DB\n        MS_CatalogService --> MS_Queue\n        MS_CatalogService --> MS_Cache\n        MS_LB --> MS_CartService\n        MS_CartService --> MS_DB\n        MS_CartService --> MS_Queue\n        MS_CartService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
-        ]
+        "id": "hld-headless-ecommerce-arch",
+        "caption": "Headless E-Commerce Architecture: Edge Storefronts, GraphQL Storefront API, Sharded Microservices, and Event Bus",
+        "definition": "flowchart TD\n    subgraph StorefrontClients[\"🛍️ Headless Storefront Presentation\"]\n        WebStore[\"🌐 Next.js / Hydrogen Web Store\"]\n        MobileStore[\"📱 Mobile App (iOS / Android)\"]\n        SocialCommerce[\"📱 Social Commerce (TikTok / Instagram)\"]\n        POS[\"🏪 Retail Store POS Terminal\"]\n    end\n\n    subgraph EdgeCDN[\"🌍 Edge & CDN Tier\"]\n        EdgeWorker[\"Cloudflare Edge Workers / Fastly\\nEdge HTML Rendering & Asset Caching\"]\n        WAF[\"WAF & Flash-Sale Queue Guard\"]\n    end\n\n    subgraph GatewayTier[\"🚪 Storefront API Gateway (GraphQL)\"]\n        GraphQL_GW[\"GraphQL Federation Gateway (Apollo / Envoy)\\nTenant Authentication & Query Routing\"]\n    end\n\n    subgraph CommerceEngines[\"⚙️ Core Headless Commerce Engines\"]\n        CatalogSvc[\"📦 Product Catalog Service\\nVariants, specs, pricing\"]\n        CartSvc[\"🛒 Cart Service\\nSession sync & promo discounts\"]\n        InventorySvc[\"🏷️ Inventory Service\\nIn-Memory Lua Stock Allocation\"]\n        CheckoutOrch[\"⚡ Checkout SAGA Orchestrator\\nTaxes, shipping, & payment\"]\n        OrderSvc[\"📋 Order Management Service\"]\n    end\n\n    subgraph Datastores[\"🗄️ Persistence Tier (Multi-Tenant Sharded)\"]\n        CatalogDB[(\"📄 Catalog DB (PostgreSQL / Aurora)\\nSharded by StoreID\")]\n        SearchIndex[(\"🔎 Product Search Cluster (Elasticsearch)\\nFaceted catalog filters\")]\n        CartCache[(\"⚡ Cart Cache (Redis Cluster)\\nCartID -> JSON (TTL 30 days)\")]\n        InventoryCache[(\"⚡ Inventory Stock (Redis Cluster)\\nAtomic Lua Scripts\")]\n        OrderDB[(\"📋 Orders DB (PostgreSQL / Vitess)\")]\n    end\n\n    subgraph EventBackbone[\"📨 Event Bus: Apache Kafka\"]\n        Kafka[\"📨 Apache Kafka (commerce-events)\\norder-placed | inventory-depleted | cdc-mutations\"]\n        FulfillmentSvc[\"🚚 Logistics & Fulfillment\"]\n        AnalyticsSvc[\"📊 Merchant Analytics & Reports\"]\n    end\n\n    StorefrontClients --> EdgeCDN\n    EdgeCDN --> WAF --> GraphQL_GW\n\n    GraphQL_GW --> CatalogSvc --> CatalogDB\n    CatalogSvc --> SearchIndex\n\n    GraphQL_GW --> CartSvc --> CartCache\n    GraphQL_GW --> InventorySvc --> InventoryCache\n    GraphQL_GW --> CheckoutOrch\n\n    CheckoutOrch --> InventorySvc\n    CheckoutOrch --> OrderSvc --> OrderDB\n    OrderSvc -->|Publish OrderPlaced| Kafka\n\n    Kafka --> FulfillmentSvc\n    Kafka --> AnalyticsSvc\n    Kafka -->|CDC Debezium Sync| SearchIndex"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Cart Reconciliation & Checkout Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "When catalog size, traffic, and order volume grow, split the monolith into microservices. Catalog Service handles product search and browsing with Elasticsearch or Redis for caching. Cart Service manages per-user cart state with Redis for fast access. Order Service orchestrates checkout with the saga pattern. Inventory Service owns stock levels and reservation logic. Recommendation Service generates personalized suggestions. User Service handles profiles, addresses, and authentication."
+        "text": "The sequence illustrates how an anonymous guest cart merges seamlessly upon customer sign-in, followed by atomic two-phase inventory reservation during checkout."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ecommerceplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for E-commerce Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CatalogService[Catalog Service]\n        MS_CartService[Cart Service]\n        MS_OrderService[Order Service]\n        MS_PaymentService[Payment Service]\n        MS_InventoryService[Inventory Service]\n        MS_RecommendationService[Recommendation Service]\n        MS_UserService[User Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CatalogService\n        MS_CatalogService --> MS_DB\n        MS_CatalogService --> MS_Queue\n        MS_CatalogService --> MS_Cache\n        MS_LB --> MS_CartService\n        MS_CartService --> MS_DB\n        MS_CartService --> MS_Queue\n        MS_CartService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_RecommendationService\n        MS_RecommendationService --> MS_DB\n        MS_RecommendationService --> MS_Queue\n        MS_RecommendationService --> MS_Cache\n        MS_LB --> MS_UserService\n        MS_UserService --> MS_DB\n        MS_UserService --> MS_Queue\n        MS_UserService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Catalog Service: Indexes products in Elasticsearch, serves search and faceted filters, manages categories and attributes, and caches top-selling products in Redis.",
-          "Cart Service: Manages per-user shopping carts with Redis for fast reads, merges anonymous carts on login, and applies promo codes and discounts.",
-          "Order Service: Orchestrates checkout using the saga pattern, creates order records, and coordinates inventory reservation and payment capture.",
-          "Payment Service: Handles payment authorization, capture, and refund events via payment gateway integration with idempotent retry logic.",
-          "Inventory Service: Tracks stock levels across warehouses, reserves units during checkout, releases reservations on cancellation or timeout, and emits low-stock alerts.",
-          "Recommendation Service: Generates personalized product suggestions using collaborative filtering and real-time browsing signals from Kafka or event streams.",
-          "User Service: Manages customer profiles, shipping addresses, authentication, and order history views with separate read-optimized projections."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "EcommerceHld/",
-            "definition": ""
-          },
-          {
-            "term": "api/           # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/     # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/          # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "pages/          # Route pages",
-            "definition": ""
-          },
-          {
-            "term": "store/          # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/          # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching and background refetch",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket / SSE for real-time updates",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries and retry logic",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"EcommerceHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapEcommerceHldEndpoints();\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run containerized or serverless workloads",
-            "tags": [
-              "Azure App Service",
-              "Amazon EC2 / ECS / EKS"
-            ],
-            "pros": [
-              "Auto-scaling",
-              "Managed infrastructure"
-            ],
-            "cons": [
-              "Cold start latency"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limiting, auth, and request routing",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Built-in policies",
-              "Developer portal"
-            ],
-            "cons": [
-              "Additional latency"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "In-memory caching for hot data",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond latency",
-              "Automatic eviction"
-            ],
-            "cons": [
-              "Memory cost"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary data store for services",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Global distribution",
-              "Auto-scaling throughput"
-            ],
-            "cons": [
-              "Consistency model learning curve"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Blob storage for media and files",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Infinite scale",
-              "Cheap archival tiers"
-            ],
-            "cons": [
-              "Eventual consistency for listings"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async communication between services",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS"
-            ],
-            "pros": [
-              "Decoupling",
-              "Buffering spikes"
-            ],
-            "cons": [
-              "Debugging async flows"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-headless-checkout-sequence",
+        "caption": "Guest cart reconciliation on login, atomic inventory hold, and idempotent SAGA checkout flow",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Shopper as 👤 Shopper\n    participant Store as 🌐 Headless Next.js Store\n    participant GW as 🚪 GraphQL Gateway\n    participant Cart as 🛒 Cart Service\n    participant Redis as ⚡ Redis Cart/Stock\n    participant Orch as ⚡ Checkout Orchestrator\n    participant Pay as 💳 Payment Gateway\n    participant Order as 📋 Order DB\n\n    Shopper->>Store: Browse & Add Item (Guest Cookie: cart_anon_99)\n    Store->>Cart: AddToCart(CartID: cart_anon_99, SKU: 881, Qty: 1)\n    Cart->>Redis: HSET cart:anon_99 item:881 1\n\n    Shopper->>Store: Logs into Account (UserID: user_55)\n    Store->>Cart: POST /cart/merge {anonCartId: cart_anon_99, userId: user_55}\n    Cart->>Redis: Merge guest items into user_55 persistent cart\n    Cart-->>Store: Cart Merged (Total Items: 3)\n\n    Shopper->>Store: Clicks \"Checkout Now\"\n    Store->>GW: POST /checkout/submit (CartID, PaymentToken, IdemKey)\n    GW->>Orch: Start Checkout SAGA\n\n    Orch->>Redis: Atomic Lua Stock Decrement (SKU: 881, HoldTTL: 15m)\n    alt Stock Available\n        Redis-->>Orch: Stock Reserved\n        Orch->>Pay: Authorize Payment ($120.00)\n        Pay-->>Orch: Payment Authorized\n        Orch->>Order: Create Order Record (Status: CONFIRMED)\n        Orch->>Redis: DEL cart:user_55\n        Orch-->>Store: 201 Created (Order #10948)\n        Store-->>Shopper: Render Order Confirmation\n    else Stock Sold Out\n        Redis-->>Orch: Insufficient Stock\n        Orch-->>Store: 409 Conflict (Item out of stock)\n        Store-->>Shopper: \"Sorry, this item just sold out!\"\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Monolith vs Headless Commerce Architecture"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Dimension",
+          "Monolithic E-Commerce (Magento/WooCommerce)",
+          "Headless Architecture (Shopify/Commercelayer)"
+        ],
+        "rows": [
+          [
+            "Frontend / Backend Coupling",
+            "Tightly coupled server-rendered templates (PHP/Liquid)",
+            "Complete decoupling: Frontend communicates via GraphQL/REST APIs"
+          ],
+          [
+            "Multi-Platform Delivery",
+            "Hard to support mobile apps, IoT, and POS natively",
+            "Universal API powers Web, iOS, Android, POS, and voice assistants"
+          ],
+          [
+            "Storefront Performance",
+            "Heavy server-side rendering, vulnerable to backend spikes",
+            "Pre-rendered static Jamstack / Edge-rendered SSR (sub-100ms TTFB)"
+          ],
+          [
+            "Scalability & Deployments",
+            "Deploying a UI theme change requires full backend redeploy",
+            "Frontend teams deploy storefronts independently with zero backend risk"
+          ],
+          [
+            "Customizability",
+            "Constrained by the monolithic CMS framework plugin limits",
+            "Complete design freedom with modern frameworks (Next.js, Remix, Nuxt)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How do you prevent the \"Noisy Neighbor\" problem in multi-tenant e-commerce?",
+            "answer": "If Store A launches a viral celebrity sneaker drop with 500,000 req/sec, it must not degrade Store B. Implement tenant isolation: (1) Rate limits enforced per `tenant_id` at the API Gateway, (2) Dedicated database partitions or sharded Redis keys (`tenant:store_id:inventory`), and (3) Tiered worker pools where traffic surges are quarantined to dedicated autoscale clusters."
+          },
+          {
+            "question": "Why use GraphQL for Headless Commerce instead of standard REST?",
+            "answer": "Headless storefronts need flexible data payloads: a mobile watch app needs only title and price, whereas a desktop product page needs full specs, variant tables, high-res image galleries, and review summaries. GraphQL eliminates over-fetching and under-fetching, enabling the frontend to request exact shapes in a single HTTP network round-trip."
+          },
+          {
+            "question": "How does Change Data Capture (CDC) keep product search in sync with database updates?",
+            "answer": "When a merchant updates product titles or specs in the primary SQL database, Debezium captures transaction log updates and streams change events into Kafka. A search indexing consumer ingests the stream and updates Elasticsearch within 1-2 seconds, decoupling the transactional write database from search query loads."
+          },
+          {
+            "question": "How are cart sessions stored for millions of unauthenticated guest users?",
+            "answer": "Anonymous guest carts are stored in a distributed Redis cluster keyed by a signed UUID cookie (`cart:anon_uuid`) with a 30-day sliding TTL. This avoids consuming expensive relational database rows for casual window shoppers who never complete checkout."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "A E-commerce Platform system requires both simple and scalable designs",
-          "Monolith is fastest to validate; microservices are for scale",
-          "React + ASP.NET Core provides a robust full-stack foundation",
-          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
-          "Always design for failure: retries, circuit breakers, and fallbacks"
+          "Headless commerce decouples edge storefront presentation from backend transactional commerce engines",
+          "Multi-tenant data sharding by Store ID protects against noisy neighbor performance interference",
+          "GraphQL Federation aggregates Catalog, Cart, and Inventory into unified, performant frontend queries",
+          "Redis atomic Lua scripts execute zero-overselling inventory holds during high-traffic flash sales",
+          "Change Data Capture (Debezium + Kafka) keeps Elasticsearch product indexes updated without direct DB coupling"
         ],
-        "takeaway": "E-commerce Platform is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Modern headless commerce platforms combine edge-rendered Jamstack storefronts with federated GraphQL APIs, backing multi-tenant stores with isolated, fault-tolerant transactional microservices."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "amazon-ecommerce-hld",
+    "payment-gateway-hld",
+    "ticket-booking-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Shopify Engineering: How Shopify Scales for Black Friday",
+      "url": "https://shopify.engineering/scaling-black-friday-cyber-monday",
+      "type": "article"
+    },
+    {
+      "title": "Headless Commerce Architecture and Principles",
+      "url": "https://shopify.engineering/what-is-headless-commerce",
+      "type": "article"
+    }
+  ]
 }

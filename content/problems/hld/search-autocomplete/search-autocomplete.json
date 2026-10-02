@@ -3,15 +3,19 @@
   "slug": "search-autocomplete",
   "moduleSlug": "search-autocomplete",
   "courseSlug": "hld-problems",
-  "title": "Search Autocomplete: Complete Architecture",
-  "description": "Design a search autocomplete system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Search Autocomplete (Typeahead): Complete Architecture",
+  "description": "Design a real-time search typeahead system (Google / Amazon scale) with prefix Tries, Top-K caching at nodes, offline aggregation, and sub-30ms latency.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "searchautocomplete"
+    "search-autocomplete",
+    "typeahead",
+    "trie",
+    "caching",
+    "prefix-tree"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a search autocomplete system that provides instant prefix-based suggestions as users type in a search box. The system must handle billions of queries per day, support typo tolerance, rank suggestions by popularity and relevance, serve results from edge caches in under 50 milliseconds, and update its index in near real-time as new content is published or trending topics emerge."
+        "text": "Design a real-time search autocomplete (typeahead) system like Google Suggest or Amazon Search Bar. As a user types each keystroke into the search input, the system instantly suggests the top 5 to 10 most relevant, high-frequency completions. The system must serve 5+ billion queries daily at hundreds of thousands of queries per second, achieve strict sub-30ms P99 latency globally, filter offensive queries, and continuously update popularity scores as new search trends emerge."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Trie (Prefix Tree)",
+            "definition": "A tree data structure where each node represents a character; all descendant nodes share a common prefix defined by their path from the root."
+          },
+          {
+            "term": "Top-K Node Caching",
+            "definition": "Storing the top 5-10 most popular completed queries directly at every Trie node, reducing lookup time from O(subtree size) to O(prefix length)."
+          },
+          {
+            "term": "Client-Side Debouncing",
+            "definition": "Delaying API network calls until the user pauses typing for 150-300ms, eliminating redundant requests during rapid typing."
+          },
+          {
+            "term": "Consistent Hashing Sharding",
+            "definition": "Partitioning prefixes across Trie server shards using consistent hashing to balance memory and query load evenly across nodes."
+          },
+          {
+            "term": "Weekly Offline Trie Rebuilder",
+            "definition": "An offline Spark/MapReduce batch job that aggregates query frequencies over rolling 7-day windows and publishes serialized Trie snapshots."
+          }
+        ]
       }
     },
     {
@@ -39,15 +70,11 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Return up to 10 suggestions matching the current query prefix",
-          "Support fuzzy matching to correct typos and misspellings",
-          "Rank suggestions by query frequency, recency, and personalization signals",
-          "Categorize suggestions (products, categories, brands, people, locations)",
-          "Show result counts or preview thumbnails alongside suggestions",
-          "Support trending and recently searched queries per user or globally",
-          "Highlight the matched portion of each suggestion in the UI",
-          "Allow keyboard navigation through suggestion list (arrow keys, enter)",
-          "Debounce input on the client to reduce API load during fast typing"
+          "Prefix Matching: Return top 5-10 relevant query suggestions matching the typed prefix string",
+          "Popularity Ranking: Rank suggestions based on historical query frequency, recency, and trending weight",
+          "Fuzzy & Typo Tolerance: Suggest corrections for common spelling errors and transpositions",
+          "Content Moderation: Filter hate speech, explicit content, and sensitive terms via a denylist filter",
+          "Personalization: Blend globally trending suggestions with user personal recent search history"
         ]
       }
     },
@@ -56,14 +83,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-50ms p99 response time for suggestion API from edge cache",
-          "99.99% availability; suggestions must remain available even if indexing fails",
-          "Handle 100,000 queries per second globally during peak traffic",
-          "Index updates visible to users within 30 seconds of content creation",
-          "Memory-efficient trie or prefix index for tens of millions of unique queries",
-          "Graceful degradation: fallback to popular queries when cache is cold",
-          "Geographically distributed for low latency across continents",
-          "Analytics pipeline records query volume, zero-result queries, and click-through rates"
+          "Ultra-Low Latency: Sub-30ms P99 response time end-to-end (every keystroke must feel instant)",
+          "Extreme High Availability: 99.999% uptime for the autocomplete read path",
+          "Scale: 5+ billion autocomplete queries/day (~60,000 QPS average, 250,000 QPS peak)",
+          "Memory Efficiency: Trie structures must be optimized and compacted to fit in distributed server RAM",
+          "Scalable Ingestion: Stream and aggregate billions of raw search click logs without slowing read traffic"
         ]
       }
     },
@@ -71,371 +95,153 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core API that loads a compressed prefix trie or a search index into memory at startup. The service exposes a single /suggestions endpoint that accepts a query prefix, traverses the trie, applies ranking heuristics, and returns ranked suggestions. This is the fastest way to validate search relevance, typo tolerance, and ranking logic before moving to a distributed architecture."
+        "text": "The architecture cleanly separates the real-time Read Path (Client Debounce, Edge CDN, Autocomplete Gateway, and Sharded In-Memory Trie Cache) from the offline Analytics & Indexing Pipeline (Kafka, Spark Aggregator, and Trie Builder)."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-searchautocompletecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Search Autocomplete: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CrawlerService[Crawler Service]\n        MS_IndexerService[Indexer Service]\n        MS_SearchService[Search Service]\n        MS_RankingService[Ranking Service]\n        MS_SnippetService[Snippet Service]\n        MS_QueryAnalyzer[Query Analyzer]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CrawlerService\n        MS_CrawlerService --> MS_DB\n        MS_CrawlerService --> MS_Queue\n        MS_CrawlerService --> MS_Cache\n        MS_LB --> MS_IndexerService\n        MS_IndexerService --> MS_DB\n        MS_IndexerService --> MS_Queue\n        MS_IndexerService --> MS_Cache\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_RankingService\n        MS_RankingService --> MS_DB\n        MS_RankingService --> MS_Queue\n        MS_RankingService --> MS_Cache\n        MS_LB --> MS_SnippetService\n        MS_SnippetService --> MS_DB\n        MS_SnippetService --> MS_Queue\n        MS_SnippetService --> MS_Cache\n        MS_LB --> MS_QueryAnalyzer\n        MS_QueryAnalyzer --> MS_DB\n        MS_QueryAnalyzer --> MS_Queue\n        MS_QueryAnalyzer --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
-        ]
+        "id": "hld-autocomplete-arch",
+        "caption": "Search Autocomplete Architecture: Edge Cache, Sharded Trie In-Memory Fleet, and Offline Log Aggregation Pipeline",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 Client Layer\"]\n        Browser[\"🌐 Web Browser (Client Debounce 250ms)\"]\n        MobileApp[\"📱 Mobile App (In-Memory Prefix Cache)\"]\n    end\n\n    subgraph EdgeLayer[\"🌍 Edge & CDN Tier\"]\n        EdgeCDN[\"Cloudflare / CloudFront Edge\\nCaches top 100k hot prefixes (TTL 1h)\"]\n        APIGW[\"API Gateway & Safety Denylist Filter\\nTerm sanitization & auth\"]\n    end\n\n    subgraph ReadServing[\"⚡ Online Real-Time Serving Fleet\"]\n        AutocompleteSvc[\"Typeahead Service (Router)\"]\n        subgraph TrieCluster[\"📚 Sharded In-Memory Trie Cluster (RAM)\"]\n            TrieShard1[\"Trie Shard 1\\nPrefixes (Hash A-F)\\nTop-K stored at nodes\"]\n            TrieShard2[\"Trie Shard 2\\nPrefixes (Hash G-M)\\nTop-K stored at nodes\"]\n            TrieShardN[\"Trie Shard N\\nPrefixes (Hash N-Z)\"]\n        end\n        PersonalizationSvc[\"👤 User Recent Search Cache (Redis)\"]\n    end\n\n    subgraph OfflinePipeline[\"🏗️ Data Collection & Trie Rebuilder Pipeline\"]\n        ClickLogs[\"📨 Apache Kafka (search-query-logs)\"]\n        SparkAggregator[\"⚙️ Apache Spark / Flink Aggregator\\nCalculates rolling 7-day query counts\"]\n        FreqDB[(\"📊 Aggregated Frequency DB (Cassandra / DynamoDB)\")]\n        TrieBuilder[\"🔨 Offline Trie Snapshot Builder\\nConstructs compact serialized Trie\"]\n        SnapshotStore[(\"🗄️ Trie Snapshots Vault (AWS S3)\")]\n    end\n\n    Clients --> EdgeCDN\n    EdgeCDN -->|Cache Miss| APIGW\n    APIGW --> AutocompleteSvc\n\n    AutocompleteSvc --> PersonalizationSvc\n    AutocompleteSvc -->|Route by Hash(Prefix)| TrieShard1 & TrieShard2 & TrieShardN\n\n    Clients -->|Log Query Clicked| ClickLogs\n    ClickLogs --> SparkAggregator\n    SparkAggregator --> FreqDB\n    FreqDB --> TrieBuilder\n    TrieBuilder --> SnapshotStore\n    SnapshotStore -->|Nightly Hot-Reload| TrieShard1 & TrieShard2 & TrieShardN"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Keystroke Query & Trie Traversal Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "At scale, split into microservices for independent indexing, ranking, and serving. Crawler Service discovers new content from data sources. Indexer Service builds and updates a compact prefix index or trie with frequency and metadata. Search Service serves suggestions from a distributed cache with fallback to a search engine. Ranking Service reorders suggestions using ML models trained on click data. Query Analyzer normalizes inputs and detects trending topics."
+        "text": "With Top-K suggestions pre-stored at each node, looking up a prefix requires only traversing down the tree to the prefix node (O(L) where L is prefix length) and returning the list immediately."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-searchautocompletecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Search Autocomplete: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CrawlerService[Crawler Service]\n        MS_IndexerService[Indexer Service]\n        MS_SearchService[Search Service]\n        MS_RankingService[Ranking Service]\n        MS_SnippetService[Snippet Service]\n        MS_QueryAnalyzer[Query Analyzer]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CrawlerService\n        MS_CrawlerService --> MS_DB\n        MS_CrawlerService --> MS_Queue\n        MS_CrawlerService --> MS_Cache\n        MS_LB --> MS_IndexerService\n        MS_IndexerService --> MS_DB\n        MS_IndexerService --> MS_Queue\n        MS_IndexerService --> MS_Cache\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_RankingService\n        MS_RankingService --> MS_DB\n        MS_RankingService --> MS_Queue\n        MS_RankingService --> MS_Cache\n        MS_LB --> MS_SnippetService\n        MS_SnippetService --> MS_DB\n        MS_SnippetService --> MS_Queue\n        MS_SnippetService --> MS_Cache\n        MS_LB --> MS_QueryAnalyzer\n        MS_QueryAnalyzer --> MS_DB\n        MS_QueryAnalyzer --> MS_Queue\n        MS_QueryAnalyzer --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Crawler Service: Discovers new content from databases, websites, or product catalogs and emits IndexUpdate events to refresh the suggestion index.",
-          "Indexer Service: Builds and maintains a compact prefix trie or search index with term frequencies, categories, and metadata; publishes index snapshots to distributed storage.",
-          "Search Service: Serves suggestions from an in-memory cache or search engine like Elasticsearch or Redis; applies prefix matching and falls back to popular terms on cache miss.",
-          "Ranking Service: Reorders raw suggestions using ML models trained on historical click-through rates, user context, and freshness signals.",
-          "Query Analyzer: Normalizes query strings (lowercasing, stemming, typo correction), detects trending queries, and routes personalized requests to the ranking layer.",
-          "Snippet Service: Fetches preview metadata like product images, category labels, and result counts to enrich suggestion items in the UI."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "SearchAutocomplete/",
-            "definition": ""
-          },
-          {
-            "term": "api/           # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/     # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/          # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "pages/          # Route pages",
-            "definition": ""
-          },
-          {
-            "term": "store/          # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/          # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching and background refetch",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket / SSE for real-time updates",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries and retry logic",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"SearchAutocompleteDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapSearchAutocompleteEndpoints();\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run containerized or serverless workloads",
-            "tags": [
-              "Azure App Service",
-              "Amazon EC2 / ECS / EKS"
-            ],
-            "pros": [
-              "Auto-scaling",
-              "Managed infrastructure"
-            ],
-            "cons": [
-              "Cold start latency"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limiting, auth, and request routing",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Built-in policies",
-              "Developer portal"
-            ],
-            "cons": [
-              "Additional latency"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "In-memory caching for hot data",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond latency",
-              "Automatic eviction"
-            ],
-            "cons": [
-              "Memory cost"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary data store for services",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Global distribution",
-              "Auto-scaling throughput"
-            ],
-            "cons": [
-              "Consistency model learning curve"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Blob storage for media and files",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Infinite scale",
-              "Cheap archival tiers"
-            ],
-            "cons": [
-              "Eventual consistency for listings"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async communication between services",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS"
-            ],
-            "pros": [
-              "Decoupling",
-              "Buffering spikes"
-            ],
-            "cons": [
-              "Debugging async flows"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-autocomplete-sequence",
+        "caption": "Keystroke query flow: Client debounce, edge cache lookup, Trie shard traversal, and Top-K return in <25ms",
+        "definition": "sequenceDiagram\n    autonumber\n    actor User as 👤 User\n    participant Browser as 🌐 Client Browser\n    participant Edge as 🌍 Edge CDN\n    participant GW as 🚪 API Gateway\n    participant Trie as 📚 Trie Shard (In-Memory)\n    participant Kafka as 📨 Kafka Log Bus\n\n    User->>Browser: Types \"sys\" (Keystroke)\n    Browser->>Browser: Debounce Timer (250ms expired)\n    Browser->>Browser: Check Local Cache [\"sys\"] -> Miss\n\n    Browser->>Edge: GET /autocomplete?q=sys\n    alt CDN Edge Hit (Hot Prefix)\n        Edge-->>Browser: Return [\"system design\", \"system32\", \"sysinternals\"] (<10ms)\n    else CDN Edge Miss\n        Edge->>GW: Forward Request\n        GW->>GW: Cleanse input & check hate-speech denylist\n        GW->>Trie: LookupPrefix(\"sys\")\n\n        Note over Trie: Traverse Trie: root -> 's' -> 'y' -> 's'<br/>Read pre-computed Top 5 at node 's':<br/>1. \"system design\" (freq: 9.8M)<br/>2. \"system of a down\" (freq: 5.2M)<br/>3. \"system32\" (freq: 3.1M)\n        Trie-->>GW: Return Top 5 Candidates in 2ms\n        GW-->>Edge: Cache-Control: max-age=3600\n        Edge-->>Browser: Deliver Suggestions (<25ms)\n    end\n\n    Browser-->>User: Render Dropdown Suggestions\n    User->>Browser: Clicks \"system design\"\n    Browser--)Kafka: Log Event {query: \"system design\", timestamp, userId}"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Data Structure Comparison for Typeahead"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Data Structure / Approach",
+          "Time Complexity",
+          "Memory Footprint",
+          "Update Complexity",
+          "Suitability"
+        ],
+        "rows": [
+          [
+            "Relational SQL (LIKE \"prefix%\")",
+            "O(N) full table scan / B-Tree scan",
+            "Low (On disk)",
+            "Instant",
+            "Unusable at scale (Crashes database under 50k QPS)"
+          ],
+          [
+            "Elasticsearch Completion Suggester",
+            "O(L) based on FST (Finite State Transducer)",
+            "Moderate",
+            "Near-real-time (1-2s)",
+            "Great off-the-shelf solution for e-commerce search"
+          ],
+          [
+            "Standard Trie (Traverse Subtree on Query)",
+            "O(L + K) where K is all descendants",
+            "High (Pointers for 26+ children per node)",
+            "Fast",
+            "Too slow at query time (traversing millions of sub-nodes)"
+          ],
+          [
+            "Trie with Top-K Pre-Computed at Nodes",
+            "O(L) where L is prefix length",
+            "Highest (Stores Top-5 at every node)",
+            "Slow (Rebuilt in batch)",
+            "Google / Amazon search bar standard (guarantees <5ms reads)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why store Top-K suggestions directly at every Trie node instead of searching on the fly?",
+            "answer": "In a standard Trie, once you reach the node for prefix \"ca\", you must traverse all thousands of sub-branches (\"car\", \"cat\", \"card\", etc.) to identify the 5 highest-frequency queries, taking 50-100ms. By caching the top 5 queries directly at the \"ca\" node, the search completes the instant the prefix node is reached in O(length) time (<2ms)."
+          },
+          {
+            "question": "How much memory does a Trie with Top-K caching consume for 100M queries?",
+            "answer": "Storing 100 million unique search terms (average length 15 characters) with Top-5 suggestions at each node would consume ~25-30 GB of RAM. This easily fits inside a single modern server (e.g. 64GB RAM instance). To ensure fault tolerance and high throughput, the Trie is replicated across 10-20 read replicas behind a load balancer."
+          },
+          {
+            "question": "How are Trie shards partitioned to avoid uneven hotspots?",
+            "answer": "Do not partition by the first letter (e.g. Shard A for 'a', Shard B for 'b') because letters like 's' or 'c' receive 20x more searches than 'z' or 'x'. Instead, partition by `hash(prefix) % num_shards` or use consistent hashing over the prefix string to distribute memory and query QPS uniformly across nodes."
+          },
+          {
+            "question": "How are breaking news and sudden viral trends accommodated if the Trie is rebuilt weekly?",
+            "answer": "Use a hybrid architecture: (1) The Master Base Trie reflects rolling 7-day historical frequencies, and (2) A Real-Time Stream Tier (Redis Sorted Set) tracks queries trending over the past 30 minutes via Apache Flink. The API Gateway queries both and merges them, prioritizing sudden viral spikes."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "A Search Autocomplete system requires both simple and scalable designs",
-          "Monolith is fastest to validate; microservices are for scale",
-          "React + ASP.NET Core provides a robust full-stack foundation",
-          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
-          "Always design for failure: retries, circuit breakers, and fallbacks"
+          "Tries with Top-K pre-stored at nodes achieve O(prefix length) lookup time in under 2ms",
+          "Client debouncing (150-300ms) drops total server network requests by over 60%",
+          "Consistent hashing distributes prefix trees evenly across memory-mapped server clusters",
+          "Offline batch pipelines (Kafka + Spark) process billions of logs to refresh frequency weights",
+          "Hybrid streaming (Flink + Redis) injects breaking viral news without waiting for weekly re-indexes"
         ],
-        "takeaway": "Search Autocomplete is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Search autocomplete systems deliver instant, sub-30ms responsiveness by combining in-memory prefix Tries with node-level Top-K caching, supported by asynchronous log aggregation pipelines."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "google-search",
+    "web-crawler",
+    "amazon-ecommerce-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Designing an Autocomplete System — ByteByteGo",
+      "url": "https://bytebytego.com/courses/system-design-interview/design-search-autocomplete-system",
+      "type": "article"
+    },
+    {
+      "title": "Prefix Hash Tree and Trie Optimization for Search",
+      "url": "https://en.wikipedia.org/wiki/Trie",
+      "type": "article"
+    }
+  ]
 }

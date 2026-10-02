@@ -114,6 +114,21 @@
       "type": "heading",
       "data": {
         "level": 2,
+        "text": "Photo Upload & Hybrid Feed Fan-out Sequence"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-instagram-feed-sequence",
+        "caption": "Photo upload, async multi-resolution transcoding, hybrid fan-out to Redis feeds, and ML re-ranking",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Creator as 📸 Creator\n    participant Gateway as 🚪 API Gateway\n    participant Upload as 📤 Upload Service\n    participant S3 as 🗄️ Object Store\n    participant Transcode as 🎬 Transcoder / CDN\n    participant Kafka as 📨 Kafka Event Bus\n    participant Fanout as ⚡ Fanout Worker\n    participant Redis as ⚡ Redis Feed Cache\n    actor Follower as 👤 Follower\n    participant FeedSvc as 📰 Feed Service\n    participant ML as 🧠 ML Ranker\n\n    Creator->>Gateway: POST /posts (Image Binary, Caption, Tags)\n    Gateway->>Upload: Stream multipart chunks\n    Upload->>S3: Store raw image in S3\n    Upload->>Transcode: Trigger WebP compression & 3 resolution crops\n    Transcode->>S3: Save 240p, 480p, 1080p images\n    Upload-->>Creator: Post Created Ack (<500ms)\n\n    Upload->>Kafka: Publish PostCreatedEvent(authorId, postId, timestamp)\n    Kafka->>Fanout: Consume event\n    Fanout->>Fanout: Check author follower count\n    alt Normal Creator (<25,000 Followers)\n        Fanout->>Redis: ZADD feed:follower_id timestamp postId (Push to all followers)\n    else Celebrity Creator (>25,000 Followers)\n        Fanout->>Redis: ZADD user:author_id timestamp postId (Skip fanout push!)\n    end\n\n    Follower->>Gateway: GET /feed/home\n    Gateway->>FeedSvc: FetchHomeFeed(FollowerId)\n    FeedSvc->>Redis: ZREVRANGEBYSCORE feed:follower_id (Top 200 candidates)\n    FeedSvc->>Redis: Fetch recent posts from followed celebrities & merge\n    FeedSvc->>ML: Score & rank top candidates by engagement signals\n    ML-->>FeedSvc: Top 20 Ranked Posts\n    FeedSvc-->>Follower: Render Home Feed with CDN images (<150ms)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
         "text": "Fan-out Strategy Decision"
       }
     },

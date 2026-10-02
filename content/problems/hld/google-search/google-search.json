@@ -4,14 +4,17 @@
   "moduleSlug": "google-search",
   "courseSlug": "hld-problems",
   "title": "Google Search Engine: Complete Architecture",
-  "description": "Design a scalable Google-style search engine with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a web search engine at Google scale with distributed crawling, inverted indexing, PageRank, scatter-gather query serving, and ML ranking.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "googlesearch"
+    "search-engine",
+    "inverted-index",
+    "pagerank",
+    "scatter-gather"
   ],
   "blocks": [
     {
@@ -24,7 +27,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a scalable Google-style web search engine. The system must continuously crawl the web to discover new pages, parse and index content for fast retrieval, process user queries with relevance ranking, generate descriptive snippets, and support autocomplete and spell correction. It must handle billions of pages, serve thousands of queries per second, and return results in under 300ms while maintaining index freshness."
+        "text": "Design a global web-scale search engine like Google. The system crawls billions of web pages across the public internet, parses and extracts document text and hyperlinks, creates and maintains a compressed inverted index, and serves user search queries with relevance ranking in sub-200ms at hundreds of thousands of queries per second (QPS)."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Inverted Index",
+            "definition": "A data structure mapping every distinct word/term to a posting list containing Document IDs, term frequencies, and word positions."
+          },
+          {
+            "term": "PageRank",
+            "definition": "An iterative link-analysis algorithm that assigns numerical weights to hyperlinked documents based on the authority of incoming links."
+          },
+          {
+            "term": "Scatter-Gather Pattern",
+            "definition": "A distributed query technique where a root node broadcasts a search query to hundreds of index leaf shards in parallel, merging and re-ranking the top results."
+          },
+          {
+            "term": "SimHash / MinHash",
+            "definition": "Locality-sensitive hashing algorithms used during crawling to detect near-duplicate web documents and save indexing capacity."
+          },
+          {
+            "term": "Posting List Compression",
+            "definition": "Techniques like Delta-encoding + Varint (VByte) to compress billions of DocIDs into compact memory-mapped index blocks."
+          }
+        ]
       }
     },
     {
@@ -39,16 +69,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Web crawler discovers and fetches pages from the internet while respecting robots.txt and crawl budgets",
-          "Indexer extracts text, metadata, and links from crawled pages and builds an inverted index",
-          "Search API accepts queries with operators (AND, OR, phrase search, site:) and returns ranked results",
-          "Ranking algorithm scores results using PageRank, TF-IDF, BM25, and machine-learned features",
-          "Snippet generator extracts relevant text around query terms for result descriptions",
-          "Autocomplete service suggests queries as users type based on popular searches and personal history",
-          "Spell checker detects misspelled queries and returns corrections with 'Did you mean?' suggestions",
-          "Safe search filters adult or explicit content from results",
-          "Image, video, and news verticals provide specialized search experiences",
-          "Search analytics track query volume, click-through rates, and result quality"
+          "Continuous Crawling: Discover and fetch billions of web pages while obeying robots.txt and host politeness rules",
+          "Document Parsing & Dedup: Strip HTML tags, extract text, compute document fingerprints (SimHash), and discard duplicates",
+          "Inverted Index Creation: Build forward indices and invert them into compressed posting lists with term positions",
+          "Search Query Processing: Parse query terms, handle operators (quotes, AND, OR, site:), expand synonyms, and spell-correct",
+          "Relevance Ranking: Score matching documents combining BM25, PageRank authority, freshness, and ML neural re-ranking",
+          "Snippet & Highlighting: Extract relevant sentences containing matching keywords for the search result page (SERP)"
         ]
       }
     },
@@ -57,13 +83,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Query response time must be under 300ms at p99 for standard web search",
-          "System must crawl and index the entire publicly accessible web (100B+ pages)",
-          "Index must be updated incrementally within minutes of page changes",
-          "Search service must handle 40,000+ queries per second globally",
-          "99.99% availability for the search API",
-          "Index storage must be efficient; compressed inverted indexes should fit on commodity hardware",
-          "Crawler must be polite: respect rate limits, crawl delays, and avoid overwhelming servers"
+          "Scale: Index 50+ billion web pages; serve 100,000+ queries per second (QPS)",
+          "Latency: Strict sub-200ms P99 search response time globally",
+          "Availability: 99.999% uptime for the query serving tier",
+          "Index Freshness: News and trending content re-crawled and indexed in minutes; static pages updated within days",
+          "Fault Tolerance: Sharded index leaf nodes must support automatic replica failover without dropped queries"
         ]
       }
     },
@@ -71,391 +95,158 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that handles crawling, indexing, and search in a single process. Store crawled documents and an inverted index in a relational database. This validates the core search pipeline before moving to distributed storage and processing."
+        "text": "The search engine system splits into two distinct, decoupled subsystems: the Offline Pipeline (Web Crawler, Inverted Index Builder, PageRank Calculator) and the Online Query Serving System (Query Parser, Scatter-Gather Index Searchers, ML Ranking Engine, and Snippet Generator)."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-googlesearchenginecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Google Search Engine: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CrawlerService[Crawler Service]\n        MS_IndexerService[Indexer Service]\n        MS_SearchService[Search Service]\n        MS_RankingService[Ranking Service]\n        MS_SnippetService[Snippet Service]\n        MS_QueryAnalyzer[Query Analyzer]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CrawlerService\n        MS_CrawlerService --> MS_DB\n        MS_CrawlerService --> MS_Queue\n        MS_CrawlerService --> MS_Cache\n        MS_LB --> MS_IndexerService\n        MS_IndexerService --> MS_DB\n        MS_IndexerService --> MS_Queue\n        MS_IndexerService --> MS_Cache\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_RankingService\n        MS_RankingService --> MS_DB\n        MS_RankingService --> MS_Queue\n        MS_RankingService --> MS_Cache\n        MS_LB --> MS_SnippetService\n        MS_SnippetService --> MS_DB\n        MS_SnippetService --> MS_Queue\n        MS_SnippetService --> MS_Cache\n        MS_LB --> MS_QueryAnalyzer\n        MS_QueryAnalyzer --> MS_DB\n        MS_QueryAnalyzer --> MS_Queue\n        MS_QueryAnalyzer --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for crawled page snapshots",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for Documents, InvertedIndex, and QueryLogs",
-            "definition": ""
-          }
-        ]
+        "id": "hld-google-search-arch",
+        "caption": "Google Search Engine Architecture: Offline crawling and indexing pipelines feed into sharded online scatter-gather search clusters",
+        "definition": "flowchart TD\n    subgraph Clients[\"👤 Users\"]\n        UserBrowser[\"🌐 Web Browser / Mobile App\"]\n    end\n\n    subgraph EdgeLayer[\"🌍 Edge & Gateway\"]\n        GeoDNS[\"Geo-DNS / Anycast Routing\"]\n        EdgeProxy[\"Envoy Proxy & SSL Termination\"]\n        Cache[\"⚡ Global SERP Cache (Redis Cluster)\"]\n    end\n\n    subgraph OnlineServing[\"⚡ Online Query Serving System\"]\n        QueryGW[\"Query Dispatcher & Rewriter\"]\n        NLP[\"NLP & Spell Correction / Synonyms\"]\n        Aggregator[\"Scatter-Gather Aggregator (Root Server)\"]\n        Ranker[\"🧠 Neural Ranking Engine (Two-Tower / RankBrain)\"]\n        SnippetSvc[\"📄 Snippet & Summary Generator\"]\n    end\n\n    subgraph IndexShards[\"📚 Sharded Inverted Index Cluster\"]\n        subgraph ShardGroup1[\"Index Shard 001 - 010\"]\n            L1[\"Leaf Node 1 (Doc 0-10M)\"]\n            L2[\"Leaf Node 2 (Doc 10-20M)\"]\n        end\n        subgraph ShardGroup2[\"Index Shard 011 - N\"]\n            L3[\"Leaf Node 3 (Doc 20-30M)\"]\n            LN[\"Leaf Node N (Replica Cluster)\"]\n        end\n    end\n\n    subgraph OfflinePipeline[\"🏗️ Offline Crawling & Indexing Pipeline\"]\n        CrawlFrontier[\"🌐 Crawl Frontier (Priority & Politeness Queues)\"]\n        CrawlerFleet[\"🕷️ Distributed Crawlers (HTTP Fetchers)\"]\n        DocParser[\"📄 Parser & SimHash Dedup Engine\"]\n        RawDocStore[(\"🗄️ Raw Web Content Store (Google Bigtable / S3)\")]\n        MapReduce[\"⚙️ MapReduce / Spark Index Builder\"]\n        PageRankCalc[\"🔗 Link Graph & PageRank Compute Engine\"]\n        InvertedIndexStore[(\"📑 Master Inverted Index Files (SSTable / GCS)\")]\n    end\n\n    UserBrowser --> GeoDNS --> EdgeProxy\n    EdgeProxy --> Cache\n    Cache -->|Cache Miss| QueryGW\n    QueryGW --> NLP --> Aggregator\n\n    Aggregator -->|Scatter Query| L1 & L2 & L3 & LN\n    L1 & L2 & L3 & LN -->|Gather Top 100 Candidates| Aggregator\n\n    Aggregator --> Ranker\n    Ranker --> SnippetSvc\n    SnippetSvc --> EdgeProxy\n    EdgeProxy --> UserBrowser\n\n    CrawlFrontier --> CrawlerFleet --> DocParser\n    DocParser --> RawDocStore\n    RawDocStore --> MapReduce\n    RawDocStore --> PageRankCalc\n    PageRankCalc --> MapReduce\n    MapReduce --> InvertedIndexStore\n    InvertedIndexStore -->|Push Daily/Hourly Delta| L1 & L2 & L3 & LN"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Online Query Serving: Scatter-Gather Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "As the web grows, split the monolith into microservices specialized for each phase of the search pipeline. Crawling, indexing, and query serving have very different scalability profiles and should be scaled independently."
+        "text": "To achieve sub-200ms latency across billions of indexed pages, the search query is broadcast simultaneously to all index shards. Each leaf node evaluates matching posting lists in memory and returns its local top-K candidates to the aggregator."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-googlesearchenginecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Google Search Engine: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_CrawlerService[Crawler Service]\n        MS_IndexerService[Indexer Service]\n        MS_SearchService[Search Service]\n        MS_RankingService[Ranking Service]\n        MS_SnippetService[Snippet Service]\n        MS_QueryAnalyzer[Query Analyzer]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_CrawlerService\n        MS_CrawlerService --> MS_DB\n        MS_CrawlerService --> MS_Queue\n        MS_CrawlerService --> MS_Cache\n        MS_LB --> MS_IndexerService\n        MS_IndexerService --> MS_DB\n        MS_IndexerService --> MS_Queue\n        MS_IndexerService --> MS_Cache\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_RankingService\n        MS_RankingService --> MS_DB\n        MS_RankingService --> MS_Queue\n        MS_RankingService --> MS_Cache\n        MS_LB --> MS_SnippetService\n        MS_SnippetService --> MS_DB\n        MS_SnippetService --> MS_Queue\n        MS_SnippetService --> MS_Cache\n        MS_LB --> MS_QueryAnalyzer\n        MS_QueryAnalyzer --> MS_DB\n        MS_QueryAnalyzer --> MS_Queue\n        MS_QueryAnalyzer --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Crawler Service: Discovers and fetches web pages using BFS/DFS with politeness delays. Respects robots.txt, maintains per-domain rate limits, and stores raw HTML in blob storage. Publishes CrawlCompleted events for indexing.",
-          "Indexer Service: Parses HTML, extracts text and metadata, removes stop words, and builds an inverted index. Runs as a distributed MapReduce or Spark job. Stores posting lists in a compressed, sharded format for fast intersection.",
-          "Search Service: Accepts queries, parses query operators, retrieves matching document IDs from the inverted index, and returns a candidate set to the Ranking Service. Handles paging, filters, and safe search.",
-          "Ranking Service: Scores candidate documents using BM25, PageRank, and ML-based features (click data, freshness, user location). Returns the top-K results sorted by relevance score.",
-          "Snippet Service: Extracts and formats relevant text segments from matched documents. Highlights query terms and ensures snippets are concise and contextually accurate.",
-          "Query Analyzer: Processes raw queries for autocomplete, spell correction, query expansion, and intent classification. Suggests corrections and popular related queries."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "search/",
-            "definition": ""
-          },
-          {
-            "term": "search-bar/         # Input with autocomplete dropdown and spell suggestions",
-            "definition": ""
-          },
-          {
-            "term": "results-page/       # SERP with snippets, rich cards, and paging",
-            "definition": ""
-          },
-          {
-            "term": "filters/            # Time range, safe search, result type toggles",
-            "definition": ""
-          },
-          {
-            "term": "image-search/       # Image grid with Lens-like visual search",
-            "definition": ""
-          },
-          {
-            "term": "news-search/        # News vertical with publisher and date filters",
-            "definition": ""
-          },
-          {
-            "term": "api/                # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/         # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/              # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "store/              # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/              # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/                  # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/                  # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/                # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Debounced query input to reduce API calls during typing",
-            "definition": ""
-          },
-          {
-            "term": "- Cached autocomplete results for recently typed queries",
-            "definition": ""
-          },
-          {
-            "term": "- Virtualized result list for smooth scrolling through thousands of results",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching search results with stale-while-revalidate",
-            "definition": ""
-          },
-          {
-            "term": "- Intersection Observer for infinite scroll pagination",
-            "definition": ""
-          },
-          {
-            "term": "- Web Workers for client-side query parsing and highlighting",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Search Service (ASP.NET Core)",
-        "language": "text",
-        "code": "// Search Service: retrieves candidate documents from the inverted index\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\n// Inverted index client connects to a distributed key-value store or search engine\nbuilder.Services.AddSingleton<IInvertedIndexClient>(_ =>\n    new InvertedIndexClient(builder.Configuration[\"Index:Endpoint\"])\n);\n\nvar app = builder.Build();\n\napp.MapPost(\"/search\", async (SearchRequest req, IInvertedIndexClient index) => {\n    // 1. Parse query and expand with synonyms\n    var parsedQuery = QueryParser.Parse(req.Query, req.Operators);\n\n    // 2. Retrieve candidate document IDs from inverted index (AND/OR intersection)\n    var candidateIds = await index.SearchAsync(parsedQuery.Terms, parsedQuery.Filters);\n\n    // 3. Fetch document metadata from cache or database\n    var docs = await cache.GetOrCreateAsync($\"docs:{string.Join(',', candidateIds.Take(1000))}\",\n        async entry =>\n        {\n            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);\n            return await db.Documents\n                .Where(d => candidateIds.Contains(d.Id))\n                .Select(d => new DocumentResult { Id = d.Id, Title = d.Title, Url = d.Url })\n                .ToListAsync();\n        });\n\n    // 4. Return candidates; Ranking Service will re-score\n    return Results.Ok(new SearchResponse\n    {\n        Total = candidateIds.Count,\n        Results = docs,\n        SpellSuggestion = await spellChecker.SuggestAsync(req.Query)\n    });\n})\n.WithName(\"Search\");\n\napp.MapGet(\"/health\", () => Results.Ok());\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run crawler workers, indexer jobs, and search API servers",
-            "tags": [
-              "Azure App Service / AKS Batch",
-              "Amazon EC2 / ECS / AWS Batch"
-            ],
-            "pros": [
-              "Scale crawler fleet horizontally across thousands of URLs",
-              "Spot instances reduce cost for batch indexing jobs"
-            ],
-            "cons": [
-              "Managing large fleets requires orchestration"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limit and route search API requests globally",
-            "tags": [
-              "Azure API Management / Front Door",
-              "Amazon API Gateway / CloudFront"
-            ],
-            "pros": [
-              "Edge caching for popular queries reduces latency",
-              "WAF protection against scraping and abuse"
-            ],
-            "cons": [
-              "Cache hit ratios depend on query diversity"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "Cache frequent queries, autocomplete results, and document metadata",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond response for cached queries",
-              "Reduces load on the ranking and snippet services"
-            ],
-            "cons": [
-              "High cardinality queries may not benefit from caching"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Store crawled documents, metadata, and query logs",
-            "tags": [
-              "Azure Cosmos DB / Blob Storage",
-              "Amazon DynamoDB / S3"
-            ],
-            "pros": [
-              "Massively scalable for billions of document records",
-              "Low-cost archival for raw crawled content"
-            ],
-            "cons": [
-              "Complex queries require secondary indexes or separate search engines"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Store raw crawled HTML, images, and index snapshots",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Cheap, durable storage for petabytes of crawled data",
-              "Lifecycle policies for archival and deletion"
-            ],
-            "cons": [
-              "Index rebuilds require reading from cold storage"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Queue crawl jobs and index update events",
-            "tags": [
-              "Azure Service Bus / Storage Queues",
-              "Amazon SQS / SNS"
-            ],
-            "pros": [
-              "Buffers crawl requests to avoid overwhelming target sites",
-              "Decouples crawler from indexer for async processing"
-            ],
-            "cons": [
-              "Queue depth can grow during crawler backlogs"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-google-query-sequence",
+        "caption": "Scatter-Gather query execution flow with parallel index shard scoring, top-K aggregation, and final neural re-ranking",
+        "definition": "sequenceDiagram\n    autonumber\n    actor User as 👤 Search User\n    participant Proxy as 🌍 Edge Gateway\n    participant QuerySvc as ⚡ Query Parser\n    participant Root as 🎯 Root Aggregator\n    participant ShardA as 📑 Index Shard A\n    participant ShardB as 📑 Index Shard B\n    participant MLRank as 🧠 ML Re-ranker\n    participant DocStore as 🗄️ Document / Snippet Store\n\n    User->>Proxy: GET /search?q=\"system design interview\"\n    Proxy->>QuerySvc: Process Query\n    QuerySvc->>QuerySvc: Normalize, Tokenize, Spell Check\n    QuerySvc->>Root: Execute Distributed Search (Tokens: [\"system\", \"design\", \"interview\"])\n\n    par Scatter to Index Shards\n        Root->>ShardA: Search local index (Tokens)\n        Root->>ShardB: Search local index (Tokens)\n    end\n\n    Note over ShardA, ShardB: Intersect Posting Lists<br/>Compute Local BM25 + PageRank\n    ShardA-->>Root: Return Top 100 DocIDs + Basic Scores\n    ShardB-->>Root: Return Top 100 DocIDs + Basic Scores\n\n    Root->>Root: Gather and merge 200 candidates\n    Root->>MLRank: Re-rank top 200 candidates with 100+ features\n    MLRank-->>Root: Sorted Top 10 DocIDs\n\n    Root->>DocStore: Fetch titles, URLs, and text snippets for Top 10 DocIDs\n    DocStore-->>Root: Hydrated Search Result Documents\n    Root-->>Proxy: Return Formatted SERP\n    Proxy-->>User: Render Results in 140ms"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Index Structure & Data Storage"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Component",
+          "Technology / Structure",
+          "Storage Type",
+          "Purpose"
+        ],
+        "rows": [
+          [
+            "Lexicon / Term Dictionary",
+            "Trie / Hash Table in Memory",
+            "RAM on Shard",
+            "Maps search terms to posting list file byte offset"
+          ],
+          [
+            "Posting Lists",
+            "Delta-encoded byte arrays (DocID, TF, Pos)",
+            "SSD / Memory-mapped",
+            "Sorted list of documents containing the term"
+          ],
+          [
+            "Forward Index",
+            "DocID -> Array of Token IDs",
+            "Bigtable / RocksDB",
+            "Used for snippet extraction and index inversion"
+          ],
+          [
+            "Link Graph & PageRank",
+            "Sparse adjacency matrix",
+            "Distributed Graph DB",
+            "Calculates global authority score for each URL"
+          ],
+          [
+            "Document Summary Cache",
+            "Key-Value store (DocID -> Title, Snippet)",
+            "Redis / Memcached",
+            "Instant snippet extraction without reading full HTML"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How is the inverted index partitioned: Document Sharding vs Term Sharding?",
+            "answer": "Google uses Document Sharding (Local Inverted Index). Each shard contains the complete dictionary for a subset of all documents. When querying, the request is broadcast to all shards (scatter-gather). This prevents single-term hotspots (like the word \"the\" or \"weather\") from overwhelming one server, and keeps shard failures isolated."
+          },
+          {
+            "question": "How are posting lists compressed to fit in memory?",
+            "answer": "DocIDs in a posting list are strictly ascending. Instead of storing 64-bit integers [1000, 1005, 1012], we store delta differences [1000, 5, 7]. Small numbers require only 1 or 2 bytes using Variable Byte (Varint) or Elias-Fano encoding, reducing index size by over 85%."
+          },
+          {
+            "question": "How is index freshness balanced with high search throughput?",
+            "answer": "Use a tiered indexing model: a Real-Time Index (in-memory LSM-tree) updates breaking news within seconds, while the Base Master Index (tens of billions of pages) is re-indexed daily or weekly via distributed batch pipelines. Query aggregators search both tiers and merge results seamlessly."
+          },
+          {
+            "question": "How does Google handle tail queries and spelling mistakes?",
+            "answer": "Query understanding applies spelling correction via character-level language models and n-gram dictionaries. Synonyms are expanded using embedding vector distance. If a query yields zero hits, relaxed term matching (dropping non-essential words) is automatically evaluated."
+          },
+          {
+            "question": "What happens if 2 out of 500 leaf shards timeout during scatter-gather?",
+            "answer": "Strict SLA enforcement: if a shard does not respond within 80ms, the aggregator proceeds with results from the other 498 shards rather than blocking the user. Users would rather see 99.6% complete results in 120ms than wait 5 seconds for 100% completeness."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Search engines are pipeline-heavy: crawling, indexing, and query serving must be decoupled for independent scaling",
-          "The inverted index is the core data structure; its compression and sharding determine query performance",
-          "Ranking is the most computationally expensive stage and benefits from ML model optimization",
-          "Crawl politeness is a first-class concern; aggressive crawlers get blocked by target sites",
-          "Start with a monolith to validate the index schema, then extract Crawler, Indexer, and Search as separate services"
+          "Document partitioning (scatter-gather) distributes query loads evenly without hotspot terms",
+          "Inverted indices store delta-compressed posting lists with term positions for fast phrase search",
+          "Two-tier ranking separates cheap candidate retrieval (BM25 + PageRank) from deep ML neural scoring",
+          "Tiered indexing (real-time in-memory + master batch) provides both instant freshness and petabyte scale",
+          "Aggregator timeouts gracefully degrade search completeness to safeguard sub-200ms P99 latency"
         ],
-        "takeaway": "Google Search Engine is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Search engine scalability relies on document-partitioned inverted indices queried via scatter-gather. Strict tail latency management and multi-stage ranking deliver relevant results from 50 billion pages in a fraction of a second."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "web-crawler",
+    "search-autocomplete",
+    "url-shortener"
+  ],
+  "furtherReading": [
+    {
+      "title": "The Anatomy of a Large-Scale Hypertextual Web Search Engine (Brin & Page)",
+      "url": "http://infolab.stanford.edu/~backrub/google.html",
+      "type": "article"
+    },
+    {
+      "title": "WSDM: Scaling Search Engines at Google Scale",
+      "url": "https://research.google/pubs/pub45837/",
+      "type": "article"
+    }
+  ]
 }

@@ -4,14 +4,18 @@
   "moduleSlug": "dropbox-storage",
   "courseSlug": "hld-problems",
   "title": "Dropbox File Storage: Complete Architecture",
-  "description": "Design dropbox file storage with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a cloud file synchronization and storage system with 4MB chunking, content-addressable storage, delta sync, and conflict resolution.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "dropboxstorage"
+    "dropbox",
+    "storage",
+    "chunking",
+    "delta-sync",
+    "deduplication"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a cloud file storage and synchronization system similar to Dropbox. Users store files in folders that sync across multiple devices, share folders with permissions, restore previous versions, and collaborate on documents. The system must handle large file uploads via chunking, detect changes with delta sync, and maintain consistency across offline clients."
+        "text": "Design a cloud storage and synchronization service like Dropbox or Google Drive. The system allows 700+ million users to store files, sync changes seamlessly across multiple desktop and mobile devices, share folders with granular permissions, and roll back to previous file revisions. The central engineering challenge is bandwidth optimization and reliability: a minor edit to a 1GB video or presentation must only transmit the modified bytes (Delta Sync), files must be split into deduplicated content-addressed blocks, and concurrent offline edits must resolve gracefully."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Content-Addressable Storage (CAS)",
+            "definition": "Storing data blocks where the storage key/identifier is the cryptographic SHA-256 hash of the block payload itself."
+          },
+          {
+            "term": "Delta Sync",
+            "definition": "Detecting and transmitting only the modified 4MB chunks of an edited file rather than re-uploading the entire file across the network."
+          },
+          {
+            "term": "Block Server (Chunk Server)",
+            "definition": "The storage subsystem responsible for receiving, encrypting, deduplicating, and persisting raw 4MB binary file chunks into cloud object stores."
+          },
+          {
+            "term": "Metadata Server",
+            "definition": "The transactional database managing user accounts, directory structures, file versions, sharing permissions, and the ordered list of chunk hashes for each file."
+          },
+          {
+            "term": "Sync Engine & Local Indexer",
+            "definition": "The client daemon monitoring filesystem events (FSEvents/inotify), computing block hashes, and synchronizing state with the cloud."
+          }
+        ]
       }
     },
     {
@@ -39,16 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Upload and download files up to 50GB with resumable chunked transfers",
-          "Synchronize files and folders across desktop, web, and mobile clients",
-          "Detect file changes using content-based hashing rather than timestamps",
-          "Maintain complete version history with rollback to any prior version",
-          "Share folders and files with view, edit, or comment permissions",
-          "Resolve sync conflicts when the same file is edited on multiple devices",
-          "Generate preview thumbnails for images, videos, PDFs, and documents",
-          "Show sync status (synced, syncing, error) and selective sync per device",
-          "Support shared links with password protection, expiration dates, and access logs",
-          "Search files by name, content, and metadata across all owned and shared items"
+          "File Upload & Download: Store files up to 50GB with resumable chunked streaming",
+          "Automatic Cross-Device Sync: Real-time synchronization across desktop (macOS/Windows/Linux), web, and mobile devices",
+          "Delta Sync & Deduplication: Only upload new or modified 4MB chunks; eliminate identical chunks across the entire system",
+          "Revision History: Automatic versioning with 30-day (free) or unlimited (enterprise) rollback capability",
+          "Sharing & Permissions: Share folders/files with Read or Read/Write access; generate public links with expiry",
+          "Offline Editing & Conflict Resolution: Allow offline changes and generate branching conflict files if concurrent edits clash"
         ]
       }
     },
@@ -57,12 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "99.99% durability for stored files with 11 nines of data integrity",
-          "Delta sync must detect changes under 100ms for files smaller than 10MB",
-          "Support 10 million concurrent active users with 500TB daily upload volume",
-          "End-to-end encryption for files at rest and in transit",
-          "Sub-second metadata API response for listing folders with 10,000 items",
-          "Offline-first sync with eventual consistency when devices reconnect"
+          "Scale: 700M+ registered users; 100M+ daily active; 500+ Petabytes of total stored data",
+          "Durability: 99.999999999% (11 nines) durability via geographic multi-region replication and erasure coding",
+          "Bandwidth Efficiency: Delta sync and client-side compression to minimize mobile and broadband data usage",
+          "Latency: File sync notifications dispatched to peer devices in under 500ms over persistent WebSockets",
+          "Consistency: Strong consistency for metadata operations (file list, versions, and chunk order)"
         ]
       }
     },
@@ -70,87 +96,83 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that validates the Dropbox storage domain: file metadata, chunked uploads, version tracking, sharing permissions, and sync logic. This validates conflict resolution and delta detection before splitting into services."
+        "text": "The architecture strictly decouples the high-volume data plane (Block Storage of binary chunks) from the high-consistency control plane (Metadata Service, Notification Service, and Sync Gateway)."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-dropboxfilestoragecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Dropbox File Storage: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_UploadService[Upload Service]\n        MS_DownloadService[Download Service]\n        MS_SyncService[Sync Service]\n        MS_MetadataService[Metadata Service]\n        MS_SharingService[Sharing Service]\n        MS_VersionService[Version Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_DownloadService\n        MS_DownloadService --> MS_DB\n        MS_DownloadService --> MS_Queue\n        MS_DownloadService --> MS_Cache\n        MS_LB --> MS_SyncService\n        MS_SyncService --> MS_DB\n        MS_SyncService --> MS_Queue\n        MS_SyncService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n        MS_LB --> MS_SharingService\n        MS_SharingService --> MS_DB\n        MS_SharingService --> MS_Queue\n        MS_SharingService --> MS_Cache\n        MS_LB --> MS_VersionService\n        MS_VersionService --> MS_DB\n        MS_VersionService --> MS_Queue\n        MS_VersionService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-dropbox-arch",
+        "caption": "Dropbox Architecture: Client Sync Daemon, Chunk Storage with global deduplication, Metadata DB, and Notification Gateway",
+        "definition": "flowchart TD\n    subgraph ClientDevice[\"💻 Client Device (Desktop / Mobile)\"]\n        FSWatcher[\"📁 Filesystem Watcher (inotify / FSEvents)\"]\n        Chunker[\"✂️ Chunking & Compression Engine (4MB Chunks)\"]\n        Hasher[\"🔑 Hasher (SHA-256 Signature per Chunk)\"]\n        LocalDB[(\"💾 Local SQLite DB\\nChunk hashes & file sync state\")]\n        ClientSync[\"🔄 Client Sync Daemon\"]\n    end\n\n    subgraph Edge[\"🌍 Edge & Gateway Tier\"]\n        APIGW[\"API Gateway (Auth & Rate Limiting)\"]\n        NotifGW[\"⚡ Notification Gateway (WebSocket / Long Poll)\"]\n    end\n\n    subgraph DataPlane[\"📦 Data Plane: Block / Chunk Storage\"]\n        BlockSvc[\"🧱 Block Service (Chunk Upload / Download)\"]\n        DedupCheck[\"🔁 Global Deduplication Engine\\nCheck if SHA-256 exists\"]\n        ObjectStore[(\"🗄️ Object Store (S3 / Magic Pocket)\\nEncrypted Content-Addressable Blocks\")]\n    end\n\n    subgraph ControlPlane[\"⚙️ Control Plane: Metadata & Coordination\"]\n        MetaSvc[\"📋 Metadata Service (File trees & permissions)\"]\n        MetaDB[(\"🗄️ Metadata DB (MySQL Shards / CockroachDB)\\nUsers, File-to-Chunk Maps, Revisions\")]\n        Cache[\"⚡ Metadata Cache (Redis Cluster)\"]\n    end\n\n    subgraph SyncNotification[\"🔔 Notification & Wake-up Pipeline\"]\n        Kafka[\"📨 Apache Kafka (file-changed events)\"]\n        NotifSvc[\"🔔 Push Notification Service\"]\n        PeerClient[\"📱 Peer Client (Laptop / Mobile)\"]\n    end\n\n    FSWatcher --> Chunker --> Hasher --> LocalDB\n    Hasher --> ClientSync\n    ClientSync --> APIGW\n\n    APIGW -->|Upload Missing Chunks| BlockSvc\n    APIGW -->|Commit File Revision| MetaSvc\n\n    BlockSvc --> DedupCheck\n    DedupCheck -->|Write New Chunks| ObjectStore\n\n    MetaSvc --> Cache\n    Cache -->|Miss| MetaDB\n    MetaSvc -->|Publish File Updated| Kafka\n\n    Kafka --> NotifSvc --> NotifGW\n    NotifGW -->|Push Sync Wake-up| PeerClient\n    PeerClient -->|Download Delta Chunks| BlockSvc"
       }
     },
     {
-      "type": "key-terms",
+      "type": "heading",
       "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
+        "level": 2,
+        "text": "File Modification & Delta Sync Sequence"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a user edits a file, the client splits it into 4MB chunks and hashes each chunk. The client sends only the list of hashes to the server. If 9 out of 10 hashes already exist in the cloud, only the single altered chunk is uploaded."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-dropbox-sync-sequence",
+        "caption": "Delta Sync sequence: local chunk hashing, server hash deduplication check, delta block upload, and peer notification",
+        "definition": "sequenceDiagram\n    autonumber\n    actor User as 👤 User Device A\n    participant Local as 💾 Local Indexer\n    participant API as 🚪 API Gateway\n    participant BlockSvc as 🧱 Block Service\n    participant MetaSvc as 📋 Metadata Service\n    participant S3 as 🗄️ Block Store\n    participant DB as 🗄️ Metadata DB\n    participant Notif as 🔔 Notification Gateway\n    actor Peer as 💻 Peer Device B\n\n    User->>Local: Modifies \"Project.docx\" (100MB)\n    Local->>Local: Split into 25 chunks (4MB each)<br/>Compute SHA-256 for each chunk\n    Local->>API: POST /check-hashes [H1, H2, ... H24, H25_new]\n    API->>BlockSvc: Query existing hashes in CAS\n    BlockSvc-->>API: Missing: [H25_new] (24 chunks already exist!)\n\n    API-->>Local: Upload required for: [H25_new] only\n    Local->>BlockSvc: PUT /chunks/H25_new (4MB binary payload)\n    BlockSvc->>S3: Persist block encrypted at rest\n    BlockSvc-->>Local: Chunk H25_new Stored Ack\n\n    Local->>MetaSvc: POST /file/commit {path: \"/Project.docx\", chunks: [H1..H25_new], rev: 4}\n    MetaSvc->>DB: Update file mapping to new chunk array & bump revision\n    DB-->>MetaSvc: Revision 4 Committed\n    MetaSvc-->>Local: Sync Completed Successfully\n\n    MetaSvc->>Notif: Publish FileChangedEvent(path: \"/Project.docx\", rev: 4)\n    Notif->>Peer: Push WebSocket sync wake-up\n    Peer->>BlockSvc: Download chunk H25_new & reconstruct file"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Chunk Size Trade-Off Analysis"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Chunk Size",
+          "Metadata Overhead",
+          "Bandwidth Efficiency",
+          "Network Overhead",
+          "Suitability"
+        ],
+        "rows": [
+          [
+            "1 MB Chunks",
+            "High: 4x more hashes & database rows per file",
+            "Excellent: Fine-grained delta sync",
+            "High: 1000 HTTP requests for 1GB file",
+            "Great for small text files, poor for large video"
+          ],
+          [
+            "4 MB Chunks (Dropbox Standard)",
+            "Balanced: ~250 hashes per 1GB file",
+            "Optimal: Minimal waste for document edits",
+            "Balanced: Manageable HTTP connection pooling",
+            "Industry standard sweet spot for desktop sync"
+          ],
+          [
+            "16 MB Chunks",
+            "Low: Few database rows and tiny metadata tables",
+            "Poor: Changing one sentence re-uploads 16MB",
+            "Low: Fast multi-part sequential streaming",
+            "Better suited for pure backup & raw video archiving"
+          ]
         ]
       }
     },
@@ -158,174 +180,62 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Key Design Decisions & Trade-Offs"
       }
     },
     {
-      "type": "paragraph",
+      "type": "faq-block",
       "data": {
-        "text": "As traffic grows, split the monolith into independently scalable microservices. Each service owns its data and communicates via async messaging or REST/gRPC."
-      }
-    },
-    {
-      "type": "mermaid",
-      "data": {
-        "id": "mermaid-dropboxfilestoragecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Dropbox File Storage: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_UploadService[Upload Service]\n        MS_DownloadService[Download Service]\n        MS_SyncService[Sync Service]\n        MS_MetadataService[Metadata Service]\n        MS_SharingService[Sharing Service]\n        MS_VersionService[Version Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_UploadService\n        MS_UploadService --> MS_DB\n        MS_UploadService --> MS_Queue\n        MS_UploadService --> MS_Cache\n        MS_LB --> MS_DownloadService\n        MS_DownloadService --> MS_DB\n        MS_DownloadService --> MS_Queue\n        MS_DownloadService --> MS_Cache\n        MS_LB --> MS_SyncService\n        MS_SyncService --> MS_DB\n        MS_SyncService --> MS_Queue\n        MS_SyncService --> MS_Cache\n        MS_LB --> MS_MetadataService\n        MS_MetadataService --> MS_DB\n        MS_MetadataService --> MS_Queue\n        MS_MetadataService --> MS_Cache\n        MS_LB --> MS_SharingService\n        MS_SharingService --> MS_DB\n        MS_SharingService --> MS_Queue\n        MS_SharingService --> MS_Cache\n        MS_LB --> MS_VersionService\n        MS_VersionService --> MS_DB\n        MS_VersionService --> MS_Queue\n        MS_VersionService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Upload Service: Handles multipart file uploads with chunk assembly, resumable transfers using presigned URLs, and duplicate detection via content hash. Returns a file handle once all chunks are committed.",
-          "Download Service: Serves file bytes with range request support for large files, generates short-lived presigned download URLs, and streams data directly from object storage without proxying through the API tier.",
-          "Sync Service: Detects file changes using content-based hashing, computes delta differences between versions, and pushes change notifications to connected clients. Manages sync cursors per device for offline reconciliation.",
-          "Metadata Service: Stores file and folder hierarchy, names, sizes, timestamps, and sharing permissions. Uses a graph-like structure for efficient tree traversal and path resolution.",
-          "Sharing Service: Manages shared links, collaborator invites, permission grants (viewer, editor, owner), and access audits. Enforces ACL checks on every file operation.",
-          "Version Service: Maintains immutable file versions with rollback support, tracks who modified each version, and applies retention policies to purge old versions beyond the user quota."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
+        "faqs": [
           {
-            "term": "src/",
-            "definition": ""
+            "question": "How is global deduplication achieved across different users?",
+            "answer": "Chunks are stored in Content-Addressable Storage (CAS) keyed by `SHA256(chunk_payload)`. If User A and User B both save the same 200MB installer or presentation, the chunk hashes are identical. The Block Service detects the hash already exists and increments a reference counter in the metadata DB without storing duplicate bytes, saving petabytes of storage."
           },
           {
-            "term": "features/",
-            "definition": ""
+            "question": "How are concurrent offline edits resolved without data loss?",
+            "answer": "Dropbox uses a Last-Write-Wins with Conflicted Copy strategy. If User A and User B edit the same file while offline, whichever user commits to the Metadata Service first wins the original filename. When the second user reconnects and attempts to commit revision N, the server detects a revision conflict and saves the second user's file as `Document (John's conflicted copy 2026-10-02).docx`."
           },
           {
-            "term": "DropboxStorage/",
-            "definition": ""
+            "question": "Why separate the Metadata Database from the Block Storage?",
+            "answer": "Metadata requires strict ACID consistency, sub-10ms transactional reads/writes, and relational queries for directory traversal. Binary file chunks are immutable, write-once blobs that require cheap, horizontally scalable durability (S3/erasure-coded disks). Combining them would cripple database performance."
           },
           {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "FileBrowser/          # Grid/list view with breadcrumb navigation",
-            "definition": ""
-          },
-          {
-            "term": "UploadProgress/       # Chunked upload progress bar with pause/resume",
-            "definition": ""
-          },
-          {
-            "term": "SyncStatusIndicator/  # Synced / syncing / error state per file",
-            "definition": ""
-          },
-          {
-            "term": "VersionHistory/       # Timeline of file versions with preview",
-            "definition": ""
-          },
-          {
-            "term": "SharingModal/         # Invite users, copy link, set permissions",
-            "definition": ""
-          },
-          {
-            "term": "ConflictResolution/   # Side-by-side diff when same file edited on two devices",
-            "definition": ""
-          },
-          {
-            "term": "FilePreview/          # Inline preview for images, PDFs, videos",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useFileSync/          # Sync cursor management and delta polling",
-            "definition": ""
-          },
-          {
-            "term": "useChunkedUpload/     # AbortController-based chunk upload with retry",
-            "definition": ""
-          },
-          {
-            "term": "useFileSearch/        # Debounced search across owned and shared files",
-            "definition": ""
-          },
-          {
-            "term": "api/",
-            "definition": ""
-          },
-          {
-            "term": "files.ts              # GET /files/metadata, POST /files/upload-chunk",
-            "definition": ""
-          },
-          {
-            "term": "sync.ts               # GET /sync/changes?cursor=, POST /sync/commit",
-            "definition": ""
-          },
-          {
-            "term": "sharing.ts            # POST /sharing/share, DELETE /sharing/",
-            "definition": "id"
-          },
-          {
-            "term": "versions.ts           # GET /files/",
-            "definition": "id/versions, POST /files/:id/restore"
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "fileStore.ts          # Current folder path, file tree, selected files",
-            "definition": ""
-          },
-          {
-            "term": "syncStore.ts          # Sync cursor, pending uploads, conflict queue",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for metadata caching",
-            "definition": ""
-          },
-          {
-            "term": "- Web Workers for large file hash computation (SHA-256)",
-            "definition": ""
-          },
-          {
-            "term": "- Service Worker cache for offline file listing access",
-            "definition": ""
+            "question": "How does client sync handle poor mobile connections?",
+            "answer": "The client sync daemon uses an exponential backoff retry queue with chunk checkpointing. If an upload fails midway through a 500MB file (e.g. after uploading chunk 42 of 125), the client resumes from chunk 43 when connection restores without restarting the entire file upload."
           }
         ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "4MB chunking with SHA-256 signatures enables both intra-file delta sync and global cross-user deduplication",
+          "Decoupled architecture: Block Servers manage raw binary data while Metadata Servers enforce ACID directory state",
+          "Client-side Local Indexer (SQLite + OS filesystem watcher) detects changes and hashes chunks before hitting network",
+          "WebSocket Notification Gateways wake up peer devices instantaneously when file revisions commit",
+          "Conflicted copy branching prevents silent data overwrites during concurrent offline modifications"
+        ],
+        "takeaway": "Dropbox achieves extreme bandwidth efficiency and 11-nines reliability by treating files as immutable content-addressed chunk chains, ensuring only modified blocks travel across the wire."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "google-search",
+    "youtube-streaming",
+    "dropbox-storage"
+  ],
+  "furtherReading": [
+    {
+      "title": "Inside the Magic Pocket: Dropbox Storage Infrastructure",
+      "url": "https://dropbox.tech/infrastructure/inside-the-magic-pocket",
+      "type": "article"
+    },
+    {
+      "title": "Streaming File Synchronization at Dropbox",
+      "url": "https://dropbox.tech/infrastructure/streaming-file-synchronization",
+      "type": "article"
+    }
+  ]
 }

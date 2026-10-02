@@ -4,14 +4,19 @@
   "moduleSlug": "zoom-conferencing-hld",
   "courseSlug": "hld-problems",
   "title": "Zoom Video Conferencing: Complete Architecture",
-  "description": "Design zoom video conferencing with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a global low-latency video conferencing platform with WebRTC signaling, Selective Forwarding Units (SFUs), Simulcast, and cascading media routing.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "zoomconferencinghld"
+    "zoom",
+    "webrtc",
+    "sfu",
+    "video-conferencing",
+    "udp",
+    "simulcast"
   ],
   "blocks": [
     {
@@ -24,7 +29,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a video conferencing platform similar to Zoom that supports multi-party video calls, screen sharing, in-meeting chat, cloud recording, breakout rooms, and waiting rooms. The system must manage real-time media routing through Selective Forwarding Units (SFUs), handle signaling for WebRTC negotiation, and scale to thousands of concurrent meetings with adaptive bitrate based on network conditions."
+        "text": "Design a real-time global video conferencing system at Zoom scale. The system supports 300+ million daily meeting participants hosting calls ranging from 1-on-1 chats to 1,000-person all-hands webinars. The paramount technical challenge is ultra-low latency interactive media delivery: packet latency must remain under 150ms globally over UDP, video must dynamically adapt to jitter and variable bandwidth (Simulcast/SVC), media streams must be efficiently routed across Selective Forwarding Units (SFUs) without server-side video transcoding melting CPU capacity, and calls must withstand up to 25% packet loss without audio dropouts."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "SFU (Selective Forwarding Unit)",
+            "definition": "A media routing server that inspects incoming RTP packets and forwards them to appropriate participants without decoding or re-encoding video frames."
+          },
+          {
+            "term": "Simulcast",
+            "definition": "The sending client encodes and uploads video at multiple resolutions/bitrates simultaneously (e.g. 180p, 360p, 720p), allowing the SFU to route the optimal layer to each viewer."
+          },
+          {
+            "term": "WebRTC Signaling",
+            "definition": "The out-of-band communication channel (over WebSocket or HTTPS) used to exchange SDP session parameters, codecs, and ICE network candidates."
+          },
+          {
+            "term": "STUN / TURN",
+            "definition": "NAT traversal protocols: STUN discovers public IP/port bindings; TURN acts as a fallback media relay server when symmetric NAT blocks direct P2P/SFU UDP."
+          },
+          {
+            "term": "Active Speaker Detection (Audio Energy)",
+            "definition": "The SFU analyzes audio packet volume levels to switch the dominant high-resolution video stream to the speaking participant."
+          }
+        ]
       }
     },
     {
@@ -39,16 +71,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Schedule meetings with calendar integration, recurring options, and passcode protection",
-          "Join meetings via desktop client, web client, mobile app, or dial-in phone number",
-          "Host controls: mute participants, remove attendees, enable waiting room, and lock meeting",
-          "Breakout rooms: split main meeting into sub-rooms with host broadcast and timer",
-          "Screen sharing with remote control, annotation tools, and multi-share support",
-          "In-meeting chat with direct messages, group chat, and file sharing",
-          "Cloud recording with speaker view, gallery view, and separate audio/video tracks",
-          "Live transcription and closed captions in multiple languages",
-          "Virtual backgrounds, blur, and touch-up appearance using client-side ML models",
-          "Post-meeting analytics: attendance duration, participant list, chat logs, and recording playback"
+          "Meeting Lifecycle: Create, schedule, join with meeting ID/passcode, host controls (mute, kick, lock)",
+          "Multi-Party Audio & Video: Up to 1,000 active participants with gallery view (25-49 tiles) and speaker view",
+          "Screen Sharing & In-Meeting Chat: Low-framerate high-resolution screen transmission with real-time text chat",
+          "Dynamic Bandwidth Adaptation: Degrade video resolution smoothly during network congestion without dropping audio",
+          "Cloud Recording: Record gallery view, speaker view, and separate audio stems with cloud storage export",
+          "Breakout Rooms: Split active call into sub-sessions and merge back seamlessly"
         ]
       }
     },
@@ -57,12 +85,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Meeting join time under 5 seconds from clicking link to first video frame",
-          "Sub-150ms latency for audio packets with jitter buffer to mask network variation",
-          "99.99% availability for meeting infrastructure with automatic failover across regions",
-          "Support 1,000 participants per meeting with SFU cascading for large rooms",
-          "Recording is stored within 2 minutes of meeting end with redundant object storage",
-          "End-to-end encryption option for enterprise meetings with client-side key exchange"
+          "Ultra-Low Latency: Glass-to-glass (camera to screen) latency under 150ms round-trip time (RTT)",
+          "Scale: 300M+ daily participants; millions of concurrent active rooms worldwide",
+          "Packet Loss Resilience: Clear audio at up to 25-30% packet loss using Forward Error Correction (FEC)",
+          "CPU Efficiency: SFUs route raw UDP/RTP packets without transcoding to support thousands of streams per box",
+          "High Availability: 99.99% reliability with automatic migration of meetings if a media server fails"
         ]
       }
     },
@@ -70,87 +97,83 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that validates the Zoom conferencing domain: meeting scheduling, signaling state machine, chat messages, recording metadata, and participant management. This validates WebRTC negotiation flows before splitting media handling into separate services."
+        "text": "Zoom separates the Control Plane (Signaling, Authentication, Meeting Scheduling) from the Data Plane (Cascading SFU Multimedia Routers operating over raw UDP/RTP)."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-zoomvideoconferencingcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Zoom Video Conferencing: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SignalingService[Signaling Service]\n        MS_MediaService[Media Service]\n        MS_RecordingService[Recording Service]\n        MS_ChatService[Chat Service]\n        MS_SchedulerService[Scheduler Service]\n        MS_ScreenShareService[Screen Share Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SignalingService\n        MS_SignalingService --> MS_DB\n        MS_SignalingService --> MS_Queue\n        MS_SignalingService --> MS_Cache\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_RecordingService\n        MS_RecordingService --> MS_DB\n        MS_RecordingService --> MS_Queue\n        MS_RecordingService --> MS_Cache\n        MS_LB --> MS_ChatService\n        MS_ChatService --> MS_DB\n        MS_ChatService --> MS_Queue\n        MS_ChatService --> MS_Cache\n        MS_LB --> MS_SchedulerService\n        MS_SchedulerService --> MS_DB\n        MS_SchedulerService --> MS_Queue\n        MS_SchedulerService --> MS_Cache\n        MS_LB --> MS_ScreenShareService\n        MS_ScreenShareService --> MS_DB\n        MS_ScreenShareService --> MS_Queue\n        MS_ScreenShareService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-zoom-arch",
+        "caption": "Zoom Architecture: Signaling WebSocket Servers, Meeting Zone Controllers, Cascading SFU Media Routers, and Cloud Recording Workers",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 Participants Layer\"]\n        Host[\"💻 Host Client (Desktop)\"]\n        SpeakerUser[\"🗣️ Active Speaker (Laptop)\"]\n        Viewer[\"📱 Mobile Attendee (iOS)\"]\n    end\n\n    subgraph ControlPlane[\"⚙️ Control Plane: Signaling & Coordination\"]\n        SignalingGW[\"⚡ Signaling Gateway (WebSockets / Envoy)\\nSDP Offer/Answer & ICE Candidates\"]\n        MeetingCoord[\"🎯 Meeting Zone Controller (Zookeeper / Raft)\\nAssigns Meeting to optimal Geo-Zone\"]\n        MeetingDB[(\"📋 Meeting DB (PostgreSQL / Aurora)\\nMeeting schedules, hosts, permissions\")]\n    end\n\n    subgraph MediaDataPlane[\"🎥 Data Plane: Cascading SFU Media Routing (UDP)\"]\n        SFU_US[\"📍 SFU Media Node (US-East)\\nPacket Router & Forwarder\"]\n        SFU_EU[\"📍 SFU Media Node (EU-West)\\nCascaded Bridge Node\"]\n        TURN[\"🔄 STUN / TURN Relay Fleet\\nFallback for strict corporate firewalls\"]\n    end\n\n    subgraph ProcessingPipelines[\"📼 Post-Meeting & Ancillary Services\"]\n        RecorderWorker[\"📼 Headless Recording Worker\\nSynthesizes MP4 & saves to S3\"]\n        AudioTranscriber[\"🎙️ Live ASR Engine (Whisper / Kaldi)\\nClosed captions stream\"]\n        S3Recordings[(\"🗄️ Recording Vault (S3 / CloudFront)\")]\n    end\n\n    Host & SpeakerUser & Viewer <-->|Signaling (WebSocket)| SignalingGW\n    SignalingGW --> MeetingCoord\n    MeetingCoord --> MeetingDB\n    MeetingCoord -->|Allocate Room Slot| SFU_US & SFU_EU\n\n    SpeakerUser -->|Upload 3 Simulcast Streams (UDP)| SFU_US\n    Host -->|Upload Stream (UDP)| SFU_US\n\n    SFU_US <-->|Internal Backhaul Bridge| SFU_EU\n    SFU_US -->|Forward Speaker (720p)| Host\n    SFU_EU -->|Forward Speaker (360p mobile)| Viewer\n\n    SFU_US --> RecorderWorker --> S3Recordings\n    SFU_US --> AudioTranscriber"
       }
     },
     {
-      "type": "key-terms",
+      "type": "heading",
       "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
+        "level": 2,
+        "text": "Meeting Join & WebRTC Signaling Sequence"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To establish a video call, the client connects to the Signaling Gateway, receives an assigned SFU media server close to their geographic location, and exchanges Session Description Protocol (SDP) configurations."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-zoom-signaling-sequence",
+        "caption": "Signaling and media negotiation sequence for joining an existing conference via an SFU server",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Participant as 👤 Participant\n    participant SignGW as ⚡ Signaling Gateway\n    participant ZoneCoord as 🎯 Zone Controller\n    participant SFU as 🎥 SFU Media Router\n    actor Host as 👤 Active Host\n\n    Participant->>SignGW: WebSocket Connect (Token, MeetingID: 881-992)\n    SignGW->>ZoneCoord: Locate Meeting 881-992\n    ZoneCoord-->>SignGW: Assigned SFU Node: sfu-us-east-14.zoom.us\n    SignGW-->>Participant: SFU Address + Join Approval\n\n    Participant->>SFU: Direct UDP Handshake / ICE Candidate Check\n    Participant->>SignGW: Send WebRTC SDP Offer (Codecs: Opus, H.264, VP9 + Simulcast)\n    SignGW->>SFU: Configure Ingest Tracks for Participant\n    SFU-->>SignGW: Return SDP Answer\n    SignGW-->>Participant: Deliver SDP Answer\n\n    Note over Participant, SFU: WebSockets finished negotiation!<br/>Direct SRTP / UDP Media Flow Begins\n    Participant->>SFU: Stream Audio (Opus) + Video (180p, 360p, 720p)\n    SFU->>SFU: Active Speaker Detection (Host is talking)\n    SFU-->>Participant: Forward Host Video (720p) + Audio\n    SFU-->>Host: Forward Participant Thumbnail (180p)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Video Architecture Comparison: Mesh vs MCU vs SFU"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Architecture",
+          "Bandwidth Consumption",
+          "Server CPU Usage",
+          "Max Participants",
+          "Industry Verdict"
+        ],
+        "rows": [
+          [
+            "Full Mesh (P2P)",
+            "O(N^2) Client Upload Choke",
+            "Zero (No media server)",
+            "~4-5 participants max",
+            "Great for 1-on-1 (WhatsApp/FaceTime), impossible for group meetings"
+          ],
+          [
+            "MCU (Multipoint Control Unit)",
+            "Low for client (1 composite stream)",
+            "Excessive: Server decodes & re-encodes all video into 1 frame",
+            "~20-30 participants per heavy CPU box",
+            "Legacy telecom (Polycom/Cisco); expensive and adds high latency"
+          ],
+          [
+            "SFU (Selective Forwarding Unit)",
+            "Balanced: Client uploads 1 simulcast, downloads N streams",
+            "Ultra-Low: Server simply routes packets without transcoding",
+            "1,000+ participants per node cluster",
+            "Modern gold standard (Zoom, Google Meet, Teams, Discord)"
+          ]
         ]
       }
     },
@@ -158,174 +181,62 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Key Design Decisions & Trade-Offs"
       }
     },
     {
-      "type": "paragraph",
+      "type": "faq-block",
       "data": {
-        "text": "As traffic grows, split the monolith into independently scalable microservices. Each service owns its data and communicates via async messaging or REST/gRPC."
-      }
-    },
-    {
-      "type": "mermaid",
-      "data": {
-        "id": "mermaid-zoomvideoconferencingcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Zoom Video Conferencing: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SignalingService[Signaling Service]\n        MS_MediaService[Media Service]\n        MS_RecordingService[Recording Service]\n        MS_ChatService[Chat Service]\n        MS_SchedulerService[Scheduler Service]\n        MS_ScreenShareService[Screen Share Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SignalingService\n        MS_SignalingService --> MS_DB\n        MS_SignalingService --> MS_Queue\n        MS_SignalingService --> MS_Cache\n        MS_LB --> MS_MediaService\n        MS_MediaService --> MS_DB\n        MS_MediaService --> MS_Queue\n        MS_MediaService --> MS_Cache\n        MS_LB --> MS_RecordingService\n        MS_RecordingService --> MS_DB\n        MS_RecordingService --> MS_Queue\n        MS_RecordingService --> MS_Cache\n        MS_LB --> MS_ChatService\n        MS_ChatService --> MS_DB\n        MS_ChatService --> MS_Queue\n        MS_ChatService --> MS_Cache\n        MS_LB --> MS_SchedulerService\n        MS_SchedulerService --> MS_DB\n        MS_SchedulerService --> MS_Queue\n        MS_SchedulerService --> MS_Cache\n        MS_LB --> MS_ScreenShareService\n        MS_ScreenShareService --> MS_DB\n        MS_ScreenShareService --> MS_Queue\n        MS_ScreenShareService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Signaling Service: Manages WebRTC signaling state machine including SDP offer/answer exchange, ICE candidate trickling, and SFU transport negotiation. Uses WebSocket connections with heartbeat and automatic reconnection for network resilience.",
-          "SFU Media Service: Operates Selective Forwarding Units that receive upstream video/audio tracks and forward selected subsets to each participant. Implements simulcast and SVC to serve different quality layers based on subscriber bandwidth and viewport size.",
-          "Recording Service: Orchestrates cloud recording by subscribing to SFU media streams, mixing audio and video tracks, and storing packaged recordings in object storage. Supports separate tracks for post-production editing and transcription jobs.",
-          "Chat Service: Handles in-meeting text chat, direct messages, file attachments, and message reactions. Delivers chat with low latency using a dedicated WebSocket channel separate from signaling.",
-          "Meeting Scheduler Service: Manages meeting lifecycle from creation through completion, enforces passcodes and waiting rooms, assigns media servers by region, and publishes meeting metadata to calendar integrations.",
-          "Screen Share Service: Handles screen and application capture from presenter clients, optimizes video encoding with hardware acceleration, and provides remote control streams with input event relay for controlled sessions."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
+        "faqs": [
           {
-            "term": "src/",
-            "definition": ""
+            "question": "Why does Zoom use UDP instead of TCP for media streaming?",
+            "answer": "TCP guarantees delivery via retransmissions (ACK/NACK). If a packet drops over TCP, subsequent packets wait (head-of-line blocking), causing frozen frames and 1-2 second audio lag. In live human conversation, a late video frame is useless. UDP with RTP transmits packets without blocking; missing packets are masked using Forward Error Correction (FEC) or packet loss concealment (PLC)."
           },
           {
-            "term": "features/",
-            "definition": ""
+            "question": "How does Simulcast save client download bandwidth in a 50-person call?",
+            "answer": "If 50 people are on a call, a participant viewing gallery view (5x5 grid) only needs tiny 180p thumbnails. The SFU dynamically drops the 720p and 360p layers and only forwards the 180p stream for background attendees. Only the person actively speaking has their 720p layer forwarded, slashing client downstream bandwidth by over 80%."
           },
           {
-            "term": "ZoomConferencingHld/",
-            "definition": ""
+            "question": "What is a Cascading SFU architecture and why is it needed for global calls?",
+            "answer": "If a meeting has attendees in New York, London, and Tokyo, routing every participant to a single US data center introduces 200ms+ transatlantic delay for Asian and European members. With cascading SFUs, European attendees connect to a local London SFU; Asian attendees connect to Tokyo. The SFUs bridge together over dedicated high-speed cloud backbones, sending only 1 copy of each stream across continents."
           },
           {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "VideoGallery/        # Adaptive grid with spotlight, filmstrip, and speaker view",
-            "definition": ""
-          },
-          {
-            "term": "AudioVisualizer/     # Speaking indicator with waveform and mute/deafen badges",
-            "definition": ""
-          },
-          {
-            "term": "ScreenShareView/     # Remote screen canvas with annotation toolbar",
-            "definition": ""
-          },
-          {
-            "term": "ChatPanel/           # Collapsible chat with mentions, file upload, search",
-            "definition": ""
-          },
-          {
-            "term": "WaitingRoom/         # Host view of lobby with admit/deny controls",
-            "definition": ""
-          },
-          {
-            "term": "BreakoutRooms/       # Host controls for creating, broadcasting, and closing rooms",
-            "definition": ""
-          },
-          {
-            "term": "RecordingControls/   # Start/stop/pause recording with consent banner",
-            "definition": ""
-          },
-          {
-            "term": "VirtualBackground/   # Background selection with blur slider and image picker",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useWebRTC/           # Peer connection management with adaptive bitrate",
-            "definition": ""
-          },
-          {
-            "term": "useSignaling/        # WebSocket signaling with exponential backoff reconnect",
-            "definition": ""
-          },
-          {
-            "term": "useMediaDevices/     # Camera/mic enumeration, device selection, permission handling",
-            "definition": ""
-          },
-          {
-            "term": "api/",
-            "definition": ""
-          },
-          {
-            "term": "meetings.ts          # POST /meetings, GET /meetings/",
-            "definition": "id, PATCH /meetings/:id/status"
-          },
-          {
-            "term": "chat.ts              # GET /meetings/",
-            "definition": "id/chat, POST /meetings/:id/chat/messages"
-          },
-          {
-            "term": "recording.ts         # POST /meetings/",
-            "definition": "id/recordings, GET /meetings/:id/recordings"
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "meetingStore.ts      # Meeting ID, participant list, host controls, breakout state",
-            "definition": ""
-          },
-          {
-            "term": "mediaStore.ts        # Local tracks, remote streams, mute state, device prefs",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for metadata caching with aggressive refetch on meeting join",
-            "definition": ""
-          },
-          {
-            "term": "- WebRTC API directly for peer connections with adaptive bitrate via BWE",
-            "definition": ""
-          },
-          {
-            "term": "- Canvas for virtual background segmentation with TensorFlow.js WASM backend",
-            "definition": ""
+            "question": "How does Active Speaker Detection prevent switching jitter?",
+            "answer": "SFUs monitor voice activity and audio energy levels in the Opus audio packets. To prevent the active speaker view from flashing frantically when someone coughs or says \"uh-huh\", the algorithm applies hysteresis (a minimum speech duration threshold of ~500ms before switching focus) and audio ducking."
           }
         ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Selective Forwarding Units (SFUs) inspect and forward UDP/RTP packets without expensive video transcoding",
+          "Simulcast allows clients to upload multiple quality streams so the SFU can match bandwidth per viewer",
+          "Control Plane (WebSockets/HTTPS for SDP signaling) is strictly isolated from Data Plane (UDP media traffic)",
+          "Cascading SFUs bridge regional media clusters across global dedicated backbones to keep local RTT under 150ms",
+          "Active speaker detection monitors audio packet energy with hysteresis smoothing to spotlight the primary presenter"
+        ],
+        "takeaway": "Zoom delivers real-time interactive video at massive scale by routing lightweight UDP packets through distributed SFU clusters, pairing Simulcast and active speaker detection to optimize every participant's bandwidth."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "youtube-streaming",
+    "video-streaming-hld",
+    "whatsapp-chat-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Zoom Architecture & Security Whitepaper",
+      "url": "https://explore.zoom.us/docs/en-us/zoom-security-white-paper.html",
+      "type": "article"
+    },
+    {
+      "title": "WebRTC Architecture and Protocols",
+      "url": "https://webrtc.org/getting-started/overview",
+      "type": "article"
+    }
+  ]
 }

@@ -4,14 +4,18 @@
   "moduleSlug": "food-delivery-hld",
   "courseSlug": "hld-problems",
   "title": "Food Delivery Service: Complete Architecture",
-  "description": "Design food delivery service with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a 3-sided marketplace food delivery platform (DoorDash / Uber Eats) with order orchestration, dynamic driver dispatch, and real-time tracking.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "fooddeliveryhld"
+    "food-delivery",
+    "3-sided-marketplace",
+    "dispatch",
+    "geospatial",
+    "order-state-machine"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a food delivery platform similar to DoorDash or Uber Eats that connects customers, restaurants, and delivery partners in real-time. Customers browse menus, place orders, and track deliveries live on a map. Restaurants receive orders, update preparation status, and manage menu availability. Delivery partners accept pickups, navigate optimized routes, and confirm deliveries with proof of completion."
+        "text": "Design a three-sided on-demand food delivery platform like DoorDash or Uber Eats connecting Customers, Restaurants (Merchants), and Delivery Couriers (Dashers). The platform handles 10+ million daily orders with sharp dinner and lunch spikes. The engineering complexity lies in coordinating physical world logistics: synchronizing food kitchen prep time with driver arrival to avoid cold food, real-time geospatial matching, route optimization with multi-order batching, and an auditable order lifecycle state machine across all three parties."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Three-Sided Marketplace",
+            "definition": "A business ecosystem coordinating three distinct stakeholders simultaneously: Consumer (demand), Restaurant (supplier), and Courier (fulfillment)."
+          },
+          {
+            "term": "Just-in-Time (JIT) Dispatch",
+            "definition": "Dispatching a courier such that their estimated travel time aligns precisely with the kitchen's estimated food preparation completion time."
+          },
+          {
+            "term": "Order Batching (Bundling)",
+            "definition": "Assigning multiple delivery drop-offs to a single driver if pickups originate from the same or neighboring restaurants and routes align."
+          },
+          {
+            "term": "Fulfillment State Machine",
+            "definition": "A strictly coordinated workflow: PLACED -> MERCHANT_ACCEPTED -> PREPARING -> COURIER_ASSIGNED -> AT_RESTAURANT -> PICKED_UP -> DELIVERED."
+          },
+          {
+            "term": "Geospatial Fencing (H3)",
+            "definition": "Hexagonal spatial partitioning to enforce restaurant delivery boundaries and calculate localized supply-demand metrics."
+          }
+        ]
       }
     },
     {
@@ -39,16 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Customer: Search restaurants by cuisine, rating, distance, delivery time, and price range",
-          "Customer: Browse restaurant menus with item descriptions, customization options, and dietary filters",
-          "Customer: Place orders with scheduled delivery windows, special instructions, and contactless delivery",
-          "Customer: Real-time order tracking on map with ETA updates, driver location, and status changes",
-          "Restaurant: Manage menu items, prices, availability, preparation time estimates, and operating hours",
-          "Restaurant: Receive new orders via printer/dashboard, accept/reject with reason, and update preparation status",
-          "Delivery Partner: View nearby available orders with earnings, distance, and restaurant name",
-          "Delivery Partner: Navigate with turn-by-turn directions, contact customer/restaurant via masked numbers",
-          "Payment: Process payments, apply promo codes and discounts, handle refunds, and support tipping",
-          "Rating: Collect star ratings and reviews for restaurants, delivery partners, and food quality"
+          "Customer: Search nearby restaurants by cuisine/distance, browse dynamic menus, place orders, and track deliveries on live maps",
+          "Merchant (Restaurant): Accept/reject incoming orders, update estimated prep times, and mark out-of-stock items in real-time",
+          "Courier (Driver): Receive dispatch offers, accept deliveries, get turn-by-turn routing, and submit proof-of-delivery photos",
+          "Dynamic Dispatch Engine: Match available couriers to ready orders minimizing customer ETA and driver idle wait time",
+          "Live Tracking: Stream courier GPS coordinates to the customer application every 3-5 seconds",
+          "Payment & Settlement: Split customer payment into restaurant revenue, courier fee/tips, and platform commission"
         ]
       }
     },
@@ -57,12 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Order placement confirms within 500ms with guaranteed idempotency for duplicate submissions",
-          "Order status updates propagate to customer and restaurant within 2 seconds",
-          "Delivery partner matching completes within 10 seconds of order placement",
-          "Real-time GPS tracking updates every 5 seconds with smooth interpolation on map",
-          "Support 1 million daily active users with 100,000 concurrent orders during peak dinner",
-          "99.9% payment success rate with automatic retry and idempotency for webhook duplicates"
+          "Scale: 10M+ daily orders; 250,000 peak concurrent active deliveries; 500,000 active couriers",
+          "Order Placement Latency: <500ms P99 order confirmation with strict idempotency",
+          "Tracking Freshness: Driver location displayed on customer map within 3 seconds of GPS emission",
+          "State Consistency: 100% strict ordering of fulfillment state transitions (zero lost or dangling orders)",
+          "Availability: 99.99% for customer checkout and restaurant order ingest"
         ]
       }
     },
@@ -70,87 +96,90 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that validates the food delivery domain: restaurant onboarding, menu management, order orchestration, delivery partner dispatch, payment processing, and notification delivery. This validates the core order lifecycle and state machine before splitting by domain."
+        "text": "The platform coordinates three distinct client interfaces through a unified API Gateway, orchestrating the physical delivery through a stateful Fulfillment SAGA and a Geospatial Dispatch Engine."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-fooddeliveryservicecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Food Delivery Service: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_RestaurantService[Restaurant Service]\n        MS_MenuService[Menu Service]\n        MS_OrderService[Order Service]\n        MS_DeliveryService[Delivery Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_TrackingService[Tracking Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_RestaurantService\n        MS_RestaurantService --> MS_DB\n        MS_RestaurantService --> MS_Queue\n        MS_RestaurantService --> MS_Cache\n        MS_LB --> MS_MenuService\n        MS_MenuService --> MS_DB\n        MS_MenuService --> MS_Queue\n        MS_MenuService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_DeliveryService\n        MS_DeliveryService --> MS_DB\n        MS_DeliveryService --> MS_Queue\n        MS_DeliveryService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_TrackingService\n        MS_TrackingService --> MS_DB\n        MS_TrackingService --> MS_Queue\n        MS_TrackingService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
+        "id": "hld-food-delivery-arch",
+        "caption": "Food Delivery Architecture: 3-Sided Client Ecosystem, SAGA Order Orchestrator, Dispatch Engine, and Real-Time Tracking",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 3-Sided Client Apps\"]\n        ConsumerApp[\"🍔 Consumer App (iOS/Android/Web)\"]\n        MerchantPortal[\"🍳 Merchant Tablet / POS Terminal\"]\n        CourierApp[\"🚴 Courier App (GPS every 3s)\"]\n    end\n\n    subgraph EdgeLayer[\"🌍 Edge & Gateway Tier\"]\n        APIGW[\"Envoy API Gateway\\nAuth, Rate Limiting & TLS\"]\n        LiveTrackingGW[\"⚡ Live Tracking Gateway (WebSockets / SSE)\\nDriver coordinates to Consumer\"]\n    end\n\n    subgraph CoreServices[\"⚙️ Domain Microservices\"]\n        SearchSvc[\"🔍 Restaurant Search & Menu Svc\\nElasticsearch + PostGIS\"]\n        OrderOrch[\"⚡ Order Fulfillment Orchestrator\\nState Machine Coordinator (Temporal)\"]\n        DispatchEngine[\"🎯 Dynamic Dispatch & Batching Engine\\nHungarian Matching + OSRM Routing\"]\n        KitchenEstimator[\"⏱️ Kitchen Prep Estimator\\nML Model based on kitchen load\"]\n        LocationIngest[\"📍 Location Tracking Service\\nIngests 100k GPS pings/sec\"]\n        PaymentSvc[\"💳 Payment & Split Settlement\\nStripe / Adyen\"]\n    end\n\n    subgraph Datastores[\"🗄️ Persistence Tier\"]\n        OrderDB[(\"📋 Order DB (PostgreSQL / Aurora)\\nPartitioned by OrderID & Date\")]\n        MenuDB[(\"📄 Restaurant & Menu DB (MongoDB / DynamoDB)\")]\n        GeoStore[(\"⚡ Driver Location Store (Redis GEO)\\nH3 index & active courier coordinates\")]\n        SearchIndex[(\"🔎 Restaurant Search Cluster (Elasticsearch)\")]\n    end\n\n    subgraph EventBackbone[\"📨 Event Stream: Apache Kafka\"]\n        Kafka[\"📨 Kafka Event Bus\\norder-created | merchant-accepted | food-ready | courier-assigned\"]\n    end\n\n    ConsumerApp --> APIGW\n    MerchantPortal --> APIGW\n    CourierApp --> APIGW\n    CourierApp -->|GPS Ping every 3s| LocationIngest\n\n    APIGW --> SearchSvc --> SearchIndex\n    SearchSvc --> MenuDB\n\n    APIGW --> OrderOrch\n    OrderOrch --> PaymentSvc\n    OrderOrch --> OrderDB\n    OrderOrch -->|Publish State Change| Kafka\n\n    Kafka --> KitchenEstimator\n    Kafka --> DispatchEngine\n    Kafka --> MerchantPortal\n\n    DispatchEngine --> GeoStore\n    DispatchEngine --> CourierApp\n\n    LocationIngest --> GeoStore\n    LocationIngest --> LiveTrackingGW\n    LiveTrackingGW -->|Stream GPS to Customer| ConsumerApp"
       }
     },
     {
-      "type": "key-terms",
+      "type": "heading",
       "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
+        "level": 2,
+        "text": "Order Fulfillment & JIT Dispatch Sequence"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To ensure food arrives hot, the dispatch engine delays offering the delivery to couriers until the kitchen has accepted and began preparation, timing driver arrival within 2 minutes of the food bagging."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-food-fulfillment-sequence",
+        "caption": "End-to-end 3-sided fulfillment sequence: customer order, kitchen prep estimation, JIT driver matching, and delivery completion",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Customer as 🍔 Customer\n    participant API as 🚪 API Gateway\n    participant Orch as ⚡ Order Orchestrator\n    actor Kitchen as 🍳 Restaurant Kitchen\n    participant Dispatch as 🎯 Dispatch Engine\n    participant Geo as ⚡ Redis GEO\n    actor Courier as 🚴 Courier\n\n    Customer->>API: POST /orders {restaurantId: 44, items: [...], idemKey: uuid}\n    API->>Orch: Submit Order (State: PLACED)\n    Orch->>Kitchen: Push Notification to Kitchen Tablet\n    Kitchen->>Orch: ACCEPT_ORDER (PrepTime Estimate: 18 mins)\n    Orch->>Customer: Update App: \"Restaurant is preparing your food\"\n\n    Note over Orch, Dispatch: Wait until PrepTime - CourierTravelTime ≈ 5 mins\n    Orch->>Dispatch: RequestCourierForOrder(OrderID: 991, PickupLoc, DropoffLoc)\n    Dispatch->>Geo: GEORADIUS around Restaurant (Find couriers within 2 miles)\n    Geo-->>Dispatch: Top 3 Candidate Couriers\n    Dispatch->>Courier: Push Dispatch Offer (Pay: $8.50, Distance: 1.8 mi)\n    Courier->>Dispatch: Accept Delivery Offer\n\n    Dispatch->>Orch: State -> COURIER_ASSIGNED\n    Orch->>Customer: \"Courier John is on the way to restaurant\"\n    Courier->>Kitchen: Arrives at Restaurant & Picks up Food\n    Courier->>Orch: State -> PICKED_UP\n    Courier->>Customer: Drives to Customer (Live GPS streamed via WebSocket)\n    Courier->>Orch: State -> DELIVERED (Photo uploaded)\n    Orch->>Customer: \"Enjoy your meal!\" & Prompt for Tip"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Driver Dispatch Algorithms Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Dispatch Strategy",
+          "Algorithm / Mechanism",
+          "Driver Wait Time",
+          "System Complexity",
+          "Suitability"
+        ],
+        "rows": [
+          [
+            "Greedy Nearest Driver",
+            "Assign immediately to closest courier with shortest Euclidean distance",
+            "High (Driver often waits outside kitchen for 15 mins)",
+            "Low",
+            "Simple MVP or late-night low supply periods"
+          ],
+          [
+            "Just-in-Time (JIT) Matching",
+            "Calculate travel time and delay dispatch until kitchen prep is 75% complete",
+            "Low (<3 minutes driver idle time)",
+            "Medium",
+            "Standard single-order delivery model (DoorDash default)"
+          ],
+          [
+            "Bipartite Graph Matching (Hungarian)",
+            "Batch orders every 30 seconds across an entire zone to maximize global efficiency",
+            "Very Low",
+            "High (Requires zone batching windows)",
+            "High-density downtown metropolitan lunch rush"
+          ],
+          [
+            "Order Bundling / Co-Routing",
+            "Merge two orders from adjacent restaurants for the same driver heading to one neighborhood",
+            "Minimal",
+            "Very High (Complex vehicle routing with time windows)",
+            "Peak hours to increase driver earnings and platform throughput"
+          ]
         ]
       }
     },
@@ -158,175 +187,62 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Key Design Decisions & Trade-Offs"
       }
     },
     {
-      "type": "paragraph",
+      "type": "faq-block",
       "data": {
-        "text": "As traffic grows, split the monolith into independently scalable microservices. Each service owns its data and communicates via async messaging or REST/gRPC."
-      }
-    },
-    {
-      "type": "mermaid",
-      "data": {
-        "id": "mermaid-fooddeliveryservicecompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Food Delivery Service: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_RestaurantService[Restaurant Service]\n        MS_MenuService[Menu Service]\n        MS_OrderService[Order Service]\n        MS_DeliveryService[Delivery Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_TrackingService[Tracking Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_RestaurantService\n        MS_RestaurantService --> MS_DB\n        MS_RestaurantService --> MS_Queue\n        MS_RestaurantService --> MS_Cache\n        MS_LB --> MS_MenuService\n        MS_MenuService --> MS_DB\n        MS_MenuService --> MS_Queue\n        MS_MenuService --> MS_Cache\n        MS_LB --> MS_OrderService\n        MS_OrderService --> MS_DB\n        MS_OrderService --> MS_Queue\n        MS_OrderService --> MS_Cache\n        MS_LB --> MS_DeliveryService\n        MS_DeliveryService --> MS_DB\n        MS_DeliveryService --> MS_Queue\n        MS_DeliveryService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_TrackingService\n        MS_TrackingService --> MS_DB\n        MS_TrackingService --> MS_Queue\n        MS_TrackingService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Restaurant Service: Manages restaurant profiles, onboarding, operating hours, preparation time estimates, and capacity limits. Enforces geo-indexed queries for discovering restaurants by delivery address using spatial search.",
-          "Menu Service: Handles menu item CRUD with support for variants (size, spice level), add-ons (extra cheese, sauces), dietary badges (vegan, gluten-free), and dynamic pricing with time-based discounts.",
-          "Order Service: Orchestrates the complete order lifecycle from cart to delivery confirmation. Implements the order state machine (created, restaurant accepted, preparing, ready, picked up, delivered) with saga pattern for distributed transactions across payment, restaurant, and delivery services.",
-          "Delivery Partner Service: Manages driver onboarding, vehicle verification, availability status, and earnings. Implements dispatch matching with ETA-aware assignment that balances customer wait time with driver pickup distance.",
-          "Payment Service: Processes payments with retry logic, applies promo codes and loyalty points, handles refunds and tips, and reconciles daily settlement reports for restaurants and drivers. Uses idempotency keys to prevent double-charge on network retry.",
-          "Notification Service: Sends order status updates via SMS, push notification, and in-app alerts to customers, restaurants, and drivers. Manages notification preferences per user and deduplicates alerts across channels.",
-          "Tracking Service: Ingests GPS pings from delivery partner apps, smooths trajectories using Kalman filtering, computes ETAs using historical traffic data, and publishes real-time location updates to customer and restaurant maps via WebSocket."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
+        "faqs": [
           {
-            "term": "src/",
-            "definition": ""
+            "question": "Why is greedy dispatch bad for food delivery?",
+            "answer": "In ride-sharing (Uber), the passenger is ready on the curb immediately, so dispatching the nearest car is optimal. In food delivery, food requires 15-30 minutes of cooking. Dispatching the nearest driver immediately means the driver stands idle in the kitchen for 20 minutes, wasting driver earning hours and increasing churn. Just-in-Time dispatch coordinates driver arrival with food completion."
           },
           {
-            "term": "features/",
-            "definition": ""
+            "question": "How do you handle restaurant out-of-stock items after the customer has paid?",
+            "answer": "The Order Orchestrator supports pre-authorized item substitution preferences: (1) Substitute with closest match, (2) Call/text customer for 5-minute decision window, or (3) Refund and proceed with remaining items. The payment pre-authorizes the total cart value with a 15% buffer, and the final payment settlement occurs when the food is picked up."
           },
           {
-            "term": "FoodDeliveryHld/",
-            "definition": ""
+            "question": "How does live driver GPS tracking scale to 500,000 concurrent couriers?",
+            "answer": "Drivers emit coordinates over UDP/HTTP every 3 seconds to a Location Ingestion Service that updates Redis GEO keys with a 10-second TTL. The Customer App only listens to tracking coordinates when the order status is `PICKED_UP`. A WebSocket Gateway subscribes to the specific driver channel on Redis Pub/Sub, streaming coordinates only to that customer, preventing global broadcast storms."
           },
           {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "RestaurantCard/       # Image, rating, delivery time, fee, cuisine tags",
-            "definition": ""
-          },
-          {
-            "term": "MenuSection/          # Categorized menu with add-to-cart and variant picker",
-            "definition": ""
-          },
-          {
-            "term": "CartDrawer/           # Item list, quantity controls, promo code, tip selector",
-            "definition": ""
-          },
-          {
-            "term": "OrderTracking/        # Live map with driver marker, route polyline, ETA countdown",
-            "definition": ""
-          },
-          {
-            "term": "CheckoutFlow/         # Address selection, payment method, order summary, tip",
-            "definition": ""
-          },
-          {
-            "term": "DriverDashboard/      # Available orders list, active delivery map, earnings",
-            "definition": ""
-          },
-          {
-            "term": "RestaurantDashboard/  # Order tickets, status buttons, preparation timers",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useOrderTracking/     # WebSocket subscription to driver location with ETA",
-            "definition": ""
-          },
-          {
-            "term": "useGeolocation/       # Customer address with autocomplete and geocoding",
-            "definition": ""
-          },
-          {
-            "term": "useMenuFiltering/     # Category, dietary, price range filters with debounced search",
-            "definition": ""
-          },
-          {
-            "term": "api/",
-            "definition": ""
-          },
-          {
-            "term": "orders.ts             # POST /orders, GET /orders/",
-            "definition": "id, PATCH /orders/:id/status"
-          },
-          {
-            "term": "restaurants.ts        # GET /restaurants/nearby, GET /restaurants/",
-            "definition": "id/menu"
-          },
-          {
-            "term": "tracking.ts           # GET /orders/",
-            "definition": "id/tracking, WS /orders/:id/location"
-          },
-          {
-            "term": "payments.ts           # POST /payments/intent, POST /orders/",
-            "definition": "id/tip"
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "cartStore.ts          # Items, quantities, selected variants, promo code",
-            "definition": ""
-          },
-          {
-            "term": "orderStore.ts         # Active orders, status, driver info, ETA",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for menu caching with background refetch on restaurant open/close",
-            "definition": ""
-          },
-          {
-            "term": "- Mapbox or Google Maps JS SDK for live tracking and route rendering",
-            "definition": ""
-          },
-          {
-            "term": "- Service Worker for offline cart persistence and cached restaurant browsing",
-            "definition": ""
+            "question": "How are multi-order batches (bundles) determined?",
+            "answer": "The dispatch engine computes vehicle routing problem (VRP) constraints with strict time penalties: (1) The second order must not delay the first customer by more than 8-10 minutes, (2) The restaurants must be within 500 meters of each other, and (3) The delivery destinations must share the same directional corridor."
           }
         ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Food delivery is a 3-sided marketplace balancing consumer hunger, kitchen prep, and courier transit",
+          "Just-in-Time (JIT) dispatch coordinates driver arrival with kitchen cooking completion to keep food hot",
+          "Order state machine strictly enforces atomic transitions across all three client applications",
+          "Driver GPS streams are filtered and routed only to customers with active in-flight deliveries",
+          "Batching and bundling algorithms group nearby restaurant pickups heading in the same route corridor"
+        ],
+        "takeaway": "Food delivery systems succeed by mastering the interplay between kitchen preparation timing and geospatial courier logistics, transforming real-world delays into predictable, synchronized delivery flows."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "uber-ride-sharing-hld",
+    "ride-sharing-hld",
+    "ecommerce-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "DoorDash Engineering: Next-Gen Fulfillment Platform",
+      "url": "https://doordash.engineering/2020/09/25/meet-the-next-generation-of-our-order-platform/",
+      "type": "article"
+    },
+    {
+      "title": "Uber Eats Dynamic Pricing and Dispatch",
+      "url": "https://eng.uber.com/uber-eats-dynamic-pricing/",
+      "type": "article"
+    }
+  ]
 }

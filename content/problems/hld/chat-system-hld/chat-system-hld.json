@@ -3,15 +3,19 @@
   "slug": "chat-system-hld",
   "moduleSlug": "chat-system-hld",
   "courseSlug": "hld-problems",
-  "title": "Chat System: Complete Architecture",
-  "description": "Design a scalable real-time chat system with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Real-Time Chat System: Complete Architecture",
+  "description": "Design a distributed real-time chat architecture supporting 50M concurrent WebSocket connections, 1:1 and group chats, presence, and Cassandra message history.",
   "order": 2,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "chatsystemhld"
+    "chat-system",
+    "websockets",
+    "cassandra",
+    "real-time",
+    "presence"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a real-time chat system like Slack or WhatsApp that supports 1:1 direct messages, group conversations with up to 50,000 members, online presence indicators, typing indicators, read receipts, and end-to-end encryption for sensitive channels. The system must handle 100M+ concurrent WebSocket connections and 10B+ messages per day with sub-100ms delivery latency."
+        "text": "Design a highly scalable, real-time distributed chat system supporting 100+ million daily active users and 50 million concurrent persistent WebSocket connections. The platform facilitates 1-on-1 private messaging, group conversations with thousands of participants, real-time typing indicators, delivery receipts (sent, delivered, read), user presence synchronization, and offline message queueing with sub-100ms delivery latency."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "WebSocket Connection Server",
+            "definition": "Stateful gateway nodes maintaining persistent TCP/TLS connections to active client devices for bi-directional real-time communication."
+          },
+          {
+            "term": "Session Registry (Lookup Table)",
+            "definition": "A centralized in-memory store (Redis) mapping each `user_id` to their currently active WebSocket Gateway server instance and connection socket ID."
+          },
+          {
+            "term": "LSM-Tree Key-Value Store (Cassandra)",
+            "definition": "A write-optimized wide-column database ideal for chat history, partitioning messages by `conversation_id` and sorting chronologically by `message_id`."
+          },
+          {
+            "term": "Message Delivery Ack & Receipts",
+            "definition": "The 3-stage delivery lifecycle: Server Ack (Message saved), Delivered Receipt (Recipient device confirmed receipt), and Read Receipt (User opened chat)."
+          },
+          {
+            "term": "Presence Heartbeat & Ephemeral Leases",
+            "definition": "Clients send a ping every 30-60 seconds; if a ping is missed and the Redis TTL expires, the user is marked offline."
+          }
+        ]
       }
     },
     {
@@ -39,16 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Users can send and receive text messages in real-time via WebSocket or SSE fallback",
-          "Users can create 1:1 conversations and group channels with member lists and roles",
-          "Users can see online/offline/away presence status for contacts and group members",
-          "Users see typing indicators when another user is composing a message",
-          "Messages show delivery status: sent, delivered, read (double-check marks)",
-          "Users can share images, files, and voice notes with preview generation",
-          "Offline users receive queued messages on reconnect with proper message ordering",
-          "Users can search message history by keyword within a conversation",
-          "Admins can archive, pin, and delete messages in channels they manage",
-          "Push notifications on mobile when the app is backgrounded or closed"
+          "1:1 Direct Messaging: Send and receive text messages, emojis, and media attachments with instant delivery",
+          "Group Chats: Multi-user conversations up to 5,000 members with participant management and admin roles",
+          "Delivery Status Receipts: Real-time visual tracking of Sent, Delivered, and Read states",
+          "Presence & Typing Indicators: Display real-time online/offline status and \"User is typing...\" indicators",
+          "Offline Queueing & Sync: Store messages for offline users and synchronize seamlessly upon reconnection",
+          "Chat History & Pagination: Infinite scroll chat history with fast backward retrieval by timestamp"
         ]
       }
     },
@@ -57,14 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Sub-100ms end-to-end message delivery between two online users on the same region",
-          "99.99% message delivery rate — no silent drops; duplicates acceptable at most once",
-          "Support 100M concurrent persistent WebSocket connections across all regions",
-          "Messages maintain total causal ordering per 1:1 conversation; group chat uses per-sender ordering",
-          "Presence status updates propagate to all conversation members within 5 seconds",
-          "Offline message queue can hold 10,000 messages per user without message loss",
-          "Horizontal scalability: add hub nodes without dropping active connections",
-          "Message history is paginated with cursor-based pagination, not offset"
+          "Scale: 50M concurrent WebSocket connections; 10+ billion messages exchanged daily (~115,000 msgs/sec)",
+          "Delivery Latency: Sub-100ms end-to-end message delivery between online users",
+          "Data Durability: Zero message loss once acknowledged by the server; stored across replicated disk clusters",
+          "High Availability: 99.999% uptime for the real-time gateway and message ingestion pipeline",
+          "Message Ordering: Strict chronological sequence within any single conversation room"
         ]
       }
     },
@@ -72,437 +96,153 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Build a monolithic ASP.NET Core application using SignalR for real-time messaging. All chat state — connections, message history, presence, and user data — lives in a single SQL Server database. A background hosted service runs a connection map to route SignalR messages. This validates the WebSocket lifecycle, message persistence, and basic presence logic before splitting."
+        "text": "The architecture isolates stateful WebSocket connection servers from stateless business logic (Auth, User Profiles, Media Uploads). A central Session Registry in Redis routes incoming messages to the specific connection server hosting the recipient's active socket."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-chatsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "- @microsoft/signalr for WebSocket connection management",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core Monolith)",
-            "definition": ""
-          },
-          {
-            "term": "- SignalR Hub (ChatHub) for real-time message routing",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core with SQL Server for message history",
-            "definition": ""
-          },
-          {
-            "term": "- StackExchange.Redis for presence map (key",
-            "definition": "userId, TTL: heartbeat interval)"
-          },
-          {
-            "term": "- Background IHostedService for connection tracking and broadcast fan-out",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SignalR Service sticky session via ScaleoutMode = Default",
-            "definition": ""
-          },
-          {
-            "term": "- Cloudflare R2 / Azure Blob for media message storage",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service with ARR affinity disabled (SignalR scale-out)",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database with row-level security for conversation isolation",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Cache for Redis for presence and typing indicator hot state",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SignalR Service (managed) for automatic hub connection scale-out",
-            "definition": ""
-          },
-          {
-            "term": "- Single database",
-            "definition": "Conversations, Messages, Participants, Presence"
-          }
-        ]
+        "id": "hld-chat-arch",
+        "caption": "Distributed Chat Architecture: WebSocket Gateway Fleet, Session Registry, Message Dispatcher, Cassandra History, and Push Notification Workers",
+        "definition": "flowchart TD\n    subgraph Clients[\"📱 Client Layer\"]\n        UserA[\"👤 User A (Sender)\"]\n        UserB[\"👤 User B (Online Recipient)\"]\n        UserC[\"👤 User C (Offline Recipient)\"]\n    end\n\n    subgraph EdgeTier[\"🚪 Edge & WebSocket Gateway Fleet\"]\n        LB[\"⚖️ Load Balancer (TCP / IP-Hash)\"]\n        WS_Node1[\"⚡ WS Gateway Server 1\\n~1M Active Sockets\"]\n        WS_Node2[\"⚡ WS Gateway Server 2\\n~1M Active Sockets\"]\n        WS_NodeN[\"⚡ WS Gateway Server N\"]\n    end\n\n    subgraph RoutingTier[\"🔀 Session Registry & Message Dispatch\"]\n        SessionRegistry[(\"⚡ Session Registry (Redis Cluster)\\nUserID -> {ServerIP, SocketID}\")]\n        MessageDispatcher[\"📨 Message Dispatcher & Router\\nRoutes payload to target WS node\"]\n        PresenceSvc[\"🟢 Presence Service (Heartbeat Manager)\"]\n    end\n\n    subgraph PersistenceTier[\"🗄️ Storage Layer\"]\n        Cassandra[(\"💬 Chat History (Apache Cassandra)\\nPartition: conversation_id\\nCluster: message_id DESC\")]\n        OfflineStore[(\"📬 Offline Message Store (PostgreSQL / Redis)\\nPer-user unread inbox queues\")]\n        UserDB[(\"👤 User & Contact DB (PostgreSQL)\")]\n    end\n\n    subgraph AsyncPipeline[\"🔔 Offline Notification Pipeline\"]\n        Kafka[\"📨 Apache Kafka (chat-events)\"]\n        PushWorker[\"🔔 Push Notification Worker\"]\n        FCM_APNS[\"FCM / APNs Gateway\"]\n    end\n\n    UserA -->|WebSocket Connection| LB\n    UserB -->|WebSocket Connection| LB\n    LB --> WS_Node1 & WS_Node2 & WS_NodeN\n\n    WS_Node1 & WS_Node2 --> SessionRegistry\n\n    UserA -->|1. Send Message| WS_Node1\n    WS_Node1 --> MessageDispatcher\n\n    MessageDispatcher -->|2. Save Message| Cassandra\n    MessageDispatcher -->|3. Lookup Recipient| SessionRegistry\n\n    MessageDispatcher -->|Recipient Online: Route to Node 2| WS_Node2\n    WS_Node2 -->|4. Push to Recipient| UserB\n\n    MessageDispatcher -->|Recipient Offline: Queue| OfflineStore\n    MessageDispatcher -->|Publish Event| Kafka\n    Kafka --> PushWorker --> FCM_APNS --> UserC"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "1:1 Message Delivery Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Split the monolith into five microservices. The Message Service is write-heavy — it uses a partitioned message table with conversation ID as the partition key. The Presence Service uses Redis with sub-second TTL heartbeats. The Delivery Service maintains an offline queue per user connection node. Azure SignalR Service or AWS AppSync replace self-hosted SignalR, enabling multi-instance fan-out without sticky sessions."
+        "text": "The sequence traces a message from User A to User B. If User B is online, the message arrives over their existing WebSocket connection. If User B is offline, the message is stored in the offline inbox and a push notification is triggered."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-chatsystemcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Chat System: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "title": "",
-        "items": [
-          "Message Service: The write path. Accepts messages via REST (HTTP fallback) or SignalR gateway events. Persists messages in PostgreSQL with conversation_id + server_timestamp as the primary sort key. Generates a client-provided UUID (client_msg_id) for idempotent deduplication on the server. Emits MessageSent events to Kafka for downstream consumers. Uses database partitioning by conversation_id for horizontal read scaling.",
-          "Presence Service: Tracks online status using Redis SET per conversation with a per-user key TTL of 30 seconds. Clients send a heartbeat via REST every 15 seconds. When a user's heartbeat TTL expires, Presence Service emits a UserWentOffline event to all conversation members via SignalR. Presence state is eventually consistent — a user may briefly show as offline during a brief network blip.",
-          "Delivery Service: Manages offline message queues partitioned by user_id. On reconnect, the client sends a last_received_message_id cursor; Delivery Service returns all messages newer than that cursor in a single batch. For group chats, the delivery fan-out is done asynchronously via a consumer group pattern to avoid slowing down the write path. Uses Sorted Sets in Redis keyed by user_id for O(log n) queue reads.",
-          "Media Service: Handles image, voice note, and file uploads. Generates multi-resolution thumbnails using ImageSharp. Returns a signed CDN URL to the sender, which is stored as the message attachment. Enforces per-user upload quotas and file-type restrictions. Publishes MediaUploaded events for content-moderation scanning via Azure Content Safety or AWS Rekognition.",
-          "User Service: Manages user profiles, avatars, contact lists, and block lists. Returns lightweight user presence snippets (name, avatar URL, online status) consumed by the Message Service to enrich message payloads before fan-out. Exposes gRPC for low-latency profile lookups during message dispatch."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "ChatSystemHld/",
-            "definition": ""
-          },
-          {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "ChatWindow/       # Message list + input, uses virtualization",
-            "definition": ""
-          },
-          {
-            "term": "ConversationList/ # Sidebar with unread badges, last message preview",
-            "definition": ""
-          },
-          {
-            "term": "MessageBubble/    # Text, image, file, read-receipt double-checks",
-            "definition": ""
-          },
-          {
-            "term": "PresenceDot/      # Green/gray dot, animated for typing",
-            "definition": ""
-          },
-          {
-            "term": "TypingIndicator/ # 'Alice is typing...' with debounce",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useChatConnection.ts  # SignalR connection with auto-reconnect + backoff",
-            "definition": ""
-          },
-          {
-            "term": "useMessagePagination.ts # Cursor-based infinite scroll up",
-            "definition": ""
-          },
-          {
-            "term": "usePresence.ts        # Subscribes to presence events per conversation",
-            "definition": ""
-          },
-          {
-            "term": "useTypingIndicator.ts # Emits typing start/stop with debounce",
-            "definition": ""
-          },
-          {
-            "term": "useOfflineQueue.ts    # Queues messages in IndexedDB when offline",
-            "definition": ""
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "chat-store.ts         # Zustand",
-            "definition": "conversations, active conversation, draft messages"
-          },
-          {
-            "term": "connection-store.ts   # Tracks SignalR reconnection state",
-            "definition": ""
-          },
-          {
-            "term": "pages/",
-            "definition": ""
-          },
-          {
-            "term": "ChatPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "ConversationPage.tsx",
-            "definition": ""
-          },
-          {
-            "term": "SettingsPage.tsx  # Notification preferences, block list",
-            "definition": ""
-          },
-          {
-            "term": "types/",
-            "definition": ""
-          },
-          {
-            "term": "message.ts",
-            "definition": ""
-          },
-          {
-            "term": "conversation.ts",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/",
-            "definition": ""
-          },
-          {
-            "term": "lib/",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- useChatConnection handles SignalR reconnect with exponential backoff (1s -> 30s max)",
-            "definition": ""
-          },
-          {
-            "term": "- Message list uses react-virtuoso for 100k+ message performance",
-            "definition": ""
-          },
-          {
-            "term": "- useOfflineQueue persists unsent messages to IndexedDB, flushes on reconnect",
-            "definition": ""
-          },
-          {
-            "term": "- Typing indicator debounces emit by 3s; stops after 5s of inactivity",
-            "definition": ""
-          },
-          {
-            "term": "- Optimistic message append with rollback on SendMessage error",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "SignalR Hub with Idempotent Message Ingestion",
-        "language": "text",
-        "code": "// ChatHub — routes incoming WebSocket messages to Message Service\npublic class ChatHub : Hub\n{\n    private readonly IConnectionMapping _connections;\n    private readonly IEventBus _eventBus;\n    private readonly IIdempotencyStore _idempotency;\n\n    public ChatHub(IConnectionMapping connections, IEventBus eventBus, IIdempotencyStore idempotency)\n    {\n        _connections = connections;\n        _eventBus = eventBus;\n        _idempotency = idempotency;\n    }\n\n    // Client sends: { clientMsgId, conversationId, text, timestamp }\n    public async Task SendMessage(OutgoingMessage message)\n    {\n        // Idempotency guard: same clientMsgId within 24h = duplicate, ignore\n        if (await _idempotency.ExistsAsync(message.ClientMsgId, TimeSpan.FromHours(24)))\n            return;\n        await _idempotency.RecordAsync(message.ClientMsgId, TimeSpan.FromHours(24));\n\n        var serverMsgId = Guid.NewGuid();\n        var serverTimestamp = DateTime.UtcNow;\n\n        var msg = new ChatMessage\n        {\n            MessageId = serverMsgId,\n            ConversationId = message.ConversationId,\n            SenderId = Context.UserIdentifier,\n            Text = message.Text,\n            ClientMsgId = message.ClientMsgId,\n            SentAt = serverTimestamp,\n            Status = MessageStatus.Sent\n        };\n\n        // Persist + broadcast atomically via outbox pattern\n        await _eventBus.Publish(new MessagePersisted(msg));\n\n        // Ack to sender only — fan-out happens via consumer group\n        await Clients.Caller.SendAsync(\"MessageAck\", new { serverMsgId = serverMsgId, serverTimestamp = serverTimestamp });\n    }\n\n    public override async Task OnDisconnectedAsync(Exception? exception)\n    {\n        var userId = Context.UserIdentifier;\n        _connections.Remove(userId, Context.ConnectionId);\n\n        if (!_connections.IsUserOnline(userId))\n        {\n            await _eventBus.Publish(new UserWentOffline(userId, DateTime.UtcNow));\n        }\n        await base.OnDisconnectedAsync(exception);\n    }\n}\n\n// Presence heartbeat endpoint — called by client every 15s\napp.MapPost(\"/api/presence/heartbeat\", async (HttpContext ctx, RedisDb redis) =>\n{\n    var userId = ctx.User.FindFirst(ClaimTypes.NameIdentifier)!.Value;\n    var key = string.Format(\"presence:user:{0}\", userId);\n    await redis.KeyExpireAsync(key, TimeSpan.FromSeconds(30));\n    await redis.KeyPersistAsync(key); // reset TTL\n    return Results.Ok();\n});"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Real-Time Hub",
-            "description": "Managed WebSocket pub/sub with automatic multi-instance scale-out for SignalR",
-            "tags": [
-              "Azure SignalR Service",
-              "Amazon AppSync (WebSocket subscriptions)"
-            ],
-            "pros": [
-              "No sticky sessions required — SDK handles connection routing",
-              "Built-in backplane for broadcasting across hub instances"
-            ],
-            "cons": [
-              "Azure SignalR is opinionated; AppSync requires GraphQL schema"
-            ]
-          },
-          {
-            "title": "Event Streaming",
-            "description": "Consume message events for delivery tracking, push notifications, and analytics",
-            "tags": [
-              "Azure Event Hubs",
-              "Amazon Kinesis Data Streams"
-            ],
-            "pros": [
-              "Partitioned by conversation_id for ordered per-conversation consumption",
-              "Retention supports replay for delivery audit and compliance"
-            ],
-            "cons": [
-              "Consumer group coordination adds operational complexity"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "Presence heartbeats, typing indicators, and active conversation read-cursors",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Keyspace notifications for presence expiry events",
-              "Sub-millisecond SET/GET for typing indicator broadcast"
-            ],
-            "cons": [
-              "Redis Cluster mode required for >250k writes/sec"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Append-only message history partitioned by conversation_id",
-            "tags": [
-              "Azure Cosmos DB (PostgreSQL API)",
-              "Amazon DynamoDB / Aurora PostgreSQL"
-            ],
-            "pros": [
-              "Cosmos PostgreSQL inherits pgvector for semantic message search",
-              "DynamoDB provides single-digit ms reads at any scale"
-            ],
-            "cons": [
-              "Cosmos DB RU/s budgeting for unpredictable group-chat fan-out"
-            ]
-          },
-          {
-            "title": "Push Notifications",
-            "description": "Background push to iOS/Android when app is backgrounded",
-            "tags": [
-              "Azure Notification Hubs",
-              "Amazon SNS"
-            ],
-            "pros": [
-              "Notification Hubs handles per-platform registration and tag targeting",
-              "SNS supports SMS and mobile in addition to APNs/FCM"
-            ],
-            "cons": [
-              "SNS topic-per-conversation does not scale to 100M channels"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-chat-delivery-sequence",
+        "caption": "1:1 message delivery sequence: Online recipient push via Session Registry vs Offline storage and mobile push notification",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Alice as 👤 Alice (Sender)\n    participant WS1 as ⚡ WS Gateway 1\n    participant Dispatcher as 🔀 Message Dispatcher\n    participant DB as 💬 Cassandra Store\n    participant Registry as ⚡ Session Registry\n    participant WS2 as ⚡ WS Gateway 2\n    actor Bob as 👤 Bob (Recipient)\n    participant Offline as 📬 Offline Store\n    participant Push as 🔔 Push Service\n\n    Alice->>WS1: SendMessage(Recipient: Bob, Text: \"Hey!\", ClientMsgID: 104)\n    WS1-->>Alice: Server Ack (Status: SENT, ServerMsgID: 991)\n    WS1->>Dispatcher: RouteMessage(Bob, payload)\n\n    Dispatcher->>DB: INSERT INTO messages (conv_id, msg_id, sender, text)\n    Dispatcher->>Registry: Lookup(Bob)\n    alt Bob is Online (Registered at WS Gateway 2)\n        Registry-->>Dispatcher: Found: {Server: WS_Node2, Socket: s-881}\n        Dispatcher->>WS2: ForwardMessage(Socket: s-881, payload)\n        WS2->>Bob: Push Message over WebSocket\n        Bob-->>WS2: Ack (DELIVERED)\n        WS2->>WS1: Forward Delivery Ack\n        WS1->>Alice: Update Checkmark: DELIVERED (✓✓)\n    else Bob is Offline (No active session in Redis)\n        Registry-->>Dispatcher: Not Found (Offline)\n        Dispatcher->>Offline: Add to Bob's Pending Queue\n        Dispatcher->>Push: Trigger Push Notification (\"Alice: Hey!\")\n        Push->>Bob: Deliver FCM/APNs Wake-up Alert\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Real-Time Communication Protocols Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Protocol",
+          "Directionality",
+          "Header Overhead",
+          "Reconnection / State",
+          "Ideal Chat Use Case"
+        ],
+        "rows": [
+          [
+            "Short HTTP Polling",
+            "Client pull only",
+            "Very High (Full HTTP header per request)",
+            "Stateless",
+            "Antiquated; unacceptable for modern real-time chat"
+          ],
+          [
+            "HTTP Long-Polling",
+            "Server pushes by holding request open",
+            "Moderate (Re-establishes HTTP request per message)",
+            "Stateless server",
+            "Good fallback for legacy corporate firewalls that block WebSockets"
+          ],
+          [
+            "Server-Sent Events (SSE)",
+            "Server-to-Client only (Half-Duplex)",
+            "Low (Lightweight HTTP stream)",
+            "Automatic client reconnection",
+            "Great for news/stock feeds, but client needs separate HTTP POST to send messages"
+          ],
+          [
+            "WebSockets",
+            "Full-Duplex (Bidirectional over 1 TCP socket)",
+            "Minimal (2 to 10 bytes frame overhead)",
+            "Stateful connection maintained on server",
+            "The gold standard for instant messaging, gaming, and real-time collaboration"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why is Apache Cassandra preferred over PostgreSQL or MongoDB for chat history?",
+            "answer": "Chat history exhibits a 99% sequential write-and-read pattern. Cassandra uses an LSM-Tree (Log-Structured Merge-tree) engine that appends writes sequentially to disk commit logs and in-memory Memtables, achieving hundreds of thousands of writes/sec without disk seek bottlenecks. Furthermore, data is partitioned by `conversation_id` with clustering key `message_id DESC`, making chat history pagination an instant range scan."
+          },
+          {
+            "question": "How do you handle 50 million concurrent WebSocket connections without running out of server memory?",
+            "answer": "A single modern Linux server tuned with epoll can comfortably hold 500,000 to 1,000,000 idle TCP sockets if kernel buffers are tuned (`tcp_rmem`, `tcp_wmem` reduced to ~4KB per connection) and file descriptor limits (`ulimit -n`) are raised to 1M+. A fleet of 50-100 gateway servers easily manages 50M connections. Redis holds only `user_id -> server_ip` mapping (~64 bytes per user), consuming under 5GB of RAM."
+          },
+          {
+            "question": "How is message ordering guaranteed across mobile devices with clock drift?",
+            "answer": "Never rely on client device clock timestamps. Use a monotonically increasing, centralized ID generator (Snowflake or ZooKeeper sequence generator) per conversation, or have the primary database assign an incrementing sequence number upon write. Messages are sorted and displayed exclusively by this server-assigned sequence ID."
+          },
+          {
+            "question": "How does Presence scale without overloading the system with millions of status broadcasts?",
+            "answer": "Do not broadcast presence changes globally. Use a Pub/Sub subscription model: User A only subscribes to presence updates for users currently in their visible chat viewport or active contacts list (typically <50 people). For large group channels (e.g. 5,000 members), individual online indicators are disabled, and only an aggregate \"1,420 Online\" count is rendered."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Message delivery is a fan-out problem: use a managed SignalR/AppSync hub, not self-hosted WebSockets at scale",
-          "Client-generated message IDs are the simplest idempotency mechanism — deduplicate on arrival",
-          "Cursor-based pagination (not OFFSET) is mandatory for conversations with 100k+ messages",
-          "Presence must be eventually consistent — use Redis TTL heartbeats, not in-memory maps",
-          "Offline delivery requires a per-user, per-device queue; flush on reconnect using last_received_id",
-          "The write path (message ingestion) must not wait for fan-out — use an outbox + consumer group pattern"
+          "Full-duplex WebSockets eliminate polling overhead, maintaining persistent connections for sub-100ms delivery",
+          "Session Registry (Redis) routes messages from any sending gateway node directly to the recipient's active server",
+          "Apache Cassandra (LSM-tree wide-column store) delivers high write throughput and fast range scans by conversation",
+          "Presence uses heartbeat leases and localized Pub/Sub subscriptions to prevent broadcast fan-out storms",
+          "Server-assigned Snowflake IDs guarantee strict chronological ordering unaffected by client device clock drift"
         ],
-        "takeaway": "Chat systems are connection-heavy, write-heavy distributed systems. Managed real-time hubs, Redis-backed presence with TTL heartbeats, an outbox pattern for durable writes, and cursor-based message pagination are the architectural pillars that separate a functional prototype from a system that handles 100M concurrent connections."
+        "takeaway": "Real-time chat architectures achieve high responsiveness and scale by decoupling stateful WebSocket gateways from write-heavy NoSQL message storage, linked via an in-memory session registry."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "whatsapp-chat-hld",
+    "slack-messaging-hld",
+    "notification-system"
+  ],
+  "furtherReading": [
+    {
+      "title": "Discord: How Discord Scaled to 15 Million Concurrent Users",
+      "url": "https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users",
+      "type": "article"
+    },
+    {
+      "title": "The WhatsApp Architecture Factor: Erlang and FreeBSD",
+      "url": "https://highscalability.com/the-whatsapp-architecture-facebook-bought-for-19-billion/",
+      "type": "article"
+    }
+  ]
 }

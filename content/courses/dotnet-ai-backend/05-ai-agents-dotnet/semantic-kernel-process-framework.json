@@ -1,0 +1,94 @@
+{
+  "id": "lesson-dotnet-ai-backend-05-ai-agents-dotnet-semantic-kernel-process-framework",
+  "slug": "semantic-kernel-process-framework",
+  "moduleSlug": "05-ai-agents-dotnet",
+  "courseSlug": "dotnet-ai-backend",
+  "title": "Semantic Kernel Process Framework",
+  "description": "Build multi-step agent pipelines with the SK Process Framework (ProcessBuilder, steps, and edges) instead of the deprecated SequentialPlanner.",
+  "order": 7,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": [
+    "semantic-kernel",
+    "process-framework",
+    "agents",
+    "csharp"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "text": "SequentialPlanner and StepwisePlanner were deprecated in Semantic Kernel v1.19+ and removed in v2.0. The current SK v1.25+ replacement is the Process Framework, which defines steps, edges, and agents as composable processes using ProcessBuilder."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "Process Framework Concepts"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Core types",
+      "items": [
+        "ProcessBuilder - defines the process graph.",
+        "ProcessStep - a single unit of work, often implemented with [KernelFunction].",
+        "ProcessEdge - connects steps and controls flow.",
+        "KernelProcess - the compiled process definition.",
+        "ProcessInstance - a running process."
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Order process with ProcessBuilder",
+      "content": "Modern SK v1.25+ multi-step agent pipeline using ProcessBuilder.",
+      "language": "csharp",
+      "code": "// Package: Microsoft.SemanticKernel --version 1.25+\n\nusing Microsoft.SemanticKernel;\nusing Microsoft.SemanticKernel.Process;\nusing Microsoft.Extensions.AI;\n\n// Define process steps using [KernelFunction]\npublic class GetOrderStep\n{\n    [KernelFunction, Description(\"Get order details by ID.\")]\n    public Task<string> GetOrderAsync(string orderId, CancellationToken ct = default)\n    {\n        return Task.FromResult(orderId == \"ABC123\"\n            ? \"Order ABC123 | Status: Shipped | Items: 3\"\n            : \"Order not found.\");\n    }\n}\n\npublic class CheckDiscountStep\n{\n    [KernelFunction, Description(\"Check discount eligibility for an order.\")]\n    public Task<string> CheckDiscountAsync(string orderId, CancellationToken ct = default)\n    {\n        return Task.FromResult(orderId == \"ABC123\"\n            ? \"Eligible for 10% loyalty discount.\"\n            : \"Not eligible for discount.\");\n    }\n}\n\npublic class ApplyDiscountStep\n{\n    [KernelFunction, Description(\"Apply a discount code to an order.\")]\n    public Task<string> ApplyDiscountAsync(string orderId, string discountCode, CancellationToken ct = default)\n    {\n        return Task.FromResult($\"Discount {discountCode} applied to order {orderId}. New total: $135.00\");\n    }\n}\n\n// Build the process\nvar builder = Kernel.CreateBuilder()\n    .AddOpenAIChatCompletion(\"gpt-4o\", new OpenAIClient(\"your-api-key\"));\n\nvar kernel = builder.Build();\n\nvar processBuilder = new ProcessBuilder(\"order_process\");\n\nprocessBuilder\n    .AddStepFromType<GetOrderStep>(\"get_order\")\n    .AddStepFromType<CheckDiscountStep>(\"check_discount\")\n    .AddStepFromType<ApplyDiscountStep>(\"apply_discount\");\n\nprocessBuilder\n    .OnEdgeEvent(\"get_order\", \"check_discount\", (from, to, context) =>\n    {\n        // Only proceed to discount check if order was found\n        return context.State.GetValue<string>(\"get_order.result\")?.Contains(\"Shipped\") == true;\n    })\n    .OnEdgeEvent(\"check_discount\", \"apply_discount\", (from, to, context) =>\n    {\n        // Only apply discount if eligible\n        return context.State.GetValue<string>(\"check_discount.result\")?.Contains(\"Eligible\") == true;\n    });\n\nvar process = processBuilder.Build();\nvar processExecutor = kernel.Factory.CreateProcessExecutor(process);\n\n// Run the process\nvar processInstance = processExecutor.CreateProcessInstance();\nvar result = await processExecutor.StartAsync(processInstance, cancellationToken);\n\nConsole.WriteLine($\"Process completed: {result}\");\n// Expected output: Process completed: Discount LOYALTY10 applied to order ABC123. New total: $135.00"
+    },
+    {
+      "type": "callout",
+      "variant": "important",
+      "title": "SequentialPlanner is gone",
+      "text": "Do not use SequentialPlanner or StepwisePlanner in new code. Use ProcessBuilder for complex multi-step flows, or a hand-rolled function-calling loop with KernelArguments for simpler plan-and-execute patterns."
+    },
+    {
+      "type": "checklist",
+      "title": "Process Framework Checklist",
+      "items": [
+        {
+          "text": "I can build a process with ProcessBuilder",
+          "hint": "Use AddStepFromType and OnEdgeEvent to define the graph"
+        },
+        {
+          "text": "I can run a process with KernelProcess",
+          "hint": "Use kernel.Factory.CreateProcessExecutor"
+        },
+        {
+          "text": "I can replace SequentialPlanner with Process Framework",
+          "hint": "Map planner steps to process steps with edges"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "Process Framework is the SK v1.25+ replacement for planners.",
+        "Steps are classes with [KernelFunction] methods.",
+        "Edges control flow between steps based on state."
+      ],
+      "takeaway": "Use ProcessBuilder for complex multi-step agent workflows in Semantic Kernel v1.25+."
+    }
+  ],
+  "relatedLessons": [
+    "semantic-kernel-agents-and-planners",
+    "tool-use-and-function-calling"
+  ],
+  "technology": null,
+  "furtherReading": [
+    {
+      "title": "SK Process Framework",
+      "url": "https://learn.microsoft.com/en-us/semantic-kernel/processes/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official Process Framework documentation."
+    }
+  ]
+}

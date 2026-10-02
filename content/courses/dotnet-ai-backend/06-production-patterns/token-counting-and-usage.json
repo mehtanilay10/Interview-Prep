@@ -1,0 +1,91 @@
+{
+  "id": "lesson-dotnet-ai-backend-06-production-patterns-token-counting-and-usage",
+  "slug": "token-counting-and-usage",
+  "moduleSlug": "06-production-patterns",
+  "courseSlug": "dotnet-ai-backend",
+  "title": "Token Counting and Usage",
+  "description": "Use ITokenizer, TokenUsage, and ChatResponse.Usage from Microsoft.Extensions.AI to count tokens, enforce budgets, and track real costs.",
+  "order": 7,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 22,
+  "tags": [
+    "tokens",
+    "cost",
+    "microsoft-extensions-ai",
+    "csharp"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "text": "Token counting matters for cost control, context-window management, and capacity planning. Microsoft.Extensions.AI v9 provides ITokenizer and TokenUsage so you can count tokens before sending and read actual usage from provider responses."
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "ITokenizer and ITokenCounter"
+    },
+    {
+      "type": "bullet-list",
+      "title": "Built-in token counting",
+      "items": [
+        "ITokenizer - counts tokens in a prompt before sending.",
+        "ITokenCounter - counts tokens in provider responses.",
+        "Both are available from IChatClient.GetService<ITokenizer>()."
+      ]
+    },
+    {
+      "type": "example",
+      "title": "Token counting and budget enforcement",
+      "content": "Count tokens before sending and read actual usage from ChatResponse.Usage.",
+      "language": "csharp",
+      "code": "// Package: Microsoft.Extensions.AI --version 9.*\n// Package: Microsoft.Extensions.AI.OpenAI --version 9.*\n\nusing Microsoft.Extensions.AI;\n\npublic sealed class TokenBudgetService\n{\n    private readonly IChatClient _chatClient;\n\n    public TokenBudgetService(IChatClient chatClient)\n    {\n        _chatClient = chatClient;\n    }\n\n    public async Task<ChatResponse> GenerateWithBudgetAsync(\n        string prompt,\n        int maxInputTokens = 4096,\n        int maxOutputTokens = 1024,\n        decimal maxCostUsd = 0.05m,\n        CancellationToken ct = default)\n    {\n        // Get the built-in tokenizer from the chat client\n        var tokenizer = _chatClient.GetService<ITokenizer>()\n            ?? throw new InvalidOperationException(\"Chat client does not provide a tokenizer.\");\n\n        // Count input tokens before sending\n        var inputTokens = tokenizer.CountTokens(prompt);\n        if (inputTokens > maxInputTokens)\n            throw new InvalidOperationException(\n                $\"Prompt exceeds input token budget: {inputTokens} > {maxInputTokens}\");\n\n        var options = new ChatOptions { MaxOutputTokens = maxOutputTokens, Temperature = 0.2f };\n        var response = await _chatClient.GetResponseAsync(\n            new[] { new ChatMessage(ChatRole.User, prompt) },\n            options,\n            ct);\n\n        // Read actual token usage from the response\n        var usage = response.Usage ?? TokenUsage.Zero;\n        var estimatedCost = EstimateCost(usage.InputTokenCount, usage.OutputTokenCount);\n\n        if (estimatedCost > maxCostUsd)\n            throw new InvalidOperationException(\n                $\"Estimated cost {estimatedCost:C} exceeds budget {maxCostUsd:C}\");\n\n        return response;\n    }\n\n    private static decimal EstimateCost(int inputTokens, int outputTokens)\n    {\n        const decimal inputRatePerM = 0.00015m;\n        const decimal outputRatePerM = 0.00060m;\n        return (inputTokens * inputRatePerM + outputTokens * outputRatePerM) / 1_000_000m;\n    }\n}\n\n// Sample usage\nvar chatClient = new OpenAIClient(\"your-api-key\").AsChatClient(\"gpt-4o-mini\");\nvar budgetService = new TokenBudgetService(chatClient);\n\nvar response = await budgetService.GenerateWithBudgetAsync(\n    prompt: \"Explain RAG in 2 sentences.\",\n    maxInputTokens: 4096,\n    maxOutputTokens: 256,\n    maxCostUsd: 0.10m);\n\nConsole.WriteLine($\"Input tokens: {response.Usage?.InputTokenCount}, Output tokens: {response.Usage?.OutputTokenCount}\");\n// Expected output: Input tokens: 12, Output tokens: 45"
+    },
+    {
+      "type": "callout",
+      "variant": "tip",
+      "title": "Use response.Usage for real costs",
+      "text": "Do not estimate output tokens from response text length. Read response.Usage.OutputTokenCount for accurate cost tracking."
+    },
+    {
+      "type": "checklist",
+      "title": "Token Counting Checklist",
+      "items": [
+        {
+          "text": "I can get ITokenizer from a chat client",
+          "hint": "Use _chatClient.GetService<ITokenizer>()"
+        },
+        {
+          "text": "I can count tokens before sending",
+          "hint": "Call tokenizer.CountTokens(prompt)"
+        },
+        {
+          "text": "I can read actual usage from ChatResponse",
+          "hint": "Check response.Usage?.InputTokenCount and OutputTokenCount"
+        }
+      ]
+    },
+    {
+      "type": "summary-box",
+      "title": "Lesson Summary",
+      "points": [
+        "ITokenizer counts tokens before sending.",
+        "ChatResponse.Usage contains real input and output token counts.",
+        "TokenUsage makes cost estimation accurate without guessing."
+      ],
+      "takeaway": "Use ITokenizer for pre-flight checks and ChatResponse.Usage for real cost tracking in production .NET AI backends."
+    }
+  ],
+  "relatedLessons": [
+    "caching-cost-and-token-management"
+  ],
+  "technology": null,
+  "furtherReading": [
+    {
+      "title": "Microsoft.Extensions.AI",
+      "url": "https://learn.microsoft.com/en-us/dotnet/ai/ai-extensions",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Microsoft.Extensions.AI documentation."
+    }
+  ]
+}

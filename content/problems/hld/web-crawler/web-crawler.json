@@ -3,15 +3,19 @@
   "slug": "web-crawler",
   "moduleSlug": "web-crawler",
   "courseSlug": "hld-problems",
-  "title": "Web Crawler: Complete Architecture",
-  "description": "Design a polite, large-scale web crawler with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Distributed Web Crawler: Complete Architecture",
+  "description": "Design a scalable, polite web crawler (Googlebot scale) with Mercator Crawl Frontier, DNS caching, SimHash near-duplicate detection, and Bloom filters.",
   "order": 4,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "webcrawler"
+    "web-crawler",
+    "crawl-frontier",
+    "politeness",
+    "simhash",
+    "bloom-filter"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a large-scale web crawler that discovers, fetches, parses, deduplicates, and indexes web pages — like Googlebot or Bing's crawler. The system must crawl 1 billion pages per month across millions of distinct domains, respect robots.txt and per-domain crawl-delay politeness policies, detect near-duplicate content using SimHash, render JavaScript-rendered pages using headless browsers, and push clean structured data into a search index. It must never DDoS a target site and must recover gracefully from transient network failures."
+        "text": "Design a distributed, production-grade web crawler capable of fetching, parsing, and storing 1 billion web pages per month across 10+ million distinct internet domains. The system must discover new links recursively from seed URLs, strictly respect robots.txt and host politeness delays, eliminate near-duplicate content via locality-sensitive hashing (SimHash), avoid spider traps and infinite URL loops, and feed structured document representations into downstream search engine indexers."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Crawl Frontier (Mercator Model)",
+            "definition": "A dual-queue scheduling architecture combining Priority Queues (importance/PageRank) and Politeness Queues (one per host) to prevent overloading any single target web server."
+          },
+          {
+            "term": "Host Politeness & Delay Heap",
+            "definition": "Enforcing a minimum interval (e.g. 1 request every 2 seconds per domain) and honoring `Crawl-delay` and `Disallow` directives from robots.txt."
+          },
+          {
+            "term": "SimHash & Hamming Distance",
+            "definition": "A 64-bit locality-sensitive fingerprinting technique where similar documents produce hashes differing by fewer than 3 bits (Hamming Distance ≤ 3), identifying scraped or near-identical pages."
+          },
+          {
+            "term": "URL Seen (Bloom Filter)",
+            "definition": "A space-efficient probabilistic data structure that tests whether a URL has already been queued or visited, running in RAM with zero disk I/O."
+          },
+          {
+            "term": "Spider Traps",
+            "definition": "Pathological website structures (e.g. infinite calendar links, dynamically generated query parameters) that trap crawlers in endless recursive fetch loops."
+          }
+        ]
       }
     },
     {
@@ -39,16 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Seed URL discovery via sitemap.xml, RSS/Atom feeds, and hyperlinks in fetched pages",
-          "Respect robots.txt: parse Crawl-delay, Disallow rules, and sitemap references per domain",
-          "Politeness enforcement: enforce per-domain request rate (e.g., max 1 req/2s) to avoid overwhelming servers",
-          "Fetch raw HTML and optionally render JavaScript using a headless browser (Playwright) for SPAs",
-          "Parse and extract clean article text, title, meta description, Open Graph tags, and structured data (JSON-LD)",
-          "Near-duplicate detection: detect pages with >90% content similarity using SimHash + Hamming distance",
-          "URL normalization: canonicalize URLs (strip tracking params, sort query params, resolve relative URLs)",
-          "Incremental recrawl: track page change frequency and prioritize recently changed content",
-          "Store raw HTML snapshots and extracted content separately for re-parsing if extractor logic changes",
-          "Crawl frontier priority: fresh seed URLs > frequently updated pages > deep-link discovered URLs"
+          "URL Discovery & Traversal: Traverse the web recursively starting from trusted seed domains and sitemaps",
+          "Politeness & Robots.txt: Parse, cache, and respect domain robots.txt rules and crawl-delay policies",
+          "Near-Duplicate Detection: Detect and drop syndicated copies and template variations using 64-bit SimHash",
+          "URL Normalization: Canonicalize URLs (resolve relative paths, lowercase hostnames, strip tracking tokens)",
+          "Content Extraction: Strip HTML boilerplate to extract title, main body text, meta tags, and outgoing hyperlinks",
+          "Raw Storage: Store raw HTML snapshots in standard WARC format in object storage for offline reprocessing"
         ]
       }
     },
@@ -57,15 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "Crawl 1 billion pages per month distributed across 10M+ domains",
-          "Per-fetch timeout of 10 seconds — a slow server must not block a crawler worker",
-          "Sub-200ms average crawl decision latency (URL priority scoring and politeness check)",
-          "Politeness: never exceed the domain's stated Crawl-delay by more than 10%",
-          "Deduplication: near-duplicate check completes in under 10ms per page at P99",
-          "99.9% scheduler availability — a scheduler restart must not lose the URL frontier",
-          "Horizontal scalability: add fetcher workers without re-crawling or re-queuing",
-          "Fault tolerance: transient DNS failures, 5xx responses, and timeouts trigger exponential backoff retry with max 3 attempts",
-          "Observability: per-domain crawl rate dashboards, politeness violation alerts, and fetcher error rate telemetry"
+          "Scale: 1 billion pages per month (~400 pages fetched/sec average, 2,500/sec peak)",
+          "Storage: ~500 TB raw HTML storage per month; ~50 TB extracted text and link graph data",
+          "Politeness Guarantee: Never hit the same host IP more than once per configured delay window",
+          "Extensibility: Pluggable parser modules for PDF, images, and headless browser rendering (Playwright)",
+          "Robustness: Isolate worker crashes caused by malformed HTML, infinite redirects, or slow server tar-pits"
         ]
       }
     },
@@ -73,429 +96,146 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Build a single ASP.NET Core application with a background IHostedService as the crawler loop. The frontier is a priority queue backed by SQL Server. The fetcher uses HttpClientFactory with Polly policies. Parsing uses AngleSharp and HtmlAgilityPack. Deduplication uses a normalized URL hash as a SQL unique constraint. This validates the end-to-end fetch → parse → store pipeline before splitting into distributed workers."
+        "text": "The architecture employs the classic Mercator Crawl Frontier pattern. The Frontier decouples priority scheduling from politeness enforcement. Distributed fetchers communicate with dedicated DNS caches and feed raw content into a decoupled parsing and deduplication pipeline."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-webcrawlercompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Web Crawler: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core Monolith)",
-            "definition": ""
-          },
-          {
-            "term": "- IHostedService CrawlerLoop",
-            "definition": "dequeues URLs, fetches, parses, enqueues new URLs"
-          },
-          {
-            "term": "- HttpClientFactory with Polly",
-            "definition": "Retry (3x exponential backoff), CircuitBreaker (5 failures / 60s), Timeout (10s)"
-          },
-          {
-            "term": "- AngleSharp for HTML5 parsing + Open Graph extraction",
-            "definition": ""
-          },
-          {
-            "term": "- HtmlAgilityPack for fallback parsing of malformed HTML",
-            "definition": ""
-          },
-          {
-            "term": "- PlaywrightSharp for JavaScript-rendered pages (headless Chromium)",
-            "definition": ""
-          },
-          {
-            "term": "- NSSieve / custom SimHash for near-duplicate detection",
-            "definition": ""
-          },
-          {
-            "term": "- Robots.txt parser with Crawl-delay and Disallow rule enforcement",
-            "definition": ""
-          },
-          {
-            "term": "- SQL Server",
-            "definition": "UrlFrontier (Priority + Domain + NextCrawlAt), CrawledPages (Hash, Content, SimHash)"
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS ECS (single worker process)",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or RDS",
-            "definition": "frontier + crawled pages tables"
-          },
-          {
-            "term": "- Azure Blob Storage / S3",
-            "definition": "raw HTML snapshots (one blob per URL hash)"
-          },
-          {
-            "term": "- Azure Cognitive Search / Elasticsearch",
-            "definition": "extracted content index for search API"
-          },
-          {
-            "term": "- Single process — max throughput limited by one machine's HTTP connection pool",
-            "definition": ""
-          }
-        ]
+        "id": "hld-crawler-arch",
+        "caption": "Distributed Web Crawler Architecture: Mercator Crawl Frontier, Fetcher Worker Fleet, DNS Cache, SimHash Dedup, and Content Store",
+        "definition": "flowchart TD\n    subgraph SeedLayer[\"🌱 Discovery & Seeds\"]\n        Seeds[\"Seed URLs / Sitemaps\"]\n        URLFilter[\"URL Normalizer & Bloom Filter\\n(URL-Seen Check)\"]\n    end\n\n    subgraph Frontier[\"🧭 Mercator Crawl Frontier\"]\n        PriorityQueues[\"📊 Priority Queues (F1..Fn)\\nPrioritizes high PageRank & news\"]\n        QueueSelector[\"Prioritizer & Queue Router\"]\n        PolitenessQueues[\"⏳ Politeness Queues (B1..Bm)\\n1 Queue per Domain Host\"]\n        DelayHeap[\"⏱️ Host Delay Min-Heap\\nEarliest permissible fetch timestamp\"]\n    end\n\n    subgraph FetcherFleet[\"🕷️ Distributed Fetcher Cluster\"]\n        WorkerPool[\"Fetcher Workers (Async HTTP/2)\"]\n        DNSCache[\"⚡ Custom DNS Resolver Cache\\nTTL: 24h, avoids DNS bottleneck\"]\n        RobotsCache[\"⚡ Robots.txt Cache (Redis)\\nDomain rules & crawl delays\"]\n    end\n\n    subgraph ProcessingPipeline[\"⚙️ Content Processing Pipeline\"]\n        HTMLParser[\"📄 Content Extractor & Stripper\"]\n        SimHashDedup[\"🔑 SimHash Fingerprint Checker\\nNear-Duplicate Detection\"]\n        LinkExtractor[\"🔗 Link Extractor & Canonicalizer\"]\n    end\n\n    subgraph StorageLayer[\"🗄️ Persistence Tier\"]\n        WARCStore[(\"🗄️ Raw Web Snapshot Store (S3 / WARC files)\")]\n        DocDB[(\"📄 Document Metadata Store (Bigtable / Cassandra)\")]\n        SimHashIndex[(\"⚡ SimHash Index (64-bit Table)\")]\n        LinkGraph[(\"🕸️ Link Graph Store (For PageRank)\")]\n    end\n\n    Seeds --> URLFilter\n    URLFilter -->|Unseen URLs| PriorityQueues\n    PriorityQueues --> QueueSelector --> PolitenessQueues\n    PolitenessQueues --> DelayHeap --> WorkerPool\n\n    WorkerPool <--> DNSCache\n    WorkerPool <--> RobotsCache\n    WorkerPool -->|Raw HTML Payload| WARCStore\n    WorkerPool --> HTMLParser\n\n    HTMLParser --> SimHashDedup\n    SimHashDedup <--> SimHashIndex\n    SimHashDedup -->|Unique Page| DocDB\n\n    HTMLParser --> LinkExtractor\n    LinkExtractor --> LinkGraph\n    LinkExtractor -->|Discovered Outgoing Links| URLFilter"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Crawl Frontier: Fetch & Politeness Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "The crawler is naturally a distributed pipeline: URL frontier → fetcher workers → parser workers → deduplication → indexer. Split into four specialized services with a shared message queue between each stage. The Scheduler Service owns the frontier with per-domain politeness gates. Fetcher workers are horizontally scalable stateless consumers. The Parser Service runs CPU-intensive NLP and SimHash computation. The Indexer pushes clean content to Azure Cognitive Search or Elasticsearch."
+        "text": "To ensure a target host is never overwhelmed, the Fetcher checks the Host Delay Heap before emitting an HTTP request, updating the next allowed timestamp immediately after download completes."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-webcrawlercompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Web Crawler: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_SearchService[Search Service]\n        MS_InventoryService[Inventory Service]\n        MS_BookingService[Booking Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_ReviewService[Review Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_SearchService\n        MS_SearchService --> MS_DB\n        MS_SearchService --> MS_Queue\n        MS_SearchService --> MS_Cache\n        MS_LB --> MS_InventoryService\n        MS_InventoryService --> MS_DB\n        MS_InventoryService --> MS_Queue\n        MS_InventoryService --> MS_Cache\n        MS_LB --> MS_BookingService\n        MS_BookingService --> MS_DB\n        MS_BookingService --> MS_Queue\n        MS_BookingService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_ReviewService\n        MS_ReviewService --> MS_DB\n        MS_ReviewService --> MS_Queue\n        MS_ReviewService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "title": "",
-        "items": [
-          "Scheduler Service: Owns the URL frontier — a priority queue (backed by Azure Service Bus or Kafka with priority partitions) ordered by page change frequency, page rank, and crawl freshness. Enforces politeness by maintaining a per-domain last-crawled timestamp in Redis. Before enqueueing a URL, it checks the domain's Crawl-delay policy and only releases the URL when the delay has elapsed. Discovers new URLs by parsing sitemaps and outlinks from previously fetched pages.",
-          "Fetcher Service: Stateless horizontally scalable workers. Each worker dequeues a URL, applies HttpClientFactory with Polly (3 retries, exponential backoff: 1s → 2s → 4s, 10s timeout, circuit-breaker after 5 consecutive failures). Checks robots.txt cache (Redis, TTL 24h) before fetching. Pages requiring JavaScript rendering are routed to a Playwright worker pool with a separate queue. Stores the raw HTML response to Azure Blob Storage (path: crawler/raw/{sha256-hash}.html.gz). Publishes a FetchedPage event to the parser queue.",
-          "Parser Service: Consumes FetchedPage events. Extracts title, meta description, canonical URL, Open Graph tags, JSON-LD structured data, and clean article body text using AngleSharp + Readability algorithm. Normalizes the URL (lowercase host, sort query params, strip UTM tracking params, resolve relative to absolute). Computes a content SimHash (64-bit) of the extracted text. Performs a near-duplicate check by querying the DedupStore for existing SimHashes within Hamming distance <= 3. If unique, publishes a ParsedContent event to the indexer queue; if duplicate, emits a DuplicateDetected event.",
-          "Indexer Service: Consumes ParsedContent events. Writes structured content to Azure Cognitive Search or Elasticsearch as a search document (id, url, title, description, body, domain, crawlDate, language). Also writes a record to the CrawlMetadata table in SQL for change-tracking and incremental recrawl scheduling. Updates the URL frontier with the next recommended crawl interval based on the page's change frequency (e.g., news sites recrawl every hour, static docs every week).",
-          "RobotsTxt Service: Centralized robots.txt cache. On cache miss, fetches robots.txt from the target domain, parses User-agent rules, and stores per-user-agent Disallow paths and Crawl-delay in Redis with a 24-hour TTL. Exposes an internal gRPC endpoint called by Fetcher workers before every fetch to get the applicable rule set for that domain + user-agent combination."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "WebCrawler/",
-            "definition": ""
-          },
-          {
-            "term": "components/",
-            "definition": ""
-          },
-          {
-            "term": "FrontierDashboard/  # Queue depth per domain, crawler throughput chart",
-            "definition": ""
-          },
-          {
-            "term": "DomainConfigPanel/  # Per-domain crawl-delay, robots.txt viewer, allow/block",
-            "definition": ""
-          },
-          {
-            "term": "CrawlLogViewer/     # Real-time log stream from fetcher workers via WebSocket",
-            "definition": ""
-          },
-          {
-            "term": "DuplicateDetector/  # URL pairs flagged as near-duplicate with similarity score",
-            "definition": ""
-          },
-          {
-            "term": "ContentInspector/   # Side-by-side",
-            "definition": "raw HTML vs extracted text vs SimHash"
-          },
-          {
-            "term": "SchedulerControls/  # Pause/resume crawl, set max concurrency per domain",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "useCrawlMetrics.ts   # React Query + WebSocket hybrid for live throughput",
-            "definition": ""
-          },
-          {
-            "term": "useDomainConfig.ts   # Mutation + cache invalidation for crawl-delay changes",
-            "definition": ""
-          },
-          {
-            "term": "useCrawlLog.ts       # Infinite scroll log viewer with log level filtering",
-            "definition": ""
-          },
-          {
-            "term": "pages/",
-            "definition": ""
-          },
-          {
-            "term": "DashboardPage.tsx    # Ops overview",
-            "definition": "pages/min, error rate, frontier depth"
-          },
-          {
-            "term": "DomainsPage.tsx      # Domain management",
-            "definition": "crawl rates, politeness config"
-          },
-          {
-            "term": "CrawlLogPage.tsx     # Full-text searchable crawl logs",
-            "definition": ""
-          },
-          {
-            "term": "DuplicatesPage.tsx   # Near-duplicate clusters for manual review",
-            "definition": ""
-          },
-          {
-            "term": "store/",
-            "definition": ""
-          },
-          {
-            "term": "crawl-store.ts       # Zustand",
-            "definition": "selected domain, paused domains, active rules"
-          },
-          {
-            "term": "types/",
-            "definition": ""
-          },
-          {
-            "term": "crawl.ts             # FrontierEntry, CrawlResult, SimHashResult, RobotsRule",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/",
-            "definition": ""
-          },
-          {
-            "term": "lib/",
-            "definition": ""
-          },
-          {
-            "term": "hooks/",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- FrontierDashboard uses WebSocket subscription for live queue-depth updates (1s refresh)",
-            "definition": ""
-          },
-          {
-            "term": "- DomainConfigPanel writes to RuleService API and shows a 5s propagation confirmation",
-            "definition": ""
-          },
-          {
-            "term": "- CrawlLogViewer uses react-virtuoso for 1M+ log line performance",
-            "definition": ""
-          },
-          {
-            "term": "- DuplicateDetector shows URL pairs with Hamming distance slider (0–3 threshold)",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Fetcher Worker — Polly + Playwright Routing + Blob Upload",
-        "language": "text",
-        "code": "// FetcherWorker — stateless background consumer processing FetchedUrlQueue messages\npublic class FetcherWorker : BackgroundService\n{\n    private readonly IServiceProvider _services;\n    private readonly IHttpClientFactory _httpFactory;\n    private readonly ILogger<FetcherWorker> _logger;\n    private readonly BlobServiceClient _blobClient;\n    private const string RawBlobContainer = \"crawler-raw\";\n\n    public FetcherWorker(\n        IServiceProvider services,\n        IHttpClientFactory httpFactory,\n        ILogger<FetcherWorker> logger,\n        BlobServiceClient blobClient)\n    {\n        _services = services;\n        _httpFactory = httpFactory;\n        _logger = logger;\n        _blobClient = blobClient;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        var scope = _services.CreateScope();\n        var queueClient = scope.ServiceProvider.GetRequiredService<QueueClient>();\n\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                var message = await queueClient.ReceiveMessageAsync(\n                    visibilityTimeout: TimeSpan.FromSeconds(30),\n                    cancellationToken: stoppingToken);\n\n                if (message == null) continue;\n\n                var fetchUrl = JsonSerializer.Deserialize<FetchUrlMessage>(message.Value.Body);\n                var result = await FetchPageAsync(fetchUrl.Url, stoppingToken);\n\n                if (result.Success)\n                {\n                    var blobPath = string.Format(\"crawler/raw/{0}.html.gz\", result.ContentHash);\n                    var blob = _blobClient.GetBlobContainerClient(RawBlobContainer)\n                        .GetBlobClient(blobPath);\n                    await blob.UploadAsync(\n                        new BinaryData(Encoding.UTF8.GetBytes(result.RawHtml)),\n                        cancellationToken: stoppingToken);\n\n                    await _eventBus.Publish(new PageFetched\n                    {\n                        Url = fetchUrl.Url,\n                        ContentHash = result.ContentHash,\n                        BlobPath = blobPath,\n                        ContentType = result.ContentType,\n                        StatusCode = result.StatusCode,\n                        FetchedAt = DateTime.UtcNow,\n                        RequiresJsRender = result.RequiresJsRender,\n                        Domain = new Uri(fetchUrl.Url).Host\n                    });\n\n                    await queueClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt, stoppingToken);\n                }\n                else\n                {\n                    fetchUrl.RetryCount++;\n                    if (fetchUrl.RetryCount < 3)\n                    {\n                        await queueClient.SendMessageAsync(\n                            JsonSerializer.Serialize(fetchUrl),\n                            cancellationToken: stoppingToken);\n                    }\n                    else\n                    {\n                        _logger.LogWarning(\"URL exhausted retries: {Url} (attempts: {Retries})\",\n                            fetchUrl.Url, fetchUrl.RetryCount);\n                        await _eventBus.Publish(new FetchFailed { Url = fetchUrl.Url, Reason = result.Error });\n                    }\n                    await queueClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt, stoppingToken);\n                }\n            }\n            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)\n            {\n                _logger.LogError(ex, \"FetcherWorker error — continuing\");\n                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);\n            }\n        }\n    }\n\n    private async Task<FetchResult> FetchPageAsync(string url, CancellationToken ct)\n    {\n        var client = _httpFactory.CreateClient(\"crawler\");\n        client.DefaultRequestHeaders.UserAgent.ParseAdd(\n            \"InterviewPrepCrawler/1.0 (+https://interviewprep.com/bot)\");\n        client.DefaultRequestHeaders.Accept.ParseAdd(\"text/html,application/xhtml+xml\");\n\n        try\n        {\n            using var response = await client.GetAsync(url, ct);\n            var content = await response.Content.ReadAsStringAsync(ct);\n            var contentHash = ComputeSha256(content);\n            var requiresJs = IsLikelySpa(content);\n\n            return new FetchResult\n            {\n                Success = response.IsSuccessStatusCode,\n                StatusCode = (int)response.StatusCode,\n                RawHtml = content,\n                ContentHash = contentHash,\n                ContentType = response.Content.Headers.ContentType?.MediaType ?? \"text/html\",\n                RequiresJsRender = requiresJs,\n                Error = response.IsSuccessStatusCode ? null : string.Format(\"HTTP {0}\", (int)response.StatusCode)\n            };\n        }\n        catch (HttpRequestException ex)\n        {\n            return new FetchResult { Success = false, Error = ex.Message };\n        }\n        catch (TaskCanceledException)\n        {\n            return new FetchResult { Success = false, Error = \"Timeout\" };\n        }\n    }\n\n    private bool IsLikelySpa(string html)\n    {\n        var bodyMatch = Regex.Match(html, \"<body[^>]*>([\\s\\S]*?)</body>\", RegexOptions.IgnoreCase);\n        if (!bodyMatch.Success) return true;\n        var scriptCount = Regex.Matches(html, \"<script\", RegexOptions.IgnoreCase).Count;\n        var bodyTextLength = HtmlEntity.DeEntitize(bodyMatch.Groups[1].Value).Trim().Length;\n        return scriptCount > 5 && bodyTextLength < 200;\n    }\n\n    private string ComputeSha256(string content)\n    {\n        var bytes = Encoding.UTF8.GetBytes(content);\n        var hash = SHA256.HashData(bytes);\n        return Convert.ToHexString(hash).ToLowerInvariant();\n    }\n\n    private string NormalizeUrl(string url)\n    {\n        var uri = new Uri(url, UriKind.Absolute);\n        var query = HttpUtility.ParseQueryString(uri.Query);\n        var strip = new[] { \"utm_source\", \"utm_medium\", \"utm_campaign\", \"utm_term\", \"utm_content\", \"gclid\" };\n        foreach (var param in strip)\n            query.Remove(param);\n        var sortedQuery = string.Join(\"&\", query.AllKeys.OrderBy(k => k)\n            .Select(k => string.Format(\"{0}={1}\",\n                HttpUtility.UrlEncode(k), HttpUtility.UrlEncode(query[k]))));\n        var builder = new UriBuilder(uri) { Query = sortedQuery };\n        return builder.Uri.AbsoluteUri.TrimEnd('/').ToLowerInvariant();\n    }\n}\n\npublic record FetchResult(bool Success, int StatusCode, string RawHtml, string ContentHash,\n    string ContentType, bool RequiresJsRender, string? Error);\n\npublic record FetchUrlMessage(string Url, int RetryCount = 0);"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Object Storage",
-            "description": "Cheap archival storage for raw HTML snapshots and crawl audit history",
-            "tags": [
-              "Azure Blob Storage (Cool/Archive tier)",
-              "Amazon S3 (Infrequent Access / Glacier)"
-            ],
-            "pros": [
-              "Lifecycle policies auto-move HTML snapshots to Archive after 30 days",
-              "S3 Glacier Deep Archive costs ~$1/TB/month — ideal for 1B page raw storage"
-            ],
-            "cons": [
-              "Glacier retrieval can take minutes — not suitable for re-parsing on demand"
-            ]
-          },
-          {
-            "title": "Search Index",
-            "description": "Full-text search index for extracted content served to the search API",
-            "tags": [
-              "Azure Cognitive Search",
-              "Amazon OpenSearch Service"
-            ],
-            "pros": [
-              "Cognitive Search has built-in AI enrichers for language detection and entity extraction",
-              "OpenSearch supports k-NN vector search for semantic similarity alongside BM25"
-            ],
-            "cons": [
-              "Cognitive Search indexer cold-starts on schema change; OpenSearch shard rebalancing can spike"
-            ]
-          },
-          {
-            "title": "Message Queue",
-            "description": "Decouples fetch → parse → index pipeline stages with at-least-once delivery",
-            "tags": [
-              "Azure Service Bus (Standard, sessions enabled)",
-              "Amazon SQS + SQS FIFO"
-            ],
-            "pros": [
-              "Service Bus sessions preserve per-URL ordering in the pipeline",
-              "SQS FIFO guarantees exactly-once processing with ContentBasedDeduplication"
-            ],
-            "cons": [
-              "Service Bus throughput units must be pre-purchased; SQS FIFO has 300 TPS limit per queue"
-            ]
-          },
-          {
-            "title": "Headless Browser",
-            "description": "Render JavaScript-rendered SPAs that return empty HTML to a plain HTTP GET",
-            "tags": [
-              "Azure Playwright (self-hosted on Container Apps)",
-              "AWS Fargate + Playwright Docker image"
-            ],
-            "pros": [
-              "Container Apps scales Playwright instances to zero between batch runs",
-              "Fargate spot instances reduce Playwright compute cost by 70% for batch rendering"
-            ],
-            "cons": [
-              "Headless Chromium is memory-heavy (~500MB per instance); container memory limits must be set"
-            ]
-          },
-          {
-            "title": "Scheduler / Orchestration",
-            "description": "Orchestrate periodic recrawl of known pages based on change frequency",
-            "tags": [
-              "Azure Logic Apps / Durable Functions",
-              "AWS Step Functions"
-            ],
-            "pros": [
-              "Durable Functions timers manage per-URL recrawl schedules with checkpoint persistence",
-              "Step Functions Express Workflows handle high-frequency timer events cost-effectively"
-            ],
-            "cons": [
-              "Step Functions per-transition pricing can become expensive at 1B pages/month"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-crawler-fetch-sequence",
+        "caption": "Crawl execution sequence: Politeness delay check, robots.txt validation, HTTP fetch, and SimHash deduplication",
+        "definition": "sequenceDiagram\n    autonumber\n    participant Frontier as 🧭 Crawl Frontier\n    participant Worker as 🕷️ Fetcher Worker\n    participant Robots as ⚡ Robots.txt Cache\n    participant Target as 🌐 Web Server (example.com)\n    participant Parser as 📄 HTML Parser\n    participant Dedup as 🔑 SimHash Dedup\n    participant Bloom as 🌸 URL-Seen Bloom Filter\n\n    Frontier->>Frontier: Pop URL from Queue for \"example.com\"<br/>Check Delay Heap (Last fetched: 2.1s ago -> OK)\n    Frontier->>Worker: Dispatch URL: https://example.com/blog/article-4\n    Worker->>Robots: Query rules for example.com\n    Robots-->>Worker: Allowed: True (Crawl-Delay: 1s)\n\n    Worker->>Target: HTTP GET /blog/article-4 (User-Agent: TechBot/1.0)\n    Target-->>Worker: 200 OK (HTML Payload, 45KB)\n    Worker->>Frontier: Update Host Delay Heap: example.com next allowed at now + 1s\n\n    Worker->>Parser: Parse HTML payload\n    Parser->>Dedup: Compute SimHash(64-bit)\n    alt Content is Near-Duplicate (Hamming Distance <= 3)\n        Dedup-->>Parser: Duplicate detected! Drop content\n    else Content is Fresh & Unique\n        Dedup-->>Parser: Unique document confirmed\n        Parser->>Parser: Extract Outgoing Links: [url_1, url_2, url_3]\n        Parser->>Bloom: Check URLs in Bloom Filter\n        Bloom-->>Frontier: Push 2 new unseen URLs to Priority Queue\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Document Deduplication Strategies Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Method",
+          "Matching Accuracy",
+          "Detects Altered Boilerplate?",
+          "Computational Cost",
+          "Application"
+        ],
+        "rows": [
+          [
+            "Exact Cryptographic Hash (MD5 / SHA-256)",
+            "Exact byte match only",
+            "No (Single timestamp or ad change breaks match)",
+            "Very Low (Fast byte scan)",
+            "Raw file deduplication (images, PDF binaries)"
+          ],
+          [
+            "SimHash (64-bit Locality Sensitive)",
+            "Near-duplicate (Hamming distance ≤ 3 bits)",
+            "Yes (Insensitive to small edits, ads, dates)",
+            "Low (Word token frequency projection)",
+            "Industry standard for web HTML article deduplication (Googlebot)"
+          ],
+          [
+            "MinHash + Jaccard Similarity",
+            "Syntactic set overlap estimate",
+            "Yes (Measures n-gram shingles overlap)",
+            "Moderate",
+            "Large document collection clustering and plagiarism detection"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why is DNS resolution a major bottleneck for web crawlers?",
+            "answer": "Fetching millions of pages across millions of distinct domains requires millions of DNS lookup queries. Standard OS DNS resolvers are blocking and slow (tens to hundreds of milliseconds per lookup). The crawler must use a high-concurrency custom asynchronous DNS resolver with an in-memory cache holding IP addresses for 24+ hours, bypassing recursive root lookups."
+          },
+          {
+            "question": "How do you detect and escape Spider Traps?",
+            "answer": "Spider traps are websites with endless generated URLs (e.g. `site.com/calendar?year=2099` or recursive directories `site.com/dir/dir/dir`). Mitigation: (1) Impose a strict maximum URL path depth (e.g. max 8 segments), (2) Limit total pages crawled per domain, (3) Use URL length caps (e.g. max 256 characters), and (4) Detect repetitive URL segment patterns via regex heuristics."
+          },
+          {
+            "question": "How does a Bloom Filter track billions of crawled URLs in memory?",
+            "answer": "Storing 1 billion full URL strings (average 80 bytes) requires 80 GB of RAM. A Bloom Filter with 1 billion elements and a 1% false positive rate requires only ~1.2 GB of RAM (approx. 9.6 bits per element). If the Bloom filter says a URL is \"new\", it is guaranteed to be new with 0% error; if it says \"already seen\", there is a 1% chance it was missed, which is an acceptable trade-off for internet crawling."
+          },
+          {
+            "question": "How are client-side rendered Single Page Applications (React / Vue) crawled?",
+            "answer": "Standard HTTP GET requests only receive empty `<div id=\"root\"></div>` shells. Crawlers maintain a tiered processing pipeline: 90% of pages are parsed using fast static HTML extractors (Cheerio / Lexbor); URLs identified as JavaScript-heavy SPAs are routed to a headless browser worker pool (Playwright / Chromium) running in headless containers to evaluate scripts and render DOM."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "Politeness is a first-class concern: per-domain Crawl-delay enforcement via a Redis gate prevents IP bans and legal risk",
-          "The URL frontier is the critical path — a priority queue ordered by freshness, page rank, and change frequency",
-          "SimHash + Hamming distance enables near-duplicate detection in O(n) time across billions of pages",
-          "Playwright-rendered pages must be routed to a separate worker pool — mixing CPU-heavy rendering with I/O-bound fetching kills throughput",
-          "URL normalization (strip tracking params, sort query strings) is essential before the dedup check or the same page fragments into many frontier entries",
-          "Raw HTML snapshots stored to Blob Storage decouple the storage format from the extraction logic, enabling safe parser upgrades"
+          "Mercator Crawl Frontier separates URL priority scheduling from per-host politeness queue management",
+          "Delay Heaps strictly enforce minimum intervals between requests to protect web servers from accidental DDoS",
+          "SimHash 64-bit fingerprints detect near-duplicate pages with modified ads, headers, or timestamps",
+          "In-memory Bloom filters track billions of seen URLs with under 2GB of RAM consumption",
+          "Custom async DNS resolver caches eliminate network lookup latency as a crawler bottleneck"
         ],
-        "takeaway": "Web crawler architecture lives or dies by politeness, frontier scheduling, and deduplication. A per-domain rate gate in Redis, a priority frontier ordered by change frequency, SimHash near-duplicate detection, and Blob Storage for raw HTML snapshots are the four pillars that distinguish a responsible crawler from a DDoS tool with a parser."
+        "takeaway": "Scalable web crawlers succeed by prioritizing politeness and resource efficiency: in-memory Bloom filters and SimHash engines filter out redundant work before distributed fetchers touch remote servers."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "google-search",
+    "search-autocomplete",
+    "url-shortener"
+  ],
+  "furtherReading": [
+    {
+      "title": "Mercator: A Scalable, Extensible Web Crawler (Heydon & Najork)",
+      "url": "https://www.researchgate.net/publication/220433722_Mercator_A_scalable_extensible_web_crawler",
+      "type": "article"
+    },
+    {
+      "title": "Detecting Near-Duplicates for Web Crawling (Manku et al., Google)",
+      "url": "https://www.cs.princeton.edu/courses/archive/spring13/cos598C/simhash.pdf",
+      "type": "article"
+    }
+  ]
 }

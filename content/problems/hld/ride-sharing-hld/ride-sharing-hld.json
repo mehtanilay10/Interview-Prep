@@ -3,15 +3,20 @@
   "slug": "ride-sharing-hld",
   "moduleSlug": "ride-sharing-hld",
   "courseSlug": "hld-problems",
-  "title": "Ride Sharing Platform: Complete Architecture",
-  "description": "Design a ride sharing platform with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "title": "Ride Sharing Platform (Lyft / Grab): Complete Architecture",
+  "description": "Design a global ride-hailing architecture with batched bipartite matchmaker dispatch, real-time map routing, surge pricing, and pooled rides.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "ridesharinghld"
+    "ride-sharing",
+    "lyft",
+    "dispatch-matcher",
+    "geospatial",
+    "routing",
+    "bipartite-matching"
   ],
   "blocks": [
     {
@@ -24,7 +29,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a ride sharing platform that connects riders with nearby drivers in real time. Riders request rides from their current location, the system matches them with the best available driver within seconds, tracks the trip with live GPS updates, calculates dynamic fares including surge pricing, and processes payments after the ride ends. The platform must also support driver dispatch, trip history, ratings, and emergency SOS features."
+        "text": "Design a global on-demand ride-hailing platform like Lyft or Grab. The system coordinates millions of riders and drivers in real time across hundreds of cities. The central engineering challenge is the Dispatch Matchmaker: matching incoming ride requests to nearby drivers not merely on a greedy first-come basis, but through Batched Bipartite Matching in 5-second windows to maximize global network efficiency, minimize total rider ETA, minimize driver unpaid driving distance, calculate traffic-aware routing, and support dynamic shared rides (pooled rides)."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Batched Bipartite Matching",
+            "definition": "Collecting ride requests and available drivers over a 5-second window, solving maximum-weight matching (Hungarian / Kuhn-Munkres algorithm) to optimize overall platform efficiency rather than greedy 1-to-1 dispatch."
+          },
+          {
+            "term": "Contraction Hierarchies (Routing)",
+            "definition": "A graph pre-processing speedup technique on road networks (OpenStreetMap) enabling sub-millisecond point-to-point shortest path and ETA calculations."
+          },
+          {
+            "term": "Ride Pooling (Shared Rides)",
+            "definition": "Dynamically matching two or more independent riders with overlapping route corridors into a single vehicle while enforcing strict detour time bounds."
+          },
+          {
+            "term": "Spatial Indexing (QuadTree / Geohash)",
+            "definition": "Hierarchical spatial decomposition indexing moving driver GPS coordinates in memory for sub-millisecond radius search."
+          },
+          {
+            "term": "Trip FSM (Finite State Machine)",
+            "definition": "A resilient state machine driving the immutable ride lifecycle: REQUESTED -> MATCHED -> DRIVER_ARRIVED -> IN_TRIP -> COMPLETED -> SETTLED."
+          }
+        ]
       }
     },
     {
@@ -39,16 +71,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Riders request rides with pickup and drop-off locations via map or text",
-          "Drivers go online, accept ride requests, and navigate to pickup",
-          "Real-time GPS tracking updates rider and driver apps every 2-5 seconds",
-          "Matching engine selects the nearest driver within 30 seconds",
-          "Calculate ETA from driver to pickup and pickup to destination using map data",
-          "Apply dynamic surge pricing based on local demand and driver supply",
-          "Track trip status: requested, matched, arriving, in-progress, completed, canceled",
-          "Process payment after trip completion using saved payment methods",
-          "Allow riders and drivers to rate each other after trip completion",
-          "Trigger SOS alerts to emergency contacts and ops when activated"
+          "Rider Booking: Request standard or pooled rides with upfront fare estimates and pickup/drop-off route preview",
+          "Driver Fleet: Online/offline toggle, accept/decline ride dispatches, and in-app turn-by-turn navigation",
+          "Batch Matchmaker: Match batches of riders and drivers in rolling 5-second windows using bipartite graph optimization",
+          "Dynamic Pricing (Surge): Adjust fares dynamically per geospatial tile based on local real-time supply vs demand",
+          "Live Tracking: Stream real-time driver coordinates and live vehicle heading angle to rider maps every 3 seconds",
+          "Trip Settlement: Compute final fares, toll charges, driver split, and process payment upon ride completion"
         ]
       }
     },
@@ -57,14 +85,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "99.5% availability for dispatch and matching services",
-          "Sub-2-second matching time from ride request to driver acceptance",
-          "Support 10,000+ concurrent drivers per city with location updates",
-          "GPS updates delivered to drivers within 2 seconds of rider movement",
-          "Geospatial queries for nearest driver complete in under 200ms",
-          "Surge pricing calculations update every 60 seconds per zone",
-          "Trip history and receipts available within 5 minutes of completion",
-          "SOS alert reaches ops and emergency contacts within 1 second"
+          "Scale: 20M+ daily completed trips; 500,000 active concurrent drivers; 150,000 location pings/sec",
+          "Dispatch Match Latency: Dispatch decision returned to rider within 5-10 seconds of request submission",
+          "Routing Latency: <15ms P99 latency for point-to-point ETA and turn-by-turn path generation",
+          "Driver Location Freshness: Vehicle location on rider phone updated with <3 seconds end-to-end lag",
+          "High Availability: 99.999% uptime for core location tracking and active trip state machines"
         ]
       }
     },
@@ -72,371 +97,146 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application that handles rider requests, driver dispatch, GPS tracking, fare calculation, payment processing, and ratings. Use Azure SQL or AWS RDS for relational data. WebSockets handle real-time location updates between drivers and the dispatch server. The monolith lets you validate the core matching and GPS pipeline before scaling to microservices."
+        "text": "The platform separates high-frequency location telemetry from transactional trip coordination and batched matchmaker dispatching."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ridesharingplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Ride Sharing Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_DispatchService[Dispatch Service]\n        MS_MatchingEngine[Matching Engine]\n        MS_TripService[Trip Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_LocationService[Location Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_DispatchService\n        MS_DispatchService --> MS_DB\n        MS_DispatchService --> MS_Queue\n        MS_DispatchService --> MS_Cache\n        MS_LB --> MS_MatchingEngine\n        MS_MatchingEngine --> MS_DB\n        MS_MatchingEngine --> MS_Queue\n        MS_MatchingEngine --> MS_Cache\n        MS_LB --> MS_TripService\n        MS_TripService --> MS_DB\n        MS_TripService --> MS_Queue\n        MS_TripService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LocationService\n        MS_LocationService --> MS_DB\n        MS_LocationService --> MS_Queue\n        MS_LocationService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
-        ]
+        "id": "hld-rideshare-arch",
+        "caption": "Ride Sharing Architecture: Real-Time Location Ingest, 5-Second Batched Matchmaker, Routing Engine, and Trip State Machine",
+        "definition": "flowchart TD\n    subgraph Clients[\"👥 Mobile Clients\"]\n        RiderApp[\"🙋 Rider App (iOS / Android)\"]\n        DriverApp[\"🚗 Driver App (GPS Ping every 3s)\"]\n    end\n\n    subgraph EdgeLayer[\"🚪 Gateway & Location Ingest\"]\n        APIGW[\"Envoy API Gateway (Auth & Rate Limit)\"]\n        LocationIngest[\"⚡ Telemetry Ingestion Gateway (Netty / UDP)\\n150,000 GPS coordinates/sec\"]\n        LiveMapGW[\"⚡ Live Tracking Gateway (WebSockets / SSE)\"]\n    end\n\n    subgraph CoreServices[\"⚙️ Domain Microservices\"]\n        LocationSvc[\"📍 Location Service (Spatial Index)\"]\n        Matchmaker[\"🎯 Batched Matchmaker Service\\n5-Second Bipartite Matching (Kuhn-Munkres)\"]\n        RoutingEngine[\"🗺️ Routing & ETA Engine\\nOSRM Contraction Hierarchies\"]\n        PricingEngine[\"💰 Dynamic Pricing & Surge Service\"]\n        TripFSM[\"🚖 Trip State Machine Coordinator\"]\n        PaymentSvc[\"💳 Payment Settlement Service\"]\n    end\n\n    subgraph Datastores[\"🗄️ Persistence Tier\"]\n        GeoStore[(\"⚡ Geospatial Index (Redis GEO / In-Memory QuadTree)\\nActive driver positions & headings\")]\n        TripDB[(\"📋 Trip DB (PostgreSQL / Aurora)\\nState transitions & trip records\")]\n        MapGraphDB[(\"🗺️ Road Network Graph (OpenStreetMap data)\")]\n    end\n\n    subgraph EventBackbone[\"📨 Event Bus: Apache Kafka\"]\n        Kafka[\"📨 Apache Kafka\\ngps-stream | ride-requested | trip-matched | trip-completed\"]\n    end\n\n    RiderApp --> APIGW\n    DriverApp --> APIGW\n    DriverApp -->|GPS Ping| LocationIngest\n\n    LocationIngest --> LocationSvc --> GeoStore\n    LocationSvc -->|Publish Location Updates| Kafka\n    Kafka --> LiveMapGW -->|Stream Driver Marker| RiderApp\n\n    APIGW --> PricingEngine\n    PricingEngine --> GeoStore\n\n    APIGW --> TripFSM\n    TripFSM -->|1. Submit Request| Matchmaker\n    TripFSM --> TripDB\n\n    Matchmaker -->|2. Query Nearby Drivers| GeoStore\n    Matchmaker -->|3. Query ETAs| RoutingEngine --> MapGraphDB\n    Matchmaker -->|4. Solve Bipartite Match| TripFSM\n\n    TripFSM -->|Dispatch Offer| DriverApp\n    TripFSM --> PaymentSvc"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Batched Dispatch Matching Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "At scale, split into microservices to handle high-frequency location updates and geospatial matching independently. Dispatch Service receives ride requests. Matching Engine runs geospatial queries to find the nearest available driver. Location Service ingests GPS pings and publishes driver positions. Trip Service manages the ride lifecycle. Pricing Service calculates fares and surge. Notification Service pushes ride updates via WebSockets. SOS Service handles emergency alerts."
+        "text": "Unlike naive systems that dispatch the first driver who appears, the Batched Matchmaker gathers all requests in an H3 hexagonal cell over a 5-second window to find the globally optimal assignment."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-ridesharingplatformcompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Ride Sharing Platform: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_DispatchService[Dispatch Service]\n        MS_MatchingEngine[Matching Engine]\n        MS_TripService[Trip Service]\n        MS_PaymentService[Payment Service]\n        MS_NotificationService[Notification Service]\n        MS_LocationService[Location Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_DispatchService\n        MS_DispatchService --> MS_DB\n        MS_DispatchService --> MS_Queue\n        MS_DispatchService --> MS_Cache\n        MS_LB --> MS_MatchingEngine\n        MS_MatchingEngine --> MS_DB\n        MS_MatchingEngine --> MS_Queue\n        MS_MatchingEngine --> MS_Cache\n        MS_LB --> MS_TripService\n        MS_TripService --> MS_DB\n        MS_TripService --> MS_Queue\n        MS_TripService --> MS_Cache\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LocationService\n        MS_LocationService --> MS_DB\n        MS_LocationService --> MS_Queue\n        MS_LocationService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Dispatch Service: Receives ride requests, validates pickup and drop-off locations, and emits MatchRequest events to the matching engine.",
-          "Matching Engine: Runs geospatial queries against driver locations, applies ETA and driver-rating heuristics, and assigns the best driver within the SLA.",
-          "Location Service: Ingests high-frequency GPS pings from drivers via WebSocket or MQTT, stores recent positions in Redis geospatial indexes, and publishes position updates.",
-          "Trip Service: Manages the full ride lifecycle from request to completion, handles cancellations, and stores trip legs and route data.",
-          "Pricing Service: Calculates base fare, distance, time, and dynamic surge multipliers by geo-zone; exposes fare estimates to rider and driver apps.",
-          "Notification Service: Pushes ride status updates, driver arrival alerts, and SOS notifications via WebSocket, FCM, or APNs."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "RideSharingHld/",
-            "definition": ""
-          },
-          {
-            "term": "api/           # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/     # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/          # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "pages/          # Route pages",
-            "definition": ""
-          },
-          {
-            "term": "store/          # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/          # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching and background refetch",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket / SSE for real-time updates",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries and retry logic",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"RideSharingHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapRideSharingHldEndpoints();\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run containerized or serverless workloads",
-            "tags": [
-              "Azure App Service",
-              "Amazon EC2 / ECS / EKS"
-            ],
-            "pros": [
-              "Auto-scaling",
-              "Managed infrastructure"
-            ],
-            "cons": [
-              "Cold start latency"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limiting, auth, and request routing",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Built-in policies",
-              "Developer portal"
-            ],
-            "cons": [
-              "Additional latency"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "In-memory caching for hot data",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond latency",
-              "Automatic eviction"
-            ],
-            "cons": [
-              "Memory cost"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary data store for services",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Global distribution",
-              "Auto-scaling throughput"
-            ],
-            "cons": [
-              "Consistency model learning curve"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Blob storage for media and files",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Infinite scale",
-              "Cheap archival tiers"
-            ],
-            "cons": [
-              "Eventual consistency for listings"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async communication between services",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS"
-            ],
-            "pros": [
-              "Decoupling",
-              "Buffering spikes"
-            ],
-            "cons": [
-              "Debugging async flows"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-rideshare-match-sequence",
+        "caption": "5-second batched bipartite matching flow evaluating global pickup efficiency and dispatching optimal drivers",
+        "definition": "sequenceDiagram\n    autonumber\n    actor RiderA as 🙋 Rider A\n    actor RiderB as 🙋 Rider B\n    participant API as 🚪 API Gateway\n    participant Matcher as 🎯 Batched Matchmaker\n    participant Geo as ⚡ Spatial Store (Redis)\n    participant Route as 🗺️ Routing Engine\n    actor Driver1 as 🚗 Driver 1\n    actor Driver2 as 🚗 Driver 2\n\n    RiderA->>API: Request Ride (Loc: 5th Ave)\n    RiderB->>API: Request Ride (Loc: 6th Ave)\n    API->>Matcher: Collect in 5-second Batch Window\n\n    Note over Matcher: 5-Second Window Closes (Batch size: 2 Riders, 2 Drivers)\n    Matcher->>Geo: Find all available drivers in Cell\n    Geo-->>Matcher: [Driver 1 (Loc: 4th Ave), Driver 2 (Loc: 7th Ave)]\n\n    Matcher->>Route: Compute Matrix ETA (Rider A/B to Driver 1/2)\n    Route-->>Matcher: Cost Matrix: [A->1: 2m, A->2: 8m, B->1: 7m, B->2: 3m]\n\n    Note over Matcher: Solve Maximum Weight Bipartite Match:<br/>Pairing (A->1) + (B->2) Total ETA: 5 mins<br/>vs Greedy (A->1, B->None) or (B->1) Total: 15 mins!\n\n    Matcher->>Driver1: Push Dispatch Offer (Pickup: Rider A, ETA: 2m)\n    Matcher->>Driver2: Push Dispatch Offer (Pickup: Rider B, ETA: 3m)\n\n    Driver1-->>Matcher: ACCEPT_OFFER\n    Driver2-->>Matcher: ACCEPT_OFFER\n    Matcher-->>API: Match Confirmed for Riders A and B\n    API-->>RiderA: Driver 1 is arriving in 2 mins!\n    API-->>RiderB: Driver 2 is arriving in 3 mins!"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Dispatch Matching Strategies Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Strategy",
+          "Wait Time / Window",
+          "Global Network Efficiency",
+          "Algorithm Complexity",
+          "Practical Evaluation"
+        ],
+        "rows": [
+          [
+            "Greedy First-Come Nearest",
+            "Instant (0s delay)",
+            "Poor (First rider takes closest car, leaving 2nd rider with 20m wait)",
+            "O(1) lookup",
+            "Simple, but causes high vehicle deadhead miles and rider cancellations"
+          ],
+          [
+            "Batched Bipartite Matching (Lyft / Grab)",
+            "5-10 second batch window",
+            "High (Minimizes cumulative wait time across all riders)",
+            "O(V^3) Kuhn-Munkres / Min-Cost Max-Flow",
+            "Industry standard; increases completed rides per hour by 15-20%"
+          ],
+          [
+            "Multi-Objective Reinforcement Learning",
+            "Rolling horizon (10-30s)",
+            "Maximum (Anticipates future demand and repositions idle cars)",
+            "High (Deep Q-Learning / RL Agent)",
+            "Modern production tier; prevents driver shortages in anticipation of flight arrivals"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why is Batched Bipartite Matching superior to Greedy Dispatch?",
+            "answer": "Greedy matching pairs Rider 1 with Driver 1 (1 min away). But 2 seconds later, Rider 2 requests a ride right next to Driver 1, but must now be assigned Driver 2 who is 15 minutes away! Cumulative wait time: 1 + 15 = 16 mins. In batched matching, a 5-second delay pairs Rider 1 with Driver 2 (4 mins) and Rider 2 with Driver 1 (2 mins). Total cumulative wait time: 6 mins, reducing cancellations and fuel waste across the city."
+          },
+          {
+            "question": "How are routing and ETAs computed in sub-15ms without querying external Google Maps APIs?",
+            "answer": "Commercial map APIs charge per call and introduce 100ms+ network latency. Ride-sharing companies self-host OSRM (Open Source Routing Machine) or Valhalla instances using Contraction Hierarchies over OpenStreetMap data. Pre-contracting the road network reduces shortest path searches (Dijkstra) to sub-millisecond bidirectional graph traversals in memory."
+          },
+          {
+            "question": "How do Pooled / Shared rides calculate detours dynamically?",
+            "answer": "Shared rides solve the Pickup and Delivery Problem with Time Windows (PDPTW). When Rider 2 requests a ride, the matchmaker checks active vehicles heading in the same direction. It simulates inserting Rider 2's pickup and drop-off into Driver 1's route. The match is only accepted if it adds no more than a hard threshold (e.g. max 5-8 minutes) to Rider 1's original estimated arrival."
+          },
+          {
+            "question": "How are driver GPS telemetry pings ingested without overwhelming databases?",
+            "answer": "Drivers transmit GPS updates over UDP or lightweight persistent TCP sockets to Netty gateways. Updates do not touch relational databases; they write directly into an in-memory spatial index (Redis GEO) with a 5-second TTL and publish to Kafka. Cassandra records historical location trails asynchronously for safety dispute audits."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "A Ride Sharing Platform system requires both simple and scalable designs",
-          "Monolith is fastest to validate; microservices are for scale",
-          "React + ASP.NET Core provides a robust full-stack foundation",
-          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
-          "Always design for failure: retries, circuit breakers, and fallbacks"
+          "5-second batched bipartite matching maximizes global fleet efficiency and cuts rider wait times",
+          "Self-hosted routing engines with Contraction Hierarchies calculate ETAs in under 15ms in memory",
+          "Redis GEO and in-memory QuadTrees store active driver locations with lightweight 5-second leases",
+          "Trip Finite State Machines coordinate atomic state changes across rider and driver apps",
+          "Pooled rides evaluate route insertion permutations to guarantee strict detour time ceilings"
         ],
-        "takeaway": "Ride Sharing Platform is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Scalable ride-sharing platforms achieve peak urban transit efficiency by replacing greedy dispatching with batched bipartite graph optimization and sub-millisecond in-memory routing."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "uber-ride-sharing-hld",
+    "food-delivery-hld",
+    "payment-gateway-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Matchmaker: How Lyft Matches Riders and Drivers",
+      "url": "https://eng.lyft.com/matchmaker-795a7047f9f3",
+      "type": "article"
+    },
+    {
+      "title": "Fast Shortest Paths with Contraction Hierarchies",
+      "url": "https://en.wikipedia.org/wiki/Contraction_hierarchies",
+      "type": "article"
+    }
+  ]
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, X, ArrowRight } from 'lucide-react';
+import { getSearchResultHref } from '@/lib/content';
 import type { SearchResult } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -114,7 +115,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
 
     const navigateToResult = useCallback(
       (result: SearchResult) => {
-        const href = `/search?q=${encodeURIComponent(result.title)}`;
+        const href = getSearchResultHref(result);
         onChange('');
         setIsOpen(false);
         setSelectedIndex(-1);
@@ -222,7 +223,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
             className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-border bg-canvas shadow-lg"
           >
             {suggestions.map((result, index) => {
-              const href = `/search?q=${encodeURIComponent(result.title)}`;
+              const href = getSearchResultHref(result);
               const label = TYPE_LABEL[result.type] || result.type;
               const isSelected = index === selectedIndex;
 

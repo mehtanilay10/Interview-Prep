@@ -4,14 +4,18 @@
   "moduleSlug": "payment-gateway-hld",
   "courseSlug": "hld-problems",
   "title": "Payment Gateway: Complete Architecture",
-  "description": "Design a payment gateway with monolith and microservice architectures using React, ASP.NET Core, Azure, and AWS.",
+  "description": "Design a high-security payment processing platform (Stripe scale) with PCI-DSS card tokenization, idempotent transactions, and double-entry ledgering.",
   "order": 1,
   "difficulty": "advanced",
   "estimatedMinutes": 60,
   "tags": [
     "hld",
     "system-design",
-    "paymentgatewayhld"
+    "payment-gateway",
+    "stripe",
+    "pci-dss",
+    "idempotency",
+    "double-entry-ledger"
   ],
   "blocks": [
     {
@@ -24,7 +28,34 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Design a payment gateway that securely processes credit card, debit card, UPI, and wallet transactions for an e-commerce platform. The system must authorize payments, detect fraud in real time, reconcile daily settlements with banks, handle refunds and chargebacks, and maintain PCI DSS compliance. It must also expose webhooks for merchant systems and support idempotent retries across distributed failures."
+        "text": "Design a secure, global payment gateway and financial processing platform similar to Stripe or Adyen. The system processes credit cards, digital wallets (Apple Pay, Google Pay), and direct bank rails across hundreds of thousands of merchants. The core engineering challenges involve strict zero-tolerance financial data integrity: maintaining PCI-DSS Level 1 compliance through isolated card tokenization, guaranteeing zero duplicate charges via idempotent execution, running real-time fraud screening, orchestrating two-phase authorization/capture with acquiring banks, and maintaining an immutable double-entry ledger for daily reconciliation."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "PCI-DSS Tokenization Vault",
+            "definition": "An isolated, air-gapped security zone storing raw Primary Account Numbers (PAN) and CVVs, returning non-sensitive surrogate tokens (`tok_xxx`) to merchant servers."
+          },
+          {
+            "term": "Two-Phase Payment (Auth & Capture)",
+            "definition": "Authorization places a temporary hold on the cardholder's credit line; Capture finalizes the transfer of funds when goods ship."
+          },
+          {
+            "term": "Strict Idempotency Mechanism",
+            "definition": "Using a client-supplied `Idempotency-Key` to cache in-flight and completed transaction states, ensuring network retries return identical responses without re-executing charges."
+          },
+          {
+            "term": "Double-Entry General Ledger",
+            "definition": "An immutable accounting paradigm where every transaction records equal and offsetting Debit and Credit entries across accounts, ensuring sum(balance) == 0."
+          },
+          {
+            "term": "Acquiring Bank vs Issuing Bank",
+            "definition": "The Acquiring Bank processes transactions on behalf of the merchant; the Issuing Bank holds the customer's credit/debit account."
+          }
+        ]
       }
     },
     {
@@ -39,15 +70,12 @@
       "data": {
         "title": "Functional Requirements",
         "items": [
-          "Authorize and capture card and UPI payments through acquiring banks",
-          "Tokenize card data so plain card numbers never touch your servers",
-          "Run real-time fraud scoring using velocity, bin checks, and ML rules",
-          "Process refunds, partial refunds, and chargeback disputes",
-          "Settle transactions daily with reconciliation files sent to banks",
-          "Send webhooks to merchants on payment success, failure, and refund",
-          "Support multiple payment methods: Visa, Mastercard, UPI, Apple Pay, wallets",
-          "Provide a dashboard for ops teams to search transactions and replay failed webhooks",
-          "Support idempotent retries so duplicate API calls do not create duplicate charges"
+          "Card Tokenization: Client-side SDK (Stripe Elements) tokenizes raw card details directly to a PCI vault",
+          "Payment Processing: Authorize, Capture, Void, and Refund credit card, debit card, and wallet transactions",
+          "Idempotent APIs: Safeguard against duplicate charges from browser double-clicks or network retry storms",
+          "Real-Time Fraud Detection: Score risk using transaction velocity, geolocation, IP reputation, and 3D Secure (3DS)",
+          "Double-Entry Ledger: Maintain an immutable ledger recording all merchant balances, payouts, and fees",
+          "Merchant Webhooks: Reliably notify merchant backend systems of asynchronous payment status events with HMAC signatures"
         ]
       }
     },
@@ -56,13 +84,11 @@
       "data": {
         "title": "Non-Functional Requirements",
         "items": [
-          "99.95% availability for the authorization path; outages must not block checkout",
-          "Sub-100ms p99 authorization latency end-to-end including acquiring bank round-trip",
-          "Daily settlement batch completes within 2 hours of bank cutoff time",
-          "PCI DSS scope minimization: card data never lands in app databases",
-          "Immutable audit logs for all payment events with 7-year retention",
-          "Idempotency keys prevent double-charge on retry from network drops",
-          "Horizontal scaling to handle Black Friday spikes (10,000 TPS authorization)"
+          "Data Integrity: Exactly-once financial semantics; zero duplicate charges or phantom ledger balances",
+          "Security Compliance: Strict PCI-DSS Level 1 compliance; raw card numbers never touch general application logs or databases",
+          "Authorization Latency: Sub-1.5s P99 latency end-to-end (including acquiring bank and card network hops)",
+          "Scale: 10,000+ payment transactions/sec; millions of daily merchant webhook deliveries",
+          "Availability: 99.999% uptime for the payment authorization API"
         ]
       }
     },
@@ -70,371 +96,153 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Basic Implementation (Monolith)"
+        "text": "High-Level Architecture"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "Start with a monolithic ASP.NET Core application. All payment domains—authorization, fraud, settlement, refund, and notification—run in a single process backed by a single relational database. This is the fastest way to validate the payment data model and banking integration contracts while keeping PCI scope as small as possible."
+        "text": "To maintain strict PCI-DSS scope reduction, raw card credentials never hit merchant servers or internal application microservices. Browser clients communicate directly with an isolated Tokenization Vault, while downstream services process tokenized payments through an idempotent SAGA orchestrator."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-paymentgatewaycompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Payment Gateway: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_PaymentService[Payment Service]\n        MS_FraudDetectionService[Fraud Detection Service]\n        MS_SettlementService[Settlement Service]\n        MS_NotificationService[Notification Service]\n        MS_LedgerService[Ledger Service]\n        MS_RefundService[Refund Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_FraudDetectionService\n        MS_FraudDetectionService --> MS_DB\n        MS_FraudDetectionService --> MS_Queue\n        MS_FraudDetectionService --> MS_Cache\n        MS_LB --> MS_SettlementService\n        MS_SettlementService --> MS_DB\n        MS_SettlementService --> MS_Queue\n        MS_SettlementService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LedgerService\n        MS_LedgerService --> MS_DB\n        MS_LedgerService --> MS_Queue\n        MS_LedgerService --> MS_Cache\n        MS_LB --> MS_RefundService\n        MS_RefundService --> MS_DB\n        MS_RefundService --> MS_Queue\n        MS_RefundService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Frontend",
-            "definition": ""
-          },
-          {
-            "term": "- React 18 with TypeScript",
-            "definition": ""
-          },
-          {
-            "term": "- Vite for build tooling",
-            "definition": ""
-          },
-          {
-            "term": "- Tailwind CSS for styling",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for server state",
-            "definition": ""
-          },
-          {
-            "term": "Backend (ASP.NET Core)",
-            "definition": ""
-          },
-          {
-            "term": "- Minimal API or MVC Controllers",
-            "definition": ""
-          },
-          {
-            "term": "- Entity Framework Core for data access",
-            "definition": ""
-          },
-          {
-            "term": "- Azure SQL Database or AWS RDS for relational data",
-            "definition": ""
-          },
-          {
-            "term": "- Built-in DI, logging, and health checks",
-            "definition": ""
-          },
-          {
-            "term": "Infrastructure",
-            "definition": ""
-          },
-          {
-            "term": "- Azure App Service or AWS EC2/ECS",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Blob Storage or AWS S3 for file assets",
-            "definition": ""
-          },
-          {
-            "term": "- Azure Monitor or AWS CloudWatch for logging",
-            "definition": ""
-          },
-          {
-            "term": "- Single database with tables for all domains",
-            "definition": ""
-          }
-        ]
+        "id": "hld-payment-arch",
+        "caption": "Payment Gateway Architecture: Isolated PCI Vault, Idempotent Payment Orchestrator, Fraud Engine, Bank Network Connectors, and Ledger",
+        "definition": "flowchart TD\n    subgraph ClientBrowser[\"👥 Buyer & Merchant Interface\"]\n        Buyer[\"Buyer Browser (Stripe Elements iFrame)\"]\n        MerchantServer[\"Merchant Application Backend\"]\n    end\n\n    subgraph PCISecurityZone[\"🔐 PCI-DSS Isolated Security Vault\"]\n        TokenVault[\"Vault API Server\\nEncrypts PAN with AES-256-GCM\"]\n        HardwareSecurityModule[\"HSM (Key Management)\"]\n        VaultDB[(\"🔒 Vault Database\\nToken -> Encrypted PAN / CVV\")]\n    end\n\n    subgraph GatewayTier[\"🚪 Payment API Gateway\"]\n        APIGW[\"API Gateway (Auth & Rate Limiting)\\nVerifies Idempotency-Key in Redis\"]\n        IdemCache[(\"⚡ Idempotency Store (Redis)\\nkey -> {status, response_payload}\")]\n    end\n\n    subgraph CoreServices[\"⚙️ Payment Core Services\"]\n        PaymentOrch[\"⚡ Payment SAGA Orchestrator\\nCoordinates Auth, Fraud, & Ledger\"]\n        FraudEngine[\"🛡️ Real-Time Fraud Engine (Radar)\\nMachine Learning Risk Scoring\"]\n        LedgerSvc[\"📒 Double-Entry Ledger Service\\nMaintains immutable journal entries\"]\n        NetworkConnector[\"🏦 Card Network & Bank Connector\\nISO 8583 / AS2 Gateway Protocol\"]\n    end\n\n    subgraph FinancialStorage[\"🗄️ Persistence & Ledger Tier\"]\n        PaymentDB[(\"📋 Payment Transactions DB (PostgreSQL)\")]\n        LedgerDB[(\"📒 Immutable Ledger DB (CockroachDB / Spanner)\\nDouble-Entry Journal & Balances\")]\n    end\n\n    subgraph BankingNetworks[\"🏛️ External Financial Networks\"]\n        VisaMastercard[\"Card Networks (Visa / Mastercard / Amex)\"]\n        AcquiringBank[\"Acquiring Bank / Payment Processor\"]\n    end\n\n    subgraph WebhookSubsystem[\"🔔 Asynchronous Webhook Dispatch\"]\n        Kafka[\"📨 Apache Kafka (payment-events)\"]\n        WebhookWorker[\"Webhook Delivery Workers\\nExponential backoff retry\"]\n    end\n\n    Buyer -->|1. Submit Raw Card PAN directly| TokenVault\n    TokenVault <--> HardwareSecurityModule\n    TokenVault --> VaultDB\n    TokenVault -->> Buyer: 2. Return Ephemeral Token (tok_99182)\n\n    Buyer -->|3. Pass Token to Merchant| MerchantServer\n    MerchantServer -->|4. POST /charges (Token, Idempotency-Key)| APIGW\n\n    APIGW <--> IdemCache\n    APIGW --> PaymentOrch\n\n    PaymentOrch --> FraudEngine\n    PaymentOrch --> NetworkConnector\n    NetworkConnector --> TokenVault\n    NetworkConnector --> VisaMastercard --> AcquiringBank\n\n    PaymentOrch --> LedgerSvc --> LedgerDB\n    PaymentOrch --> PaymentDB\n    PaymentOrch -->|Publish Event| Kafka\n\n    Kafka --> WebhookWorker -->|Signed HMAC Webhook| MerchantServer"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Scalable Implementation (Microservices)"
+        "text": "Card Authorization & Tokenization Sequence"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "At scale, split the monolith into independently deployable microservices. The Payment Service owns authorization and capture. Fraud Detection runs ML rules asynchronously without blocking checkout. Settlement runs nightly batches. Ledger owns financial double-entry. Refund handles returns and chargebacks. Notification delivers webhooks and emails. Each service uses async messaging so failures in settlement or refund do not stall payment authorization."
+        "text": "The sequence demonstrates how raw card numbers are isolated in the PCI Vault before the payment authorization executes with complete idempotency."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-paymentgatewaycompletearchitecture-combined",
-        "caption": "Combined architecture diagram for Payment Gateway: Complete Architecture. Compare monolith vs microservices deployment.",
-        "definition": "graph TB\n    subgraph Monolith [Monolith Deployment]\n        M_Client[Client]\n        M_Gateway[API Gateway]\n        M_Service[All Services]\n        M_DB[(Database)]\n        M_Client --> M_Gateway --> M_Service --> M_DB\n    end\n    subgraph Microservices [Microservices Deployment]\n        MS_Client[Client: React App]\n        MS_LB[Load Balancer / API Gateway]\n        MS_Cache[(Cache: Redis)]\n        MS_PaymentService[Payment Service]\n        MS_FraudDetectionService[Fraud Detection Service]\n        MS_SettlementService[Settlement Service]\n        MS_NotificationService[Notification Service]\n        MS_LedgerService[Ledger Service]\n        MS_RefundService[Refund Service]\n        MS_DB[(Database: Cosmos DB / DynamoDB)]\n        MS_Queue[(Queue: Service Bus / SQS)]\n        MS_Monitor[Monitoring]\n        MS_Client --> MS_LB\n        MS_LB --> MS_PaymentService\n        MS_PaymentService --> MS_DB\n        MS_PaymentService --> MS_Queue\n        MS_PaymentService --> MS_Cache\n        MS_LB --> MS_FraudDetectionService\n        MS_FraudDetectionService --> MS_DB\n        MS_FraudDetectionService --> MS_Queue\n        MS_FraudDetectionService --> MS_Cache\n        MS_LB --> MS_SettlementService\n        MS_SettlementService --> MS_DB\n        MS_SettlementService --> MS_Queue\n        MS_SettlementService --> MS_Cache\n        MS_LB --> MS_NotificationService\n        MS_NotificationService --> MS_DB\n        MS_NotificationService --> MS_Queue\n        MS_NotificationService --> MS_Cache\n        MS_LB --> MS_LedgerService\n        MS_LedgerService --> MS_DB\n        MS_LedgerService --> MS_Queue\n        MS_LedgerService --> MS_Cache\n        MS_LB --> MS_RefundService\n        MS_RefundService --> MS_DB\n        MS_RefundService --> MS_Queue\n        MS_RefundService --> MS_Cache\n    end\n    Monolith -.-> Microservices\n    style Monolith fill:#f9f,stroke:#333,stroke-width:2px\n    style Microservices fill:#bbf,stroke:#333,stroke-width:2px\n"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Core Microservices"
-      }
-    },
-    {
-      "type": "bullet-list",
-      "data": {
-        "items": [
-          "Payment Service: Authorizes and captures payments via acquiring bank APIs. Enforces idempotency keys and PCI-safe token handling.",
-          "Fraud Detection Service: Evaluates transaction risk using velocity rules, bin checks, device fingerprint, and ML models. Returns approve/challenge/block decisions.",
-          "Settlement Service: Runs nightly batches to match authorized transactions with bank settlement files and posts cash movements.",
-          "Ledger Service: Maintains immutable double-entry financial records for every payment, fee, refund, and adjustment.",
-          "Notification Service: Delivers webhooks and email/SMS alerts to merchants and customers on payment lifecycle events.",
-          "Refund Service: Handles full and partial refunds, chargeback intake, and dispute evidence workflows."
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "React Frontend Architecture"
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "src/",
-            "definition": ""
-          },
-          {
-            "term": "features/",
-            "definition": ""
-          },
-          {
-            "term": "PaymentGatewayHld/",
-            "definition": ""
-          },
-          {
-            "term": "api/           # API clients per service",
-            "definition": ""
-          },
-          {
-            "term": "components/     # Shared UI components",
-            "definition": ""
-          },
-          {
-            "term": "hooks/          # Custom hooks",
-            "definition": ""
-          },
-          {
-            "term": "pages/          # Route pages",
-            "definition": ""
-          },
-          {
-            "term": "store/          # Zustand/Jotai state",
-            "definition": ""
-          },
-          {
-            "term": "types/          # TypeScript interfaces",
-            "definition": ""
-          },
-          {
-            "term": "shared/",
-            "definition": ""
-          },
-          {
-            "term": "ui/              # Design system",
-            "definition": ""
-          },
-          {
-            "term": "lib/              # Utilities",
-            "definition": ""
-          },
-          {
-            "term": "hooks/            # Global hooks",
-            "definition": ""
-          },
-          {
-            "term": "Key Patterns",
-            "definition": ""
-          },
-          {
-            "term": "- Feature-based folder structure",
-            "definition": ""
-          },
-          {
-            "term": "- API Gateway as single entry point",
-            "definition": ""
-          },
-          {
-            "term": "- React Query for caching and background refetch",
-            "definition": ""
-          },
-          {
-            "term": "- WebSocket / SSE for real-time updates",
-            "definition": ""
-          },
-          {
-            "term": "- Error boundaries and retry logic",
-            "definition": ""
-          }
-        ]
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "ASP.NET Core Backend Services"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "title": "Service Template (ASP.NET Core)",
-        "language": "text",
-        "code": "// Example service structure per domain\nvar builder = WebApplication.CreateBuilder(args);\n\n// Services\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseCosmos(\n        accountEndpoint: builder.Configuration[\"Azure:Cosmos:Endpoint\"],\n        accountKey: builder.Configuration[\"Azure:Cosmos:Key\"],\n        databaseName: \"PaymentGatewayHldDb\"\n    )\n);\nbuilder.Services.AddStackExchangeRedisCache(opt =>\n    opt.Configuration = builder.Configuration.GetConnectionString(\"Redis\")\n);\nbuilder.Services.AddMassTransit(opt =>\n    opt.UsingRabbitMq((context, cfg) => {\n        cfg.Host(\"rabbitmq\", h => {\n            h.Username(\"guest\");\n            h.Password(\"guest\");\n        });\n        cfg.ConfigureEndpoints(context);\n    })\n);\n\nvar app = builder.Build();\napp.MapGet(\"/health\", () => Results.Ok());\napp.MapPaymentGatewayHldEndpoints();\napp.Run();"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "level": 3,
-        "text": "Cloud Services Comparison"
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "title": "Azure vs AWS Services",
-        "cards": [
-          {
-            "title": "Compute",
-            "description": "Run containerized or serverless workloads",
-            "tags": [
-              "Azure App Service",
-              "Amazon EC2 / ECS / EKS"
-            ],
-            "pros": [
-              "Auto-scaling",
-              "Managed infrastructure"
-            ],
-            "cons": [
-              "Cold start latency"
-            ]
-          },
-          {
-            "title": "API Gateway",
-            "description": "Rate limiting, auth, and request routing",
-            "tags": [
-              "Azure API Management",
-              "Amazon API Gateway"
-            ],
-            "pros": [
-              "Built-in policies",
-              "Developer portal"
-            ],
-            "cons": [
-              "Additional latency"
-            ]
-          },
-          {
-            "title": "Cache",
-            "description": "In-memory caching for hot data",
-            "tags": [
-              "Azure Cache for Redis",
-              "Amazon ElastiCache (Redis)"
-            ],
-            "pros": [
-              "Sub-millisecond latency",
-              "Automatic eviction"
-            ],
-            "cons": [
-              "Memory cost"
-            ]
-          },
-          {
-            "title": "Database",
-            "description": "Primary data store for services",
-            "tags": [
-              "Azure Cosmos DB",
-              "Amazon DynamoDB"
-            ],
-            "pros": [
-              "Global distribution",
-              "Auto-scaling throughput"
-            ],
-            "cons": [
-              "Consistency model learning curve"
-            ]
-          },
-          {
-            "title": "Storage",
-            "description": "Blob storage for media and files",
-            "tags": [
-              "Azure Blob Storage",
-              "Amazon S3"
-            ],
-            "pros": [
-              "Infinite scale",
-              "Cheap archival tiers"
-            ],
-            "cons": [
-              "Eventual consistency for listings"
-            ]
-          },
-          {
-            "title": "Messaging",
-            "description": "Async communication between services",
-            "tags": [
-              "Azure Service Bus",
-              "Amazon SQS"
-            ],
-            "pros": [
-              "Decoupling",
-              "Buffering spikes"
-            ],
-            "cons": [
-              "Debugging async flows"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "type": "callout",
-      "data": {
-        "variant": "info",
-        "title": "When to Choose Microservices?",
-        "text": "Start with a monolith. Split into microservices only when you have clear scaling bottlenecks, independent deployment needs, or team boundaries that justify the operational overhead."
+        "id": "hld-payment-auth-sequence",
+        "caption": "Payment authorization sequence: Client card tokenization, idempotency lock, fraud evaluation, bank network authorization, and ledger posting",
+        "definition": "sequenceDiagram\n    autonumber\n    actor Customer as 👤 Cardholder\n    participant iFrame as 💳 Stripe Elements (Vault)\n    participant Merchant as 🏪 Merchant Server\n    participant API as 🚪 Payment API Gateway\n    participant Redis as ⚡ Redis Idempotency\n    participant Orch as ⚡ Payment Orchestrator\n    participant Bank as 🏛️ Card Network / Bank\n    participant Ledger as 📒 Double-Entry Ledger\n\n    Customer->>iFrame: Enter Card Number (16 digits, CVV)\n    iFrame->>iFrame: Direct TLS POST to PCI Vault\n    iFrame-->>Customer: Return Single-Use Token: \"tok_visa_4410\"\n\n    Customer->>Merchant: Complete Order (Token: \"tok_visa_4410\")\n    Merchant->>API: POST /v1/charges {amount: $50, token: \"tok_visa_4410\"}<br/>Header: Idempotency-Key: \"order_991_uuid\"\n\n    API->>Redis: SETNX idem:order_991_uuid \"IN_PROGRESS\" EX 120\n    alt Duplicate Request Detected\n        Redis-->>API: Key already exists\n        API-->>Merchant: Return Cached Previous Response (No double charge!)\n    else First Time Request\n        Redis-->>API: Lock Acquired\n        API->>Orch: AuthorizeCharge(Amount: $50, Token)\n        Orch->>Bank: Submit ISO 8583 Authorization (PAN from Vault)\n        Bank-->>Orch: Auth Approved (AuthCode: \"AUTH_7721\")\n\n        Orch->>Ledger: Record Double-Entry Journal Entry\n        Note over Ledger: Debit: Merchant Cash In-Flight ($50)<br/>Credit: Merchant Available Balance ($48.55)<br/>Credit: Platform Processing Fee ($1.45)\n        Ledger-->>Orch: Ledger Posted\n\n        Orch->>Redis: Update idem:order_991_uuid \"SUCCESS\" {chargeId: ch_882}\n        Orch-->>API: 200 OK (Charge Succeeded)\n        API-->>Merchant: Charge Confirmed (chargeId: ch_882)\n    end"
       }
     },
     {
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "Key Takeaways"
+        "text": "Payment Workflows Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Payment Mode",
+          "Steps",
+          "Fund Guarantee",
+          "Merchant Best Practice",
+          "Example Scenario"
+        ],
+        "rows": [
+          [
+            "Immediate Charge (Auth + Capture)",
+            "Single API call authorizes and captures immediately",
+            "Funds captured instantly",
+            "Digital downloads, SaaS subscriptions, instant services",
+            "Spotify subscription, Uber ride completion"
+          ],
+          [
+            "Separate Auth & Capture (Two-Phase)",
+            "Phase 1: Hold funds at checkout. Phase 2: Capture on shipping",
+            "Funds held for 7 days",
+            "Physical e-commerce with delayed warehouse fulfillment",
+            "Amazon orders, hotel reservations"
+          ],
+          [
+            "Refund",
+            "Reverses captured funds back to cardholder",
+            "Funds returned in 5-10 business days",
+            "Product return, cancellation",
+            "E-commerce product return"
+          ],
+          [
+            "Chargeback / Dispute",
+            "Cardholder reports fraud directly to issuing bank",
+            "Funds immediately clawed back with penalty fee",
+            "Merchant must submit evidence (proof of delivery)",
+            "Unauthorized credit card usage claim"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How is PCI-DSS Level 1 compliance achieved without massive audit overhead?",
+            "answer": "By enforcing strict scope reduction. Using hosted iFrames (e.g. Stripe Elements), the merchant website never receives, processes, or transmits credit card numbers. The customer types the 16-digit card number directly into the iFrame hosted by the PCI Vault domain. The merchant server only receives a non-PCI token (`tok_123`), exempting 99% of company microservices from onerous PCI-DSS audit requirements."
+          },
+          {
+            "question": "Why is a Double-Entry Ledger required instead of a simple balance column?",
+            "answer": "In a single-column architecture (`balance = balance + 50`), a bug, failed transaction, or partial database rollback can silently corrupt accounts with no audit trail. In double-entry bookkeeping, money cannot be created or destroyed: every credit must have a corresponding debit. If total debits do not equal total credits across all accounts, the ledger transaction is rejected, providing mathematical proof of financial integrity."
+          },
+          {
+            "question": "How does Idempotency protect against network timeouts during bank authorization?",
+            "answer": "If an API client sends a payment request and experiences a network timeout before receiving the response, it will retry the call. The payment gateway stores the `Idempotency-Key` in an \"IN_PROGRESS\" state. If a duplicate arrives while the bank is still processing, the second request waits; when completed, the cached authorization result is returned without calling the card network a second time."
+          },
+          {
+            "question": "How are Webhooks delivered reliably to merchants during downtime?",
+            "answer": "Merchant webhooks are published to Kafka and consumed by a dedicated delivery worker fleet. If the merchant endpoint returns HTTP 5xx or times out, the message enters a dead-letter retry topic with exponential backoff (e.g. retry after 1m, 5m, 15m, 1h, up to 72 hours). Every webhook payload includes an HMAC-SHA256 signature header so the merchant can verify authentic gateway origin."
+          }
+        ]
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Summary",
+        "title": "Key Takeaways",
         "points": [
-          "A Payment Gateway system requires both simple and scalable designs",
-          "Monolith is fastest to validate; microservices are for scale",
-          "React + ASP.NET Core provides a robust full-stack foundation",
-          "Azure Cosmos DB and Amazon DynamoDB are strong choices for distributed data",
-          "Always design for failure: retries, circuit breakers, and fallbacks"
+          "Client-side iFrame tokenization limits PCI-DSS scope to an isolated, secure vault tier",
+          "Strict idempotency keys with atomic Redis state locks eliminate duplicate charges from network retries",
+          "Two-phase authorization and capture decouples payment reservation from warehouse fulfillment",
+          "Immutable double-entry ledger bookkeeping ensures financial balance integrity with zero drift",
+          "Signed HMAC webhooks with exponential backoff retries guarantee reliable merchant notifications"
         ],
-        "takeaway": "Payment Gateway is a distributed system. Start simple, then scale horizontally with microservices, caching, and managed cloud services."
+        "takeaway": "Payment gateways demand zero-error fault tolerance: tokenized PCI vaults safeguard credit credentials while idempotent state machines and double-entry ledgers ensure mathematical precision for every financial transaction."
       }
     }
   ],
-  "relatedLessons": [],
-  "furtherReading": []
+  "relatedLessons": [
+    "amazon-ecommerce-hld",
+    "ticket-booking-hld",
+    "rate-limiter"
+  ],
+  "furtherReading": [
+    {
+      "title": "Designing Robust and Predictable APIs with Idempotency — Stripe",
+      "url": "https://stripe.com/blog/idempotency",
+      "type": "article"
+    },
+    {
+      "title": "How Stripe Prevents Double Charges and Money Creation",
+      "url": "https://stripe.com/blog/ledger-architecture",
+      "type": "article"
+    }
+  ]
 }
