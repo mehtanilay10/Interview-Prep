@@ -1,0 +1,201 @@
+{
+  "id": "lesson-sdi-055",
+  "slug": "chat-system-design",
+  "moduleSlug": "common-system-designs",
+  "courseSlug": "system-design-interviews",
+  "title": "Chat System Design",
+  "description": "Design a real-time chat system supporting one-on-one messaging, group channels, online presence, and message delivery guarantees.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["system-design", "chat", "websockets", "real-time", "messaging", "presence"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Real-time chat systems must deliver messages instantly while maintaining message history, presence awareness, and delivery guarantees. Products like WhatsApp and Slack serve billions of daily messages. In an interview, chat design tests your ability to reason about stateful connections, scaling WebSockets, and ordering messages across multiple clients and devices."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Functional Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Core Chat Features",
+        "items": [
+          "Send and receive one-on-one messages in real time",
+          "Create and participate in group channels",
+          "Show online, away, and offline presence status",
+          "Deliver message history and unread message counts",
+          "Support file attachments and rich media"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Communication Protocols"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "WebSockets are the standard for real-time chat because they maintain a persistent, full-duplex connection between client and server. Unlike HTTP polling, WebSockets eliminate the overhead of repeated handshakes. For clients that cannot keep a persistent connection, fall back to long polling. Chat servers must manage thousands of concurrent connections efficiently, which makes connection pooling and async I/O critical."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Message Delivery and Ordering"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Messages must be delivered exactly once and in the correct order. Use a logical sequence number or timestamp to sort messages on the client. Store every message in a database for history and recovery. For groups, send a single message to all members via push notification and in-app delivery. Handle offline messages by queuing them until the recipient reconnects."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "chat-architecture",
+        "caption": "High-level architecture for a real-time chat system",
+        "definition": "flowchart LR\n    A[Mobile/Web Client] --> B[Load Balancer]\n    B --> C[Chat Server 1]\n    B --> D[Chat Server 2]\n    C --> E[Presence Service]\n    D --> E\n    C --> F[(Message DB)]\n    D --> F\n    E --> G[Redis Cluster]\n    H[Push Service] --> I[APNs / FCM]\n    F --> H"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Presence Management"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Track whether a user is online, idle, or offline using heartbeat pings from connected clients. Store presence state in Redis with a short TTL. When a user disconnects, the TTL expires and the user is marked offline. Show the last seen timestamp for offline users. For large groups, compute presence lazily rather than broadcasting every status change to all members."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Scaling WebSockets",
+        "text": "A single chat server can hold roughly 20,000 to 50,000 concurrent WebSocket connections depending on message rate and hardware. For 10 million concurrent users, you need roughly 200 to 500 chat server instances behind a load balancer with connection-aware routing."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage Strategy"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Data Type", "Store", "Reason"],
+        "rows": [
+          ["Message history", "Cassandra / ScyllaDB", "High write throughput, time-series data"],
+          ["User profiles", "PostgreSQL", "Relational, strong consistency"],
+          ["Presence / active users", "Redis", "Low latency, TTL-based expiration"],
+          ["Media attachments", "S3 / CDN", "Cheap, scalable object storage"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Consistency and Delivery Guarantees"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Chat applications favor availability over strong consistency. Messages are eventually consistent across devices. Use vector clocks or hybrid logical clocks to order messages when network partitions occur. For critical notifications, provide a delivery receipt and allow the sender to see if the recipient read the message. Implement retry logic with exponential backoff for failed message deliveries."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "WebSocket",
+            "definition": "A persistent, full-duplex TCP connection that enables real-time, low-latency messaging between client and server."
+          },
+          {
+            "term": "Presence",
+            "definition": "A user's online status, typically tracked via heartbeat pings and stored in Redis with a TTL."
+          },
+          {
+            "term": "Exactly-once Delivery",
+            "definition": "A guarantee that each message is delivered to the recipient exactly one time, typically achieved via deduplication and sequence numbers."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use WebSockets for real-time, bidirectional chat communication",
+          "Store message history in a write-optimized database like Cassandra",
+          "Track presence in Redis with heartbeat pings and TTL expiration",
+          "Enforce message ordering with logical sequence numbers",
+          "Accept eventual consistency across devices for availability"
+        ],
+        "takeaway": "A well-designed chat system hides eventual consistency behind reliable delivery and instant user experience."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you prevent duplicate messages?",
+            "answer": "Assign a unique message ID and deduplicate on the receiving device. If the client sees the same ID twice, it ignores the duplicate."
+          },
+          {
+            "question": "What if the chat server restarts?",
+            "answer": "Clients detect the broken WebSocket and reconnect automatically. The client re-syncs missed messages from the database using the last known sequence number."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Capacity Estimation",
+        "description": "Estimate the number of chat server instances needed for 5 million concurrent users, each sending 10 messages per minute, with 20,000 connections per server.",
+        "expectedOutcome": "Approximately 83,333 msg/s; with 1,000 msg/s per server, roughly 84 chat server instances needed"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Slack Architecture",
+      "url": "https://slack.engineering/category/engineering/",
+      "type": "article",
+      "author": "Slack Engineering Blog",
+      "description": "Real-world engineering posts about Slack's real-time messaging infrastructure and scaling challenges."
+    },
+    {
+      "title": "System Design: Chat Application",
+      "url": "https://www.geeksforgeeks.org/design-chat-system/",
+      "type": "article",
+      "author": "GeeksforGeeks",
+      "description": "A step-by-step guide to designing a scalable chat application with WebSockets and message queues."
+    }
+  ]
+}

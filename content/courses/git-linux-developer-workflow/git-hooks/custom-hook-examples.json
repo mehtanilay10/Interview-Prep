@@ -1,0 +1,185 @@
+{
+  "id": "lesson-git-037",
+  "slug": "custom-hook-examples",
+  "moduleSlug": "git-hooks",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Custom Hook Examples",
+  "description": "Explore practical custom Git hooks for protecting branches, auto-generating changelogs, and enforcing team conventions.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "git",
+    "hooks",
+    "automation",
+    "custom"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Custom hooks can automate almost any aspect of your Git workflow. This lesson provides practical examples: protecting main from direct pushes, auto-formatting files on commit, generating changelog entries, and enforcing branch naming conventions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prevent direct pushes to main"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pre-push hook can check if the target branch is main or another protected branch and reject the push if it comes from an unauthorized source."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-push: block direct pushes to main",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/pre-push\n\nPROTECTED_BRANCHES=\"main master production\"\n\nwhile read local_ref local_sha remote_ref remote_sha; do\n  # Extract branch name from refs/heads/<branch>\n  BRANCH=$(basename \"$local_ref\")\n  TARGET_BRANCH=$(basename \"$remote_ref\")\n  \n  # Check if pushing to a protected branch\n  if echo \"$PROTECTED_BRANCHES\" | grep -qw \"$TARGET_BRANCH\"; then\n    if [ \"$BRANCH\" = \"$TARGET_BRANCH\" ]; then\n      echo \"Direct push to $TARGET_BRANCH is not allowed.\"\n      echo \"Use a pull request instead.\"\n      exit 1\n    fi\n  fi\ndone\n\nexit 0"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Server-side hooks are more reliable",
+        "text": "Client-side pre-push hooks can be bypassed with --no-verify. For critical protection, implement the same logic as a server-side pre-receive hook on your Git server."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Auto-format on commit"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Instead of asking developers to run a formatter before committing, have the pre-commit hook format staged files automatically. This ensures consistent formatting regardless of developer setup."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-commit: auto-format staged files",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/pre-commit\n\nSTAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)\n\nif [ -z \"$STAGED_FILES\" ]; then\n  exit 0\nfi\n\n# Format C# files\nCS_FILES=$(echo \"$STAGED_FILES\" | grep '\\\\.cs$')\nif [ -n \"$CS_FILES\" ]; then\n  echo \"Formatting C# files...\"\n  echo \"$CS_FILES\" | xargs dotnet format --include\n  echo \"$CS_FILES\" | xargs git add\nfi\n\n# Format JSON files\nJSON_FILES=$(echo \"$STAGED_FILES\" | grep '\\\\.json$')\nif [ -n \"$JSON_FILES\" ]; then\n  echo \"Formatting JSON files...\"\n  echo \"$JSON_FILES\" | xargs prettier --write\n  echo \"$JSON_FILES\" | xargs git add\nfi\n\necho \"Formatting complete.\"\nexit 0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Generate changelog entry on commit"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The post-commit hook can append the commit message to a CHANGELOG.md file automatically. This keeps the changelog up to date without requiring manual maintenance."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Post-commit: append to CHANGELOG",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/post-commit\n\nCOMMIT_HASH=$(git rev-parse HEAD)\nCOMMIT_MSG=$(git log -1 --format=%B \"$COMMIT_HASH\")\nCOMMIT_AUTHOR=$(git log -1 --format='%an' \"$COMMIT_HASH\")\nDATE=$(date +%Y-%m-%d)\n\nCHANGELOG=\"CHANGELOG.md\"\n\n# Append to Unreleased section if it exists\nif grep -q '^## \\[Unreleased\\]' \"$CHANGELOG\"; then\n  sed -i \"/^## \\[Unreleased\\]/a \\n- $COMMIT_MSG ($COMMIT_AUTHOR, $DATE)\" \"$CHANGELOG\"\n  echo \"Changelog updated.\"\nelse\n  sed -i '1i ## [Unreleased]\\n\\n- \\\"$COMMIT_MSG\\\" ('\\\"$COMMIT_AUTHOR\\\"', '\\\"$DATE\\\"')\\n' \"$CHANGELOG\"\n  echo \"Changelog created.\"\nfi\n\nexit 0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enforce branch naming conventions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pre-commit hook can verify the current branch name follows your team's naming convention before allowing a commit. This prevents badly named branches from entering the team's workflow."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-commit: enforce branch naming",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/pre-commit\n\nBRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)\n\n# Allowed prefixes: feature/, fix/, hotfix/, chore/\nif ! echo \"$BRANCH\" | grep -qE '^(feature|fix|hotfix|chore)/[A-Z]+-[0-9]+'; then\n  echo \"\"\n  echo \"Branch name does not follow convention: $BRANCH\"\n  echo \"Expected format: <type>/<TICKET-ID>-<description>\"\n  echo \"Examples:\"\n  echo \"  feature/AUTH-123-add-login\"\n  echo \"  fix/AUTH-456-token-expiry\"\n  echo \"\"\n  exit 1\nfi\n\necho \"Branch name valid: $BRANCH\"\nexit 0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Post-checkout: sync environment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The post-checkout hook can automatically install dependencies or sync environment files when switching branches. This is useful for projects where different branches require different dependency versions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Post-checkout: install dependencies on branch switch",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/post-checkout\n\nPREV_BRANCH=$1\nNEW_BRANCH=$2\nIS_BRANCH_SWITCH=$3\n\n# Only run on branch switches, not file checkouts\nif [ \"$IS_BRANCH_SWITCH\" = \"1\" ]; then\n  echo \"Switched to branch: $NEW_BRANCH\"\n  \n  # Install dependencies if package.json changed\n  if git diff --name-only \"$PREV_BRANCH\" \"$NEW_BRANCH\" | grep -q '^package.json$'; then\n    echo \"package.json changed — installing dependencies...\"\n    npm install\n  fi\nfi\n\nexit 0"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "How do I share custom hooks with my team?",
+            "answer": "Use Husky to commit the hook scripts to your repository. The .husky/ directory is tracked in Git and installed automatically when teammates run npm install."
+          },
+          {
+            "question": "Can hooks interact with external services?",
+            "answer": "Yes. Pre-push hooks can trigger CI pipelines, post-commit hooks can post to Slack, and pre-commit hooks can call external APIs for validation."
+          },
+          {
+            "question": "What if my hook depends on a tool that is not installed?",
+            "answer": "Check for the tool at the start of the hook and provide a clear error message. For Node.js tools, verify with command -v before running."
+          },
+          {
+            "question": "Are there performance considerations for complex hooks?",
+            "answer": "Yes. Cache results where possible, run checks in parallel, and avoid network calls in pre-commit hooks. Move expensive operations to CI or pre-push."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Protect branches by checking branch names in pre-push or pre-commit",
+          "Auto-format staged files in pre-commit for consistent code style",
+          "Use post-commit to append changelog entries automatically",
+          "Use post-checkout to sync environment when switching branches",
+          "Share hooks with Husky so the entire team uses the same automation"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "pre-commit-hooks",
+    "husky-lint-staged"
+  ],
+  "furtherReading": [
+    {
+      "title": "Awesome Git Hooks",
+      "url": "https://github.com/aitemr/awesome-git-hooks",
+      "type": "article"
+    }
+  ]
+}

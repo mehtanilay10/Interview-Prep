@@ -1,0 +1,243 @@
+{
+  "id": "lesson-redis-035",
+  "slug": "caching-profiling",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Profiling and Debugging Cache Behavior",
+  "description": "Learn to measure cache hit ratios, diagnose common caching issues, and use profiling tools to optimize ASP.NET Core caching performance.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "asp.net core",
+    "profiling",
+    "caching",
+    "redis",
+    "diagnostics"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Profile Caching?",
+        "anchor": "why-profile-caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A cache that is incorrectly configured can be worse than no cache at all. Stale data confuses users, excessive TTLs waste memory, and poor hit ratios mean your application still hits the database on most requests. Profiling reveals whether caching is actually delivering value and where the bottlenecks are."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with the fundamental metric: cache hit ratio. A healthy in-memory or distributed cache should have a ratio above 80 percent for hot data. Below that, you are paying for infrastructure without getting most of the benefit. If the ratio is low, investigate the expiration settings, key design, and access patterns."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Hit Ratio",
+            "definition": "The percentage of cache requests that return a value. Calculated as hits / (hits + misses)."
+          },
+          {
+            "term": "Cache Stampede",
+            "definition": "A sudden burst of cache misses that all try to repopulate the same entry at once, overloading the data source."
+          },
+          {
+            "term": "Thundering Herd",
+            "definition": "Synonymous with cache stampede. Also describes many clients retrying a failed backend simultaneously."
+          },
+          {
+            "term": "Latency Percentile",
+            "definition": "A statistical measure (p50, p95, p99) that shows typical and worst-case response times, including the time saved by caching."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Instrumenting IMemoryCache",
+        "anchor": "instrumenting-imemorycache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "MemoryCache exposes a Count property and the PostEvictionCallback event for coarse-grained monitoring. For production-grade metrics, wrap the cache in a decorator that records hits, misses, and latencies through your existing metrics system."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Decorating IMemoryCache with Metrics",
+        "content": "Wrap the cache to collect hit and miss counts using System.Diagnostics.Metrics.",
+        "code": "public class MetricsMemoryCache : IMemoryCache\n{\n    private readonly MemoryCache _inner;\n    private readonly Counter<long> _hits;\n    private readonly Counter<long> _misses;\n    private readonly Histogram<double> _latency;\n\n    public MetricsMemoryCache(IMemoryCache inner, ILogger<MetricsMemoryCache> logger)\n    {\n        _inner = inner as MemoryCache\n            ?? throw new ArgumentException(\"Expected MemoryCache\", nameof(inner));\n\n        var meter = new Meter(\"MyApp.Cache\", \"1.0.0\");\n        _hits = meter.CreateCounter<long>(\"cache.hits\");\n        _misses = meter.CreateCounter<long>(\"cache.misses\");\n        _latency = meter.CreateHistogram<double>(\"cache.latency_ms\");\n    }\n\n    public bool TryGetValue(object key, out object? value)\n    {\n        var sw = System.Diagnostics.Stopwatch.StartNew();\n        var result = _inner.TryGetValue(key, out value);\n        sw.Stop();\n\n        if (result) _hits.Increment();\n        else _misses.Increment();\n\n        _latency.Record(sw.Elapsed.TotalMilliseconds);\n        return result;\n    }\n\n    // Delegate remaining IMemoryCache members to _inner...\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Profiling Redis with INFO and Monitoring Tools",
+        "anchor": "profiling-redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis provides built-in observability through the INFO command, which returns server statistics including keyspace hits and misses. Calculate the hit ratio from these values and set up alerts when the ratio drops below your threshold."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Fetching Redis INFO via StackExchange.Redis",
+        "content": "Query Redis INFO stats and compute the hit ratio from keyspace_hits and keyspace_misses.",
+        "code": "public class RedisCacheProfiler\n{\n    private readonly IDatabase _db;\n    private readonly IServer _server;\n\n    public RedisProfiler(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n        _server = redis.GetServers().First();\n    }\n\n    public async Task<double> GetHitRatioAsync()\n    {\n        var info = await _server.InfoAsync(InfoSection.Statistics);\n        var stats = info.FirstOrDefault(i => i.ContainsKey(\"keyspace_hits\"));\n\n        if (stats is null) return 0;\n\n        var hits = long.Parse(stats[\"keyspace_hits\"]);\n        var misses = long.Parse(stats[\"keyspace_misses\"]);\n        var total = hits + misses;\n\n        return total == 0 ? 0 : (double)hits / total;\n    }\n\n    public async Task LogSlowCommandsAsync(TimeSpan threshold)\n    {\n        var slowlog = await _server.SlowlogGetAsync(convertToMs: true);\n        var slow = slowlog.Where(entry => entry.Duration >= threshold.TotalMilliseconds);\n        foreach (var entry in slow)\n        {\n            Console.WriteLine($\"Slow: {entry.Command} ({entry.Duration}ms) at {entry.TimeStamp}\");\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Redis SLOWLOG",
+        "text": "Redis maintains a slow log of commands that exceed a configurable threshold. Use SLOWLOG GET to identify cache operations that are unexpectedly slow — often caused by large value sizes or network issues."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "profiling-architecture",
+        "caption": "Cache profiling data flow from application to dashboards",
+        "definition": "flowchart LR\n    A[ASP.NET Core App] -->|Metrics| B[Prometheus / OpenTelemetry]\n    A -->|Cache Calls| C[(Redis)]\n    C -->|INFO / SLOWLOG| D[Redis Exporter]\n    D --> B\n    B --> E[Grafana Dashboard]\n    E --> F[Hit Ratio Alerts]\n    E --> G[Latency Percentile Charts]\n    E --> H[Slow Command Reports]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Cache Debugging Issues",
+        "anchor": "common-issues"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Symptom",
+          "Likely Cause",
+          "Fix"
+        ],
+        "rows": [
+          [
+            "Hit ratio near 0%",
+            "Keys are unique per request or TTL is too short",
+            "Review key design and increase TTL"
+          ],
+          [
+            "Stale data served to users",
+            "Cache not invalidated after data changes",
+            "Implement tag-based invalidation or reduce TTL"
+          ],
+          [
+            "Redis memory approaching max",
+            "Large values or unbounded key growth",
+            "Set maxmemory-policy and size limits; compress values"
+          ],
+          [
+            "Occasional 500 errors on cache calls",
+            "Redis connection drops or timeouts",
+            "Add retry logic and fallback to database"
+          ],
+          [
+            "Same entry cached repeatedly",
+            "Missing VaryBy header causing cache misses",
+            "Add VaryByQueryKeys or VaryByHeader"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Cache Profiling Checklist",
+        "items": [
+          {
+            "text": "Instrument both IMemoryCache and IDistributedCache with hit/miss counters",
+            "hint": "Use a decorator pattern for IMemoryCache and Redis INFO for distributed cache"
+          },
+          {
+            "text": "Set up dashboards showing hit ratio, p95 latency, and eviction counts",
+            "hint": "Grafana + Prometheus or Application Insights are common choices"
+          },
+          {
+            "text": "Configure Redis maxmemory-policy to evict least-recently-used keys",
+            "hint": "volatile-lru or allkeys-lru are the most common eviction policies"
+          },
+          {
+            "text": "Alert when hit ratio drops below 80 percent",
+            "hint": "Calculate from keyspace_hits / (keyspace_hits + keyspace_misses)"
+          },
+          {
+            "text": "Run Redis SLOWLOG regularly and tune slow command thresholds",
+            "hint": "SLOWLOG GET and SLOWLOG RESET are your primary tools"
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache hit ratio above 80% is the standard health target",
+          "Wrap IMemoryCache in a decorator to collect metrics without modifying core code",
+          "Redis INFO and SLOWLOG provide built-in observability for distributed caches",
+          "Set up alerts on hit ratio drops and slow command spikes",
+          "Use dashboards (Grafana, Application Insights) to track cache health trends"
+        ],
+        "takeaway": "You cannot optimize what you do not measure. Profiling turns caching from a guess into a data-driven decision."
+      }
+    },
+    {
+      "type": "further-reading",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Redis INFO command reference",
+            "url": "https://redis.io/docs/latest/commands/info/",
+            "type": "reference"
+          },
+          {
+            "title": "OpenTelemetry .NET instrumentation",
+            "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/otel-tracing",
+            "type": "article"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Redis INFO command reference",
+      "url": "https://redis.io/docs/latest/commands/info/",
+      "type": "reference"
+    },
+    {
+      "title": "OpenTelemetry .NET instrumentation",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/otel-tracing",
+      "type": "article"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "id": "lesson-api-design-problems-api-versioning-problems-url-versioning",
+  "slug": "url-versioning",
+  "moduleSlug": "api-versioning-problems",
+  "courseSlug": "api-design-problems",
+  "title": "URL Versioning",
+  "description": "Implement API versioning using URL paths, including route structure, documentation, migration, and deprecation timelines.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["versioning", "url", "routes", "deprecation"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "URL versioning embeds the API version directly in the path: /v1/users, /v2/users. It is the most visible and widely adopted versioning strategy. Clients can see the version at a glance, and deprecation is as simple as returning 404 on an old path."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Route Structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Place the version as the first path segment. This makes routing simple and documentation clear. Every versioned endpoint follows the same path pattern."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Endpoint", "Version", "Description"],
+        "rows": [
+          ["/v1/users", "v1", "List users — v1 format"],
+          ["/v2/users", "v2", "List users — v2 with displayName"],
+          ["/v1/users/{id}", "v1", "User detail — v1 fields"],
+          ["/v2/users/{id}", "v2", "User detail — v2 fields"],
+          ["/v1/orders", "v1", "Orders — minimal fields"],
+          ["/v2/orders", "v2", "Orders — includes line items"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: ASP.NET Core Versioned Routes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "URL versioning with route constraints in C#",
+        "content": "Use API versioning attributes to keep controllers organized by version while sharing business logic.",
+        "code": "// Shared service — no version coupling\npublic interface IUserService\n{\n    Task<UserResponse> GetAsync(Guid id);\n}\n\n// v1 controller\n[ApiController]\n[Route(\"v{version:apiVersion}/users\")]\n[ApiVersion(\"1.0\")]\npublic class UsersV1Controller : ControllerBase\n{\n    private readonly IUserService _service;\n    public UsersV1Controller(IUserService service) => _service = service;\n\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<UserResponseV1>> Get(Guid id)\n    {\n        var user = await _service.GetAsync(id);\n        return Ok(new UserResponseV1\n        {\n            Id = user.Id,\n            Username = user.Username,\n            Email = user.Email\n        });\n    }\n}\n\n// v2 controller — adds displayName\n[ApiController]\n[Route(\"v{version:apiVersion}/users\")]\n[ApiVersion(\"2.0\")]\npublic class UsersV2Controller : ControllerBase\n{\n    private readonly IUserService _service;\n    public UsersV2Controller(IUserService service) => _service = service;\n\n    [HttpGet(\"{id}\")]\n    public async Task<ActionResult<UserResponseV2>> Get(Guid id)\n    {\n        var user = await _service.GetAsync(id);\n        return Ok(new UserResponseV2\n        {\n            Id = user.Id,\n            Username = user.Username,\n            Email = user.Email,\n            DisplayName = user.DisplayName,  // New in v2\n            AvatarUrl = user.AvatarUrl       // New in v2\n        });\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deprecation Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When retiring a version, return 410 Gone for old paths after the sunset date. Include a Deprecation header and a Link to the migration guide."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deprecated v1 response",
+        "content": "After the sunset date, v1 endpoints return 410 Gone with helpful headers.",
+        "code": "HTTP/1.1 410 Gone\nDeprecation: true\nSunset: Sat, 31 Oct 2026 23:59:59 GMT\nLink: </v2/users>; rel=\"successor-version\",\n     </docs/migration/v1-to-v2>; rel=\"help\"\n\nBody:\n{\n  \"error\": {\n    \"code\": \"DeprecatedVersion\",\n    \"message\": \"v1 was sunset on 2026-10-31. Migrate to v2.\",\n    \"documentationUrl\": \"/docs/migration/v1-to-v2\"\n  }\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep v1 running during migration",
+        "text": "Publish a 12-month deprecation timeline. Monitor v1 traffic weekly. When active v1 clients drop below 5%, accelerate the sunset date. When they drop below 1%, return 410 Gone immediately."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Does URL versioning cause code duplication?",
+            "answer": "Share business logic through internal services. Controllers should only translate between external contracts and internal models. If you find yourself copying controllers, extract a shared adapter layer."
+          },
+          {
+            "question": "What versioning scheme should I use?",
+            "answer": "Use simple integer versions (v1, v2) or date-based versions (v2026-10). Integer versions are easier for humans; date versions are better for continuous deployment."
+          },
+          {
+            "question": "Should I version every endpoint?",
+            "answer": "Only version endpoints that change. If v2 only adds a field to GET /users, you can return the new field in v1 as an additive, non-breaking change and skip v2 entirely."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "URL versioning is the most explicit and debuggable strategy.",
+          "Share logic through services, not through duplicated controllers.",
+          "410 Gone with migration links is the professional way to sunset a version.",
+          "Monitor version traffic to accelerate or extend deprecation timelines."
+        ],
+        "takeaway": "URL versioning makes the API contract visible in every request. That visibility is a feature, not a burden."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "header-versioning",
+    "deprecation-strategy"
+  ],
+  "furtherReading": [
+    {
+      "title": "API Versioning Best Practices",
+      "url": "https://swagger.io/resources/articles/best-practices-in-api-design/",
+      "type": "article",
+      "author": "SmartBear",
+      "description": "Comprehensive guide to REST API versioning strategies."
+    }
+  ]
+}

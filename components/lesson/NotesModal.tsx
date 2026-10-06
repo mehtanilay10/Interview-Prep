@@ -5,6 +5,7 @@ import { X, Trash2, BookOpen } from 'lucide-react';
 import { useLessonNotes } from '@/hooks/useLessonNotes';
 import { SignInPrompt } from '@/components/auth/SignInPrompt';
 import { cn } from '@/lib/utils';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface NotesModalProps {
   isOpen: boolean;
@@ -21,6 +22,9 @@ export function NotesModal({ isOpen, onClose, courseSlug, moduleSlug, lessonSlug
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, isOpen);
 
   const getNoteRef = useRef(getNote);
   getNoteRef.current = getNote;
@@ -90,7 +94,7 @@ export function NotesModal({ isOpen, onClose, courseSlug, moduleSlug, lessonSlug
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
       {/* Panel */}
-      <div className="relative z-10 flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl border border-border bg-canvas shadow-2xl outline-none">
+      <div ref={dialogRef} className="relative z-10 flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl border border-border bg-canvas shadow-2xl outline-none">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-3 rounded-t-2xl bg-canvas-subtle shrink-0">
           <div className="flex items-center gap-2">

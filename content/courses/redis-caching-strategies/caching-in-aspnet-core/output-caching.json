@@ -1,0 +1,186 @@
+{
+  "id": "lesson-redis-034",
+  "slug": "output-caching",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Output Caching in ASP.NET Core",
+  "description": "Use the ASP.NET Core output caching middleware to cache entire endpoint outputs with fine-grained policies, vary-by rules, and cache eviction controls.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "asp.net core",
+    "output-caching",
+    "middleware",
+    "caching-policy"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Output Caching?",
+        "anchor": "what-is-output-caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Output caching was introduced in ASP.NET Core 7.0 as a more powerful successor to response caching. While response caching relies on HTTP headers and works at the edge, output caching operates inside the ASP.NET Core pipeline with full programmatic control. You can define cache policies using attributes, fluent configuration, or the new OutputCacheOptions API, and control eviction, locking, and varying without relying on client headers."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Output caching is not just for HTML pages — it works with any endpoint type including minimal APIs, controllers, and gRPC. It integrates with IDistributedCache for distributed scenarios, so cached outputs are shared across server instances."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "OutputCachePolicy",
+            "definition": "A policy object that defines how an endpoint's output should be cached: duration, vary-by rules, expiration modes, and eviction triggers."
+          },
+          {
+            "term": "OutputCacheOptions",
+            "definition": "The central options class where named policies are registered and retrieved by the middleware."
+          },
+          {
+            "term": "VaryBy",
+            "definition": "Rules that create separate cache entries for different header values, query keys, route values, or custom claims."
+          },
+          {
+            "term": "Cache Locking",
+            "definition": "A mechanism that serializes requests for the same cache key while the first request regenerates the value, preventing duplicate work."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enabling and Configuring Output Caching",
+        "anchor": "enabling-and-configuring"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add the output caching services, register named policies, and add the middleware to the pipeline. Policy names act as reusable templates that endpoints reference by name."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Output Cache Policies",
+        "content": "Define named policies in Program.cs that can be applied to any endpoint.",
+        "code": "builder.Services.AddOutputCache(options =>\n{\n    options.AddPolicy(\"ProductList\", policy =>\n    {\n        policy.Expire(TimeSpan.FromMinutes(5))\n              .SetVaryByQuery(\"category\", \"page\")\n              .SetLocking(OutputCacheLocking.AllowLocking);\n    });\n\n    options.AddBasePolicy(policy =>\n    {\n        policy.With(p => p.CacheKeyGenerator = context =>\n        {\n            // Include the user's role in the cache key for role-specific content\n            var role = context.HttpContext.User.FindFirst(\"role\")?.Value;\n            return $\"{context.HttpContext.Request.Path}:{role}\";\n        });\n    });\n});\n\nvar app = builder.Build();\napp.UseOutputCache(); // After routing, before auth",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Applying Output Cache to an Endpoint",
+        "content": "Apply the named policy to a minimal API endpoint or controller action.",
+        "code": "// Minimal API endpoint\napp.MapGet(\"/api/products\", async (ProductService service) =>\n{\n    var products = await service.GetAllAsync();\n    return Results.Ok(products);\n})\n.CacheOutput(\"ProductList\"); // Uses the policy defined above\n\n// Controller endpoint\n[HttpGet(\"api/products/{id}\")]\n[OutputCache(PolicyName = \"ProductDetail\")]\npublic async Task<ActionResult<ProductDto>> GetProduct(int id)\n{\n    var product = await _service.GetByIdAsync(id);\n    if (product is null) return NotFound();\n    return Ok(product);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Cache Locking Prevents Stampedes",
+        "text": "When a cached entry expires, multiple concurrent requests can all try to regenerate it simultaneously. Enable locking to ensure only one request rebuilds the cache while others wait for the result."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Output Caching Architecture",
+        "anchor": "architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "output-cache-architecture",
+        "caption": "Output caching middleware pipeline flow",
+        "definition": "flowchart TD\n    A[Incoming Request] --> B[OutputCache Middleware]\n    B --> C{Entry in Cache?}\n    C -->|Hit| D[Return Cached Output]\n    C -->|Miss| E{Lock Held?}\n    E -->|Yes| F[Wait for Lock Release]\n    E -->|No| G[Acquire Lock]\n    G --> H[Invoke Next Middleware]\n    H --> I[Capture Response]\n    I --> J[Store in Cache]\n    J --> K[Release Lock]\n    K --> L[Return Response to Client]\n    F --> L\n    D --> L"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Eviction and Invalidation",
+        "anchor": "eviction-and-invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Output cache entries can be evicted in three ways: by expiration, by explicit eviction via IOutputCacheEntryEvictor, or by triggering a tag-based group eviction. You can resolve an IOutputCacheEntryEvictor from DI and call EvictByTagAsync to invalidate a set of cached endpoints whenever related data changes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Evicting Cache by Tag",
+        "content": "Inject the evictor and clear cached product pages when a product is updated.",
+        "code": "public class ProductController : ControllerBase\n{\n    private readonly IOutputCacheEntryEvictor _evictor;\n\n    [HttpPut(\"api/products/{id}\")]\n    public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto dto)\n    {\n        await _service.UpdateAsync(id, dto);\n\n        // Invalidate all cached product pages\n        await _evictor.EvictByTagAsync(\"products\");\n\n        return NoContent();\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Output caching operates inside the ASP.NET Core pipeline with full programmatic control",
+          "Named policies defined in OutputCacheOptions are reusable across endpoints",
+          "VaryBy rules create separate cache entries for different request dimensions",
+          "Cache locking prevents stampedes when entries expire and are regenerated",
+          "IOutputCacheEntryEvictor enables tag-based eviction from within your application code"
+        ],
+        "takeaway": "Output caching is the preferred server-side caching approach in modern ASP.NET Core applications."
+      }
+    },
+    {
+      "type": "further-reading",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Output caching in ASP.NET Core",
+            "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/output",
+            "type": "article"
+          },
+          {
+            "title": "OutputCacheOptions API reference",
+            "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.outputcaching.outputcacheoptions",
+            "type": "reference"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Output caching in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/output",
+      "type": "article"
+    },
+    {
+      "title": "OutputCacheOptions API reference",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.outputcaching.outputcacheoptions",
+      "type": "reference"
+    }
+  ]
+}

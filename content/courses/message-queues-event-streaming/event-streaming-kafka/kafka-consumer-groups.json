@@ -1,0 +1,143 @@
+{
+  "id": "lesson-mqes-025",
+  "slug": "kafka-consumer-groups",
+  "moduleSlug": "event-streaming-kafka",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Kafka Consumer Groups",
+  "description": "Understand consumer groups, partition assignment strategies, and rebalancing in Kafka.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "kafka",
+    "consumer-groups",
+    "partitions",
+    "rebalancing",
+    "scaling"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Consumer groups are Kafka's mechanism for horizontal scaling and fault-tolerant consumption. Each consumer group represents a logical subscriber to one or more topics. Within a group, each partition is consumed by exactly one consumer, enabling parallel processing while maintaining message order."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Consumer Groups Work"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When consumers join a group, Kafka's group coordinator assigns partitions to consumers using a partition assignment strategy. The default strategy, RangeAssignor, assigns contiguous ranges of partitions to consumers. For more even distribution, CooperativeStickyAssignor minimizes partition movement during rebalances."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "consumer-group-assignment",
+        "definition": "flowchart TD\n    T[Topic: orders<br/>3 partitions] -->|assigned to| CG[Consumer Group: processors]\n\n    CG --> C1[Consumer 1]\n    CG --> C2[Consumer 2]\n    CG --> C3[Consumer 3]\n\n    C1 -->|reads| P0[Partition 0]\n    C2 -->|reads| P1[Partition 1]\n    C3 -->|reads| P2[Partition 2]\n\n    style C1 fill:#f9f,stroke:#333,stroke-width:1px\n    style C2 fill:#f9f,stroke:#333,stroke-width:1px\n    style C3 fill:#f9f,stroke:#333,stroke-width:1px",
+        "caption": "Three consumers in one group each reading one partition of a three-partition topic"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rebalancing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When consumers join or leave a group, Kafka triggers a rebalance to reassign partitions. During a rebalance, the group pauses consumption while partitions are redistributed. Long rebalances can increase consumer lag. To minimize disruption, use CooperativeStickyAssignor and keep consumer instances stable."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Rebalancing Best Practices",
+        "items": [
+          "Use CooperativeStickyAssignor for minimal partition movement during rebalances.",
+          "Avoid frequent consumer restarts by handling errors gracefully inside the consume loop.",
+          "Set `session.timeout.ms` and `heartbeat.interval.ms` appropriately to detect failed consumers quickly.",
+          "Keep consumer group IDs stable in production; changing the group ID causes a full rebalance and offset reset."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Consumer Lag",
+        "text": "Consumer lag measures how far behind a consumer group is from the latest message offset. Monitor lag in production using Kafka's consumer group command or a monitoring tool like Prometheus with JMX exporter."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monitoring Consumer Lag with kafkajs",
+        "content": "Retrieving consumer group lag using the KafkaJS admin client.",
+        "language": "javascript",
+        "code": "const { Kafka } = require('kafkajs');\n\nconst kafka = new Kafka({ clientId: 'monitor', brokers: ['localhost:9092'] });\nconst admin = kafka.admin();\n\nasync function checkLag() {\n  await admin.connect();\n\n  const groupId = 'order-processors';\n  const topic = 'orders';\n\n  const consumerGroup = await admin.describeConsumerGroups({\n    groups: [groupId]\n  });\n\n  const offsets = await admin.fetchTopicOffsetsByTimestamp(topic, Date.now());\n  const groupOffsets = await admin.fetchConsumerGroupOffsets(groupId, topic);\n\n  for (const [partition, groupOffset] of Object.entries(groupOffsets.offsets)) {\n    const topicOffset = offsets.find(o => o.partition === Number(partition));\n    const lag = topicOffset.high - groupOffset.offset;\n    console.log(`Partition ${partition}: lag = ${lag}`);\n  }\n\n  await admin.disconnect();\n}\n\ncheckLag();"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Property",
+          "Default",
+          "Impact"
+        ],
+        "rows": [
+          [
+            "partition.assignment.strategy",
+            "org.apache.kafka.clients.consumer.RangeAssignor",
+            "Controls how partitions are distributed across consumers."
+          ],
+          [
+            "session.timeout.ms",
+            "10000",
+            "Max time without heartbeat before the coordinator removes a consumer."
+          ],
+          [
+            "heartbeat.interval.ms",
+            "3000",
+            "Frequency of heartbeat threads. Must be less than session timeout."
+          ],
+          [
+            "max.poll.interval.ms",
+            "300000",
+            "Max delay between poll calls before the consumer is removed."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Consumer groups allow multiple consumers to share the work of reading a topic.",
+          "Each partition in a group is consumed by exactly one consumer instance.",
+          "Rebalancing redistributes partitions when consumers join or leave.",
+          "CooperativeStickyAssignor reduces disruption during rebalances."
+        ],
+        "takeaway": "Consumer groups are the scalability primitive in Kafka; understanding assignment and rebalancing prevents production surprises."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Consumer Group Protocol",
+      "url": "https://kafka.apache.org/documentation/#consumerconfigs",
+      "type": "article",
+      "description": "Official documentation for consumer group configuration and protocol details."
+    }
+  ]
+}

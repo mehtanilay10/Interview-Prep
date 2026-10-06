@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Bookmark } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface BookmarkItem {
   id: string;
@@ -47,7 +48,7 @@ export function BookmarksClient({ user }: BookmarksClientProps) {
           setBookmarks(data.items || []);
         }
       } catch (err) {
-        console.error('Failed to fetch bookmarks:', err);
+        logger.error('BookmarksClient', 'Failed to fetch bookmarks:', err);
       } finally {
         setLoading(false);
       }

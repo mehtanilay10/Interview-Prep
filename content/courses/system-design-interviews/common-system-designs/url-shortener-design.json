@@ -1,0 +1,213 @@
+{
+  "id": "lesson-sdi-054",
+  "slug": "url-shortener-design",
+  "moduleSlug": "common-system-designs",
+  "courseSlug": "system-design-interviews",
+  "title": "URL Shortener Design",
+  "description": "Learn to design a scalable URL shortener service with hashing, base-62 encoding, distributed ID generation, and high-throughput redirect handling.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["system-design", "url-shortener", "hashing", "encoding", "redirect"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A URL shortener converts long web addresses into compact, shareable links. Services like Bit.ly and TinyURL handle billions of redirects daily. Designing one tests your ability to balance low latency, high availability, and storage efficiency while keeping links memorable and human-readable."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Functional Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Core Features",
+        "items": [
+          "Shorten a given URL and return a unique short link",
+          "Redirect a short URL to its original destination",
+          "Support custom aliases for branded links",
+          "Track click analytics and link expiration dates"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Non-Functional Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Performance and Reliability",
+        "items": [
+          "Redirect latency must be under 100 ms to avoid perceived slowness",
+          "System must remain available even during partial outages",
+          "Links should expire gracefully with configurable TTL",
+          "Analytics updates are eventually consistent"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Base-62 Encoding Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most URL shorteners use base-62 encoding because it produces compact, URL-safe strings without reserved characters. The character set is 0-9, a-z, and A-Z, giving 62 options per character. With just 7 characters you can encode over 3.5 trillion unique IDs. An auto-incrementing numeric ID from a database or ID generator is converted into a base-62 string to form the short code."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Why Base-62?",
+        "text": "Base-62 is shorter than hexadecimal (base-16) and avoids URL-unsafe characters present in base-64 (such as +, /, and =)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "System Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The system uses a stateless API layer behind a load balancer, a distributed ID generator, and a key-value store for fast redirects. The write path stores the mapping in a database and caches it in Redis. The read path checks Redis first, falling back to the database on a cache miss. A CDN or edge cache can serve hot redirects without hitting your origin servers."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "url-shortener-flow",
+        "caption": "Write and read paths for a URL shortener",
+        "definition": "flowchart LR\n    A[Client] --> B[Load Balancer]\n    B --> C[API Server]\n    C --> D[ID Generator]\n    D --> E[(Primary DB)]\n    C --> F[Redis Cache]\n    G[Client] --> H[Load Balancer]\n    H --> I[API Server]\n    I --> F\n    F -->|cache hit| I\n    F -->|cache miss| E\n    E --> F"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ID Generation Approaches"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Comparing ID Generators",
+        "cards": [
+          {
+            "title": "Auto-Increment DB",
+            "pros": ["Simple to implement", "Sequential IDs keep storage compact"],
+            "cons": ["Single point of failure", "Database bottleneck at scale", "Leaks total link count"]
+          },
+          {
+            "title": "Snowflake (Twitter)",
+            "pros": ["Distributed and decentralized", "Monotonically increasing IDs", "No coordination needed"],
+            "cons": ["64-bit IDs are longer", "Requires clock synchronization", "More complex to explain"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Prevent collisions",
+        "text": "Always validate short code uniqueness at write time. Even with a perfect ID generator, concurrent requests can theoretically collide. Use a unique constraint on the short_code column and handle duplicate key errors gracefully by retrying with a new ID."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Base-62",
+            "definition": "A numeral system using 62 characters (0-9, a-z, A-Z) to encode numbers into short, URL-safe strings."
+          },
+          {
+            "term": "ID Generator",
+            "definition": "A service that produces unique identifiers, such as auto-incrementing sequences or distributed algorithms like Snowflake."
+          },
+          {
+            "term": "Canary URL",
+            "definition": "A test short link used to monitor redirect latency and detect degradation before user traffic is affected."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Base-62 encoding produces compact, URL-safe short codes",
+          "Use a key-value store like Redis for redirect caching to meet sub-100ms latency",
+          "Choose an ID generator based on write volume and coordination complexity",
+          "Enforce uniqueness with database constraints and handle collisions via retries"
+        ],
+        "takeaway": "A successful URL shortener hides complexity behind a 7-character redirect while serving millions of requests per second."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle analytics without slowing redirects?",
+            "answer": "Log the redirect event asynchronously to a message queue. A separate analytics service consumes events and updates counters. This decouples analytics from the critical redirect path."
+          },
+          {
+            "question": "What happens when a short link expires?",
+            "answer": "Return a 404 or redirect to an expiration notice page. Delete expired entries from the cache to free memory and serve accurate results."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Practice Estimation",
+        "description": "Estimate storage and QPS for a URL shortener with 50 million daily active users, each creating 2 links per day and clicking 15 links per day.",
+        "expectedOutcome": "Write QPS ~ 1,160; read QPS ~ 17,361; ~5 TB storage per year assuming 500 bytes per entry"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "System Design: URL Shortener",
+      "url": "https://www.educative.io/courses/grokking-the-system-design-interview",
+      "type": "course",
+      "author": "Educative",
+      "description": "A detailed walkthrough of URL shortener design including encoding, expiry, and scaling."
+    },
+    {
+      "title": "How Bit.ly Handles Billions of Redirects",
+      "url": "https://bit.ly/3J4p5kL",
+      "type": "article",
+      "author": "Bitly Engineering",
+      "description": "Behind-the-scenes architecture of a production URL shortener at massive scale."
+    }
+  ]
+}

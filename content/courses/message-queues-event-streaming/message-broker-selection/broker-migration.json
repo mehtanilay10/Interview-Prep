@@ -1,0 +1,157 @@
+{
+  "id": "lesson-mqes-046",
+  "slug": "broker-migration",
+  "title": "Broker Migration",
+  "description": "Plan and execute a migration between message brokers with minimal downtime and data loss.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 35,
+  "tags": [
+    "migration",
+    "broker-selection",
+    "kafka",
+    "rabbitmq",
+    "sqs",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Migrating between message brokers is one of the riskiest infrastructure changes a team can make. Messages in flight can be lost, consumers can miss offsets, and producer retries can duplicate events. A careful migration plan with a dual-write phase, consumer validation, and a clean cutover reduces those risks to near zero."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Migration Strategy Overview"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The safest migration strategy is a three-phase approach: dual-write, validate, then cutover. During dual-write, producers send every message to both the old and new brokers. Consumers read from the old broker and write acknowledgments to a shared store. Once the new broker has caught up and consumers are healthy, producers stop writing to the old broker and consumers switch their read pointer."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Phase 1: Dual-Write"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add a second publisher in the producer code that forwards every message to the new broker. Do not remove the old publisher yet. This phase isolates the migration risk to additional network I/O and gives you a real-time mirror of traffic on the new broker."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dual-write publisher in C#",
+        "content": "public class DualWritePublisher\n{\n    private readonly RabbitMQ.Client.IModel _rabbitChannel;\n    private readonly IProducer<string, string> _kafkaProducer;\n\n    public void Publish(string routingKey, string payload)\n    {\n        // Write to legacy broker\n        _rabbitChannel.BasicPublish(\"orders-exchange\", routingKey,\n            mandatory: false,\n            body: Encoding.UTF8.GetBytes(payload));\n\n        // Write to new broker\n        _kafkaProducer.Produce(\"orders-topic\",\n            new Message<string, string> { Key = routingKey, Value = payload },\n            DeliveryHandler);\n    }\n\n    private static void DeliveryHandler(DeliveryReport<string, string> report)\n    {\n        if (report.Error is not null)\n            Console.WriteLine($\"Kafka delivery failed: {report.Error.Reason}\");\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Phase 2: Consumer Validation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start a shadow consumer group on the new broker. It reads every message but does not process side effects—it only counts messages and compares them to the old consumer's output. If counts match and payloads are identical for a validation window (for example, 24 hours), the new broker is ready."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Validation Tip",
+        "text": "Log both the old and new consumer offsets every minute. A steady offset delta under one message indicates consistent delivery."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Phase 3: Cutover"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Once validation passes, stop the dual-write and switch consumers to the new broker. Retain the old broker in read-only mode for one retention period as a safety net. If you discover missing or duplicate messages, you can replay from the old broker without re-running the migration."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-046-migration-phases",
+        "definition": "flowchart TB\n    A[\"Phase 1:\nDual-Write\"] --> B[\"Producers write to\nold + new brokers\"]\n    B --> C[\"Phase 2:\nValidate\"]\n    C --> D[\"Shadow consumers\ncompare message counts\nand payloads\"]\n    D --> E{validation\npasses?}\n    E -->|No| F[\"Fix mismatch\ninvestigate gaps\"]\n    F --> D\n    E -->|Yes| G[\"Phase 3:\nCutover\"]\n    G --> H[\"Stop old writes\nswitch consumers\nkeep old broker as backup\"]",
+        "caption": "The three-phase broker migration strategy minimizes risk by validating before any irreversible change."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling In-Flight Messages"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Messages already in the old broker queue when you cut over must be drained or migrated. Draining is simpler: stop producers, let consumers finish the backlog, then cut over. Migration is faster but harder: replay unacknowledged messages from the old broker into the new one. In RabbitMQ, use the shovel plugin or a custom consumer. In Kafka, consumer offsets make this easier—reset the offset to an earlier position to re-read historical messages."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Migration checklist",
+        "items": [
+          "Schema compatibility: ensure the new broker accepts the same message format.",
+          "Idempotent consumers: consumers must tolerate duplicates during dual-write.",
+          "Offset tracking: store consumer offsets externally so you can reset them after cutover.",
+          "Monitoring: alert on delivery failures in both brokers during dual-write.",
+          "Rollback plan: keep the old broker alive until the new one has processed a full business cycle."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use dual-write to build a real-time mirror before any cutover.",
+          "Validate with shadow consumers that compare counts and payloads.",
+          "Drain or migrate in-flight messages before switching consumers.",
+          "Keep the old broker as a read-only backup until the new system is fully trusted."
+        ],
+        "takeaway": "Broker migration is not a deploy event—it is a controlled experiment. Validate, measure, and only then commit to the new broker."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Migration Best Practices",
+      "url": "https://www.confluent.io/blog/migrating-to-apache-kafka/",
+      "type": "article",
+      "author": "Confluent"
+    },
+    {
+      "title": "AWS SQS Migration Guide",
+      "url": "https://docs.aws.amazon.com/sqs/latest/SQSDeveloperGuide/sqs-migration.html",
+      "type": "article",
+      "author": "AWS"
+    }
+  ],
+  "moduleSlug": "message-broker-selection",
+  "courseSlug": "message-queues-event-streaming"
+}

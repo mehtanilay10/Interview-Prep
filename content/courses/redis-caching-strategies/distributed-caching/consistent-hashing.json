@@ -1,0 +1,109 @@
+{
+  "id": "lesson-redis-020",
+  "slug": "consistent-hashing",
+  "moduleSlug": "distributed-caching",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Consistent Hashing for Data Distribution",
+  "description": "Learn how consistent hashing distributes keys across cache nodes while minimizing data movement when nodes join or leave the cluster.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["redis", "consistent-hashing", "sharding", "distributed-systems"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Consistent hashing is a technique used in distributed caching to map keys to nodes in a way that minimizes reorganization when the cluster changes. Unlike traditional modular hashing (where adding a node remaps nearly all keys), consistent hashing only moves the keys for the affected node range." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "The Problem with Modular Hashing" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "With modular hashing, node = hash(key) % N. When N changes (a node joins or leaves), approximately N/(N+1) of all keys must be remapped — a costly operation that causes cache misses across the board. In a cache serving millions of requests per second, this is unacceptable." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "tip", "title": "The 1/N Rule", "text": "With modular hashing, adding or removing a node causes roughly 1/N of the keys to move. Consistent hashing reduces this to approximately 1/N of keys moving only for the affected range." }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "consistent-hashing-ring",
+        "caption": "Consistent hashing ring showing virtual nodes for balanced distribution",
+        "definition": "flowchart LR\n    subgraph \"Hash Ring (0 to 2^32)\"\n        VN1[\"VNode A1\"]\n        VN2[\"VNode B1\"]\n        VN3[\"VNode A2\"]\n        VN4[\"VNode C1\"]\n        VN5[\"VNode B2\"]\n        VN6[\"VNode C2\"]\n    end\n    K1[\"Key: user:1001\"] --> VN3\n    K2[\"Key: user:1002\"] --> VN5\n    K3[\"Key: user:1003\"] --> VN1\n    VN1 --> NODE_A[\"Physical Node A\"]\n    VN3 --> NODE_A\n    VN2 --> NODE_B[\"Physical Node B\"]\n    VN5 --> NODE_B\n    VN4 --> NODE_C[\"Physical Node C\"]\n    VN6 --> NODE_C"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Virtual Nodes and Load Balancing" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Real-world implementations use virtual nodes (vnodes) to improve distribution. Each physical node is mapped to multiple positions on the ring (e.g., 100-200 vnodes). This balances load even when nodes have different capacities and ensures more uniform key distribution than a single hash per node." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Implementing Consistent Hashing in Node.js",
+        "language": "javascript",
+        "code": "const crypto = require('crypto');\n\nclass ConsistentHash {\n  constructor(replicas = 100) {\n    this.replicas = replicas;\n    this.ring = new Map();\n    this.nodes = new Set();\n  }\n\n  // Hash function using MD5\n  _hash(key) {\n    return crypto.createHash('md5').update(key).digest('hex');\n  }\n\n  addNode(node) {\n    this.nodes.add(node);\n    for (let i = 0; i < this.replicas; i++) {\n      const hash = this._hash(`${node}:vnode:${i}`);\n      this.ring.set(hash, node);\n    }\n  }\n\n  getNode(key) {\n    if (this.ring.size === 0) return null;\n    const hash = this._hash(key);\n    // Find the next node on the ring (clockwise)\n    for (const [ringHash, node] of this.ring) {\n      if (hash <= ringHash) return node;\n    }\n    // Wrap around to first node\n    return this.ring.values().next().value;\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Consistent Hashing in C#",
+        "language": "csharp",
+        "code": "using System.Collections.Generic;\nusing System.Linq;\nusing System.Security.Cryptography;\nusing System.Text;\n\npublic class ConsistentHashRing\n{\n    private readonly int _replicas;\n    private readonly SortedDictionary<uint, string> _ring = new();\n    private readonly List<string> _nodes = new();\n\n    public ConsistentHashRing(int replicas = 100)\n    {\n        _replicas = replicas;\n    }\n\n    private uint ComputeHash(string key)\n    {\n        var bytes = Encoding.UTF8.GetBytes(key);\n        var hash = MD5.HashData(bytes);\n        return BitConverter.ToUInt32(hash, 0);\n    }\n\n    public void AddNode(string node)\n    {\n        _nodes.Add(node);\n        for (var i = 0; i < _replicas; i++)\n        {\n            var hash = ComputeHash($\"{node}:vnode:{i}\");\n            _ring[hash] = node;\n        }\n    }\n\n    public string? GetNode(string key)\n    {\n        if (_ring.Count == 0) return null;\n        var hash = ComputeHash(key);\n        foreach (var kvp in _ring)\n        {\n            if (hash <= kvp.Key) return kvp.Value;\n        }\n        return _ring.Values.First();\n    }\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Virtual Node (vnode)", "definition": "A logical copy of a physical node placed at multiple positions on the hash ring to improve distribution balance." },
+          { "term": "Hash Ring", "definition": "A circular namespace of hash values where nodes are placed and keys are routed to the next clockwise node." },
+          { "term": "Replica Factor", "definition": "The number of times each data item is replicated across different nodes for redundancy." }
+        ]
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Scenario", "Modular Hash Keys Moved", "Consistent Hash Keys Moved"],
+        "rows": [
+          ["Add 1 node to 10", "~90%", "~10%"],
+          ["Remove 1 node from 10", "~90%", "~10%"],
+          ["Add 1 node to 100", "~99%", "~1%"],
+          ["Node failure", "100% (if single node)", "Only keys on failed node"]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Consistent hashing maps nodes and keys to the same circular hash space",
+          "Keys route to the next node clockwise on the ring",
+          "Adding or removing a node only moves keys from the affected range",
+          "Virtual nodes (vnodes) ensure balanced distribution across physical nodes"
+        ],
+        "takeaway": "Consistent hashing is essential for production distributed caches because it minimizes disruption during cluster changes."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Consistent Hashing — Web Proxies to Distributed Caches", "url": "https://www.toptal.com/big-data/consistent-hashing", "type": "article" },
+        { "title": "Amazon DynamoDB: Partitioning and Consistent Hashing", "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Consistent Hashing — Web Proxies to Distributed Caches", "url": "https://www.toptal.com/big-data/consistent-hashing", "type": "article" },
+    { "title": "Amazon DynamoDB: Partitioning and Consistent Hashing", "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html", "type": "article" }
+  ]
+}

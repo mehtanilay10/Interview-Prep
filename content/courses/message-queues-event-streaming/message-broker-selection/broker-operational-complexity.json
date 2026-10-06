@@ -1,0 +1,181 @@
+{
+  "id": "lesson-mqes-045",
+  "slug": "broker-operational-complexity",
+  "title": "Broker Operational Complexity",
+  "description": "Compare the day-to-day operational burden of running RabbitMQ, Kafka, and managed SQS in production.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": [
+    "operations",
+    "kafka",
+    "rabbitmq",
+    "sqs",
+    "monitoring",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Operational complexity is the hidden cost of any broker. A team that picks Kafka for its throughput but lacks Kafka expertise will spend more time on cluster health, partition rebalancing, and consumer lag than on delivering business value. Conversely, a managed service like SQS shifts that burden to the vendor but removes direct control over configuration and troubleshooting."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "RabbitMQ Operations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RabbitMQ is moderately complex to operate. A single-node instance is straightforward, but production clusters require careful attention to quorum queues, mirrored queues, and network partition handling. The management plugin provides a web UI for inspecting queues, connections, and message rates. Monitoring focuses on queue depth, consumer utilization, and disk free space. RabbitMQ is generally easier to run than Kafka but harder than a fully managed queue."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Kafka Operations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka is the most operationally demanding of the three. A production Kafka cluster requires ZooKeeper or Kraft for metadata, careful broker configuration, partition leadership management, and log compaction tuning. Consumer lag is the primary health signal, and interpreting it requires understanding consumer group rebalancing, retention policies, and ISR (in-sync replica) state. Teams running Kafka need dedicated expertise or a managed service like Amazon MSK or Confluent Cloud."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SQS Operations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQS requires no cluster management. AWS handles provisioning, replication, and failure recovery. The operational burden shifts to configuration: setting visibility timeouts, dead-letter queue thresholds, and IAM policies. Monitoring uses CloudWatch metrics like ApproximateAgeOfOldestMessage and NumberOfMessagesSent. The main limitation is that you cannot SSH into a node, change a broker setting, or inspect message internals directly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Operational Comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Area",
+          "RabbitMQ",
+          "Kafka",
+          "SQS"
+        ],
+        "rows": [
+          [
+            "Cluster setup",
+            "Moderate (quorum queues, load balancer)",
+            "High (ZooKeeper/Kraft, broker config, partitions)",
+            "None (AWS-managed)"
+          ],
+          [
+            "Monitoring",
+            "Management UI + Prometheus exporter",
+            "JMX + Prometheus + consumer lag dashboards",
+            "CloudWatch metrics and alarms"
+          ],
+          [
+            "Backup and recovery",
+            "Queue definitions exportable; messages typically not",
+            "Topic replication + log compaction; snapshot for offset resets",
+            "AWS-managed; messages retained up to 14 days"
+          ],
+          [
+            "Scaling",
+            "Add nodes and rebalance queues",
+            "Add brokers and reassign partitions",
+            "Automatic (no action required)"
+          ],
+          [
+            "Security patching",
+            "Team responsibility",
+            "Team or managed service responsibility",
+            "AWS responsibility"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Hidden Cost of Self-Hosted Clusters",
+        "text": "A single Kafka cluster can require a dedicated engineer on call for partition failures, ISR shrinks, and consumer group instability. Factor on-call burden into your total cost of ownership, not just server pricing."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-045-ops-burden",
+        "definition": "flowchart TB\n    A[\"Broker Choice\"] --> B[RabbitMQ]\n    A --> C[Kafka]\n    A --> D[SQS]\n\n    B --> B1[\"Moderate ops\nqueue config + monitoring\"]\n    C --> C1[\"High ops\ncluster + partitions + lag\"]\n    D --> D1[\"Low ops\nCloudWatch + IAM only\"]\n\n    C1 --> C2[\"Dedicated Kafka\nengineer often needed\"]\n    B1 --> B2[\"Shared responsibility\nwith app team\"]\n    D1 --> D2[\"Vendor-managed\nno cluster access\"]",
+        "caption": "Operational responsibility shifts from the team to the vendor as you move from Kafka to SQS."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Code Example: Monitoring RabbitMQ with HTTP API"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The RabbitMQ management plugin exposes an HTTP API that you can query from health checks or monitoring jobs. The example below shows a simple C# health probe that checks queue depth and consumer count."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RabbitMQ health probe in C#",
+        "content": "using System.Net.Http.Json;\n\npublic class RabbitHealthProbe\n{\n    private readonly HttpClient _http = new();\n\n    public async Task<bool> IsHealthyAsync(string managementUrl, string queueName)\n    {\n        var response = await _http.GetFromJsonAsync<QueueInfo>($\"{managementUrl}/api/queues/%2F/{queueName}\");\n        return response is\n        {\n            Messages: < 1000,\n            Consumers: > 0\n        };\n    }\n\n    private record QueueInfo(int Messages, int Consumers);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RabbitMQ requires moderate operational effort: queue management, monitoring, and cluster rebalancing.",
+          "Kafka requires the most expertise: partitions, consumer lag, ISR state, and metadata management.",
+          "SQS removes operational burden entirely but removes direct access to internals.",
+          "Always include on-call cost and staffing requirements in your broker evaluation."
+        ],
+        "takeaway": "The cheapest broker is not the one with the lowest server bill—it is the one that fits your team's ability to operate it reliably."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ Monitoring and Alarms",
+      "url": "https://www.rabbitmq.com/docs/monitoring",
+      "type": "article",
+      "author": "RabbitMQ"
+    },
+    {
+      "title": "Kafka Operations: Monitoring Consumer Lag",
+      "url": "https://kafka.apache.org/documentation/#monitoring",
+      "type": "article",
+      "author": "Apache Kafka"
+    }
+  ],
+  "moduleSlug": "message-broker-selection",
+  "courseSlug": "message-queues-event-streaming"
+}

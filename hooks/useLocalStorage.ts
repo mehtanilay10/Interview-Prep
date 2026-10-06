@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/lib/logger';
 
 /**
  * A typesafe localStorage hook with SSR safety.
@@ -24,7 +25,7 @@ export function useLocalStorage<T>(
         setStoredValue(JSON.parse(item) as T);
       }
     } catch (err) {
-      console.warn(`[useLocalStorage] Failed to read key "${key}"`, err);
+      logger.warn('useLocalStorage', `Failed to read key "${key}"`, err);
     }
   }, [key]);
 
@@ -37,7 +38,7 @@ export function useLocalStorage<T>(
           return next;
         });
       } catch (err) {
-        console.warn(`[useLocalStorage] Failed to write key "${key}"`, err);
+        logger.warn('useLocalStorage', `Failed to write key "${key}"`, err);
       }
     },
     [key]
@@ -48,7 +49,7 @@ export function useLocalStorage<T>(
       window.localStorage.removeItem(key);
       setStoredValue(initialValue);
     } catch (err) {
-      console.warn(`[useLocalStorage] Failed to remove key "${key}"`, err);
+      logger.warn('useLocalStorage', `Failed to remove key "${key}"`, err);
     }
   }, [key, initialValue]);
 

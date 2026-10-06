@@ -1,0 +1,171 @@
+{
+  "id": "lesson-api-design-problems-rate-limiting-design-rate-limit-headers",
+  "slug": "rate-limit-headers",
+  "moduleSlug": "rate-limiting-design",
+  "courseSlug": "api-design-problems",
+  "title": "Rate Limit Headers",
+  "description": "Use standard and draft rate limit headers to communicate quota, remaining requests, and reset time to API clients.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["headers", "standards", "clients", "draft"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limit headers let clients know their current quota without guessing. Without them, clients hit 429 errors randomly and have no way to self-regulate. With them, clients can pace their requests intelligently."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Standard Headers"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Header", "Standard", "Meaning", "Example"],
+        "rows": [
+          ["X-RateLimit-Limit", "De facto standard", "Max requests in window", "100"],
+          ["X-RateLimit-Remaining", "De facto standard", "Requests remaining", "42"],
+          ["X-RateLimit-Reset", "De facto standard", "Unix timestamp of reset", "1728203460"],
+          ["RateLimit-Limit", "RFC 6585 draft", "Max requests in window", "100"],
+          ["RateLimit-Remaining", "RFC 6585 draft", "Requests remaining", "42"],
+          ["RateLimit-Reset", "RFC 6585 draft", "Seconds until reset", "6"],
+          ["Retry-After", "RFC 6585", "Seconds to wait on 429", "6"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Complete Rate Limit Response"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Response headers for a healthy and limited request",
+        "content": "Every response should include rate limit headers so clients can track their usage.",
+        "code": "# Request allowed (42 of 100 remaining)\nHTTP/1.1 200 OK\nX-RateLimit-Limit: 100\nX-RateLimit-Remaining: 42\nX-RateLimit-Reset: 1728203460\n\n{\n  \"id\": \"prod_881\",\n  \"name\": \"Wireless Headphones\"\n}\n\n# Request rejected (0 remaining, retry in 6s)\nHTTP/1.1 429 Too Many Requests\nX-RateLimit-Limit: 100\nX-RateLimit-Remaining: 0\nX-RateLimit-Reset: 1728203460\nRetry-After: 6\n\n{\n  \"type\": \"https://api.example.com/errors/rate-limited\",\n  \"title\": \"Rate Limited\",\n  \"status\": 429,\n  \"retryAfter\": 6\n  }\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "RFC 6585 RateLimit Headers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The IETF draft (now RFC 6585 Section 8) defines RateLimit-* headers. While not universally adopted yet, they are becoming the standard. Support both old and new header names for maximum compatibility."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "RateLimit-Limit — same as X-RateLimit-Limit",
+          "RateLimit-Remaining — same as X-RateLimit-Remaining",
+          "RateLimit-Reset — can be seconds or unix timestamp; document which you use",
+          "Set both header sets during a transition period",
+          "Prefer the RFC 6585 headers in new APIs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Client Behavior"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Well-behaved clients use rate limit headers to pace themselves. They do not wait for a 429 before slowing down."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Track X-RateLimit-Remaining on each response",
+          "When remaining drops below a threshold (e.g., 10), start backing off",
+          "On 429, read Retry-After and wait exactly that long before retrying",
+          "Implement exponential backoff with jitter for repeated 429s",
+          "Reset internal counters when X-RateLimit-Reset passes"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Python client respecting rate limits",
+        "content": "Client-side rate limit tracking using response headers.",
+        "code": "import time\n\nclass RateLimitedClient:\n    def __init__(self):\n        self.limit = None\n        self.remaining = None\n        self.reset = None\n\n    def handle_response(self, response):\n        self.limit = int(response.headers.get('X-RateLimit-Limit', 100))\n        self.remaining = int(response.headers.get('X-RateLimit-Remaining', 100))\n        self.reset = int(response.headers.get('X-RateLimit-Reset', 0))\n\n        if response.status_code == 429:\n            retry_after = int(response.headers.get('Retry-After', 1))\n            time.sleep(retry_after)\n            return self.retry(response.request)\n\n        if self.remaining < 10:\n            # Back off proactively\n            wait_time = max(0, self.reset - time.time())\n            time.sleep(wait_time / self.remaining)\n\n        return response\n\n    def retry(self, request):\n        return self.send(request)  # Retry once",
+        "language": "python"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Rate limit headers on every response",
+        "text": "Send rate limit headers on every response, not just 429. Clients need to see their remaining quota before they hit the limit. Sending headers only on errors is an anti-pattern."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should X-RateLimit-Reset be a Unix timestamp or seconds?",
+            "answer": "Document it clearly. Unix timestamps are unambiguous. Seconds-until-reset is easier for clients but ambiguous across time zones. The RFC 6585 draft recommends seconds."
+          },
+          {
+            "question": "What if the client ignores the headers?",
+            "answer": "You cannot force clients to respect headers. Return 429 with Retry-After when they exceed the limit. Log clients that ignore headers for monitoring and potential blocking."
+          },
+          {
+            "question": "Should I include rate limits in the OpenAPI spec?",
+            "answer": "Yes. Use the x-* extension fields to document rate limit behavior. This lets SDK generators include rate limit awareness in client libraries."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Send rate limit headers on every response, not just errors.",
+          "Support both de facto and RFC 6585 header names.",
+          "Include Retry-After on 429 responses.",
+          "Document your header semantics in the OpenAPI spec."
+        ],
+        "takeaway": "Rate limit headers are the API's way of telling clients how to behave. Send them on every request, and clients will self-regulate instead of hammering your 429 endpoint."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "rate-limiting-algorithms",
+    "distributed-rate-limiting"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 6585: Additional HTTP Status Codes",
+      "url": "https://datatracker.ietf.org/doc/html/rfc6585",
+      "type": "article",
+      "author": "IETF",
+      "description": "Standard defining 429 Too Many Requests and rate limit headers."
+    }
+  ]
+}

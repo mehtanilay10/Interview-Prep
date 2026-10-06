@@ -1,0 +1,180 @@
+{
+  "id": "lesson-redis-014",
+  "slug": "cache-stampede-prevention",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Preventing Cache Stampedes",
+  "description": "Learn what a cache stampede is and how to prevent it with locking, jittered TTLs, and request coalescing.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "stampede", "thundering-herd", "locking", "resilience"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is a Cache Stampede?",
+        "anchor": "what-is-stampede"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **cache stampede** — also called a thundering herd — happens when a popular cache key expires and a large number of concurrent requests all miss the cache at the same time. Every request tries to rebuild the cache entry, usually by querying the database or an expensive API. The sudden spike in traffic can overwhelm backend services and degrade performance for all users."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Stampedes are especially common with fixed TTLs on high-traffic keys. If thousands of requests depend on the same product-catalog key and it expires at 09:00:00, every request arriving at that moment will hit the database simultaneously."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Stampede",
+            "definition": "A sudden surge of requests that all miss an expired cache key simultaneously."
+          },
+          {
+            "term": "Thundering Herd",
+            "definition": "Another name for a cache stampede, describing the herd-like behavior of concurrent requests."
+          },
+          {
+            "term": "Request Coalescing",
+            "definition": "Deduplicating concurrent requests so only one backend call is made while others wait."
+          },
+          {
+            "term": "Jittered TTL",
+            "definition": "Adding a small random offset to TTL values to prevent mass expiration at the same instant."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Stampedes Start",
+        "anchor": "how-stampedes-start"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-stampede-timeline",
+        "caption": "Timeline of a cache stampede: many requests arrive at the same instant, all miss Redis, and flood the database.",
+        "definition": "sequenceDiagram\n    participant C as Clients\n    participant R as Redis\n    participant D as Database\n    C->>R: 500 requests for same key\n    R-->>C: key expired / not found\n    par All requests hit DB simultaneously\n        C->>D: SELECT * FROM products WHERE id=1\n        D-->>C: result\n        C->>R: SET products:1 ... (many writers)\n    end"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prevention Strategies",
+        "anchor": "prevention-strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Proven Techniques",
+        "items": [
+          "**Jittered TTLs** — Add a small random delta (e.g., ±10%) to TTLs so keys do not expire at the same time.",
+          "**Request coalescing / probabilistic early expiration** — Let one request rebuild the cache while others serve stale data or wait.",
+          "**Locking / mutex** — Use a Redis lock so only one request can rebuild the cache entry at a time.",
+          "**Never-expire / background refresh** — Keep serving stale data while a background job silently refreshes the cache.",
+          "**Cache warming** — Pre-populate hot keys before traffic spikes (covered in the final lesson)."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Jittered TTL Example",
+        "anchor": "jittered-ttl"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A simple and highly effective technique is to randomize TTLs around a base value. If every key gets a slightly different expiration time, no large group of keys will ever expire simultaneously."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Jittered TTL with StackExchange.Redis",
+        "content": "Apply a ±10% jitter to a 5-minute base TTL so keys spread out over time.",
+        "code": "private static readonly Random _rng = new Random();\n\npublic async Task SetWithJitterAsync(string key, string value, TimeSpan baseTtl)\n{\n    var db = _redis.GetDatabase();\n    var jitterPercent = _rng.NextDouble() * 0.2 - 0.1; // -10% to +10%\n    var jitteredTtl = TimeSpan.FromTicks((long)(baseTtl.Ticks * (1 + jitterPercent)));\n\n    await db.StringSetAsync(key, value, jitteredTtl);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Lock-Based Rebuild",
+        "anchor": "lock-based-rebuild"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **mutex** ensures that when a cache miss occurs, only one request performs the expensive rebuild. Other requests either wait a short time and retry, or receive a fallback value. Redis is a natural place to store the lock because it is already the shared cache."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Mutex cache rebuild with ioredis",
+        "content": "Use SETNX to acquire a lock, rebuild the cache once, and release the lock for others.",
+        "code": "import Redis from 'ioredis';\nconst redis = new Redis();\n\nasync function getWithMutex(key, ttlSeconds, rebuildFn) {\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n\n  const lockKey = `${key}:lock`;\n  const lockAcquired = await redis.set(lockKey, '1', 'NX', 'EX', 10);\n\n  if (lockAcquired) {\n    try {\n      const fresh = await rebuildFn();\n      await redis.setex(key, ttlSeconds, JSON.stringify(fresh));\n      return fresh;\n    } finally {\n      await redis.del(lockKey);\n    }\n  } else {\n    await new Promise(r => setTimeout(r, 50));\n    return getWithMutex(key, ttlSeconds, rebuildFn);\n  }\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid deadlocks",
+        "text": "Always set an expiration on the lock key. If the process that acquired the lock crashes, the lock must eventually release itself so future requests can rebuild the cache."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "A cache stampede happens when many requests simultaneously miss an expired hot key.",
+          "Jittered TTLs are the simplest defense — spread expirations over time.",
+          "Mutex locking ensures only one request rebuilds the cache entry.",
+          "Background refresh and cache warming prevent the miss in the first place."
+        ],
+        "takeaway": "Stampedes are avoidable: small changes to TTL strategy and rebuild logic protect your backend from traffic spikes."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Cache Stampede Prevention",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/#preventing-cache-stampede",
+      "type": "article",
+      "description": "Redis.io guide to preventing stampedes with probabilistic early expiration and request coalescing."
+    },
+    {
+      "title": "Probabilistic Early Expiration",
+      "url": "https://ieftimov.com/post/make-cache-thundering-herd-pattern-harmless-probabilistic-early-expiration/",
+      "type": "article",
+      "description": "In-depth explanation of probabilistic early expiration as a lightweight alternative to locking."
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "id": "lesson-mqes-008",
+  "slug": "topic-exchange",
+  "moduleSlug": "publish-subscribe-patterns",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Topic Exchange: Flexible Routing with Wildcards",
+  "description": "Master topic exchanges and wildcard-based routing for flexible, scalable message distribution.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "rabbitmq",
+    "topic-exchange",
+    "wildcards",
+    "routing",
+    "messaging"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **topic exchange** routes messages to queues based on pattern matching between the message's routing key and the patterns specified when binding queues. Routing keys consist of words separated by dots (e.g., `order.created.us`), and binding patterns support two wildcards: `*` matches exactly one word, and `#` matches one or more words."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Wildcard Routing Rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `*` wildcard matches a single word in any position. So `order.*` matches `order.created` but not `order.created.us`. The `#` wildcard matches zero or more words — `order.#` matches `order.created`, `order.created.us`, and even just `order`. Combining wildcards gives you powerful expressive routing patterns."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "topic-diagram",
+        "caption": "Topic exchange routing keys matched against binding patterns",
+        "definition": "graph LR\n    P[Publisher] --> E[topic: app.events]\n    E -->|key: user.signup| Q1[pattern: user.*]\n    E -->|key: order.created| Q2[pattern: order.#]\n    E -->|key: payment.failed| Q3[pattern: *.failed]\n    Q1 --> C1[Consumer: UserService]\n    Q2 --> C2[Consumer: OrderService]\n    Q3 --> C3[Consumer: Alerting]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Use Cases"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Topic exchanges shine when you need category- and subcategory-based routing. For example, an e-commerce system might use routing keys like `order.created.us`, `order.cancelled.eu`, and `payment.failed.global`. Binding queues with patterns like `order.#` lets the order service listen to all order events regardless of region, while `*.failed` routes all failure events to a centralized alerting service."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka's topic model follows the same conceptual pattern: each topic functions like a log, and consumer groups subscribe to one or more topics. While Kafka does not support pattern-based routing within a topic, its topic naming convention achieves the same outcome by encouraging dot-separated hierarchies at the infrastructure level. Understanding topic exchange patterns in RabbitMQ prepares you well for Kafka topic design."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Declaring a topic exchange and binding with patterns",
+        "content": "This example sets up a topic exchange, declares queues, and binds them with wildcard patterns.",
+        "code": "var factory = new ConnectionFactory() { HostName = \"localhost\" };\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\nchannel.ExchangeDeclare(\"app.events\", ExchangeType.Topic, durable: true);\n\nchannel.QueueDeclare(\"order-service-queue\", durable: true);\nchannel.QueueDeclare(\"alerting-queue\", durable: true);\nchannel.QueueDeclare(\"global-events-queue\", durable: true);\n\n// Bind with wildcard patterns\nchannel.QueueBind(\"order-service-queue\", \"app.events\", \"order.#\");\nchannel.QueueBind(\"alerting-queue\",    \"app.events\", \"*.failed\");\nchannel.QueueBind(\"global-events-queue\", \"app.events\", \"#\");\n\n// Publish with a hierarchical routing key\nvar eventBody = Encoding.UTF8.GetBytes(\"Order #1234 created for US region\");\nchannel.BasicPublish(\n    exchange: \"app.events\",\n    routingKey: \"order.created.us\",\n    basicProperties: null,\n    body: eventBody);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Consuming with topic pattern bindings",
+        "content": "A consumer that subscribes to all order events using the # wildcard.",
+        "code": "const amqp = require('amqplib');\n\nasync function startOrderConsumer() {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n\n  await ch.assertExchange('app.events', 'topic', { durable: true });\n  const { queue } = await ch.assertQueue('', { exclusive: true });\n\n  // 'order.#' matches order.created, order.created.us, order.cancelled, etc.\n  ch.bindQueue(queue, 'app.events', 'order.#');\n\n  ch.consume(queue, (msg) => {\n    if (msg.content) {\n      console.log(`[${msg.fields.routingKey}] ${msg.content.toString()}`);\n    }\n  }, { noAck: true });\n\n  console.log('Listening for all order events...');\n}\n\nstartOrderConsumer();",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid Overly Broad Patterns",
+        "text": "Using `#` as a binding pattern means your queue receives every message on the exchange. This can overload consumers and defeat the purpose of message routing. Use the most specific pattern that satisfies your requirements."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Routing Key",
+          "Pattern `*.*.*`",
+          "Pattern `order.#`",
+          "Pattern `*.created.*`",
+          "Pattern `#`"
+        ],
+        "rows": [
+          [
+            "order.created.us",
+            "matches",
+            "matches",
+            "matches",
+            "matches"
+          ],
+          [
+            "user.signup",
+            "matches",
+            "no match",
+            "no match",
+            "matches"
+          ],
+          [
+            "payment.failed.global",
+            "matches",
+            "no match",
+            "matches",
+            "matches"
+          ],
+          [
+            "order.created",
+            "matches",
+            "matches",
+            "no match",
+            "matches"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Topic Exchange",
+            "definition": "An AMQP exchange type that routes messages using pattern matching with wildcards (* and #) against the routing key."
+          },
+          {
+            "term": "Wildcard (*)",
+            "definition": "Matches exactly one word in a routing key. For example, order.* matches order.created but not order.created.us."
+          },
+          {
+            "term": "Wildcard (#)",
+            "definition": "Matches zero or more words in a routing key. For example, order.# matches order.created, order.created.us, and order."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can I use both * and # in the same binding pattern?",
+            "answer": "Yes. Patterns like *.created.# are valid and match any word, then created, then any remaining words. This gives you maximum flexibility in routing."
+          },
+          {
+            "question": "Does Kafka support wildcard topic subscriptions natively?",
+            "answer": "No. Kafka requires explicit topic names in consumer subscriptions. Wildcard behavior must be implemented at the application level using topic pattern regex subscriptions available since Kafka 2.2.0."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Topic exchanges use wildcards (* for one word, # for zero or more words) to match routing keys.",
+          "Multiple queues can receive the same message if their binding patterns match.",
+          "Use the most specific pattern possible to avoid unnecessary message delivery.",
+          "Topic exchanges are the most flexible and widely used exchange type."
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Design a Topic Routing Scheme",
+        "description": "Design a topic exchange routing scheme for a multi-tenant SaaS notification platform. You need to support: (1) email notifications per tenant, (2) SMS notifications per tenant, (3) push notifications per tenant, (4) all notifications for a given priority (low, medium, high), and (5) a dead-letter audit queue that captures every notification.",
+        "steps": [
+          "Define a routing key structure (e.g., <channel>.<tenantId>.<priority>)",
+          "List the queues and their binding patterns",
+          "Show which queues receive a message with key: email.tenant42.high",
+          "Show which queues receive a message with key: sms.tenant99.low"
+        ],
+        "expectedOutcome": "A clear table of routing key format, queue names, binding patterns, and example match results."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "RabbitMQ — Topic Exchange Tutorial",
+          "url": "https://www.rabbitmq.com/tutorials/tutorial-five-python.html",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "Official RabbitMQ tutorial on topic exchanges with wildcard routing examples."
+        },
+        {
+          "title": "Apache Kafka — Topic Design Best Practices",
+          "url": "https://www.confluent.io/blog/event-streaming-best-practices-topic-design/",
+          "type": "article",
+          "author": "Confluent",
+          "description": "Best practices for designing Kafka topics, including naming conventions and partitioning strategies."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ — Topic Exchange Tutorial",
+      "url": "https://www.rabbitmq.com/tutorials/tutorial-five-python.html",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Official RabbitMQ tutorial on topic exchanges with wildcard routing examples."
+    },
+    {
+      "title": "Apache Kafka — Topic Design Best Practices",
+      "url": "https://www.confluent.io/blog/event-streaming-best-practices-topic-design/",
+      "type": "article",
+      "author": "Confluent",
+      "description": "Best practices for designing Kafka topics, including naming conventions and partitioning strategies."
+    }
+  ]
+}

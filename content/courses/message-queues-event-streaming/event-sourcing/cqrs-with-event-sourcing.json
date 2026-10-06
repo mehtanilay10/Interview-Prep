@@ -1,0 +1,148 @@
+{
+  "id": "lesson-mqes-038",
+  "slug": "cqrs-with-event-sourcing",
+  "moduleSlug": "event-sourcing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "CQRS with Event Sourcing",
+  "description": "Combine Command Query Responsibility Segregation with event sourcing to build scalable, query-optimized systems.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": [
+    "cqrs",
+    "event-sourcing",
+    "read-model",
+    "projection",
+    "write-model"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CQRS stands for Command Query Responsibility Segregation. The idea is simple: the model you use to write data is different from the model you use to read data. Event sourcing pairs naturally with CQRS because the event stream is the write model, and projections built from those events are the read models. This separation lets you optimize each side independently."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Write Model vs. Read Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The write model accepts commands, validates business rules, and appends events. It is designed for correctness and consistency. The read model consumes events and updates one or more query-optimized views. These views can be relational tables, document stores, or in-memory caches. Because the read model is eventually consistent, there is a delay between a command completing and the read model reflecting the change."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "es-cqrs-flow",
+        "caption": "CQRS architecture with event sourcing",
+        "definition": "flowchart LR\n    A[Client] --> B[Command API]\n    B --> C[Aggregate / Write Model]\n    C --> D[Event Store]\n    D --> E[Projection Handler]\n    E --> F[Read Database]\n    F --> G[Query API]\n    G --> A"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Projection Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Projections are the bridge between events and read models. A simple projection maintains one table and updates it for every relevant event. A more complex projection may fan out a single event into multiple tables, denormalize data for query performance, or even trigger downstream commands. Projections run independently and can be restarted from scratch by replaying the event stream."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Building an Order Summary Projection (C#)",
+        "content": "This projection maintains a denormalized read model table for order listings.",
+        "code": "public class OrderSummaryProjection : IProjection\n{\n    public async Task HandleAsync(IEvent @event, CancellationToken ct)\n    {\n        switch (@event)\n        {\n            case OrderPlaced e:\n                await _db.ExecuteAsync(\n                    \"INSERT INTO order_summaries (order_id, customer_id, total, status, placed_at) VALUES (@Id, @CustomerId, @Total, 'Placed', @PlacedAt)\",\n                    e, ct);\n                break;\n            case OrderShipped e:\n                await _db.ExecuteAsync(\n                    \"UPDATE order_summaries SET status = 'Shipped', shipped_at = @ShippedAt WHERE order_id = @OrderId\",\n                    e, ct);\n                break;\n        }\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CQRS in Node.js"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Projection with EventEmitter in Node.js",
+        "content": "A lightweight event handler that updates a read model when events arrive.",
+        "code": "class OrderProjection {\n  constructor(eventBus, readDb) {\n    this.eventBus = eventBus;\n    this.readDb = readDb;\n    this.eventBus.on('OrderPlaced', this.onOrderPlaced.bind(this));\n    this.eventBus.on('OrderShipped', this.onOrderShipped.bind(this));\n  }\n\n  async onOrderPlaced({ orderId, customerId, total }) {\n    await this.readDb.query(\n      `INSERT INTO order_summaries (order_id, customer_id, total, status)\n       VALUES ($1, $2, $3, 'Placed')`,\n      [orderId, customerId, total]\n    );\n  }\n\n  async onOrderShipped({ orderId, shippedAt }) {\n    await this.readDb.query(\n      `UPDATE order_summaries SET status = 'Shipped', shipped_at = $1 WHERE order_id = $2`,\n      [shippedAt, orderId]\n    );\n  }\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Eventual Consistency is a Feature",
+        "text": "Do not try to make read models instantly consistent with the write model. Accept that there is a short delay and design your UX accordingly. If you need synchronous consistency, use the write model directly for that specific query."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Write Model vs. Read Model",
+        "cards": [
+          {
+            "title": "Write Model",
+            "description": "Accepts commands, validates rules, and appends events.",
+            "tags": [
+              "Consistency",
+              "Validation",
+              "Event Store"
+            ]
+          },
+          {
+            "title": "Read Model",
+            "description": "Consumes events and serves optimized queries.",
+            "tags": [
+              "Performance",
+              "Denormalization",
+              "Eventual Consistency"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Separate write and read models so each can evolve independently.",
+          "Projections build read models by consuming events.",
+          "Read models are eventually consistent; design your UX to tolerate this.",
+          "You can have multiple projections for different query needs."
+        ],
+        "takeaway": "CQRS with event sourcing gives you a correct write model and as many optimized read models as you need."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "event-sourcing-fundamentals",
+    "event-store-design"
+  ],
+  "furtherReading": [
+    {
+      "title": "CQRS Pattern - Microsoft Azure Architecture Center",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs",
+      "type": "article"
+    },
+    {
+      "title": "CQRS - Martin Fowler",
+      "url": "https://martinfowler.com/bliki/CQRS.html",
+      "type": "article"
+    }
+  ]
+}

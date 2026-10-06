@@ -1,0 +1,134 @@
+{
+  "id": "lesson-redis-044",
+  "slug": "connection-pooling",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Connection Pooling Deep Dive",
+  "description": "Learn how Redis connection pools work, when to tune them, and how to avoid exhaustion under high concurrency.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "connection-pool", "concurrency", "performance", "networking"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Establishing a TCP connection to Redis involves a handshake, authentication, and buffer allocation. Under high concurrency, creating a new connection per request is expensive and can exhaust file descriptors. Connection pooling solves this by maintaining a reusable set of open connections. Clients borrow a connection, execute commands, and return it to the pool instead of closing it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How Pooling Works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A typical pool has a minimum size (connections kept warm), a maximum size (connections allowed in total), and an idle timeout (how long a connection can sit unused before being closed). When your application needs a connection, it borrows one from the pool. If all connections are busy and the pool is at maximum size, the request blocks until a connection is returned. This back-pressure prevents your application from overwhelming Redis with too many simultaneous requests."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "connection-pool-flow",
+        "caption": "Application borrowing and returning connections from a pool",
+        "definition": "flowchart LR\n    App1[\"Thread 1\"] -->|borrow| Pool[\n    App2[\"Thread 2\"] -->|borrow| Pool\n    App3[\"Thread 3\"] -->|borrow| Pool\n    Pool -->|reuse| Redis[\"Redis Server\"]\n    App1 -->|return| Pool\n    App2 -->|return| Pool\n    App3 -->|return| Pool"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Tuning Pool Size"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The optimal pool size depends on your workload and Redis configuration. Redis is single-threaded per instance, so a pool larger than the number of CPU cores on the Redis server rarely helps. A common starting point is 2-4 connections per application instance, scaled by the number of application servers. For .NET applications using StackExchange.Redis, the default pool is 5 per endpoint; for Node.js ioredis, the default is 1."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring connection pool in StackExchange.Redis (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar options = new ConfigurationOptions\n{\n    EndPoints = { { \"localhost\", 6379 } },\n    // Pool settings\n    PoolSize = 10,\n    ConnectTimeout = 5000,\n    KeepAlive = 180,\n    // Retry on transient failures\n    AbortOnConnectFail = false,\n    SyncTimeout = 5000\n};\n\n// ConnectionMultiplexer is itself a connection pool\nConnectionMultiplexer mux = ConnectionMultiplexer.Connect(options);\nIDatabase db = mux.GetDatabase();\n\n// Dispose when the app shuts down\nawait mux.DisposeAsync();"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connection pooling with ioredis (Node.js)",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\n\n// Create a shared pool\nconst redis = new Redis({\n  host: 'localhost',\n  port: 6379,\n  // Connection pool settings\n  maxRetriesPerRequest: 3,\n  retryStrategy: (times) => {\n    const delay = Math.min(times * 50, 2000);\n    return delay;\n  },\n  // Keep-alive helps detect dead connections\n  keepAlive: true,\n  keepAliveTimeout: 60000\n});\n\n// ioredis manages a pool per instance\nredis.set('pool:status', 'healthy');\n\nasync function shutdown() {\n  await redis.quit();\n  console.log('Redis pool closed');\n}\nprocess.on('SIGINT', shutdown);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Connection Leaks",
+        "text": "If your code opens connections and never returns them to the pool, you will eventually hit the pool limit and block new requests. Always use using statements in C# or try-finally patterns in Node.js to ensure connections are returned."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Monitoring Pool Health"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Track how often borrowers wait for a connection",
+          "Alert when pool utilization exceeds 80%",
+          "Log connection failures and retry storms",
+          "Use keep-alive to detect stale connections before use"
+        ],
+        "title": "What to monitor"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Metric", "Healthy Range", "Action if Breached"],
+        "rows": [
+          ["Pool utilization", "< 80%", "Increase max pool size or investigate slow commands"],
+          ["Wait time for borrow", "< 50ms", "Reduce pool size or add more Redis instances"],
+          ["Connection failures", "0%", "Check Redis availability and network"],
+          ["Idle connection count", "> min pool size", "Lower keep-alive timeout"]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Connection pooling eliminates per-request handshake overhead",
+          "Pool size should be tuned to workload, not maximized",
+          "Monitor wait times and utilization to catch leaks early",
+          "Keep-alive detects dead connections before they cause errors"
+        ],
+        "takeaway": "A well-tuned connection pool removes networking jitter from your Redis performance. Start with conservative sizes, monitor utilization, and scale only when metrics show contention."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "StackExchange.Redis Configuration", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#configuration", "type": "article" },
+        { "title": "ioredis Connection Options", "url": "https://github.com/luin/ioredis/blob/master/API.md#new_Redis", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "StackExchange.Redis Configuration", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#configuration", "type": "article" },
+    { "title": "ioredis Connection Options", "url": "https://github.com/luin/ioredis/blob/master/API.md#new_Redis", "type": "article" }
+  ]
+}

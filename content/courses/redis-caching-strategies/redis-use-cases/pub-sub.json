@@ -1,0 +1,114 @@
+{
+  "id": "lesson-redis-027",
+  "slug": "pub-sub",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Redis Pub/Sub for Real-Time Messaging",
+  "description": "Use Redis Pub/Sub to broadcast messages between services, build live notifications, and implement event-driven architectures.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "pub-sub", "messaging", "events", "notifications"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Redis Pub/Sub is a lightweight messaging primitive that lets one process publish messages to a channel while any number of other processes subscribe to that channel and receive every message in real time. It is not a durable message queue like RabbitMQ or Kafka; messages are fire-and-forget, and subscribers only receive messages while they are actively connected. For live notifications, chat, and event broadcasting, however, Redis Pub/Sub is fast, simple, and very effective." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Publishers, Subscribers, and Channels" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Channels are identified by string names, much like topics in other messaging systems. Any client can publish to any channel without prior registration. Subscribers listen on one or more channels and receive every message published to those channels. Redis pushes messages to subscribers as they arrive, so latency is typically sub-millisecond." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "warning", "title": "No Message Persistence", "text": "If no subscriber is listening when a message is published, the message is lost. Redis Pub/Sub does not queue messages for later delivery. If you need durability or replay, use Redis Streams instead." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Implementing Pub/Sub in Code" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "StackExchange.Redis provides an event-based subscriber API.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class NotificationService : BackgroundService\n{\n    private readonly IConnectionMultiplexer _redis;\n\n    public NotificationService(IConnectionMultiplexer redis)\n    {\n        _redis = redis;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        var sub = _redis.GetSubscriber();\n\n        await sub.SubscribeAsync(\"notifications\", (channel, message) =>\n        {\n            Console.WriteLine($\"Received: {message}\");\n        });\n\n        // Keep the service running\n        await Task.Delay(Timeout.Infinite, stoppingToken);\n    }\n\n    public async Task PublishAsync(string message)\n    {\n        var sub = _redis.GetSubscriber();\n        await sub.PublishAsync(\"notifications\", message);\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis",
+        "content": "ioredis supports both callback and event-based pub/sub.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst sub = new Redis();\nconst pub = new Redis();\n\nsub.subscribe('notifications', (err, count) => {\n  if (err) console.error('Failed to subscribe:', err);\n});\n\nsub.on('message', (channel, message) => {\n  console.log(`Received on ${channel}: ${message}`);\n});\n\n// Publish a message\nasync function sendNotification(message) {\n  await pub.publish('notifications', message);\n}\n\nsendNotification('New order received!');"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "pubsub-topology",
+        "caption": "Redis Pub/Sub topology with one publisher and multiple subscribers.",
+        "definition": "flowchart LR\n    P[Publisher Service] -->|PUBLISH| C[Redis Channel]\n    C -->|Push| S1[Subscriber: Email Service]\n    C -->|Push| S2[Subscriber: SMS Service]\n    C -->|Push| S3[Subscriber: Analytics]\n    S1 -->|Send| U1[User receives email]\n    S2 -->|Send| U2[User receives SMS]\n    S3 -->|Store| DB[(Database)]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Pattern Matching with PSUBSCRIBE" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Redis supports glob-style pattern subscriptions. Instead of subscribing to a single channel, you can subscribe to a pattern like user:* and receive messages from every channel that matches. This is useful when you want a service to listen to a family of related events without subscribing individually." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Channel", "definition": "A named conduit for messages. Publishers send to channels; subscribers receive from them." },
+          { "term": "Pattern subscription", "definition": "A subscription to a glob-style pattern that matches multiple channel names." },
+          { "term": "Pub/Sub", "definition": "Publish/Subscribe. A messaging pattern where senders publish to channels and receivers subscribe to channels." }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "What is the maximum message size?", "answer": "Redis does not enforce a strict message size limit for Pub/Sub, but very large messages can degrade performance. Keep messages small, and store larger payloads in Redis or your database, sending only references or IDs over Pub/Sub." },
+          { "question": "Can I have multiple Redis instances for Pub/Sub?", "answer": "Subscribers only receive messages from the Redis instance they are connected to. If you publish to a different instance, those subscribers will not see the message. Ensure all publishers and subscribers connect to the same Redis instance or cluster." },
+          { "question": "Is Pub/Sub reliable?", "answer": "No. Pub/Sub is best-effort. If a subscriber disconnects, it misses any messages published during the disconnection window. For guaranteed delivery, use Redis Streams or a dedicated message broker." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis Pub/Sub provides sub-millisecond, fire-and-forget messaging.",
+          "Messages are not persisted; disconnected subscribers miss messages.",
+          "Use pattern subscriptions to listen to multiple related channels with one subscription.",
+          "For durability, consider Redis Streams or a dedicated message queue."
+        ],
+        "takeaway": "Redis Pub/Sub is ideal for live notifications and event broadcasting where speed matters more than guaranteed delivery."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Pub/Sub Documentation", "url": "https://redis.io/docs/latest/develop/interact/pub-sub/", "type": "article" },
+        { "title": "Redis Streams vs Pub/Sub", "url": "https://redis.io/docs/latest/develop/data-types/streams/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Pub/Sub Documentation", "url": "https://redis.io/docs/latest/develop/interact/pub-sub/", "type": "article" },
+    { "title": "Redis Streams vs Pub/Sub", "url": "https://redis.io/docs/latest/develop/data-types/streams/", "type": "article" }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "id": "lesson-sd-rate-limiter",
+  "slug": "design-rate-limiter",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a distributed rate limiter.",
+  "description": "Rate limiting system with per-user and per-API limits across multiple servers using Redis.",
+  "order": 12,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["interview", "system-design", "rate-limiting", "distributed"],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a distributed rate limiter that works across multiple servers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Per-user rate limits (e.g., 100 requests per minute)",
+          "Per-API endpoint rate limits",
+          "Distributed enforcement across multiple servers",
+          "Support for different time windows (second, minute, hour)",
+          "Graceful degradation when the rate limiter is unavailable",
+          "Burst allowance for legitimate traffic spikes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limiting Algorithms"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Three common algorithms are token bucket, leaky bucket, and fixed window counter. Each has different trade-offs for burst handling, memory usage, and distributed accuracy."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-rate-arch",
+        "caption": "Distributed rate limiter architecture with Redis",
+        "definition": "graph TD\n    A[Client] --> B[API Gateway]\n    B --> C{Rate Check}\n    C -->|Allowed| D[Backend Service]\n    C -->|Denied| E[429 Response]\n\n    F[Redis Cluster] --> G[User Buckets]\n    F --> H[API Buckets]\n\n    I[Admin API] --> J[Rules Service]\n    J --> F\n\n    K[Rate Limit Config DB] --> J"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Entity", "Key Fields", "Description"],
+        "rows": [
+          ["RateLimitRule", "rule_id, key_type, window_seconds, max_requests", "Defines a rate limit policy"],
+          ["RateLimitCounter", "key, window_start, request_count, ttl", "Tracks current usage per key"],
+          ["ApiConfig", "endpoint, limit_per_min, burst_size, enabled", "Per-endpoint configuration"],
+          ["UserTier", "user_id, tier, custom_limits", "Custom limits per user tier"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Clock Skew",
+        "text": "Distributed rate limiters are sensitive to clock skew between servers. Use Redis sorted sets with timestamps rather than relying on local clocks."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Edge Cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Edge Cases",
+        "items": [
+          "Burst traffic at window boundaries",
+          "Distributed Redis node failures and failover",
+          "Clock skew between rate limiter instances",
+          "Backend service unavailable while Redis is healthy",
+          "High cardinality keys causing Redis memory pressure"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Algorithm Trade-offs",
+        "cards": [
+          {
+            "title": "Token Bucket",
+            "description": "Tokens accumulate at a fixed rate. Requests consume tokens. Allows bursts up to bucket capacity.",
+            "pros": ["Handles bursts naturally", "Simple implementation"],
+            "cons": ["Distributed accuracy requires atomic operations"]
+          },
+          {
+            "title": "Leaky Bucket",
+            "description": "Requests queue and are processed at a fixed rate. Smooths traffic but adds latency.",
+            "pros": ["Enforces constant rate", "Predictable latency"],
+            "cons": ["Rejects bursts", "Requires queue management"]
+          },
+          {
+            "title": "Fixed Window",
+            "description": "Counts requests in fixed time windows. Simple but vulnerable to boundary bursts.",
+            "pros": ["Simple and memory-efficient", "Easy to reason about"],
+            "cons": ["Burst at window edges", "Not burst-friendly"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Horizontal Scaling Strategies",
+        "items": [
+          "Use Redis cluster with consistent hashing for key distribution",
+          "Set TTL on all counters to prevent unbounded memory growth",
+          "Replicate Redis for read-heavy workloads and high availability",
+          "Cache rate limit rules locally with periodic refresh",
+          "Implement fallback to local counters when Redis is unavailable"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you prevent Redis from becoming a bottleneck?",
+            "answer": "Use Redis cluster sharding, pipeline multiple commands, and implement local caching with eventual consistency for non-critical limits."
+          },
+          {
+            "question": "How do you handle rate limiting for authenticated versus anonymous users?",
+            "answer": "Use user ID for authenticated users and IP address for anonymous users. Apply stricter limits to anonymous traffic to prevent abuse."
+          },
+          {
+            "question": "What happens when Redis goes down?",
+            "answer": "Implement a fail-open or fail-closed strategy based on risk tolerance. For critical APIs, fail-closed with cached rules. For less critical APIs, fail-open with local counters."
+          },
+          {
+            "question": "How do you handle microservice-to-microservice rate limiting?",
+            "answer": "Use mTLS-based service identity and apply rate limits per service account. Consider circuit breakers in addition to rate limiting."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Token bucket is the most common algorithm for flexible rate limiting",
+          "Redis provides atomic operations needed for distributed counters",
+          "Always set TTLs on counters to prevent memory leaks",
+          "Implement graceful degradation when the rate limiter is unavailable",
+          "Use different strategies for user-based and IP-based limits"
+        ],
+        "takeaway": "Distributed rate limiters require atomic operations, careful clock handling, and graceful degradation to remain accurate under high concurrency."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "interview-qa"
+}

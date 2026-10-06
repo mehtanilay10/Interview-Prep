@@ -1,0 +1,230 @@
+{
+  "id": "lesson-msa-019",
+  "slug": "rate-limiting-strategies",
+  "moduleSlug": "api-gateway-patterns",
+  "courseSlug": "microservices-architecture",
+  "title": "Rate Limiting Strategies",
+  "description": "Apply rate limiting algorithms to protect services.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": [
+    "rate-limiting",
+    "algorithms",
+    "throttling"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limiting protects services from abuse and overload. Different algorithms offer different trade-offs between accuracy and complexity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Concepts"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Rate Limiting",
+            "definition": "Restricting the number of requests a client can make."
+          },
+          {
+            "term": "Token Bucket",
+            "definition": "An algorithm that allows bursts up to a bucket capacity."
+          },
+          {
+            "term": "Leaky Bucket",
+            "definition": "An algorithm that processes requests at a constant rate."
+          },
+          {
+            "term": "Sliding Window",
+            "definition": "An algorithm that counts requests in a moving time window."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limiting Algorithms"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Algorithm",
+          "Description",
+          "Pros",
+          "Cons"
+        ],
+        "rows": [
+          [
+            "Fixed Window",
+            "Count per fixed time window",
+            "Simple",
+            "Bursts at window edges"
+          ],
+          [
+            "Sliding Window",
+            "Count per moving window",
+            "Accurate",
+            "More memory"
+          ],
+          [
+            "Token Bucket",
+            "Tokens refill at rate",
+            "Allows bursts",
+            "Complex"
+          ],
+          [
+            "Leaky Bucket",
+            "Constant outflow",
+            "Smooths traffic",
+            "No bursts"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Bucket"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The token bucket algorithm maintains a bucket of tokens. Each request consumes a token. Tokens refill at a fixed rate. If the bucket is empty, requests are rejected. This allows bursts up to the bucket size."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Gateway-level rate limiting",
+          "Service-level rate limiting",
+          "User-level, IP-level, API-key-level",
+          "Distributed rate limiting with Redis"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Response Headers"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "X-RateLimit-Limit: total allowed",
+          "X-RateLimit-Remaining: remaining requests",
+          "X-RateLimit-Reset: when limit resets",
+          "Retry-After: when to retry"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "msa-token-bucket",
+        "caption": "Token Bucket Algorithm",
+        "definition": "flowchart TD\n    Request[Request] --> Check{Tokens > 0?}\n    Check -->|Yes| Consume[Consume Token]\n    Consume --> Allow[Allow Request]\n    Check -->|No| Reject[Reject 429]\n    Refill[Refill Timer] -->|Add Tokens| Bucket[(Token Bucket)]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token Bucket in Redis",
+        "content": "Implementing token bucket with Redis.",
+        "code": "const tokenBucket = async (key, maxTokens, refillRate) => {\n  const now = Date.now();\n  const result = await redis.eval(`\n    local tokens = tonumber(redis.call(\"get\", KEYS[1]) or ARGV[1])\n    local last = tonumber(redis.call(\"get\", KEYS[2]) or ARGV[2])\n    local delta = math.max(0, ARGV[2] - last)\n    local refill = delta * ARGV[3] / 1000\n    tokens = math.min(ARGV[1], tokens + refill)\n    if tokens >= 1 then\n      tokens = tokens - 1\n      redis.call(\"set\", KEYS[1], tokens)\n      redis.call(\"set\", KEYS[2], ARGV[2])\n      return 1\n    end\n    return 0\n  `, 2, key .. \":tokens\", key .. \":ts\", maxTokens, now, refillRate);\n  return result === 1;\n};",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Best Practices"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Design for failure",
+          "Keep services loosely coupled",
+          "Monitor and observe everything",
+          "Automate testing and deployment"
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Implement Rate Limiter",
+        "description": "Implement a rate limiter using token bucket.",
+        "steps": [
+          "Implement token bucket algorithm",
+          "Store state in Redis",
+          "Add response headers",
+          "Test burst handling",
+          "Test refill rate"
+        ],
+        "expectedOutcome": "A working rate limiter with headers"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": []
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Rate limiting protects services",
+          "Token bucket allows bursts",
+          "Sliding window is most accurate"
+        ],
+        "takeaway": "Choose rate limiting algorithm based on burst tolerance and accuracy needs."
+      }
+    }
+  ]
+}

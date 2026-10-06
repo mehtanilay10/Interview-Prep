@@ -1,0 +1,209 @@
+{
+  "id": "lesson-redis-037",
+  "slug": "ioredis",
+  "moduleSlug": "caching-in-nodejs",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Using the ioredis Client",
+  "description": "Connect to Redis from Node.js using ioredis and perform caching operations with its fluent API.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "ioredis",
+    "redis",
+    "nodejs",
+    "client"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`ioredis` is a robust, full-featured Redis client for Node.js. It supports Redis Cluster, Sentinel, pipelining, Lua scripting, and pub/sub out of the box. With over 14 million weekly downloads, it is the most widely adopted Redis client in the Node.js ecosystem and serves as the backbone for production caching layers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Installing ioredis",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Install ioredis via npm or yarn. No native compilation is required, so it works reliably across operating systems and CI environments."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Installation",
+        "content": "Add ioredis to your project with npm or yarn.",
+        "language": "bash",
+        "code": "npm install ioredis\n# or\nyarn add ioredis"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Creating a Client",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Create a Redis connection by instantiating `Redis` with a connection string or individual options. The `lazyConnect` option defers the connection until the first command runs, which helps avoid startup failures in serverless environments."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic ioredis client",
+        "content": "Connect to Redis using a connection string.",
+        "language": "typescript",
+        "code": "import Redis from 'ioredis';\n\nconst redis = new Redis({\n  host: 'localhost',\n  port: 6379,\n  password: process.env.REDIS_PASSWORD,\n  lazyConnect: true,\n  retryStrategy: (times) => {\n    const delay = Math.min(times * 50, 2000);\n    return delay;\n  },\n});\n\nawait redis.connect();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Core Caching Operations",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ioredis exposes familiar Redis commands as methods. The `set` command accepts an `EX` option for TTL in seconds. The `get` command returns a Promise that resolves to `null` on a miss. Because ioredis uses Promises, async/await integrates cleanly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache get and set with TTL",
+        "content": "Store and retrieve values with automatic expiry.",
+        "language": "typescript",
+        "code": "const CACHE_KEY = 'product:101';\nconst TTL_SECONDS = 300;\n\n// Set with TTL\nawait redis.set(CACHE_KEY, JSON.stringify({ id: 101, name: 'Widget', price: 29.99 }), 'EX', TTL_SECONDS);\n\n// Get\nconst raw = await redis.get(CACHE_KEY);\nconst product = raw ? JSON.parse(raw) : null;\n\n// Delete\nawait redis.del(CACHE_KEY);"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-ioredis-commands",
+        "definition": "flowchart LR\n    A[Node.js App] --> B[ioredis Client]\n    B --> C[Redis Server]\n    C -->|SET key value EX 300| D[(Memory Store)]\n    C -->|GET key| D",
+        "caption": "ioredis client communicating with Redis over RESP protocol"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Pipelining for Batch Operations",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you need to execute multiple commands in sequence, pipelining reduces round-trip latency by sending all commands at once and reading all replies together. ioredis supports pipelining via the `pipeline()` method or by passing an array of commands."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pipelining multiple cache writes",
+        "content": "Batch several SET commands into a single network round-trip.",
+        "language": "typescript",
+        "code": "const pipeline = redis.pipeline();\n\npipeline.set('user:1:name', 'Alice', 'EX', 300);\npipeline.set('user:1:email', 'alice@example.com', 'EX', 300);\npipeline.set('user:1:role', 'admin', 'EX', 300);\n\nconst results = await pipeline.exec();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use Batches for Large Datasets",
+        "text": "For sets of 100+ keys, use `redis.pipeline()` in chunks of 50-100 commands. This balances throughput against memory usage in the Redis process."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Error Handling",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis errors fall into two broad categories: connection errors (network failures, timeouts) and command errors (wrong syntax, key type mismatches). Wrapping operations in try/catch blocks and checking `redis.status` ensures your application degrades gracefully."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Robust error handling",
+        "content": "Wrap Redis calls in try/catch and check connection status.",
+        "language": "typescript",
+        "code": "async function getCachedProduct(id: number) {\n  try {\n    const raw = await redis.get(`product:${id}`);\n    if (raw) return JSON.parse(raw);\n\n    // Cache miss — fetch from source\n    const product = await fetchProductFromDB(id);\n    await redis.set(\n      `product:${id}`,\n      JSON.stringify(product),\n      'EX',\n      300\n    );\n    return product;\n  } catch (err) {\n    console.error('Redis error:', err);\n    // Fallback to source without caching\n    return fetchProductFromDB(id);\n  }\n}"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "RESP",
+            "definition": "REdis Serialization Protocol: the wire protocol Redis uses for client-server communication."
+          },
+          {
+            "term": "Pipeline",
+            "definition": "A mechanism to send multiple Redis commands in one round-trip and read all replies together."
+          },
+          {
+            "term": "TTL",
+            "definition": "The expiry duration in seconds set with SET key value EX seconds."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Is ioredis the only Redis client for Node.js?",
+            "answer": "No, alternatives include redis (v4) by Redis Inc. and node_redis (v3). ioredis is favored for its Cluster and Sentinel support."
+          },
+          {
+            "question": "Does ioredis work with Redis Cluster?",
+            "answer": "Yes. Pass a list of startup nodes to the constructor and ioredis handles slot mapping automatically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "ioredis is a full-featured Redis client with Promise and pipeline support.",
+          "Use lazyConnect in serverless environments to avoid startup failures.",
+          "Pipelining reduces round-trip latency for bulk cache operations."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "ioredis GitHub Repository",
+      "url": "https://github.com/redis/ioredis",
+      "type": "tool"
+    },
+    {
+      "title": "Redis Commands Reference",
+      "url": "https://redis.io/docs/latest/commands/",
+      "type": "article"
+    }
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "id": "lesson-redis-008",
+  "slug": "write-through-pattern",
+  "moduleSlug": "caching-patterns",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Write-Through Pattern",
+  "description": "Understand write-through caching, where writes update both Redis and the database atomically for strong consistency.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 13,
+  "tags": [
+    "redis",
+    "caching",
+    "write-through",
+    "consistency",
+    "write-pattern",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Write-through caching ensures that every write operation updates both the cache and the underlying database before the operation is considered complete. Unlike cache-aside, where the application manages both stores separately, write-through treats Redis as a first-class participant in every write."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works",
+        "anchor": "how-it-works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a write-through setup, the application writes new data to Redis first and immediately propagates that write to the database. If either write fails, the operation returns an error. This keeps the cache and database synchronized because every successful write touches both systems in the same request."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Write flow:",
+        "items": [
+          "Application sends a write request with the new value.",
+          "Redis stores the new value under the target key.",
+          "The database is updated with the same new value.",
+          "Only after both writes succeed does the operation return success.",
+          "If either write fails, the application can retry or roll back."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Read flow",
+        "anchor": "read-flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reads simply query Redis because the cache is kept up to date on every write. There is no separate read-through logic. This eliminates cache misses for recently written data, which is a significant advantage over cache-aside."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "write-through-flow",
+        "caption": "Write-through write and read flow",
+        "definition": "sequenceDiagram\n    participant App\n    participant Redis\n    participant DB\n    App->>Redis: SET product:10 <new-data>\n    Redis-->>App: OK\n    App->>DB: UPDATE Products SET ... WHERE Id = 10\n    DB-->>App: Rows affected\n    Note right of App: Both stores now hold the same data\n    App->>Redis: GET product:10\n    Redis-->>App: new-data"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example with IDistributedCache",
+        "anchor": "csharp-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "csharp example",
+        "language": "csharp",
+        "code": "// Write-through in C#\nusing Microsoft.Extensions.Caching.Distributed;\nusing System.Text.Json;\n\npublic class ProductWriteService\n{\n    private readonly IDistributedCache _cache;\n    private readonly AppDbContext _db;\n\n    public ProductWriteService(IDistributedCache cache, AppDbContext db)\n    {\n        _cache = cache;\n        _db = db;\n    }\n\n    public async Task<bool> SaveProductAsync(Product product)\n    {\n        var json = JsonSerializer.Serialize(product);\n        var options = new DistributedCacheEntryOptions\n        {\n            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)\n        };\n\n        await _cache.SetStringAsync($\"product:{product.Id}\", json, options);\n        _db.Products.Update(product);\n        await _db.SaveChangesAsync();\n        return true;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Node.js Example with ioredis",
+        "anchor": "nodejs-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "javascript example",
+        "language": "javascript",
+        "code": "// Write-through in Node.js\nconst Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);\n\nasync function saveProduct(product) {\n  const key = `product:${product.id}`;\n  await redis.setex(key, 900, JSON.stringify(product));\n  await db('products').where('id', product.id).update(product);\n  return true;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Consistency Trade-off",
+        "text": "Write-through gives the strongest consistency guarantees of the patterns in this module, but every write now pays the latency cost of two round-trips. Use it when stale reads are unacceptable."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Write-Through",
+          "Cache-Aside"
+        ],
+        "rows": [
+          [
+            "Write latency",
+            "Higher (two stores)",
+            "Lower (one store)"
+          ],
+          [
+            "Read after write",
+            "Always hits cache",
+            "May miss until repopulated"
+          ],
+          [
+            "Consistency",
+            "Stronger",
+            "Eventual"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Strong Consistency",
+            "definition": "A guarantee that any read after a write returns the most recent value because all stores are updated together."
+          },
+          {
+            "term": "Atomic Write",
+            "definition": "A write operation that either fully completes on all stores or fully fails, with no partial updates."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Questions",
+        "items": [
+          {
+            "question": "What if the database write fails after Redis was updated?",
+            "answer": "The cache now holds data the database does not. Wrap both writes in a transaction or compensating logic. If the database write fails, delete the Redis key and retry the database write."
+          },
+          {
+            "question": "Does write-through work with transactions?",
+            "answer": "It is harder to keep Redis and a relational database in a single ACID transaction. Most implementations use a best-effort approach with compensating deletes on failure."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Write-through updates Redis and the database together on every write.",
+          "Reads are fast because the cache is always fresh.",
+          "Strong consistency comes at the cost of higher write latency.",
+          "Failure handling is more complex than cache-aside."
+        ],
+        "takeaway": "Use write-through when read-after-write consistency matters more than write throughput."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add Write-Through to Settings",
+        "description": "Application settings are read on every request. Writes are rare but must be visible immediately.",
+        "steps": [
+          "Create a Redis-backed write-through service for application settings.",
+          "On write, update Redis first, then the database.",
+          "On read, query Redis only because it always mirrors the latest data.",
+          "Simulate a database failure after a Redis write and add a compensating delete.",
+          "Measure the added latency of the two-store write."
+        ],
+        "expectedOutcome": "Settings are consistent between Redis and the database after every write."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Microsoft: Write-Through Cache Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/write-through-cache",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Cloud design pattern reference for write-through caching."
+    },
+    {
+      "title": "Redis: Caching with Strong Consistency",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Guidance on consistency models when using Redis as a cache."
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import { logger } from '@/lib/logger';
 
 const STORAGE_KEY = 'interview_prep_theme';
 
@@ -27,7 +28,7 @@ async function syncThemeToServer(theme: Theme): Promise<void> {
       body: JSON.stringify({ theme }),
     });
   } catch (err) {
-    console.warn('[useUserTheme] Failed to sync to server', err);
+    logger.warn('useUserTheme', 'Failed to sync to server', err);
   }
 }
 

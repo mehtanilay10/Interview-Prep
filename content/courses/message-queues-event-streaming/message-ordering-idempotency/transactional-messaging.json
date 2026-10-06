@@ -1,0 +1,167 @@
+{
+  "id": "lesson-mqes-017",
+  "slug": "transactional-messaging",
+  "moduleSlug": "message-ordering-idempotency",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Transactional Messaging",
+  "description": "Use transactions to make message production and consumption atomic with your database operations.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 16,
+  "tags": [
+    "transactions",
+    "outbox-pattern",
+    "atomicity",
+    "consistency",
+    "distributed-systems"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Transactional messaging ensures that producing or consuming a message and updating a database happen atomically. Without transactions, a system can end up in an inconsistent state: the database might be updated but the message lost, or the message sent but the database unchanged. The outbox pattern and transactional consumers are the primary tools for solving this."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Problem Without Transactions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common inconsistency scenarios",
+        "items": [
+          "Application updates the database but crashes before publishing the message",
+          "Application publishes the message but the database write fails",
+          "Consumer processes the message and crashes before committing the database transaction",
+          "Consumer commits the database but crashes before acknowledging the message, causing redelivery"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Outbox Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The outbox pattern solves the producer side of the problem. Instead of writing to the database and then publishing to the broker in two separate steps, the application writes both the business entity and the outgoing message to the same database transaction. A separate process polls the outbox table and publishes pending messages to the broker."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Outbox pattern with EF Core",
+        "content": "Save the business entity and the outbox message in a single DbContext transaction.",
+        "language": "csharp",
+        "code": "public class OrderService\n{\n    private readonly AppDbContext _db;\n\n    public async Task PlaceOrderAsync(PlaceOrderCommand cmd)\n    {\n        var order = new Order { /* ... */ };\n        var outbox = new OutboxMessage\n        {\n            Id = Guid.NewGuid(),\n            Topic = \"orders.created\",\n            Payload = JsonSerializer.Serialize(order),\n            CreatedAt = DateTime.UtcNow\n        };\n\n        await using var tx = await _db.Database.BeginTransactionAsync();\n        try\n        {\n            await _db.Orders.AddAsync(order);\n            await _db.OutboxMessages.AddAsync(outbox);\n            await _db.SaveChangesAsync();\n            await tx.CommitAsync();\n        }\n        catch\n        {\n            await tx.RollbackAsync();\n            throw;\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-outbox-pattern",
+        "caption": "Outbox pattern ensuring atomic database write and message production",
+        "definition": "flowchart TD\n    A[Client Request] --> B[Application Service]\n    B --> C{Same DB Transaction?}\n    C -->|Yes| D[Write Order + Outbox Message]\n    D --> E[Transaction Commit]\n    E --> F[Outbox Relay Process]\n    F -->|Polls| G[Outbox Table]\n    G -->|Publishes| H[Message Broker]\n    H --> I[Downstream Consumer]\n    C -->|No| X[Inconsistent State]\n    style E fill:#e8f5e9\n    style X fill:#ffebee"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transactional Consumer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "On the consumer side, a transactional consumer reads a message and commits the database update in the same transaction. If the database write fails, the consumer does not acknowledge the message, and the broker redelivers it. Kafka's transactional consumer API is the most widely used implementation of this pattern."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Kafka transactional consumer",
+        "content": "Use KafkaJS consumer in a transactional group to process and commit atomically.",
+        "language": "javascript",
+        "code": "const { Kafka } = require('kafkajs');\nconst { Pool } = require('pg');\n\nconst kafka = new Kafka({ brokers: ['localhost:9092'] });\nconst consumer = kafka.consumer({ groupId: 'order-processors' });\nconst db = new Pool({ connectionString: process.env.DATABASE_URL });\n\nasync function run() {\n  await consumer.connect();\n  await consumer.subscribe({ topic: 'orders.created', fromBeginning: false });\n\n  await consumer.run({\n    eachMessage: async ({ message }) => {\n      const client = await db.connect();\n      try {\n        await client.query('BEGIN');\n\n        const order = JSON.parse(message.value);\n        await client.query(\n          'INSERT INTO processed_orders (id, data) VALUES ($1, $2)',\n          [order.id, JSON.stringify(order)]\n        );\n\n        await client.query('COMMIT');\n        await consumer.commitOffsets([{ topic: 'orders.created', partition: message.partition, offset: message.offset }]);\n      } catch (err) {\n        await client.query('ROLLBACK');\n        console.error('Processing failed, message will be redelivered:', err);\n      } finally {\n        client.release();\n      }\n    }\n  });\n}\n\nrun();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Inbox Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The inbox pattern is the consumer-side counterpart to the outbox. Before processing a message, the consumer inserts it into an inbox table within a transaction. A scheduler then processes inbox entries exactly once, avoiding duplicates from redelivery. This is particularly useful when the consumer is a public API that cannot trust the broker's redelivery behavior."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Idempotency Still Required",
+        "text": "Transactional messaging prevents most inconsistencies, but broker restarts, network partitions, and human error can still introduce edge cases. Keep idempotent consumers as a safety net."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Outbox pattern",
+            "definition": "Saving outgoing messages in the same database transaction as the business entity, then relayed to a broker by a background process."
+          },
+          {
+            "term": "Transactional consumer",
+            "definition": "A consumer that processes a message and commits the result in a single atomic transaction."
+          },
+          {
+            "term": "Inbox pattern",
+            "definition": "Saving incoming messages to an inbox table before processing, enabling exactly-once processing from the consumer side."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "The outbox pattern atomically writes data and messages to the broker",
+          "Transactional consumers tie message acknowledgment to database commits",
+          "The inbox pattern protects consumers from duplicate redelivery",
+          "Transactions reduce but do not eliminate the need for idempotency"
+        ],
+        "takeaway": "Transactional messaging is the structural solution to consistency. Combine it with idempotency for a robust, production-ready message pipeline."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka: Transactions",
+      "url": "https://kafka.apache.org/documentation/#transactions",
+      "type": "article",
+      "author": "Apache Kafka",
+      "description": "How Kafka transactional producers and consumers achieve exactly-once semantics."
+    },
+    {
+      "title": "Martin Fowler: The Outbox Pattern",
+      "url": "https://www.martinfowler.com/eaaCatalog/transactionalOutbox.html",
+      "type": "article",
+      "author": "Martin Fowler",
+      "description": "The classic pattern description for reliable message production in distributed systems."
+    }
+  ]
+}

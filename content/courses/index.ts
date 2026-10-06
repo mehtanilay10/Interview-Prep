@@ -1,5 +1,6 @@
 import type { Course } from "@/types";
 
+import apiDesignCourse from "../problems/api-design/content.json";
 import apolloCourse from "./apollo/content.json";
 import architectureDecisionLabProblemsCourse from "../problems/architecture-decision-lab-problems/content.json";
 import aspnetCoreCourse from "./aspnet-core/content.json";
@@ -15,6 +16,7 @@ import cheatsheetCourse from "../cheatsheet/content.json";
 import cleanCodeCsharpCourse from "./clean-code-csharp/content.json";
 import csharpCourse from "../problems/csharp/content.json";
 import csharpFundamentalsCourse from "./csharp-fundamentals/content.json";
+import databaseDesignCourse from "../problems/database-design/content.json";
 import designPatternsCourse from "./design-patterns/content.json";
 import devopsCourse from "./devops/content.json";
 import dotnetAiBackendCourse from "./dotnet-ai-backend/content.json";
@@ -29,6 +31,8 @@ import hldCourse from "../problems/hld/content.json";
 import interviewQaCourse from "../interview-qa/content.json";
 import linqCourse from "./linq/content.json";
 import lldCourse from "../problems/lld/content.json";
+import messageQueuesEventStreamingCourse from "./message-queues-event-streaming/content.json";
+import microservicesArchitectureCourse from "./microservices-architecture/content.json";
 import nextJsFullStackReactCourse from "./next-js-full-stack-react/content.json";
 import oopsConceptsCourse from "./oops-concepts/content.json";
 import postgresqlCourse from "./postgresql/content.json";
@@ -39,18 +43,21 @@ import reactAdvancedPatternsCourse from "./react-advanced-patterns/content.json"
 import reactFundamentalsCourse from "./react-fundamentals/content.json";
 import reactQueryCourse from "./react-query/content.json";
 import reactTestingCourse from "./react-testing/content.json";
+import redisCachingStrategiesCourse from "./redis-caching-strategies/content.json";
 import reduxCourse from "./redux/content.json";
 import seniorCodeReviewLabProblemsCourse from "../problems/senior-code-review-lab-problems/content.json";
 import seniorSoftwareEngineeringCourse from "./senior-software-engineering/content.json";
 import sqlCourse from "../problems/sql/content.json";
 import sqlServerCourse from "./sql-server/content.json";
 import systemDesignCourse from "../problems/system-design/content.json";
+import systemDesignInterviewsCourse from "./system-design-interviews/content.json";
 import systemDesignProblemsCourse from "../problems/system-design-problems/content.json";
 import typescriptForReactCourse from "./typescript-for-react/content.json";
 import unitTestingDotnetCourse from "./unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";
 
 const rawCoursesPart1 = [
+	apiDesignCourse,
 	apolloCourse,
 	architectureDecisionLabProblemsCourse,
 	aspnetCoreCourse,
@@ -66,6 +73,7 @@ const rawCoursesPart1 = [
 	cleanCodeCsharpCourse,
 	csharpCourse,
 	csharpFundamentalsCourse,
+	databaseDesignCourse,
 	designPatternsCourse,
 	devopsCourse,
 	dotnetAiBackendCourse,
@@ -80,6 +88,8 @@ const rawCoursesPart1 = [
 	interviewQaCourse,
 	linqCourse,
 	lldCourse,
+	messageQueuesEventStreamingCourse,
+	microservicesArchitectureCourse,
 	nextJsFullStackReactCourse,
 	oopsConceptsCourse,
 	postgresqlCourse,
@@ -90,12 +100,14 @@ const rawCoursesPart1 = [
 	reactFundamentalsCourse,
 	reactQueryCourse,
 	reactTestingCourse,
+	redisCachingStrategiesCourse,
 	reduxCourse,
 	seniorCodeReviewLabProblemsCourse,
 	seniorSoftwareEngineeringCourse,
 	sqlCourse,
 	sqlServerCourse,
 	systemDesignCourse,
+	systemDesignInterviewsCourse,
 	systemDesignProblemsCourse,
 	typescriptForReactCourse,
 	unitTestingDotnetCourse,

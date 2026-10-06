@@ -1,0 +1,186 @@
+{
+  "id": "lesson-redis-033",
+  "slug": "response-caching",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Response Caching Middleware",
+  "description": "Configure the ASP.NET Core response caching middleware to cache entire HTTP responses based on headers and cache profiles.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "asp.net core",
+    "response-caching",
+    "middleware",
+    "http-caching"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Response Caching?",
+        "anchor": "what-is-response-caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Response caching stores an entire HTTP response — headers and body — so that the server skips executing the endpoint logic on subsequent requests. Unlike data caching, where you cache a single object, response caching operates at the HTTP layer. It respects standard HTTP cache headers like Cache-Control and Vary, making it interoperable with CDNs and reverse proxies."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core includes a built-in Response Caching Middleware that stores responses in an IResponseCache implementation. The default stores entries in memory, but you can swap in a Redis-backed implementation for a distributed response cache across multiple server instances."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "ResponseCache Middleware",
+            "definition": "Middleware that stores and serves cached HTTP responses based on request headers and cache policies."
+          },
+          {
+            "term": "Cache-Control",
+            "definition": "An HTTP response header that declares whether a response is cacheable, for how long, and by whom."
+          },
+          {
+            "term": "Vary",
+            "definition": "An HTTP header that tells the cache to store separate responses for different values of a given header (e.g., Accept-Encoding)."
+          },
+          {
+            "term": "Cache Profile",
+            "definition": "A named set of response cache options defined in configuration and applied via the [ResponseCache] attribute."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enabling Response Caching",
+        "anchor": "enabling-response-caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add the middleware in the request pipeline before authorization middleware. Response caching only works for GET or HEAD requests and requires the Cache-Control header to be set by the endpoint or action."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Response Caching Middleware",
+        "content": "Enable the middleware and add a named cache profile in configuration.",
+        "code": "// Program.cs\nbuilder.Services.AddResponseCaching(options =>\n{\n    options.MaximumBodySize = 64 * 1024; // 64 KB\n    options.UseCaseSensitivePaths = false;\n});\n\nbuilder.Services.AddOptions<ResponseCacheOptions>()\n    .Configure<IConfiguration>((options, config) =>\n    {\n        options.DefaultExpiration = TimeSpan.FromSeconds(30);\n    });\n\nvar app = builder.Build();\napp.UseResponseCaching(); // Before routing / auth",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Applying Response Cache to an Endpoint",
+        "content": "Use the ResponseCache attribute or a cache profile to control caching behavior per endpoint.",
+        "code": "// In a controller or minimal API\n[ResponseCache(CacheProfileName = \"StaticProducts\")]\n[HttpGet(\"api/products\")]\npublic async Task<IActionResult> GetProducts()\n{\n    var products = await _service.GetAllAsync();\n    return Ok(products);\n}\n\n// In Program.cs configuration\nbuilder.Services.AddControllersWithViews(options =>\n{\n    options.CacheProfileNames.Add(\"StaticProducts\", new CacheProfile\n    {\n        Duration = \"60\",\n        Location = ResponseCacheLocation.Any,\n        VaryByHeader = \"Accept-Encoding\",\n        NoStore = false\n    });\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Authorization Prevents Caching",
+        "text": "By default, responses to authorized requests are never cached. The middleware skips caching when an Authorization header is present unless you explicitly set VaryByQueryKeys or use a custom policy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Response Cache Flow",
+        "anchor": "response-cache-flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "response-cache-flow",
+        "caption": "Response caching middleware request processing",
+        "definition": "flowchart TD\n    A[Incoming GET Request] --> B[Check Response Cache]\n    B -->|Hit| C[Return Cached Response]\n    B -->|Miss| D{Has Authorization Header?}\n    D -->|Yes| E[Skip Cache, Execute Endpoint]\n    D -->|No| F[Execute Endpoint Logic]\n    F --> G{Response Cacheable?}\n    G -->|Yes| H[Store Response in Cache]\n    G -->|No| I[Return Response, Do Not Cache]\n    H --> J[Return Response to Client]\n    I --> J\n    E --> J\n    C --> J"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "VaryByQueryKeys",
+        "anchor": "varyby-query-keys"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When your endpoint returns different content based on query parameters, use VaryByQueryKeys to store separate cached responses for each distinct query combination. This is critical for search endpoints, filtered lists, and paginated APIs."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "VaryByQueryKeys Example",
+        "content": "Cache a separate response for each unique search query.",
+        "code": "[ResponseCache(VaryByQueryKeys = new[] { \"search\", \"category\" }, Duration = 120)]\n[HttpGet(\"api/products\")]\npublic async Task<IActionResult> SearchProducts(\n    [FromQuery] string? search,\n    [FromQuery] string? category)\n{\n    var results = await _service.SearchAsync(search, category);\n    return Ok(results);\n}\n// GET /api/products?search=laptop&category=electronics\n// => cached separately from ?search=phone&category=electronics",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Response caching operates at the HTTP layer, caching full responses",
+          "Only GET and HEAD requests are cached by default",
+          "Cache profiles centralize settings and can be shared across endpoints",
+          "VaryByQueryKeys creates separate cache entries per query combination",
+          "Authorized requests are not cached unless explicitly configured"
+        ],
+        "takeaway": "Response caching is ideal for public, read-heavy GET endpoints with consistent output."
+      }
+    },
+    {
+      "type": "further-reading",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Response caching in ASP.NET Core",
+            "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/response",
+            "type": "article"
+          },
+          {
+            "title": "HTTP caching semantics (MDN)",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching",
+            "type": "article"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Response caching in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/response",
+      "type": "article"
+    },
+    {
+      "title": "HTTP caching semantics (MDN)",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching",
+      "type": "article"
+    }
+  ]
+}

@@ -3,29 +3,39 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import type { BookmarkState, BookmarkItem } from '@/types';
+import { logger } from '@/lib/logger';
+import { syncBookmarksToServer, syncUserData } from '@/lib/userSync';
+import { retryWithBackoff } from '@/lib/retry';
 
 const DEFAULT_BOOKMARKS: BookmarkState = { items: [] };
 
 async function fetchBookmarksFromServer(): Promise<BookmarkState | null> {
   try {
-    const res = await fetch('/api/bookmarks');
-    if (!res.ok) return null;
-    const data = await res.json();
-    return { items: data.items || [] };
+    return await retryWithBackoff(async () => {
+      const res = await fetch('/api/bookmarks');
+      if (!res.ok) throw new Error(`Failed to fetch bookmarks: ${res.status}`);
+      const data = await res.json();
+      return { items: data.items || [] };
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch {
     return null;
   }
 }
 
-async function syncBookmarksToServer(bookmarks: BookmarkState): Promise<void> {
+async function syncBookmarksToServerFn(bookmarks: BookmarkState): Promise<void> {
   try {
-    await fetch('/api/bookmarks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: bookmarks.items }),
-    });
+    await retryWithBackoff(async () => {
+      const res = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: bookmarks.items }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to sync bookmarks: ${res.status}`);
+      }
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch (err) {
-    console.warn('[useBookmarks] Failed to sync to server', err);
+    logger.warn('useBookmarks', 'Failed to sync to server', err);
   }
 }
 
@@ -69,12 +79,20 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [prevLoggedIn, setPrevLoggedIn] = useState(isLoggedIn);
   const serverBookmarksRef = useRef(serverBookmarks);
   serverBookmarksRef.current = serverBookmarks;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isLoggedIn && !prevLoggedIn) {
+      syncUserData();
+    }
+    setPrevLoggedIn(isLoggedIn);
+  }, [isLoggedIn, prevLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn || serverBookmarks) return;
@@ -95,7 +113,7 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !serverBookmarksRef.current) return;
-    syncBookmarksToServer(serverBookmarksRef.current);
+    syncBookmarksToServerFn(serverBookmarksRef.current);
   }, [isLoggedIn, serverBookmarks, isInitialLoad]);
 
   useEffect(() => {
@@ -193,7 +211,7 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   const resetBookmarks = useCallback(() => {
     if (!isLoggedIn) return;
     setServerBookmarks(DEFAULT_BOOKMARKS);
-    syncBookmarksToServer(DEFAULT_BOOKMARKS);
+    syncBookmarksToServerFn(DEFAULT_BOOKMARKS);
   }, [isLoggedIn]);
 
   const value = useMemo(

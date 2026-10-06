@@ -1,0 +1,192 @@
+{
+  "id": "lesson-redis-011",
+  "slug": "refresh-ahead-pattern",
+  "moduleSlug": "caching-patterns",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Refresh-Ahead Pattern",
+  "description": "Learn refresh-ahead caching, where a background worker proactively refreshes Redis keys before they expire to prevent latency spikes.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 13,
+  "tags": [
+    "redis",
+    "caching",
+    "refresh-ahead",
+    "proactive",
+    "latency",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Refresh-ahead is a proactive caching strategy. Instead of waiting for a cache miss to repopulate data, a background process refreshes keys before their TTL expires. This eliminates the latency spike that occurs when a popular key is missing and must be loaded from the database."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works",
+        "anchor": "how-it-works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each cached key is stored with a TTL. The application also records an expected refresh time slightly before expiration, often by using a sorted set where the score is the refresh deadline. A background worker polls for keys that are approaching their refresh window, loads fresh data from the database, and updates Redis before users request the stale data."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Refresh flow:",
+        "items": [
+          "On write, store data in Redis with a TTL and register the refresh deadline in a sorted set.",
+          "A background worker queries the sorted set for keys whose refresh deadline is near.",
+          "The worker loads the latest data from the database.",
+          "The worker updates Redis and resets the TTL.",
+          "The worker updates the refresh deadline in the sorted set."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why it matters",
+        "anchor": "why-it-matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In cache-aside or read-through, the first request after a key expires pays the full database latency. For high-traffic endpoints, that single slow request can cascade into connection pool exhaustion or thread saturation. Refresh-ahead removes that penalty by ensuring the cache is always warm for hot data."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "refresh-ahead-flow",
+        "caption": "Refresh-ahead background worker",
+        "definition": "sequenceDiagram\n    participant Worker\n    participant Redis\n    participant DB\n    loop Every 30 seconds\n        Worker->>Redis: ZRANGEBYSCORE refresh:products -inf <now+60s>\n        Redis-->>Worker: [product:10, product:42]\n        Worker->>DB: SELECT * FROM Products WHERE Id IN (10,42)\n        DB-->>Worker: product rows\n        Worker->>Redis: SET product:10 <fresh> EX 600\n        Worker->>Redis: ZADD refresh:products <new-deadline> product:10"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Node.js Example with ioredis",
+        "anchor": "nodejs-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "javascript example",
+        "language": "javascript",
+        "code": "// Refresh-ahead in Node.js\nconst Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);\n\nasync function cacheWithRefresh(key, dbLoader, ttlSeconds) {\n  const refreshSet = 'refresh:products';\n  await redis.setex(key, ttlSeconds, JSON.stringify(await dbLoader()));\n  const refreshAt = Date.now() + (ttlSeconds - 60) * 1000;\n  await redis.zAdd(refreshSet, [{ score: refreshAt, value: key }]);\n}\n\nasync function refreshAheadWorker() {\n  const refreshSet = 'refresh:products';\n  const now = Date.now();\n  const keys = await redis.zRangeByScore(refreshSet, '-inf', now);\n  for (const key of keys) {\n    const product = await db('products').where('id', key.replace('product:', '')).first();\n    if (product) {\n      await redis.setex(key, 600, JSON.stringify(product));\n      const nextRefresh = Date.now() + 8 * 60 * 1000;\n      await redis.zAdd(refreshSet, [{ score: nextRefresh, value: key }]);\n    }\n  }\n}\n\n// Run every 30 seconds\nsetInterval(refreshAheadWorker, 30000);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example with StackExchange.Redis",
+        "anchor": "csharp-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "csharp example",
+        "language": "csharp",
+        "code": "// Refresh-ahead in C#\nusing StackExchange.Redis;\nusing System.Text.Json;\n\npublic class RefreshAheadService\n{\n    private readonly IDatabase _redis;\n    private readonly AppDbContext _db;\n\n    public RefreshAheadService(IConnectionMultiplexer redis, AppDbContext db)\n    {\n        _redis = redis.GetDatabase();\n        _db = db;\n    }\n\n    public async Task CacheProductAsync(int productId)\n    {\n        var product = await _db.Products.FindAsync(productId);\n        if (product is null) return;\n\n        var json = JsonSerializer.Serialize(product);\n        var key = $\"product:{productId}\";\n        await _redis.StringSetAsync(key, json, TimeSpan.FromMinutes(10));\n\n        var refreshAt = DateTimeOffset.UtcNow.AddMinutes(9).ToUnixTimeMilliseconds();\n        await _redis.SortedSetAddAsync(\"refresh:products\", key, refreshAt);\n    }\n\n    public async Task RefreshDueProductsAsync()\n    {\n        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();\n        var dueKeys = await _redis.SortedSetRangeByScoreAsync(\"refresh:products\", double.NegativeInfinity, now);\n\n        foreach (var key in dueKeys)\n        {\n            var id = int.Parse(key.ToString().Split(':')[1]);\n            var product = await _db.Products.FindAsync(id);\n            if (product is not null)\n            {\n                var json = JsonSerializer.Serialize(product);\n                await _redis.StringSetAsync(key, json, TimeSpan.FromMinutes(10));\n                var nextRefresh = DateTimeOffset.UtcNow.AddMinutes(9).ToUnixTimeMilliseconds();\n                await _redis.SortedSetAddAsync(\"refresh:products\", key, nextRefresh);\n            }\n        }\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Refresh Window",
+        "text": "Refresh-ahead works best when the refresh window is short enough that keys rarely become stale, but long enough to avoid unnecessary database load. A common starting point is to refresh when 10-20 percent of the TTL remains."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Refresh Window",
+            "definition": "The period before key expiration during which the background worker starts refreshing the key."
+          },
+          {
+            "term": "Latency Spike",
+            "definition": "A sudden increase in response time caused by cache misses that force requests to wait for the database."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Questions",
+        "items": [
+          {
+            "question": "Does refresh-ahead replace TTLs?",
+            "answer": "No. TTLs are still needed as a safety net. The background worker keeps hot keys warm, but the TTL ensures that unpopular keys are eventually evicted."
+          },
+          {
+            "question": "What if the worker fails to refresh in time?",
+            "answer": "The application should still handle cache misses gracefully as a fallback. Refresh-ahead reduces misses; it does not eliminate the need for a fallback read path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Refresh-ahead removes latency spikes by warming the cache proactively.",
+          "A background worker uses a sorted set to track refresh deadlines.",
+          "Hot keys are refreshed before they expire; cold keys still fall back to the database.",
+          "Pair with TTLs and cache-miss fallbacks for resilience."
+        ],
+        "takeaway": "Refresh-ahead is ideal for high-traffic read-heavy workloads where consistent low latency matters."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add Refresh-Ahead to a Leaderboard",
+        "description": "A game leaderboard is read thousands of times per minute. A cold key means a slow response.",
+        "steps": [
+          "Cache the top-100 leaderboard in Redis with a 5-minute TTL.",
+          "Store the leaderboard refresh deadline in a sorted set.",
+          "Build a background worker that refreshes the leaderboard when 1 minute remains.",
+          "Simulate 1,000 concurrent leaderboard requests while the worker refreshes.",
+          "Verify that response times stay low and no cache misses occur."
+        ],
+        "expectedOutcome": "The leaderboard is always warm, and concurrent requests never see a cold cache."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Microsoft: Cache-Aside Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Cloud design patterns including refresh-ahead considerations."
+    },
+    {
+      "title": "Redis: Caching Best Practices",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Redis guidance on caching strategies, TTLs, and invalidation."
+    }
+  ]
+}

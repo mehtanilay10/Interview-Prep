@@ -1,26 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
-import { getOrCreateUser, prisma } from '@/lib/prisma';
+import { createApiAuthHandler } from '@/lib/authMiddleware';
+import { ValidationError, DatabaseError } from '@/lib/errorHandler';
+import { logError } from '@/lib/errorHandler';
+import { rateLimit } from '@/lib/rateLimit';
+import { validateCsrf, generateCsrfToken } from '@/lib/csrf';
+import { ThemePayloadSchema } from '@/lib/validators';
 import type { UserTheme } from '@prisma/client';
 
 function isUserTheme(value: unknown): value is UserTheme {
   return value === 'light' || value === 'dark' || value === 'system';
 }
 
-async function getDatabaseUser() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return null;
-  }
-
-  return getOrCreateUser(user);
-}
-
-export async function GET() {
-  const databaseUser = await getDatabaseUser();
-  if (!databaseUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = createApiAuthHandler(async (databaseUser) => {
+  const { prisma } = await import('@/lib/prisma');
 
   const row = await prisma.userThemePreference.findUnique({
     where: { userId: databaseUser.id },
@@ -28,30 +20,68 @@ export async function GET() {
   });
 
   return NextResponse.json({ theme: row?.theme ?? 'system' });
-}
+});
 
-export async function POST(request: Request) {
-  const databaseUser = await getDatabaseUser();
-  if (!databaseUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const POST = createApiAuthHandler(async (databaseUser, request) => {
+  const { prisma } = await import('@/lib/prisma');
+
+  const csrfResult = validateCsrf(request);
+  if (!csrfResult.valid) {
+    const error = new ValidationError(csrfResult.error ?? 'Invalid CSRF token');
+    logError('theme:POST', error);
+    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const body = await request.json().catch(() => null);
-  if (!body || !isUserTheme(body.theme)) {
-    return NextResponse.json({ error: 'Invalid theme payload' }, { status: 400 });
+  const rateLimitResult = rateLimit(request, { limit: 10, windowMs: 60_000 });
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimitResult.retryAfterMs ?? 1000) / 1000)) } }
+    );
   }
 
-  await prisma.userThemePreference.upsert({
-    where: { userId: databaseUser.id },
-    create: {
-      userId: databaseUser.id,
-      theme: body.theme,
-    },
-    update: {
-      theme: body.theme,
-      updatedAt: new Date(),
-    },
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    const error = new ValidationError('Invalid theme payload');
+    logError('theme:POST', error);
+    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
+  }
+
+  const parseResult = ThemePayloadSchema.safeParse(rawBody);
+  if (!parseResult.success) {
+    const error = new ValidationError('Invalid theme payload');
+    logError('theme:POST', { ...error, details: parseResult.error.issues });
+    return NextResponse.json({ code: error.code, message: error.message, details: parseResult.error.issues }, { status: error.statusCode });
+  }
+
+  const { theme } = parseResult.data;
+
+  try {
+    await prisma.userThemePreference.upsert({
+      where: { userId: databaseUser.id },
+      create: {
+        userId: databaseUser.id,
+        theme,
+      },
+      update: {
+        theme,
+        updatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    const dbError = new DatabaseError('Failed to save theme preference', error);
+    logError('theme:POST', dbError);
+    return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
+  }
+
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set('interview_prep_csrf', generateCsrfToken(), {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
   });
-
-  return NextResponse.json({ ok: true });
-}
+  return response;
+});

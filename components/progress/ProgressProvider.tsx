@@ -3,6 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import type { CourseProgress, LessonProgress, ProgressState } from '@/types';
+import { logger } from '@/lib/logger';
+import { syncProgressToServer, syncUserData } from '@/lib/userSync';
+import { retryWithBackoff } from '@/lib/retry';
 
 const DEFAULT_PROGRESS: ProgressState = {
   lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
@@ -14,31 +17,33 @@ type Category = keyof ProgressState;
 
 async function fetchProgressFromServer(): Promise<ProgressState | null> {
   try {
-    const res = await fetch('/api/progress');
-    if (!res.ok) return null;
-    const data = await res.json();
-    const progress: ProgressState = {
-      lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
-      problems: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
-      interviewQuestions: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
-    };
-    if (data.progress) {
-      for (const [cat, items] of Object.entries(data.progress)) {
-        const category = cat as Category;
-        if (Array.isArray(items)) {
-          progress[category] = {
-            completedLessons: items.map((item: { lessonSlug: string; moduleSlug: string; completedAt: string }) => ({
-              lessonSlug: item.lessonSlug,
-              moduleSlug: item.moduleSlug,
-              completedAt: item.completedAt,
-            })),
-            lastVisitedLesson: undefined,
-            startedAt: items[0]?.completedAt,
-          };
+    return await retryWithBackoff(async () => {
+      const res = await fetch('/api/progress');
+      if (!res.ok) throw new Error(`Failed to fetch progress: ${res.status}`);
+      const data = await res.json();
+      const progress: ProgressState = {
+        lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
+        problems: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
+        interviewQuestions: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
+      };
+      if (data.progress) {
+        for (const [cat, items] of Object.entries(data.progress)) {
+          const category = cat as Category;
+          if (Array.isArray(items)) {
+            progress[category] = {
+              completedLessons: items.map((item: { lessonSlug: string; moduleSlug: string; completedAt: string }) => ({
+                lessonSlug: item.lessonSlug,
+                moduleSlug: item.moduleSlug,
+                completedAt: item.completedAt,
+              })),
+              lastVisitedLesson: undefined,
+              startedAt: items[0]?.completedAt,
+            };
+          }
         }
       }
-    }
-    return progress;
+      return progress;
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch {
     return null;
   }
@@ -67,7 +72,7 @@ function mergeProgress(base: ProgressState, incoming: ProgressState): ProgressSt
   return merged;
 }
 
-async function syncProgressToServer(progress: ProgressState): Promise<void> {
+async function syncProgressToServerFn(progress: ProgressState): Promise<void> {
   try {
     const allEntries: Array<{ category: Category; lessonSlug: string; moduleSlug: string }> = [];
     for (const [cat, courseProgress] of Object.entries(progress)) {
@@ -76,17 +81,19 @@ async function syncProgressToServer(progress: ProgressState): Promise<void> {
         allEntries.push({ category, lessonSlug: entry.lessonSlug, moduleSlug: entry.moduleSlug });
       }
     }
-    const res = await fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entries: allEntries }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.warn('[ProgressProvider] Failed to sync to server', res.status, text);
-    }
+    await retryWithBackoff(async () => {
+      const res = await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: allEntries }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to sync progress: ${res.status} ${text}`);
+      }
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch (err) {
-    console.warn('[useProgress] Failed to sync to server', err);
+    logger.warn('useProgress', 'Failed to sync to server', err);
   }
 }
 
@@ -132,12 +139,20 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [prevLoggedIn, setPrevLoggedIn] = useState(isLoggedIn);
   const serverProgressRef = useRef(serverProgress);
   serverProgressRef.current = serverProgress;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isLoggedIn && !prevLoggedIn) {
+      syncUserData();
+    }
+    setPrevLoggedIn(isLoggedIn);
+  }, [isLoggedIn, prevLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -158,7 +173,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !serverProgressRef.current) return;
-    syncProgressToServer(serverProgressRef.current);
+    syncProgressToServerFn(serverProgressRef.current);
   }, [isLoggedIn, serverProgress, isInitialLoad]);
 
   useEffect(() => {
@@ -296,7 +311,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const resetProgress = useCallback(() => {
     if (!isLoggedIn) return;
     setServerProgress(DEFAULT_PROGRESS);
-    syncProgressToServer(DEFAULT_PROGRESS);
+    syncProgressToServerFn(DEFAULT_PROGRESS);
   }, [isLoggedIn]);
 
   const value = useMemo(

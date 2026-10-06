@@ -1,0 +1,110 @@
+{
+  "id": "lesson-redis-028",
+  "slug": "geospatial-queries",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Geospatial Indexing and Queries",
+  "description": "Use Redis geospatial commands to store locations, find nearby points, and calculate distances efficiently.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "geospatial", "location", "queries", "mapping"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Redis includes first-class geospatial support through a set of specialized commands. You can add locations to a sorted set, query for points within a radius, and compute distances between coordinates. Under the hood, Redis converts longitude and latitude into a 52-bit geohash and stores it in a sorted set, which means geospatial queries are fast and can be combined with other sorted set operations." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Core Geospatial Commands" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "GEOADD inserts one or more locations into a sorted set key. Each location is a member with an associated longitude and latitude. GEODIST calculates the distance between two locations in meters, kilometers, miles, or feet. GEORADIUS returns all members within a given radius of a center point, optionally with distance information and sorted by distance." }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Command", "Purpose", "Complexity"],
+        "rows": [
+          ["GEOADD", "Add locations to a geospatial index", "O(log N) per item"],
+          ["GEODIST", "Get distance between two points", "O(log N)"],
+          ["GEORADIUS", "Find members within a radius", "O(log N + M)"],
+          ["GEOSEARCH", "Modern replacement for GEORADIUS", "O(log N + M)"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Building a Store Locator" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "A common use case is a store locator: given a user's coordinates, find the ten nearest stores. You store each store in a sorted set keyed by stores:locations. When the user searches, you call GEOSEARCH with their coordinates, a radius large enough to cover your service area, and a count of ten. Redis returns the store IDs sorted by distance, and you look up the store details in your main database." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "StackExchange.Redis exposes geospatial commands through the Geo() API.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class StoreLocatorService\n{\n    private readonly IDatabase _db;\n    private const string StoreKey = \"stores:locations\";\n\n    public StoreLocatorService(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n    }\n\n    public async Task AddStoreAsync(string storeId, double longitude, double latitude)\n    {\n        await _db.GeoAddAsync(StoreKey, longitude, latitude, storeId);\n    }\n\n    public async Task<IList<GeoResult>> FindNearbyAsync(double longitude, double latitude, double radiusKm, int count)\n    {\n        var results = await _db.GeoSearchAsync(\n            StoreKey,\n            longitude,\n            latitude,\n            radius: radiusKm,\n            count: count,\n            order: GeoOrder.Asc);\n\n        return results.Select(r => new GeoResult\n        {\n            StoreId = r.Member!,\n            DistanceKm = r.Distance.GetValueOrDefault().Kilometers\n        }).ToList();\n    }\n}\n\npublic class GeoResult\n{\n    public string StoreId { get; set; } = string.Empty;\n    public double DistanceKm { get; set; }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis",
+        "content": "ioredis supports geospatial commands directly.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\nconst STORE_KEY = 'stores:locations';\n\nasync function addStore(storeId, longitude, latitude) {\n  await redis.geoadd(STORE_KEY, longitude, latitude, storeId);\n}\n\nasync function findNearby(longitude, latitude, radiusKm, count) {\n  const results = await redis.geosearch(\n    STORE_KEY,\n    'FROMLONLAT', longitude, latitude,\n    'BYRADIUS', radiusKm, 'km',\n    'COUNT', count,\n    'ASC',\n    'WITHDIST'\n  );\n\n  return results.map(r => ({\n    storeId: r.name,\n    distanceKm: parseFloat(r.dist)\n  }));\n}\n\n(async () => {\n  await addStore('store-1', -73.935242, 40.730610);\n  await addStore('store-2', -73.985130, 40.758896);\n  console.log(await findNearby(-73.935242, 40.730610, 10, 5));\n})();"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "geosearch-flow",
+        "caption": "Flow of a nearby store search using Redis geospatial queries.",
+        "definition": "flowchart LR\n    A[User opens store locator] --> B[App gets user GPS coordinates]\n    B --> C[Send to backend]\n    C --> D[GEOSEARCH stores:locations]\n    D --> E[Redis returns nearby store IDs]\n    E --> F[Lookup store details in DB]\n    F --> G[Return sorted list to client]\n    G --> H[User sees nearest stores on map]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "important", "title": "Earth Curvature", "text": "Redis uses the Haversine formula by default for distance calculations, which assumes a spherical Earth. For most applications this is accurate enough. If you need higher precision over short distances, you can use the Vincenty formula manually after retrieving coordinates." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Geohash", "definition": "A compact string encoding of a geographic coordinate. Redis uses 52-bit geohashes internally." },
+          { "term": "Haversine", "definition": "A formula for calculating the great-circle distance between two points on a sphere." },
+          { "term": "GEOSEARCH", "definition": "The modern Redis command for querying members within a geographic area." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis geospatial indexes are built on sorted sets, so they inherit sorted set performance.",
+          "Use GEOADD to add locations, GEODIST for distances, and GEOSEARCH for radius queries.",
+          "Geospatial queries are O(log N + M), making them fast even with millions of points."
+        ],
+        "takeaway": "Redis geospatial commands make location-based features like store locators and nearby searches straightforward to implement."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Geospatial Documentation", "url": "https://redis.io/docs/latest/develop/data-types/geospatial/", "type": "article" },
+        { "title": "Building Location-Based Services with Redis", "url": "https://redis.io/blueprint/location-based-service/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Geospatial Documentation", "url": "https://redis.io/docs/latest/develop/data-types/geospatial/", "type": "article" },
+    { "title": "Building Location-Based Services with Redis", "url": "https://redis.io/blueprint/location-based-service/", "type": "article" }
+  ]
+}

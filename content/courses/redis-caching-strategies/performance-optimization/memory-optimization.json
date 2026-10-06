@@ -1,0 +1,139 @@
+{
+  "id": "lesson-redis-045",
+  "slug": "memory-optimization",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Advanced Memory Optimization",
+  "description": "Reduce Redis memory footprint with encoding selection, key expiration, and data-structure-aware design.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "memory", "optimization", "encoding", "data-structures"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis stores everything in memory, so every byte matters. A poorly designed cache can consume gigabytes of RAM for data that would fit in megabytes with smarter encoding. Memory optimization is not just about saving money — it directly affects how much data you can keep hot, how quickly Redis responds, and whether your instance survives traffic spikes without evicting critical keys."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Hash Encoding and Hashtable Optimization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis uses two internal encodings for hashes: ziplist and hashtable. When a hash has fewer than a configurable number of entries and each value is small, Redis stores it as a ziplist — a compact, contiguous memory block. Once the hash crosses the threshold, Redis converts it to a hashtable with better read performance but higher overhead. You can control these thresholds with hash-max-ziplist-entries and hash-max-ziplist-value."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "memory-encoding-flow",
+        "caption": "Redis selecting ziplist vs hashtable encoding for a hash",
+        "definition": "flowchart TD\n    A[\"Hash command\nHSET/MGET\"] --> B[\"Check entries count\n& value size\"]\n    B --> C{Entries < 128\n& values < 64 bytes?}\n    C -->|Yes| D[\"Ziplist Encoding\nCompact, sequential memory\"]\n    C -->|No| E[\"Hashtable Encoding\nO(1) access, more overhead\"]\n    D --> F{Threshold\nbreached?}\n    F -->|Yes| E"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Choosing the Right Data Structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Many Redis memory problems come from using the wrong data structure. Storing JSON as a single string prevents Redis from understanding your data. A hash lets you access individual fields, use ziplist encoding, and expire specific fields if needed. Similarly, using a sorted set when you only need uniqueness wastes memory; a set is the correct choice."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Optimized session storage with hash (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\nvar db = mux.GetDatabase();\n\n// Store session fields as a hash instead of a JSON string\nstring sessionKey = $\"session:{sessionId}\";\n\nawait db.HashSetAsync(sessionKey, new HashEntry[]\n{\n    new HashEntry(\"userId\", userId),\n    new HashEntry(\"username\", username),\n    new HashEntry(\"role\", role),\n    new HashEntry(\"created\", DateTime.UtcNow.ToBinary())\n});\n\n// Set TTL for automatic expiration\nawait db.KeyExpireAsync(sessionKey, TimeSpan.FromHours(1));\n\n// Fetch only the fields you need\nstring username = await db.HashGetAsync(sessionKey, \"username\");"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Memory-efficient tag storage with set (Node.js)",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\nasync function tagArticle(articleId, tag) {\n  // Use a set for unique tags per article\n  const key = `article:${articleId}:tags`;\n  await redis.sadd(key, tag);\n  await redis.expire(key, 86400); // 1 day\n}\n\nasync function getArticleTags(articleId) {\n  // SMEMBERS returns unique tags without duplicates\n  return await redis.smembers(`article:${articleId}:tags`);\n}\n\n// Avoid this anti-pattern:\n// await redis.set(`tag:${tag}`, JSON.stringify(articleIds));"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Memory Command",
+        "text": "Run MEMORY USAGE <key> to see exactly how much RAM a key consumes. Run MEMORY DOCTOR to get optimization suggestions. Run INFO memory for a full breakdown of Redis memory usage by component."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Eviction and Expiration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis supports per-key expiration with EXPIRE and TTL. For large-scale caches, use LRU eviction (maxmemory-policy allkeys-lru) so Redis automatically evicts the least recently used keys when memory is full. This is far better than allowing Redis to run out of memory and crash, or manually managing eviction in your application code."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use hashes instead of JSON strings for related fields",
+          "Set EXPIRE on every key to prevent unbounded growth",
+          "Monitor MEMORY USAGE for keys larger than expected",
+          "Choose allkeys-lru or volatile-lru eviction policy",
+          "Avoid storing large blobs when smaller chunks suffice"
+        ],
+        "title": "Memory optimization checklist"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Ziplist", "definition": "A compact memory encoding for small hashes, lists, and sets that stores entries sequentially without pointers." },
+          { "term": "LRU eviction", "definition": "Least Recently Used eviction policy that removes the oldest accessed keys when memory reaches the limit." },
+          { "term": "maxmemory", "definition": "The upper memory limit for a Redis instance. Redis stops accepting writes when this limit is reached and starts evicting." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use hashes instead of JSON strings to enable ziplist encoding",
+          "Set TTL on every cache key to prevent memory leaks",
+          "Configure LRU eviction to protect Redis from OOM",
+          "Use MEMORY USAGE and INFO memory to audit usage"
+        ],
+        "takeaway": "Memory optimization starts with data-structure choice. A hash that fits in ziplist encoding can use 90% less memory than the same data stored as a JSON string."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Memory Optimization", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/memory/", "type": "article" },
+        { "title": "Redis LRU Cache Eviction", "url": "https://redis.io/docs/latest/develop/command-keys/eviction/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Memory Optimization", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/memory/", "type": "article" },
+    { "title": "Redis LRU Cache Eviction", "url": "https://redis.io/docs/latest/develop/command-keys/eviction/", "type": "article" }
+  ]
+}

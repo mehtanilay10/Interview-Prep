@@ -1,0 +1,107 @@
+{
+  "id": "lesson-redis-019",
+  "slug": "redis-sentinel",
+  "moduleSlug": "distributed-caching",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Redis Sentinel for High Availability",
+  "description": "Learn how Redis Sentinel provides automatic failover and monitoring for a single master-replica Redis deployment.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "sentinel", "high-availability", "failover"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Redis Sentinel is a distributed system that monitors Redis master and replica instances, automatically promoting a replica to master when the current master fails. Unlike Redis Cluster, Sentinel does not shard data — it provides high availability for a single dataset across multiple nodes." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "How Sentinel Works" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "A Sentinel deployment requires at least 3 instances to avoid split-brain issues. Sentinels communicate using a gossip protocol to agree on the current master's status. When a quorum (majority) of Sentinels detects that the master is unreachable, they collectively promote one of the replicas. This quorum-based approach ensures only one master exists at any time." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "warning", "title": "The 3-Node Rule", "text": "Always run an odd number of Sentinel instances (3 or 5 is recommended). With only 2 Sentinels, a network partition can cause both to disagree, leaving the cluster without a valid master." }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sentinel-failover",
+        "caption": "Redis Sentinel monitoring a master with 2 replicas",
+        "definition": "flowchart LR\n    S1[\"Sentinel 1\"]\n    S2[\"Sentinel 2\"]\n    S3[\"Sentinel 3\"]\n    M[\"Master\n(port 6379)\"]\n    R1[\"Replica 1\"]\n    R2[\"Replica 2\"]\n    APP[\"Application Client\"]\n    S1 -.-> M\n    S2 -.-> M\n    S3 -.-> M\n    S1 -.-> R1\n    S2 -.-> R1\n    S3 -.-> R1\n    S1 -.-> R2\n    S2 -.-> R2\n    S3 -.-> R2\n    M -.x|fails| M\n    S1 --> R1\n    S2 --> R1\n    S3 --> R1\n    R1 -.->|promoted| M2[\"New Master\n(Replica 1)\"]\n    APP --> S1\n    APP --> S2"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Client Configuration" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Clients connect to Sentinel rather than directly to the master. When they need the current master address, they query Sentinel using the command SENTINEL get-master-addr-by-name. If the master changes, Sentinel notifies connected clients, which then reconnect to the new master." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis Sentinel Configuration (redis-sentinel.conf)",
+        "language": "text",
+        "code": "port 26379\n\ndir /tmp\n\n# Monitor the master named 'mymaster'\nsentinel monitor mymaster redis-master 6379 2\n\n# Replica authentication\nsentinel auth-pass mymaster MySecurePassword\n\n# Require 2 seconds of unresponsiveness before declaring failure\nsentinel down-after-milliseconds mymaster 5000\n\n# 5 second failover timeout\nsentinel failover-timeout mymaster 5000\n\n# Parallel syncs during failover\nsentinel parallel-syncs mymaster 1"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connecting via Sentinel with StackExchange.Redis (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar sentinelConfig = new ConfigurationOptions\n{\n    EndPoints = {\n        { \"sentinel-1\", 26379 },\n        { \"sentinel-2\", 26379 },\n        { \"sentinel-3\", 26379 }\n    },\n    TieBreaker = \"\", // Use empty string for sentinel\n    CommandMap = CommandMap.Sentinel\n};\n\nvar sentinel = ConnectionMultiplexer.Connect(sentinelConfig);\nvar masterEndpoints = sentinel.GetSentinelMasterAddress(\"mymaster\");\n\nvar mux = ConnectionMultiplexer.Connect(masterEndPoints);\nvar db = mux.GetDatabase();"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Quorum", "definition": "The minimum number of Sentinels that must agree before a decision (like failover) is executed." },
+          { "term": "SDOWN", "definition": "Subjective Down — when a single Sentinel determines a node is unreachable." },
+          { "term": "ODOWN", "definition": "Objective Down — when enough Sentinels agree a node is down to trigger a failover." }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "How does Sentinel differ from Redis Cluster?", "answer": "Sentinel provides high availability for a single dataset without sharding. Redis Cluster shards data across multiple masters and provides both scaling and high availability." },
+          { "question": "What happens during a network partition?", "answer": "The partition with the quorum majority of Sentinels performs failover. The minority partition cannot elect a new master and its clients become read-only or disconnected." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use 3 or 5 Sentinel instances for reliable quorum-based failover",
+          "Clients connect to Sentinel, not directly to the master",
+          "Sentinel does not shard data — it protects a single dataset",
+          "Failover happens automatically within seconds of detecting the master is down"
+        ],
+        "takeaway": "Redis Sentinel is the simplest way to add high availability to Redis, making it ideal when you need failover but not data sharding."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Sentinel Documentation", "url": "https://redis.io/docs/latest/operate/rc/architecture/sentinel/", "type": "article" },
+        { "title": "High Availability with Redis Sentinel", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Sentinel Documentation", "url": "https://redis.io/docs/latest/operate/rc/architecture/sentinel/", "type": "article" },
+    { "title": "High Availability with Redis Sentinel", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/", "type": "article" }
+  ]
+}

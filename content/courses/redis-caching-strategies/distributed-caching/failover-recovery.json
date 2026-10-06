@@ -1,0 +1,117 @@
+{
+  "id": "lesson-redis-022",
+  "slug": "failover-recovery",
+  "moduleSlug": "distributed-caching",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Failover and Recovery Procedures",
+  "description": "Implement robust failover and recovery procedures for Redis Cluster and Sentinel deployments.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["redis", "failover", "recovery", "high-availability"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Failover is the process of promoting a replica to master when the current master fails. Recovery involves bringing failed nodes back into the cluster and rebalancing data. Both procedures must be well-understood and tested to ensure minimal downtime and data integrity." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Automatic Failover in Redis Cluster" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "In Redis Cluster, the failover process is automatic. When a majority of master nodes cannot reach a given master, it is flagged as failing. The cluster then initiates an election among the failed master's replicas. The replica with the most recent data (least replication offset) typically wins the election and is promoted to master." }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "failover-sequence",
+        "caption": "Automatic failover sequence when a master node fails",
+        "definition": "sequenceDiagram\n    participant M as Failed Master\n    participant R as Replica\n    participant S1 as Sentinel/Majority Masters\n    participant C as Clients\n\n    M->>S1: Connection lost\n    S1->>S1: Quorum detects failure\n    S1->>R: Initiate election\n    R->>S1: Request votes\n    S1->>R: Vote granted (quorum)\n    R->>R: Promote to master\n    R->>S1: Announce new master\n    S1->>C: Update routing configuration\n    C->>R: Redirect writes to new master"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Split-Brain Prevention" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "A split-brain occurs when two nodes believe they are the master simultaneously, typically after a network partition heals. Redis prevents this by requiring a majority vote before any promotion. If a network partition isolates a minority of masters, they cannot elect a new master because they lack quorum, and they enter an error state for their owned slots." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "danger", "title": "Split-Brain Risk", "text": "Never use odd numbers of master nodes without quorum enforcement. If you have 2 masters and the network splits, both sides can promote a replica independently, causing data divergence." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Manual Recovery Procedures" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "When automatic mechanisms fail or when recovering a node after extended downtime, manual intervention may be necessary. Common recovery tasks include: forcing a replica to take over as master, reinitializing a failed node, and resharding data after adding a new node." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Forcing a Failover with Redis CLI (Sentinel)",
+        "language": "bash",
+        "code": "# Connect to any Sentinel instance\nredis-cli -p 26379\n\n# Force failover of 'mymaster' (useful for testing or emergencies)\nSENTINEL FAILOVER mymaster\n\n# Verify the new master\nSENTINEL MASTERS\nSENTINEL SLAVES mymaster"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Recovering a Redis Cluster Node with redis-cli (C# script via Process)",
+        "language": "csharp",
+        "code": "using System.Diagnostics;\n\nvar process = new Process\n{\n    StartInfo = new ProcessStartInfo\n    {\n        FileName = \"redis-cli\",\n        Arguments = \"--cluster fix 10.0.0.1:6379 --cluster-fix-with-unreachable-masters\",\n        RedirectStandardOutput = true,\n        UseShellExecute = false\n    }\n};\nprocess.Start();\nvar output = await process.StandardOutput.ReadToEndAsync();\nawait process.WaitForExitAsync();\nConsole.WriteLine(output);\n\n// Fixes orphaned slots and migrates keys from empty masters"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Epoch", "definition": "A version number for the cluster configuration. Higher epochs always win during merge conflicts." },
+          { "term": "Replication Offset", "definition": "A monotonically increasing counter that tracks how much data a replica has processed from its master." },
+          { "term": "Orphaned Node", "definition": "A master that has no slots assigned after a failover or resharding operation." }
+        ]
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Recovery Scenario", "Automatic?", "Typical Duration", "Action Required"],
+        "rows": [
+          ["Master fails (Replica exists)", "Yes", "1-5 seconds", "None — monitor client reconnection"],
+          ["All replicas of a master fail", "No", "Minutes to hours", "Restore from RDB/AOF backup"],
+          ["New node added to cluster", "No", "Minutes to hours", "Run CLUSTER RESHARD or use redis-cli --cluster"],
+          ["Split-brain detected", "Manual", "Depends", "Force failover to one side, rebuild the other"]
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis Cluster failover is automatic but requires a quorum of masters",
+          "Replicas with the highest replication offset win elections",
+          "Split-brain is prevented by requiring majority votes for all promotions",
+          "Manual recovery is needed for data loss scenarios or cluster resizing"
+        ],
+        "takeaway": "Automatic failover handles routine failures, but always have a tested manual recovery runbook for edge cases."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Cluster Failover Documentation", "url": "https://redis.io/docs/latest/operate/rc/architecture/failover/", "type": "article" },
+        { "title": "Redis Cluster Administration Guide", "url": "https://redis.io/docs/latest/operate/rc/operating/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Cluster Failover Documentation", "url": "https://redis.io/docs/latest/operate/rc/architecture/failover/", "type": "article" },
+    { "title": "Redis Cluster Administration Guide", "url": "https://redis.io/docs/latest/operate/rc/operating/", "type": "article" }
+  ]
+}

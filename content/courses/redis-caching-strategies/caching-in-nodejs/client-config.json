@@ -1,0 +1,208 @@
+{
+  "id": "lesson-redis-039",
+  "slug": "client-config",
+  "moduleSlug": "caching-in-nodejs",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Redis Client Configuration Best Practices",
+  "description": "Configure ioredis correctly for development, staging, and production to avoid connection failures and data loss.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 11,
+  "tags": [
+    "ioredis",
+    "configuration",
+    "production",
+    "connection",
+    "best-practices"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A Redis client is only as reliable as its configuration. Incorrect timeouts, missing retry strategies, and weak connection pools cause cascading failures in production. This lesson covers the essential settings every Node.js service should apply to its ioredis instance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Connection Options Overview",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The ioredis constructor accepts host, port, password, and database as first-class options. Beyond those, `connectTimeout` and `lazyConnect` are the two settings most likely to prevent startup crashes. A sensible retry strategy with a maximum backoff cap prevents thundering-herd reconnections."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Option",
+          "Default",
+          "Production Recommendation"
+        ],
+        "rows": [
+          ["connectTimeout", "10000 ms", "5000 ms — fail fast and alert"],
+          ["lazyConnect", "false", "true for serverless, false for long-running"],
+          ["maxRetriesPerRequest", "null", "3 — cap retries on critical writes"],
+          ["retryStrategy", "exponential", "delay with max 2000 ms cap"],
+          ["keepAlive", "false", "true — detect dead TCP connections"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Production-Ready Constructor",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The following configuration balances resilience and speed. The retry strategy caps at 2 seconds so a failing Redis does not hold open connections indefinitely. keepAlive sends TCP probes to detect silently dropped connections."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Production-ready Redis configuration",
+        "content": "Apply these settings in every environment above local development.",
+        "language": "typescript",
+        "code": "import Redis from 'ioredis';\n\nconst IS_PRODUCTION = process.env.NODE_ENV === 'production';\n\nconst redis = new Redis({\n  host: process.env.REDIS_HOST ?? 'localhost',\n  port: parseInt(process.env.REDIS_PORT ?? '6379', 10),\n  password: process.env.REDIS_PASSWORD,\n  db: IS_PRODUCTION ? 0 : 1,             // separate DB for dev\n  lazyConnect: IS_PRODUCTION,             // lazy in prod to handle migrations\n  connectTimeout: 5000,\n  keepAlive: IS_PRODUCTION,               // detect dead connections\n  maxRetriesPerRequest: IS_PRODUCTION ? 3 : null,\n  retryStrategy: (times) => {\n    if (times > 10) return null;          // give up after 10 retries\n    return Math.min(times * 50, 2000);\n  },\n  // Tune for your workload\n  enableOfflineQueue: !IS_PRODUCTION,\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Command Timeouts",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every Redis command can take an optional timeout in milliseconds. Without one, a slow Redis instance can hold a request open indefinitely. Apply timeouts to SET, GET, and pipeline calls in your caching layer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Applying per-command timeouts",
+        "content": "Wrap SET and GET with explicit 100 ms timeouts.",
+        "language": "typescript",
+        "code": "async function setWithTimeout(\n  key: string,\n  value: string,\n  ttl: number\n): Promise<void> {\n  await redis.set(key, value, 'EX', ttl, 'NX');\n}\n\n// get with 50 ms timeout\nasync function getWithTimeout(\n  key: string\n): Promise<string | null> {\n  return redis.get(key, { checkFrequency: 100 });\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Never Skip Timeouts in Production",
+        "text": "A Redis command with no timeout can hang a request handler, exhaust the event loop, and take down your service. Always set a command-level or global socket timeout."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Environment-Specific Configuration",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Local development usually uses a local Redis at port 6379 with no password. Staging and production use managed Redis (ElastiCache, Memorystore, Upstash) with authentication, TLS, and connection limits. Keep credentials in environment variables — never hardcode them."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Environment configuration rules",
+        "items": [
+          "local: lazyConnect false, no retry cap, enableOfflineQueue true",
+          "staging: same options as production but with staging host and retry cap 5",
+          "production: lazyConnect true, retry cap 3, keepAlive true, maxRetriesPerRequest 3",
+          "Always load host, port, password from process.env",
+          "Use a separate Redis database number per environment (db: 0 vs 1)"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-client-config-env",
+        "definition": "flowchart LR\n    A[Local Dev] -->|6379, no auth| B[ioredis Client]\n    C[Staging] -->|6380, auth| B\n    D[Production] -->|TLS, auth, HA| B\n    B --> E[Redis Instance]\n\n    F[process.env] -->|REDIS_HOST, PORT, PASS| B",
+        "caption": "Environment-specific Redis client configuration"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Pre-Production Checklist",
+        "items": [
+          {
+            "text": "REDIS_HOST, REDIS_PORT, REDIS_PASSWORD loaded from environment variables"
+          },
+          {
+            "text": "connectTimeout set to 5000 ms or lower"
+          },
+          {
+            "text": "retryStrategy configured with a maximum backoff cap"
+          },
+          {
+            "text": "keepAlive enabled for long-running Node.js processes"
+          },
+          {
+            "text": "maxRetriesPerRequest set to 3 for production writes"
+          },
+          {
+            "text": "Per-command timeouts added to caching helper functions"
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Should I use TLS for Redis?",
+            "answer": "Yes, in managed cloud environments (ElastiCache with in-transit encryption, Upstash, Redis Enterprise). ioredis supports TLS via the tls option in the constructor."
+          },
+          {
+            "question": "What is enableOfflineQueue?",
+            "answer": "When true, ioredis buffers commands during disconnection and replays them on reconnect. Disable it in production to avoid sending stale commands after a failover."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Set connectTimeout to 5 seconds and always apply per-command timeouts.",
+          "Use lazyConnect and maxRetriesPerRequest in production only.",
+          "Keep keepAlive enabled to detect dead TCP connections early.",
+          "Load all connection settings from environment variables."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "ioredis Options Reference",
+      "url": "https://github.com/redis/ioredis/blob/main/API.md#new-redis",
+      "type": "article"
+    },
+    {
+      "title": "AWS ElastiCache Best Practices",
+      "url": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/BestPractices.html",
+      "type": "article"
+    }
+  ]
+}

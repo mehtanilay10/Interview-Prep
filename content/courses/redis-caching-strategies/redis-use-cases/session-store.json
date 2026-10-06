@@ -1,0 +1,118 @@
+{
+  "id": "lesson-redis-024",
+  "slug": "session-store",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Using Redis for Session Storage",
+  "description": "Learn how to use Redis as a fast, scalable session store for web applications, including expiration handling and distributed session management.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "sessions", "authentication", "scalability"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Web applications need to remember who you are between requests. The traditional approach stores session data on the server's local disk or memory, which works fine for a single server. But once you scale to multiple servers, that approach breaks down: a user's next request might land on a server that does not have their session data. Redis solves this by providing a fast, shared session store that all application servers can read from and write to." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Why Redis for Sessions?" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Redis stores session data in memory, so reads and writes complete in microseconds. It also supports automatic expiration via TTL, which prevents stale sessions from accumulating forever. Unlike in-memory stores on a single server, Redis is centralized, so any server in your cluster can access the same session data. This makes it ideal for horizontally scaled web farms and containerized deployments." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "tip", "title": "Session Key Pattern", "text": "Use a consistent key naming scheme such as session:{sessionId} so you can inspect, debug, and delete sessions directly in Redis without guessing key names." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Storing and Retrieving Sessions" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "When a user logs in, your application creates a session object containing the user ID, roles, and any other claims. You serialize that object to JSON and store it in Redis with a key like session:abc123. Set an expiration time that matches your session timeout policy, typically 30 minutes to 2 hours. On each subsequent request, your middleware looks up the session key, deserializes the JSON, and attaches the user context to the request." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "The following example stores and retrieves a session object using StackExchange.Redis.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class SessionService\n{\n    private readonly IDatabase _db;\n\n    public SessionService(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n    }\n\n    public async Task SetSessionAsync(string sessionId, UserSession session, TimeSpan ttl)\n    {\n        var json = JsonSerializer.Serialize(session);\n        await _db.StringSetAsync($\"session:{sessionId}\", json, ttl);\n    }\n\n    public async Task<UserSession?> GetSessionAsync(string sessionId)\n    {\n        var json = await _db.StringGetAsync($\"session:{sessionId}\");\n        return json.IsNullOrEmpty ? null : JsonSerializer.Deserialize<UserSession>(json);\n    }\n\n    public async Task RemoveSessionAsync(string sessionId)\n    {\n        await _db.KeyDeleteAsync($\"session:{sessionId}\");\n    }\n}\n\npublic class UserSession\n{\n    public string UserId { get; set; } = string.Empty;\n    public string[] Roles { get; set; } = Array.Empty<string>();\n    public DateTimeOffset CreatedAt { get; set; }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis",
+        "content": "The same pattern in Node.js using ioredis.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\nasync function setSession(sessionId, session, ttlSeconds) {\n  const key = `session:${sessionId}`;\n  await redis.set(key, JSON.stringify(session), 'EX', ttlSeconds);\n}\n\nasync function getSession(sessionId) {\n  const key = `session:${sessionId}`;\n  const data = await redis.get(key);\n  return data ? JSON.parse(data) : null;\n}\n\nasync function removeSession(sessionId) {\n  await redis.del(`session:${sessionId}`);\n}\n\n// Example usage\n(async () => {\n  await setSession('abc123', { userId: 1, roles: ['admin'] }, 1800);\n  const session = await getSession('abc123');\n  console.log(session);\n  await removeSession('abc123');\n})();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Session Lifecycle" }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "session-lifecycle",
+        "caption": "How a session flows through Redis across requests.",
+        "definition": "graph LR\n    A[User logs in] --> B[Create session object]\n    B --> C[Serialize to JSON]\n    C --> D[Store in Redis with TTL]\n    D --> E[Return session cookie]\n    E --> F[Subsequent request]\n    F --> G[Lookup session in Redis]\n    G --> H{Session found?}\n    H -->|Yes| I[Deserialize and authorize]\n    H -->|No| J[Redirect to login]\n    I --> K[Refresh TTL]\n    K --> F"
+      }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "important", "title": "Security Considerations", "text": "Never store sensitive data like passwords or credit card numbers in Redis sessions. Sessions should contain only identifiers and claims. Always use TLS when connecting to a remote Redis instance, and restrict Redis access to your application servers only." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "TTL", "definition": "Time-to-live. The duration after which Redis automatically deletes a key." },
+          { "term": "Session ID", "definition": "A random, high-entropy string stored in the user's cookie that identifies their session." },
+          { "term": "Session fixation", "definition": "An attack where an attacker sets a known session ID. Always regenerate the session ID after login." }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Should I compress session data before storing it in Redis?", "answer": "For typical session payloads, compression is unnecessary. Redis stores data in memory, and session objects are usually only a few hundred bytes. If you are storing large objects, consider compressing with GZip or storing only references." },
+          { "question": "What happens if Redis goes down?", "answer": "If Redis becomes unavailable, users will be logged out because their sessions cannot be retrieved. Use Redis Sentinel or Redis Cluster for high availability, and consider a short fallback cache or graceful degraded mode." },
+          { "question": "Can I share sessions between different applications?", "answer": "Yes, as long as they all use the same Redis instance and agree on the session key format and serialization schema. Just ensure each application uses a unique key prefix to avoid collisions." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis provides a fast, centralized session store for horizontally scaled applications.",
+          "Use TTL to automatically expire stale sessions and prevent unbounded memory growth.",
+          "Serialize session data to JSON and store it under a predictable key pattern.",
+          "Always secure your Redis connection and avoid storing sensitive data in sessions."
+        ],
+        "takeaway": "Redis session storage is a production-ready pattern that simplifies scaling and improves session management across distributed systems."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Sessions Documentation", "url": "https://redis.io/docs/latest/develop/use-cases/sessions/", "type": "article" },
+        { "title": "StackExchange.Redis Basics", "url": "https://stackexchange.github.io/StackExchange.Redis/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Sessions Documentation", "url": "https://redis.io/docs/latest/develop/use-cases/sessions/", "type": "article" },
+    { "title": "StackExchange.Redis Basics", "url": "https://stackexchange.github.io/StackExchange.Redis/", "type": "article" }
+  ]
+}

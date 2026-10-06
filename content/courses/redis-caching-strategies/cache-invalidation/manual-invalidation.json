@@ -1,0 +1,188 @@
+{
+  "id": "lesson-redis-015",
+  "slug": "manual-invalidation",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Manual Cache Invalidation Techniques",
+  "description": "Learn how to programmatically remove or update cache entries when data changes outside of TTL expiration.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 16,
+  "tags": ["redis", "invalidation", "del", "patterns", "manual"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Manual Invalidation?",
+        "anchor": "why-manual"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "TTL-based expiration is automatic and simple, but it is not enough when data changes unpredictably. If a user updates their profile, a product price changes, or an admin publishes new content, waiting for the TTL to run out means serving stale data. **Manual invalidation** gives your application direct control over when cached entries are removed or refreshed."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Manual invalidation is the backbone of cache consistency in write-heavy or real-time applications. It keeps the cache aligned with the database without relying solely on time-based expiration."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Invalidation",
+            "definition": "The process of removing or updating a cached entry because the underlying data has changed."
+          },
+          {
+            "term": "Write-Through",
+            "definition": "A strategy that writes to both the cache and the database simultaneously so the cache is always up to date."
+          },
+          {
+            "term": "Write-Behind",
+            "definition": "A strategy that writes to the cache first and persists to the database asynchronously."
+          },
+          {
+            "term": "Write-Invalidate",
+            "definition": "A strategy that updates the database first and then removes or updates the related cache entry."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Redis Invalidation Commands",
+        "anchor": "redis-commands"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis provides several commands for removing cache entries. `DEL` removes one or more keys by name. `UNLINK` is an asynchronous variant that frees memory in the background. `FLUSHDB` and `FLUSHALL` wipe entire databases or all databases, respectively — useful in development but dangerous in production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis — Manual invalidation commands",
+        "content": "Remove a specific cached product, then remove all cached categories.",
+        "code": "# Remove a single key\nDEL product:42:details\n\n# Asynchronous removal (non-blocking)\nUNLINK product:42:details product:43:details\n\n# Remove all keys matching a pattern\nredis-cli --scan --pattern 'category:*' | xargs redis-cli DEL",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidation in Application Code",
+        "anchor": "application-code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a typical web application, you invalidate the cache immediately after a successful database write. The exact placement depends on your architecture: a repository method, a service-layer event handler, or a domain-event subscriber."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Invalidate cache after updating a product",
+        "content": "Update a product in the database, then remove the stale cache entry using StackExchange.Redis.",
+        "code": "public async Task UpdateProductAsync(Product updated, CancellationToken ct)\n{\n    await _dbContext.Products.ExecuteUpdateAsync(s => s\n        .SetProperty(p => p.Name, updated.Name)\n        .SetProperty(p => p.Price, updated.Price)\n        .Where(p => p.Id == updated.Id), ct);\n\n    var redis = _redis.GetDatabase();\n    var cacheKey = $\"product:{updated.Id}:details\";\n    await redis.KeyDeleteAsync(cacheKey);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Invalidate related keys after a mutation",
+        "content": "After updating a user, remove both the user profile and any cached user-list entries.",
+        "code": "import Redis from 'ioredis';\nconst redis = new Redis();\n\nasync function updateUserAndInvalidate(userId, updates) {\n  await db.users.update({ where: { id: userId }, data: updates });\n\n  await redis.del(`user:${userId}:profile`);\n  await redis.del('users:active:list');\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Invalidation Patterns",
+        "anchor": "patterns"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Write Strategies and Cache Consistency",
+        "cards": [
+          {
+            "title": "Write-Through",
+            "description": "Write to cache and database in the same transaction.",
+            "pros": ["Cache is always fresh", "Simple consistency model"],
+            "cons": ["Higher write latency", "Cache write may fail"]
+          },
+          {
+            "title": "Write-Invalidate",
+            "description": "Write to database first, then delete the cache entry.",
+            "pros": ["Fast writes", "Cache rebuilt on next read"],
+            "cons": ["Brief window of inconsistency", "Requires explicit invalidation"]
+          },
+          {
+            "title": "Write-Behind",
+            "description": "Write to cache immediately, flush to database asynchronously.",
+            "pros": ["Very fast writes", "Absorbs write spikes"],
+            "cons": ["Risk of data loss", "Complex recovery logic"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Invalidate related keys too",
+        "text": "A single database row may appear in multiple cache keys — user lists, search results, aggregated dashboards. Invalidation must account for all derived keys, or you will serve stale aggregated data even after the source is updated."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-invalidation-flow",
+        "caption": "Write-invalidate flow: the database is updated first, then the related cache entries are removed so the next read rebuilds them.",
+        "definition": "graph LR\n    A[Client Update] --> B[Write to Database]\n    B --> C[Delete Cache Key]\n    C --> D[Next Read]\n    D --> E[Cache Miss]\n    E --> F[Read from Database]\n    F --> G[Write to Cache]\n    G --> H[Return Fresh Value]"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use DEL or UNLINK to remove specific keys programmatically.",
+          "Invalidate cache entries immediately after successful database writes.",
+          "Consider all derived cache keys when invalidating aggregated or list data.",
+          "Write-invalidate is a safe default for most applications."
+        ],
+        "takeaway": "Manual invalidation keeps the cache honest — remove stale entries the moment the source data changes."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Cache Invalidation Strategies",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article",
+      "description": "Redis guide to caching patterns including write-through, write-behind, and write-invalidate."
+    }
+  ]
+}

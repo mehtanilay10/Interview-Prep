@@ -1,0 +1,167 @@
+{
+  "id": "lesson-mqes-014",
+  "slug": "idempotent-processing",
+  "moduleSlug": "message-ordering-idempotency",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Idempotent Processing",
+  "description": "Make your message consumers idempotent so that processing the same message multiple times does not cause duplicate side effects.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 14,
+  "tags": [
+    "idempotency",
+    "consumer-design",
+    "duplicate-messages",
+    "resilience"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Idempotency means that applying the same operation multiple times has the same result as applying it once. In messaging, this is critical because most brokers offer at-least-once delivery. A message that was processed but not acknowledged before the consumer crashed will be redelivered. Without idempotency, the second delivery creates a duplicate side effect."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Duplicate Problem"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Scenarios that produce duplicates",
+        "items": [
+          "Consumer crashes after processing but before acknowledging",
+          "Broker redelivers messages after a timeout",
+          "Application retries after a transient database failure",
+          "Operator manually re-queues messages for debugging"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 1: Unique Operation Keys"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest approach is to assign a unique identifier to each operation — typically the message ID combined with the entity being modified. Before executing the side effect, check whether this operation has already been applied. This pattern is the foundation of all other idempotency techniques."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Idempotent payment processor",
+        "content": "Store processed message IDs in Redis with a TTL to deduplicate.",
+        "language": "javascript",
+        "code": "const redis = require('ioredis');\nconst client = new redis();\nconst IDEMPOTENCY_TTL_SECONDS = 86400; // 24 hours\n\nasync function processPaymentMessage(msg) {\n  const key = `paid:${msg.orderId}`;\n  const alreadyProcessed = await client.get(key);\n\n  if (alreadyProcessed) {\n    console.log('Duplicate message skipped');\n    return { skipped: true };\n  }\n\n  await db.payments.create({\n    orderId: msg.orderId,\n    amount: msg.amount,\n    status: 'paid'\n  });\n\n  await client.set(key, '1', 'EX', IDEMPOTENCY_TTL_SECONDS);\n  return { skipped: false };\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 2: Conditional Updates"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When using a relational database, you can encode idempotency directly in the SQL. A conditional `INSERT` with a unique constraint, or an `UPDATE` with a `WHERE` clause checking the expected current state, ensures the database itself rejects duplicates without application-layer checks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Idempotent upsert with EF Core",
+        "content": "Use a database-level unique constraint and catch the duplicate exception.",
+        "language": "csharp",
+        "code": "public class PaymentService\n{\n    private readonly AppDbContext _db;\n\n    public async Task ProcessAsync(ProcessPaymentCommand cmd)\n    {\n        try\n        {\n            var payment = new Payment\n            {\n                Id = cmd.PaymentId,\n                OrderId = cmd.OrderId,\n                Amount = cmd.Amount,\n                ProcessedAt = DateTime.UtcNow\n            };\n\n            await _db.Payments.AddAsync(payment);\n            await _db.SaveChangesAsync();\n        }\n        catch (DbUpdateException ex) when\n            (IsUniqueConstraintViolation(ex))\n        {\n            _logger.LogWarning(\"Duplicate payment {PaymentId} ignored\", cmd.PaymentId);\n        }\n    }\n\n    private bool IsUniqueConstraintViolation(DbUpdateException ex)\n        => ex.InnerException is PostgresException pg &&\n           pg.SqlState == PostgresErrorCodes.UniqueViolation;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 3: Idempotency Keys in the Message"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Many producers can generate an idempotency key before sending. The key is a deterministic hash of the operation parameters. If the consumer sees the same key twice, it knows the operation has already been attempted. This shifts responsibility to the producer but keeps the consumer stateless."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-idempotent-flow",
+        "caption": "Idempotent consumer flow using a processed message store",
+        "definition": "flowchart TD\n    M[Message Received] --> K{Key in Store?}\n    K -->|Yes| D[Return Success — Duplicate]\n    K -->|No| P[Process Side Effect]\n    P --> S[Store Key + Timestamp]\n    S --> A[Ack Message]\n    P -->|Failure| R[Retry / Nack]\n    style D fill:#e8f5e9\n    style A fill:#e1f5fe"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Atomicity Matters",
+        "text": "Store the processed key and apply the side effect in the same transaction where possible. If the store write succeeds but the side effect fails, you may block future legitimate attempts. Consider using a database transaction spanning both operations."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Should I use Redis or the database for deduplication?",
+            "answer": "Redis is faster for high-throughput scenarios but is volatile. The database is slower but durable and transactional. A common pattern is to use Redis as a fast check and the database as the authoritative store."
+          },
+          {
+            "question": "What TTL should I use for processed message keys?",
+            "answer": "Use a TTL that exceeds the maximum time a duplicate might appear. For most systems, 24 hours is a safe default. If your business requires reconciliation, use days or weeks instead."
+          },
+          {
+            "question": "Does idempotency guarantee exactly-once delivery?",
+            "answer": "No. Idempotency makes at-least-once delivery safe, but it does not prevent duplicates from reaching the consumer. Exactly-once semantics require additional coordination at the broker or framework level."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Idempotency means multiple applications of the same operation produce the same result",
+          "Use unique operation keys stored in Redis or the database",
+          "Conditional database updates prevent duplicates at the persistence layer",
+          "Atomicity between side effect and key storage is critical"
+        ],
+        "takeaway": "Always build consumers as if they will receive duplicates. Idempotency is not optional — it is a reliability requirement."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "AWS: Making Queues Idempotent",
+      "url": "https://docs.aws.amazon.com/general/latest/gr/api-retries.html",
+      "type": "article",
+      "author": "AWS",
+      "description": "AWS guidance on idempotent API design and safe retries."
+    },
+    {
+      "title": "RabbitMQ: Consumer Acknowledgements and Redelivery",
+      "url": "https://www.rabbitmq.com/docs/consumers#acknowledgement-modes",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Understanding when and why RabbitMQ redelivers messages."
+    }
+  ]
+}

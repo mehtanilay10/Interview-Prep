@@ -1,0 +1,118 @@
+{
+  "id": "lesson-redis-029",
+  "slug": "bloom-filters",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Bloom Filters with Redis",
+  "description": "Use Redis bloom filter modules to efficiently test set membership, reduce database load, and prevent cache penetration.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "bloom-filters", "probabilistic", "cache-penetration", "data-structures"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "A Bloom filter is a compact, probabilistic data structure that answers one question: is this item in the set? It never produces false negatives, meaning if it says an item is absent, that item is definitely absent. It can, however, produce false positives: if it says an item is present, that item might not actually be there. The false positive rate is configurable and usually very small. Because Bloom filters use constant memory, they are ideal for filtering out queries that would hit a slower backing store." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "How Bloom Filters Work" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "A Bloom filter starts as a bit array of m bits, all set to zero. When you add an item, the filter runs the item through k independent hash functions, each of which sets a corresponding bit to one. To test membership, the filter runs the item through the same k hash functions and checks whether all k bits are set. If any bit is zero, the item is definitely absent. If all bits are one, the item is probably present." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "info", "title": "RedisBloom Module", "text": "Redis does not include Bloom filters in core. You need the RedisBloom module, available in Redis Stack, Redis Cloud, or as a self-hosted module. The commands are BF.ADD, BF.EXISTS, BF.INFO, and more." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Preventing Cache Penetration" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "One of the most practical uses for Bloom filters is preventing cache penetration. Cache penetration happens when attackers or crawlers request items that do not exist in your cache or database. Every request for a nonexistent item bypasses the cache and hits your database directly, wasting resources and potentially degrading performance. By checking a Bloom filter before querying the cache or database, you can filter out most nonexistent items with a single, fast in-memory check." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis and RedisBloom",
+        "content": "The following example uses ioredis with the RedisBloom module.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\nconst BLOOM_KEY = 'bloom:product-ids';\n\nasync function initializeBloomFilter(expectedItems, errorRate) {\n  await redis.call('BF.ADD', BLOOM_KEY, '__reserved__');\n  const info = await redis.call('BF.INFO', BLOOM_KEY);\n  console.log('Bloom filter created:', info);\n}\n\nasync function addProductId(productId) {\n  await redis.call('BF.ADD', BLOOM_KEY, productId);\n}\n\nasync function isProductLikelyExist(productId) {\n  const exists = await redis.call('BF.EXISTS', BLOOM_KEY, productId);\n  return exists === 1;\n}\n\n// Example usage\n(async () => {\n  await initializeBloomFilter(100000, 0.01);\n  await addProductId('product-123');\n  console.log(await isProductLikelyExist('product-123'));\n  console.log(await isProductLikelyExist('product-999999'));\n})();"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "StackExchange.Redis does not include Bloom filter commands by default. You can invoke them using the Lua or Scripting API, or use the Redis.Stack library.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class BloomFilterService\n{\n    private readonly IDatabase _db;\n    private const string BloomKey = \"bloom:product-ids\";\n\n    public BloomFilterService(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n    }\n\n    public async Task AddAsync(string item)\n    {\n        await _db.ScriptEvaluateAsync(\n            \"return redis.call('BF.ADD', KEYS[1], ARGV[1])\",\n            new RedisKey[] { BloomKey },\n            new RedisValue[] { item });\n    }\n\n    public async Task<bool> ExistsAsync(string item)\n    {\n        var result = (long)await _db.ScriptEvaluateAsync(\n            \"return redis.call('BF.EXISTS', KEYS[1], ARGV[1])\",\n            new RedisKey[] { BloomKey },\n            new RedisValue[] { item });\n        return result == 1;\n    }\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "bloom-filter-flow",
+        "caption": "Using a Bloom filter to prevent cache penetration before querying the database.",
+        "definition": "flowchart LR\n    A[Client requests product] --> B[Check Bloom filter]\n    B --> C{Bloom says probably exists?}\n    C -->|No| D[Return 404 immediately]\n    C -->|Yes| E[Check Redis cache]\n    E --> F{Cache hit?}\n    F -->|Yes| G[Return cached data]\n    F -->|No| H[Query database]\n    H --> I{Found in DB?}\n    I -->|Yes| J[Populate cache and return]\n    I -->|No| K[Return 404]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Choosing Parameters" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "When you create a Bloom filter, you specify the expected number of items and your target false positive rate. RedisBloom calculates the optimal bit array size and number of hash functions. If you underestimate the item count, the false positive rate will grow beyond your target. If you overestimate, you waste memory. For most applications, a false positive rate between 0.01 and 0.001 provides a good balance." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "False positive", "definition": "A Bloom filter reports an item is present when it is actually absent." },
+          { "term": "False negative", "definition": "A Bloom filter reports an item is absent when it is actually present. Bloom filters never produce false negatives." },
+          { "term": "Cache penetration", "definition": "Requests for nonexistent items bypass the cache and hit the database directly." }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Can I delete items from a Bloom filter?", "answer": "Standard Bloom filters do not support deletion. If you need deletion, use a counting Bloom filter, available in RedisBloom with the CF. commands. Counting Bloom filters use more memory but allow you to decrement counts when items are removed." },
+          { "question": "What happens if the filter fills up beyond the expected item count?", "answer": "The Bloom filter continues to work, but the false positive rate will increase beyond your target. You can monitor the fill ratio with BF.INFO and recreate the filter if needed." },
+          { "question": "Are Bloom filters thread-safe?", "answer": "Yes. RedisBloom commands are executed atomically within Redis, so multiple clients can safely add to or check the same Bloom filter concurrently." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Bloom filters answer set membership with constant memory and no false negatives.",
+          "Use RedisBloom to add Bloom filter support to your Redis instance.",
+          "Bloom filters are excellent for preventing cache penetration by filtering out nonexistent keys.",
+          "Choose your expected item count and false positive rate carefully to balance memory and accuracy."
+        ],
+        "takeaway": "RedisBloom brings probabilistic data structures to Redis, enabling efficient membership testing and cache penetration prevention."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "RedisBloom Documentation", "url": "https://redis.io/docs/latest/stack/bloom/", "type": "article" },
+        { "title": "Bloom Filter Wikipedia", "url": "https://en.wikipedia.org/wiki/Bloom_filter", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "RedisBloom Documentation", "url": "https://redis.io/docs/latest/stack/bloom/", "type": "article" },
+    { "title": "Bloom Filter Wikipedia", "url": "https://en.wikipedia.org/wiki/Bloom_filter", "type": "article" }
+  ]
+}

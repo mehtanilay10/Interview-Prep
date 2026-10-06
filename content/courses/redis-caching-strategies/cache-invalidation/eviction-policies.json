@@ -1,0 +1,191 @@
+{
+  "id": "lesson-redis-013",
+  "slug": "eviction-policies",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Redis Eviction Policies (LRU, LFU, etc.)",
+  "description": "Understand Redis memory eviction policies and how to choose the right one for your workload.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": ["redis", "eviction", "lru", "lfu", "memory"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is an Eviction Policy?",
+        "anchor": "what-is-eviction"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When Redis reaches its configured `maxmemory` limit, it must decide which keys to remove to make room for new data. That decision is governed by the **eviction policy**. Eviction only applies when Redis is used as a cache and `maxmemory` is set; if you never set a limit, Redis will keep writing until the host runs out of memory."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choosing the right eviction policy can dramatically affect cache hit rates and application latency. A poor choice may evict hot data while keeping cold data, or may allow one expensive key to consume the entire cache."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "maxmemory",
+            "definition": "A Redis configuration option that caps the amount of memory Redis can use for data."
+          },
+          {
+            "term": "Eviction",
+            "definition": "The automatic removal of keys when Redis hits its memory limit."
+          },
+          {
+            "term": "LRU (Least Recently Used)",
+            "definition": "Evicts the key that has not been accessed for the longest time."
+          },
+          {
+            "term": "LFU (Least Frequently Used)",
+            "definition": "Evicts the key with the lowest access count over a recent window."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Eviction Policies",
+        "anchor": "common-policies"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Policy", "Description", "Best For"],
+        "rows": [
+          ["noeviction", "Reject writes when memory is full; reads still work.", "Persistent stores where data loss is unacceptable."],
+          ["allkeys-lru", "Evict the least recently used key across all keyspaces.", "General-purpose caches with temporal locality."],
+          ["volatile-lru", "Evict the least recently used key among keys with an EXPIRE.", "Caches where some keys should never expire."],
+          ["allkeys-lfu", "Evict the least frequently used key across all keyspaces.", "Skewed access patterns where some keys are hot."],
+          ["volatile-lfu", "Evict the least frequently used key among keys with an EXPIRE.", "Mixed workloads with expiring and persistent data."],
+          ["allkeys-random", "Evict a random key across all keyspaces.", "Uniform access patterns where recency does not matter."],
+          ["volatile-random", "Evict a random key among keys with an EXPIRE.", "Simple fallback when LRU/LFU is too expensive."],
+          ["volatile-ttl", "Evict the key with the nearest expiration among keys with an EXPIRE.", "TTL-driven caches where sooner-to-expire keys can go first."]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configuring Eviction",
+        "anchor": "configuring-eviction"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You configure `maxmemory` and the eviction policy in `redis.conf` or via the `CONFIG SET` command at runtime. Many managed Redis services expose these as environment variables or dashboard settings."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Setting maxmemory and eviction policy",
+        "content": "Configure Redis to use up to 512 MB and evict using the allkeys-lru policy.",
+        "code": "# redis.conf\nmaxmemory 512mb\nmaxmemory-policy allkeys-lru\n\n# Runtime via Redis CLI\nCONFIG SET maxmemory 536870912\nCONFIG SET maxmemory-policy allkeys-lfu",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Reading current eviction config",
+        "content": "Inspect the current memory limit and eviction policy using ioredis.",
+        "code": "import Redis from 'ioredis';\nconst redis = new Redis();\n\nasync function showEvictionConfig() {\n  const maxmemory = await redis.config('GET', 'maxmemory');\n  const policy = await redis.config('GET', 'maxmemory-policy');\n  console.log('maxmemory:', maxmemory[1]);\n  console.log('policy:', policy[1]);\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "LRU vs LFU",
+        "anchor": "lru-vs-lfu"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**LRU** works well when recently accessed data is likely to be accessed again soon — a pattern called temporal locality. **LFU** is better when a small set of keys is accessed far more often than the rest. Redis approximates both algorithms using sampled data to avoid scanning every key, which keeps eviction fast even with millions of keys."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-eviction-comparison",
+        "caption": "Comparison of LRU and LFU eviction: LRU removes the oldest accessed key, while LFU removes the least accessed key.",
+        "definition": "graph LR\n    A[Eviction Triggered] --> B{Policy?}\n    B -->|allkeys-lru| C[Scan keys by last access time]\n    B -->|allkeys-lfu| D[Scan keys by access frequency]\n    C --> E[Remove oldest accessed key]\n    D --> F[Remove least accessed key]\n    E --> G[Free memory for new data]\n    F --> G"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Start with allkeys-lru",
+        "text": "For most caching workloads, allkeys-lru is a safe default. Switch to allkeys-lfu only if you have confirmed skewed access patterns and need better hit rates."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Will eviction delete my database?",
+            "answer": "No. Eviction only removes keys from memory. It does not drop databases, delete RDB/AOF files, or affect replication. Persistent keys are evicted the same as keys with TTL under most policies."
+          },
+          {
+            "question": "Does LFU require Redis 4.0 or later?",
+            "answer": "Yes. LFU was added in Redis 4.0. Earlier versions only support LRU, random, and TTL-based policies."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Set maxmemory and an eviction policy when using Redis as a cache.",
+          "allkeys-lru is a strong default; allkeys-lfu helps skewed access patterns.",
+          "volatile-* policies only evict keys with an EXPIRE set.",
+          "noeviction rejects writes when memory is full but keeps reads working."
+        ],
+        "takeaway": "Eviction policies let Redis defend itself against out-of-memory conditions — choose one that matches your access patterns."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Redis Eviction Policies",
+      "url": "https://redis.io/docs/latest/develop/configure/eviction-policy/",
+      "type": "article",
+      "description": "Official explanation of all Redis eviction policies and when to use each."
+    },
+    {
+      "title": "Redis LRU Approximation",
+      "url": "https://redis.io/docs/latest/develop/configure/eviction-policy/#approximated-lru-algorithm",
+      "type": "article",
+      "description": "How Redis approximates LRU and LFU using sampled data for performance."
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "id": "lesson-mqes-031",
+  "slug": "stream-vs-table",
+  "moduleSlug": "stream-processing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Stream vs Table",
+  "description": "Understand the stream-table duality and choose the right abstraction for your processing logic.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["stream-table-duality", "kafka-streams", "ksqldb", "abstractions", "state"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "The **stream-table duality** is one of the most important concepts in stream processing. A **stream** is an immutable, ordered sequence of events — every insert, update, and delete is a separate record. A **table** is the current state derived from applying all the events in a stream. The same underlying data can be viewed as either a stream or a table depending on the processing semantics you need." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "The Duality Explained" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "If you stream a table's changelog, you get a stream of insert and update events. Conversely, if you fold a stream by key — keeping only the latest value — you get a table. This is not just a theoretical curiosity; it determines how you model aggregations, joins, and caching in systems like Kafka Streams and ksqlDB." }
+    },
+    {
+      "type": "key-terms",
+      "id": "kt1",
+      "data": {
+        "terms": [
+          { "term": "Stream", "definition": "An append-only log of events where every record matters, including retractions and corrections." },
+          { "term": "Table", "definition": "The latest state for each key, derived by folding a stream with an aggregation such as reduce or count." },
+          { "term": "Changelog", "definition": "A stream that represents the history of changes to a table." },
+          { "term": "Retraction", "definition": "A record that supersedes a previous value for the same key, common in compacted topics." }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 3, "text": "When to Use a Stream" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p3",
+      "data": { "text": "Use a **stream** when you need the full history of events: auditing, event replay, or calculating metrics that depend on every occurrence (for example, total revenue per day). Streams are also the right choice when the same key appears multiple times and each occurrence carries independent meaning, such as individual click events." }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "When to Use a Table" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p4",
+      "data": { "text": "Use a **table** when you only care about the current state: the latest price of a product, the current status of an order, or the most recent location of a device. Tables are materialized views that make lookups and joins efficient because they avoid scanning historical events on every query." }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Stream-to-Table Aggregation in C#",
+        "content": "The following C# example illustrates stream-table duality by folding a stream of user events into a dictionary representing the current state.",
+        "code": "var userEvents = new List<(string UserId, string EventType, DateTime Timestamp)>\n{\n    (\"u1\", \"login\", DateTime.Parse(\"2024-01-01T08:00:00Z\")),\n    (\"u2\", \"login\", DateTime.Parse(\"2024-01-01T08:05:00Z\")),\n    (\"u1\", \"logout\", DateTime.Parse(\"2024-01-01T09:00:00Z\")),\n    (\"u1\", \"login\", DateTime.Parse(\"2024-01-01T10:00:00Z\"))\n};\n\n// Stream: every event is retained\nforeach (var evt in userEvents)\n    Console.WriteLine($\"{evt.Timestamp:u} {evt.UserId} -> {evt.EventType}\");\n\n// Table: latest state per user (fold by key)\nvar latestState = userEvents\n    .GroupBy(e => e.UserId)\n    .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Timestamp).First());\n\nforeach (var (userId, state) in latestState)\n    Console.WriteLine($\"{userId}: {state.EventType} at {state.Timestamp:u}\");",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-031-1",
+        "caption": "Stream-table duality: same data, two views",
+        "definition": "flowchart LR\n    Stream[(Event Stream)] -->|Fold by Key| Table[(Table / Current State)]\n    Table -->|Changelog| Stream2[(Changelog Stream)]\n    Stream -->|Replay| Audit[Audit / Replay]\n    Table -->|Lookup| Query[Point Lookup]\n    style Stream fill:#e1f5fe\n    style Table fill:#e8f5e9"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "id": "bl1",
+      "data": {
+        "title": "Modeling Decisions",
+        "items": [
+          "Model a payment ledger as a stream because every transaction must be recorded and auditable.",
+          "Model a customer profile as a table because you only need the latest address and tier.",
+          "Model a sensor reading as a stream when you need historical trends; model it as a table when you only need the current reading.",
+          "Use compacted topics to store tables efficiently in Kafka."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "warning", "title": "Retraction Matters", "text": "In Kafka, updates to a key generate a new record with the same key. The old record is not deleted; it is superseded. If you consume a stream as a table without compacting, your table will grow indefinitely and lookups will return stale results." }
+    },
+    {
+      "type": "summary-box",
+      "id": "s1",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Streams preserve every event; tables preserve only the latest state per key",
+          "A table's changelog is a stream; a stream folded by key becomes a table",
+          "Use streams for audit, replay, and full-history analytics",
+          "Use tables for lookups, joins, and materialized views"
+        ],
+        "takeaway": "Choosing between stream and table is not about the data itself, but about the processing semantics you need."
+      }
+    },
+    {
+      "type": "faq-block",
+      "id": "f1",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Can I convert a stream to a table in ksqlDB?", "answer": "Yes. Use CREATE TABLE ... AS SELECT ... FROM stream GROUP BY key to materialize a table from a stream. The resulting table is backed by a compacted Kafka topic." },
+          { "question": "Does Kafka Streams automatically compact topics for tables?", "answer": "Kafka Streams uses compacted changelog topics for state stores, but output topics must be explicitly configured with cleanup.policy=compact if you want them compacted." },
+          { "question": "What is a global table in Kafka Streams?", "answer": "A GlobalKTable is a table that is fully replicated on every stream application instance. It is useful for small, rarely changing reference data such as customer profiles or product catalogs." }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Streams and Tables in Kafka", "url": "https://www.confluent.io/blog/streams-and-tables-in-part-1-the-basics/", "type": "article", "author": "Confluent", "description": "Foundational blog post explaining the stream-table duality with Kafka examples." }
+  ],
+  "courseSlug": "message-queues-event-streaming"
+}

@@ -1,6 +1,6 @@
 import nextVitals from 'eslint-config-next/core-web-vitals';
 
-export default [
+const config = [
   ...nextVitals,
   {
     ignores: ['.kilo', 'node_modules', '.next', 'out']
@@ -12,3 +12,5 @@ export default [
     }
   }
 ];
+
+export default config;

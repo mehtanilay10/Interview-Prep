@@ -1,0 +1,210 @@
+{
+  "id": "lesson-api-design-problems-rate-limiting-design-distributed-rate-limiting",
+  "slug": "distributed-rate-limiting",
+  "moduleSlug": "rate-limiting-design",
+  "courseSlug": "api-design-problems",
+  "title": "Distributed Rate Limiting",
+  "description": "Implement distributed rate limiting across multiple API gateway instances using Redis cluster, sticky sessions, and consistent hashing.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["distributed", "redis-cluster", "gateway", "consistency"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a distributed system with multiple API gateway instances, rate limit state must be shared. In-memory rate limiters fail because each instance has its own counter. You need a shared store — typically Redis — and a strategy to keep it consistent under high concurrency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture Options"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Distributed rate limiting patterns",
+        "cards": [
+          {
+            "title": "Centralized Redis",
+            "description": "All gateways read/write rate limit state to a single Redis cluster.",
+            "pros": [
+              "Single source of truth",
+              "Simple to implement",
+              "Lua scripts provide atomicity"
+            ],
+            "cons": [
+              "Redis is a single point of failure",
+              "Network round-trip adds latency (~1-2ms)",
+              "Redis cluster sharding must consider rate limit key distribution"
+            ],
+            "tags": ["simple", "single-store"]
+          },
+          {
+            "title": "Sticky Sessions",
+            "description": "Route the same client to the same gateway instance for rate limiting.",
+            "pros": [
+              "No shared store needed",
+              "Low latency (in-memory counters)",
+              "Simple gateway configuration"
+            ],
+            "cons": [
+              "Breaks on instance restart or scale-down",
+              "Load balancing is uneven",
+              "Client failover resets their rate limit"
+            ],
+            "tags": ["low-latency", "fragile"]
+          },
+          {
+            "title": "Consistent Hashing",
+            "description": "Hash the rate limit key to a specific gateway instance.",
+            "pros": [
+              "Even load distribution",
+              "Minimal reshuffling on scale",
+              "No shared store"
+            ],
+            "cons": [
+              "Still breaks on instance removal",
+              "Key migration is complex",
+              "Not truly consistent across deployments"
+            ],
+            "tags": ["complex", "eventual"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Recommended: Centralized Redis Cluster"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use a Redis Cluster with the rate limit key as the hash tag. Lua scripts run atomically on the shard that owns the key. This gives you a single source of truth with sub-millisecond latency."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis Cluster key design for rate limiting",
+        "content": "Use hash tags to ensure all rate limit keys for a user land on the same shard.",
+        "code": "# Redis Cluster hash tag: {user:123}\n# All keys with the same tag hash to the same shard\n\nKEYS:\n  {user:123}:rate:tokens    # Token balance for user 123\n  {user:123}:rate:last      # Last refill timestamp\n  {user:123}:sliding:prev   # Sliding window previous count\n  {user:123}:sliding:curr   # Sliding window current count\n\n# Lua script runs on the shard that owns {user:123}\n# All operations are atomic — no race conditions across shards",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Envoy Rate Limit Service"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Envoy gRPC rate limit service configuration",
+        "content": "Envoy delegates rate limiting to a gRPC service that queries Redis.",
+        "code": "# Envoy rate limit config\nextension_config:\n  name: envoy.rate_limit_descriptors\n\nrate_limits:\n  - actions:\n      - generic_key:\n          descriptor_key: user_id\n          value: \"%REQ:x-user-id%\"\n  - actions:\n      - generic_key:\n          descriptor_key: endpoint\n          value: \"%REQ(:path)%\"\n\n# Rate limit service (RLS) gRPC backend\nrate_limit_service:\n  grpc_service:\n    envoy_grpc:\n      cluster_name: rate_limit_cluster\n  transport_api_version: V3\n\n# RLS checks Redis via Lua and returns:\n# OK: allow request\n# OVER_LIMIT: reject with 429",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Redis Failures"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use Redis Cluster with replicas for high availability",
+          "If Redis is unreachable, decide: fail open (allow all) or fail closed (reject all)",
+          "Most production APIs fail open — a rate limit outage should not take down the entire API",
+          "Alert on Redis latency spikes; a slow Redis degrades all rate limit decisions",
+          "Use sentinel or cluster auto-failover for automatic Redis recovery"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Latency Budget"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Component", "Typical Latency", "P99 Latency", "Mitigation"],
+        "rows": [
+          ["Redis single-node", "0.5-1ms", "2ms", "Keep Redis co-located with gateway"],
+          ["Redis Cluster (cross-slot)", "1-2ms", "5ms", "Use hash tags to keep related keys on same shard"],
+          ["Redis Lua script", "0.3-0.5ms", "1ms", "Keep scripts simple; avoid loops"],
+          ["gRPC RLS round-trip", "1-3ms", "10ms", "Cache results locally with short TTL"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The distributed penalty",
+        "text": "Distributed rate limiting adds 1-3ms of latency per request. For APIs with strict latency budgets (<10ms), consider local rate limiting with periodic Redis sync, or accept that rate limiting requires a latency tax."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Can I use PostgreSQL instead of Redis?",
+            "answer": "PostgreSQL can work but is slower for high-throughput rate limiting. Use it for billing or compliance where accuracy matters more than throughput. Use Redis for real-time API rate limiting."
+          },
+          {
+            "question": "How do I prevent Redis hot shards?",
+            "answer": "Use consistent hash tags and avoid high-cardinality keys hitting the same shard. Distribute rate limit keys across the cluster using a prefix like rate:{hash(userId) % 16}:{userId}."
+          },
+          {
+            "question": "Should I use a CDN for rate limiting?",
+            "answer": "CDNs can rate limit at the edge, but they lack the granularity of per-user Redis state. Use CDN rate limiting for IP-based abuse prevention and Redis for authenticated user quotas."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Centralized Redis with Lua scripts is the standard distributed pattern.",
+          "Hash tags keep related keys on the same Redis shard.",
+          "Fail open on Redis outages — rate limiting should not cause downtime.",
+          "Add 1-3ms latency budget for the Redis round-trip."
+        ],
+        "takeaway": "Distributed rate limiting is a solved problem with Redis. The hard part is not the algorithm — it is handling Redis failures gracefully and keeping key distribution even across the cluster."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "token-bucket-implementation",
+    "rate-limit-headers"
+  ],
+  "furtherReading": [
+    {
+      "title": "Envoy Rate Limit Service",
+      "url": "https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/rate_limit",
+      "type": "article",
+      "author": "Envoy Proxy",
+      "description": "How to configure Envoy's rate limiting extension."
+    }
+  ]
+}

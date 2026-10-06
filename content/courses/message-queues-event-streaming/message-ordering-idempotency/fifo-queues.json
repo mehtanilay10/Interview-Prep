@@ -1,0 +1,178 @@
+{
+  "id": "lesson-mqes-013",
+  "slug": "fifo-queues",
+  "moduleSlug": "message-ordering-idempotency",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "FIFO Queues",
+  "description": "Implement first-in-first-out message delivery using RabbitMQ quorum queues and Amazon SQS FIFO queues.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "fifo",
+    "rabbitmq",
+    "sqs",
+    "ordering",
+    "queue-policies"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A FIFO queue guarantees that messages are delivered and processed in the order they are sent. This sounds trivial, but most popular message brokers default to best-effort ordering. To get strong ordering guarantees you must configure the broker and the producer correctly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "RabbitMQ: Quorum Queues"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Classic mirrored queues in RabbitMQ do not guarantee strict ordering across failovers. Quorum queues, introduced in RabbitMQ 3.8, use the Raft consensus algorithm. Every message is replicated to a majority of nodes before being acknowledged, which provides both durability and a single, consistent delivery order."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Declaring a Quorum Queue",
+        "content": "Use amqplib to declare a durable quorum queue with single active consumer.",
+        "language": "javascript",
+        "code": "const amqp = require('amqplib');\n\nasync function declareFifoQueue(channel) {\n  await channel.assertQueue('order-events', {\n    durable: true,\n    arguments: {\n      'x-queue-type': 'quorum',\n      'x-single-active-consumer': true\n    }\n  });\n\n  channel.prefetch(1);\n  const { consumerTag } = await channel.consume('order-events', (msg) => {\n    if (msg !== null) {\n      console.log('Received:', msg.content.toString());\n      channel.ack(msg);\n    }\n  }, { noAck: false });\n\n  console.log('Consumer tag:', consumerTag);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Amazon SQS FIFO Queues"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQS FIFO queues preserve the order of messages within a single message group. The producer sets a `MessageGroupId` — all messages with the same group ID are delivered in first-in-first-out order. Content-based deduplication is available via a five-minute deduplication window, which we will cover in the deduplication lesson."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Sending to an SQS FIFO Queue",
+        "content": "Use the AWS SDK for .NET to send an ordered message.",
+        "language": "csharp",
+        "code": "using Amazon.SQS;\nusing Amazon.SQS.Model;\n\npublic class SqsFifoProducer\n{\n    private readonly IAmazonSQS _sqs;\n    private readonly string _queueUrl;\n\n    public SqsFifoProducer(IAmazonSQS sqs, string queueUrl)\n    {\n        _sqs = sqs;\n        _queueUrl = queueUrl;\n    }\n\n    public async Task SendAsync(string groupId, string body, string messageDeduplicationId)\n    {\n        var request = new SendMessageRequest\n        {\n            QueueUrl = _queueUrl,\n            MessageBody = body,\n            MessageGroupId = groupId,\n            MessageDeduplicationId = messageDeduplicationId\n        };\n\n        var response = await _sqs.SendMessageAsync(request);\n        Console.WriteLine($\"Sent {response.MessageId} to group {groupId}\");\n    }\n}"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "RabbitMQ Quorum Queue vs SQS FIFO",
+        "cards": [
+          {
+            "title": "RabbitMQ Quorum Queue",
+            "description": "Ordering guaranteed by Raft consensus across replicas. Best for on-premises or self-managed deployments.",
+            "pros": [
+              "Strong consistency via consensus",
+              "High availability with automatic failover",
+              "Supports complex routing topologies"
+            ],
+            "cons": [
+              "Requires at least 3 nodes for production",
+              "Higher latency than classic queues due to consensus",
+              "Memory and disk overhead from replication"
+            ]
+          },
+          {
+            "title": "Amazon SQS FIFO",
+            "description": "Ordering scoped to message groups. Managed service with no infrastructure to maintain.",
+            "pros": [
+              "Fully managed, no servers to run",
+              "Scales automatically",
+              "Integrated with AWS IAM and CloudWatch"
+            ],
+            "cons": [
+              "Throughput limited to 300 msg/s per group without batching",
+              "Vendor lock-in",
+              "No push delivery — consumers must poll"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-fifo-comparison",
+        "caption": "Message flow through FIFO queues in RabbitMQ and SQS",
+        "definition": "graph LR\n    subgraph RabbitMQ[RabbitMQ Quorum]\n        P1[Publisher] --> Q1[Quorum Queue]\n        Q1 --> R1[Raft Replicate]\n        R1 --> C1[Single Consumer]\n    end\n    subgraph SQS[AWS SQS FIFO]\n        P2[Producer] -->|GroupId: A| Q2[FIFO Queue]\n        Q2 -->|poll| C2[Lambda Consumer]\n    end\n    style Q1 fill:#e1f5fe\n    style Q2 fill:#e8f5e9"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Single Active Consumer",
+        "text": "Both RabbitMQ (with x-single-active-consumer) and SQS (with one consumer) avoid the out-of-order delivery that occurs when multiple consumers race to process messages from the same group."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Terms"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Quorum queue",
+            "definition": "A RabbitMQ queue type that replicates messages using Raft consensus, providing strong consistency and ordering."
+          },
+          {
+            "term": "MessageGroupId",
+            "definition": "An SQS FIFO attribute that groups messages for ordered delivery. All messages with the same ID are delivered in order."
+          },
+          {
+            "term": "Single active consumer",
+            "definition": "A queue setting ensuring only one consumer is active at a time, preventing concurrent processing that could reorder messages."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RabbitMQ quorum queues use Raft for ordered, replicated delivery",
+          "SQS FIFO queues use MessageGroupId for per-group ordering",
+          "Single active consumer prevents concurrent reordering",
+          "Choose the broker that matches your operational and throughput requirements"
+        ],
+        "takeaway": "FIFO queues are available in both RabbitMQ and SQS, but they achieve ordering through different mechanisms and with different trade-offs."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ: Quorum Queues",
+      "url": "https://www.rabbitmq.com/docs/quorum-queues",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Deep dive into quorum queues, Raft consensus, and when to use them."
+    },
+    {
+      "title": "AWS: Amazon SQS FIFO Queues",
+      "url": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html",
+      "type": "article",
+      "author": "AWS Documentation",
+      "description": "How to use MessageGroupId and content-based deduplication in SQS FIFO."
+    }
+  ]
+}

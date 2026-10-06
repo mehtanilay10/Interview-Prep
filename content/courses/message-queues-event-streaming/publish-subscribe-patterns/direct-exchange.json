@@ -1,0 +1,218 @@
+{
+  "id": "lesson-mqes-007",
+  "slug": "direct-exchange",
+  "moduleSlug": "publish-subscribe-patterns",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Direct Exchange: Precise Message Routing",
+  "description": "Understand how direct exchanges route messages to queues based on exact routing key matches.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 13,
+  "tags": [
+    "rabbitmq",
+    "direct-exchange",
+    "routing",
+    "routing-key",
+    "messaging"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **direct exchange** routes messages to queues whose binding routing key exactly matches the message's routing key. It is the most predictable exchange type and forms the basis for most production messaging architectures. Unlike fanout, which ignores routing keys, direct exchanges give you precise control over where each message lands."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Routing Keys in Action"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Suppose your application processes log messages at multiple severity levels: `error`, `warning`, and `info`. You can bind a queue to the direct exchange with the key `error` so it receives only error logs, while another queue bound with `warning` receives only warnings. A third queue bound to `#` (a special binding key in some brokers) could receive all severities."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "direct-diagram",
+        "caption": "Direct exchange routing messages by exact routing key match",
+        "definition": "graph LR\n    P[Publisher] --> E[direct: app.logs]\n    E -->|key: error| Q1[queue: error-alerts]\n    E -->|key: warning| Q2[queue: warning-dashboard]\n    E -->|key: info| Q3[queue: info-archive]\n    Q1 --> C1[Consumer: OnCall]\n    Q2 --> C2[Consumer: Dashboard]\n    Q3 --> C3[Consumer: Archive]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Binding Multiple Keys to One Queue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A single queue can be bound to a direct exchange multiple times with different routing keys. For example, a `logs` queue could be bound with both `error` and `warning` keys so it receives both severity levels from the same exchange without needing multiple consumers."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This multi-binding capability is especially useful for consumer applications that need to process multiple message categories. Rather than deploying separate consumers for each category, a single worker can consume from one queue bound to multiple routing keys. The trade-off is that the consumer must now inspect and categorize messages itself, adding a small amount of application logic."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When designing a direct exchange routing scheme, choose routing keys that are descriptive and consistent. Use dot-separated namespaces like `order.created`, `order.shipped`, and `payment.completed` to enable future migration to topic exchanges without breaking existing bindings. Consistent key naming also makes monitoring and debugging significantly easier in production."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Direct exchange with multiple bindings",
+        "content": "Declare a direct exchange, bind queues with specific routing keys, then publish messages using those keys.",
+        "code": "var factory = new ConnectionFactory() { HostName = \"localhost\" };\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\n// Declare direct exchange\nchannel.ExchangeDeclare(\"app.logs\", ExchangeType.Direct, durable: true);\n\n// Declare queues\nchannel.QueueDeclare(\"error-alerts\", durable: true);\nchannel.QueueDeclare(\"warning-dashboard\", durable: true);\nchannel.QueueDeclare(\"info-archive\", durable: true);\n\n// Bind each queue with its specific routing key\nchannel.QueueBind(queue: \"error-alerts\", exchange: \"app.logs\", routingKey: \"error\");\nchannel.QueueBind(queue: \"warning-dashboard\", exchange: \"app.logs\", routingKey: \"warning\");\nchannel.QueueBind(queue: \"info-archive\", exchange: \"app.logs\", routingKey: \"info\");\n\n// Publish an error message\nvar body = Encoding.UTF8.GetBytes(\"Disk full on /dev/sda1\");\nchannel.BasicPublish(\n    exchange: \"app.logs\",\n    routingKey: \"error\",\n    basicProperties: null,\n    body: body);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Routing with direct exchange",
+        "content": "A Node.js consumer that binds to a specific routing key and processes matching messages.",
+        "code": "const amqp = require('amqplib');\n\nasync function startErrorConsumer() {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n\n  await ch.assertExchange('app.logs', 'direct', { durable: true });\n  await ch.assertQueue('error-alerts', { durable: true });\n\n  // Bind only to the 'error' routing key\n  ch.bindQueue('error-alerts', 'app.logs', 'error');\n\n  ch.consume('error-alerts', (msg) => {\n    if (msg.content) {\n      const severity = msg.fields.routingKey;\n      const text = msg.content.toString();\n      console.log(`[${severity}] ${text}`);\n    }\n  });\n}\n\nstartErrorConsumer();",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Direct vs Fanout",
+        "text": "Direct exchanges are to fanout exchanges what a mail slot is to a broadcast speaker. If you know exactly where a message should go, use direct. If every interested party should receive it regardless of intent, use fanout."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Direct Exchange",
+          "Fanout Exchange"
+        ],
+        "rows": [
+          [
+            "Routing Key",
+            "Required for matching",
+            "Ignored entirely"
+          ],
+          [
+            "Message Delivery",
+            "Only to matching queues",
+            "To all bound queues"
+          ],
+          [
+            "Common Use Case",
+            "Log severity, task types",
+            "Event broadcasting, notifications"
+          ],
+          [
+            "Binding Complexity",
+            "Medium (key management)",
+            "Low (no keys to manage)"
+          ],
+          [
+            "Performance",
+            "High (narrow routing)",
+            "Slightly higher (fanout overhead)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Direct Exchange",
+            "definition": "An AMQP exchange type that routes messages to queues based on exact routing key matches."
+          },
+          {
+            "term": "Routing Key",
+            "definition": "A string label attached to a message that direct exchanges use to look up matching queue bindings."
+          },
+          {
+            "term": "Multi-binding",
+            "definition": "The ability to bind a single queue to one exchange multiple times using different routing keys."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can a queue receive messages from multiple direct exchanges?",
+            "answer": "Yes. A queue can be bound to any number of exchanges. This is useful for aggregating messages from different sources into a single consumer."
+          },
+          {
+            "question": "What if the routing key does not match any binding?",
+            "answer": "The message is silently discarded by the broker. Always validate routing keys at the publisher side or monitor with a dead-letter exchange to catch un-routed messages."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Direct exchanges route messages based on exact routing key matches.",
+          "One queue can have multiple bindings with different keys.",
+          "Unmatched messages are silently dropped — use DLQ for safety.",
+          "Best for targeted routing like log levels and task categories."
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "RabbitMQ — Direct Exchange Tutorial",
+          "url": "https://www.rabbitmq.com/tutorials/tutorial-four-python.html",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "Official RabbitMQ tutorial demonstrating direct exchange routing with code examples."
+        },
+        {
+          "title": "Azure Service Bus — Topics and Subscriptions",
+          "url": "https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-topics-subscriptions",
+          "type": "article",
+          "author": "Microsoft",
+          "description": "Microsoft documentation on topics and subscriptions — Azure's equivalent of direct exchange routing."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ — Direct Exchange Tutorial",
+      "url": "https://www.rabbitmq.com/tutorials/tutorial-four-python.html",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Official RabbitMQ tutorial demonstrating direct exchange routing with code examples."
+    },
+    {
+      "title": "Azure Service Bus — Topics and Subscriptions",
+      "url": "https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-topics-subscriptions",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Microsoft documentation on topics and subscriptions — Azure's equivalent of direct exchange routing."
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "id": "lesson-mqes-006",
+  "slug": "fanout-exchange",
+  "moduleSlug": "publish-subscribe-patterns",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Fanout Exchange: Broadcast Messaging",
+  "description": "Learn how fanout exchanges broadcast messages to every bound queue regardless of routing keys.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "rabbitmq",
+    "fanout-exchange",
+    "broadcast",
+    "pubsub",
+    "messaging"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **fanout exchange** is the simplest type of exchange in AMQP-based brokers like RabbitMQ. When a message arrives at a fanout exchange, it is blindly broadcast to every queue that is bound to it — routing keys are completely ignored. This makes fanout exchanges ideal for scenarios where you need to deliver the same message to multiple independent consumers simultaneously."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Fanout Exchanges Work"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Imagine a stock-trading application. When a new trade executes, you may want to simultaneously notify the audit service, the notification service, and the analytics pipeline. Rather than sending three separate messages, you publish one message to a fanout exchange and let the broker deliver copies to all three queues."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "fanout-diagram",
+        "caption": "Fanout exchange routing one message to three bound queues",
+        "definition": "graph LR\n    P[Publisher] --> E[fanout: stock.trades]\n    E -->|copy| Q1[queue: audit-service]\n    E -->|copy| Q2[queue: notification-service]\n    E -->|copy| Q3[queue: analytics-pipeline]\n    Q1 --> C1[Consumer A]\n    Q2 --> C2[Consumer B]\n    Q3 --> C3[Consumer C]"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "From a design perspective, fanout exchanges decouple publishers from consumers completely. The publisher knows nothing about which services are listening or how many. This decoupling is powerful: you can add a new analytics consumer at any time without changing a single line of publisher code. You simply declare a new queue, bind it to the fanout exchange, and it begins receiving events immediately. This is the hallmark of a well-architected event-driven system."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "It is equally important to recognize when fanout exchanges are the wrong tool. If your workload has even modest routing requirements — such as filtering events by type, region, or tenant — fanout will waste network and CPU resources delivering irrelevant messages to consumers that must discard them. In those cases, a direct or topic exchange is the more efficient choice."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Declaring and Using a Fanout Exchange"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Below is a C# example using the `RabbitMQ.Client` library. The publisher declares the exchange as `fanout`, and each consumer binds its queue with an empty routing key (since routing keys are irrelevant for fanout exchanges)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Publishing to a fanout exchange",
+        "content": "The publisher sends a message to the fanout exchange. Every bound queue receives a copy.",
+        "code": "var factory = new ConnectionFactory() { HostName = \"localhost\" };\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\n// Declare a fanout exchange\nchannel.ExchangeDeclare(\"stock.trades\", ExchangeType.Fanout);\n\nvar message = \"AAPL:150.25,BUY,100\";\nvar body = Encoding.UTF8.GetBytes(message);\n\nvar properties = channel.CreateBasicProperties();\nproperties.Persistent = true;\n\n// Publish — routingKey is ignored by fanout exchanges\nchannel.BasicPublish(\n    exchange: \"stock.trades\",\n    routingKey: \"\",\n    basicProperties: properties,\n    body: body);\n\nConsole.WriteLine(\"Message broadcast to all bound queues.\");",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Consuming from a fanout-bound queue",
+        "content": "Each consumer declares an exclusive queue, binds it to the fanout exchange, and receives all messages.",
+        "code": "const amqp = require('amqplib');\n\nasync function startConsumer(queueName) {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n\n  await ch.assertExchange('stock.trades', 'fanout', { durable: true });\n\n  const { queue } = await ch.assertQueue('', { exclusive: true });\n  await ch.bindQueue(queue, 'stock.trades', '');\n\n  console.log(`[${queueName}] Waiting for messages...`);\n  ch.consume(queue, (msg) => {\n    if (msg.content) {\n      console.log(`[${queueName}] Received: ${msg.content.toString()}`);\n    }\n  }, { noAck: true });\n}\n\nstartConsumer('audit-service');",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "When to Use Fanout Exchanges",
+        "text": "Use fanout exchanges when the same event must trigger multiple independent workflows. Common patterns include event notification pipelines, cache invalidation across services, and audit logging. Avoid fanout if you only need one consumer to handle a message — use a direct or work queue instead."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Fanout Exchange",
+            "definition": "An AMQP exchange type that routes every message to all bound queues, ignoring the routing key entirely."
+          },
+          {
+            "term": "Binding",
+            "definition": "A relationship between an exchange and a queue that tells the broker how to route messages from the exchange to that queue."
+          },
+          {
+            "term": "Routing Key",
+            "definition": "An optional label attached to a message that certain exchange types use to decide which queues receive the message."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What happens if no queues are bound to a fanout exchange?",
+            "answer": "The message is silently discarded by the broker. If you need guaranteed delivery, always bind at least one durable queue before publishing."
+          },
+          {
+            "question": "Can a fanout exchange have a durable queue?",
+            "answer": "Yes. Durable queues survive broker restarts, and durable fanout exchanges persist their bindings. Combine both to ensure no events are lost across restarts."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Fanout exchanges broadcast every message to all bound queues.",
+          "Routing keys are ignored completely.",
+          "Ideal for event notification, audit logging, and multi-consumer scenarios.",
+          "Always use durable queues if message persistence matters."
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "RabbitMQ — AMQP 0-9-1 Model: Exchanges",
+          "url": "https://www.rabbitmq.com/tutorials/amqp-concepts.html",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "Official AMQP model documentation covering fanout, direct, topic, and header exchanges."
+        },
+        {
+          "title": "RabbitMQ Tutorials: Publish/Subscribe",
+          "url": "https://www.rabbitmq.com/tutorials/tutorial-five-python.html",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "Step-by-step tutorial on implementing a fanout-based publish/subscribe pattern in Python (concepts apply to all languages)."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ — AMQP 0-9-1 Model: Exchanges",
+      "url": "https://www.rabbitmq.com/tutorials/amqp-concepts.html",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Official AMQP model documentation covering fanout, direct, topic, and header exchanges."
+    },
+    {
+      "title": "RabbitMQ Tutorials: Publish/Subscribe",
+      "url": "https://www.rabbitmq.com/tutorials/tutorial-five-python.html",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Step-by-step tutorial on implementing a fanout-based publish/subscribe pattern."
+    }
+  ]
+}

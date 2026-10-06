@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { logger } from '@/lib/logger';
 
 const STORAGE_KEY = 'interview_prep_preferences';
 
@@ -52,7 +53,7 @@ async function syncPreferencesToServer(preferences: UserPreferences): Promise<vo
       body: JSON.stringify(preferences),
     });
   } catch (err) {
-    console.warn('[useUserPreferences] Failed to sync to server', err);
+    logger.warn('useUserPreferences', 'Failed to sync to server', err);
   }
 }
 

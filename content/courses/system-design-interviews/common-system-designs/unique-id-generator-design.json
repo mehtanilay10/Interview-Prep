@@ -1,0 +1,211 @@
+{
+  "id": "lesson-sdi-059",
+  "slug": "unique-id-generator-design",
+  "moduleSlug": "common-system-designs",
+  "courseSlug": "system-design-interviews",
+  "title": "Unique ID Generator Design",
+  "description": "Design a distributed unique ID generator that produces sortable, collision-free identifiers across multiple data centers and services.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["system-design", "id-generation", "snowflake", "uuid", "distributed-systems", "sorting"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Unique ID generators produce identifiers that never collide, even across thousands of independent services. They appear in almost every system: user IDs, order IDs, message IDs, and payment transaction IDs. In interviews, ID generator design tests your ability to reason about uniqueness guarantees, sortability, time-based ordering, and coordination in distributed environments."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Not Use Database Sequences"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Auto-incrementing database columns are simple but create a single point of failure. Scaling the database shards the sequence and requires coordination between shards. Database sequences also leak information about total records and growth rate. For distributed systems, a centralized sequence does not scale horizontally and introduces coupling between services that should be independent."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "UUID and Its Limitations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "UUIDs are 128-bit random or pseudo-random identifiers that guarantee an astronomically low collision probability without coordination. Version 4 UUIDs use random numbers and never require a central generator. However, UUIDs are not sortable by creation time because the timestamp portion is not at the most significant bits. Random UUIDs also cause B-tree index fragmentation in databases, slowing down range queries and inserts."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Comparing ID Strategies",
+        "cards": [
+          {
+            "title": "UUID v4",
+            "pros": ["No coordination required", "Near-zero collision probability", "Standardized and portable"],
+            "cons": ["Not sortable by time", "128 bits is long", "Causes index fragmentation"]
+          },
+          {
+            "title": "Snowflake",
+            "pros": ["64 bits, sortable by time", "Monotonically increasing", "No coordination needed after initialization"],
+            "cons": ["Requires clock synchronization", "More complex to explain", "Clock rollback can cause collisions"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Snowflake ID Structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Snowflake encodes a 64-bit integer from five components: 1 bit for sign, 41 bits for a custom epoch millisecond timestamp, 10 bits for a worker or machine ID, and 12 bits for a per-machine sequence number. The worker ID must be unique within the deployment and is typically assigned via ZooKeeper, etcd, or a configuration management system. Within the same millisecond, the sequence number increments to avoid collisions on the same machine."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "snowflake-structure",
+        "caption": "Bit layout of a Snowflake ID",
+        "definition": "flowchart LR\n    A[64-bit ID] --> B[1 bit: Sign]\n    A --> C[41 bits: Timestamp]\n    A --> D[10 bits: Worker ID]\n    A --> E[12 bits: Sequence]\n    C --> F[Custom epoch]\n    D --> G[Up to 1024 workers]\n    E --> H[4096 IDs per ms per worker]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Alternative: Database-Ticket Approach"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For services that already depend on a relational database, the ticket approach pre-allocates blocks of IDs from a centralized table. Each service instance requests a block of 1,000 IDs and uses them locally without further coordination. When the block is exhausted, the service requests a new block. This approach reduces database round trips while maintaining uniqueness through the source of truth."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Clock synchronization",
+        "text": "Time-based ID generators require NTP or a similar clock synchronization protocol. Monitor clock drift and failover to UUID generation if the clock drifts beyond a safe threshold."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements Checklist"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "ID Generator Requirements",
+        "items": [
+          {
+            "text": "IDs must be globally unique with an astronomically low collision probability",
+            "hint": "Collisions corrupt data and break referential integrity"
+          },
+          {
+            "text": "IDs should be sortable by creation time for efficient range queries",
+            "hint": "Time-based IDs avoid expensive ORDER BY DESC operations"
+          },
+          {
+            "text": "Generator must scale horizontally without coordination overhead",
+            "hint": "New instances should start generating IDs immediately"
+          },
+          {
+            "text": "Generator should tolerate clock skew and failover gracefully",
+            "hint": "Use NTP monitoring and fallback strategies"
+          }
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Snowflake",
+            "definition": "A 64-bit distributed ID format that encodes a timestamp, worker ID, and sequence number for sortable, collision-free identifiers."
+          },
+          {
+            "term": "Worker ID",
+            "definition": "A unique numeric identifier assigned to each instance in a Snowflake deployment so IDs generated on different machines do not collide."
+          },
+          {
+            "term": "Clock Skew",
+            "definition": "The difference in time between two machines; time-based ID generators require clocks to stay synchronized."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "UUID v4 is simple and portable but not time-sortable and causes index fragmentation",
+          "Snowflake produces 64-bit, time-ordered IDs without coordination after initialization",
+          "Worker IDs must be unique and can be assigned via ZooKeeper or configuration management",
+          "Pre-allocate ID blocks when using a database as the sequence source of truth",
+          "Monitor clock drift and fall back to random IDs if synchronization fails"
+        ],
+        "takeaway": "A well-designed ID generator removes coordination overhead while delivering sortable, unique identifiers at scale."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Should IDs be sequential?",
+            "answer": "Sequential IDs are easy to read but leak information about volume and timing. Sortable IDs are usually sufficient for ordering without revealing sensitive business metrics."
+          },
+          {
+            "question": "What if two workers generate the same ID?",
+            "answer": "A well-assigned worker ID prevents this. If a collision somehow occurs, rely on a database unique constraint and regenerate the ID automatically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement a Simple ID Generator",
+        "description": "Write a function that generates a 64-bit Snowflake-style ID given a timestamp, worker ID, and sequence number. Calculate how many unique IDs per second a single worker can generate with 12 sequence bits.",
+        "expectedOutcome": "With 12 sequence bits, a single worker can generate 4,096 unique IDs per millisecond, or 4,096,000 IDs per second"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Twitter Snowflake: Distributed ID Generation",
+      "url": "https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake",
+      "type": "article",
+      "author": "Twitter Engineering",
+      "description": "The original announcement of Snowflake, Twitter's distributed unique ID generation system."
+    },
+    {
+      "title": "UUIDs and Universal Uniqueness",
+      "url": "https://www.citusdata.com/blog/2018/03/14/uuids-and-primary-keys-in-distributed-systems/",
+      "type": "article",
+      "author": "Citus Data",
+      "description": "A deep dive into UUID strategies and their trade-offs in distributed PostgreSQL and Citus environments."
+    }
+  ]
+}

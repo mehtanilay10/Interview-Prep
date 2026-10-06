@@ -1,0 +1,173 @@
+{
+  "id": "lesson-redis-016",
+  "slug": "invalidation-propagation",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Propagating Invalidation in Distributed Systems",
+  "description": "Learn how to propagate cache invalidation across multiple cache instances and services in a distributed architecture.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 22,
+  "tags": ["redis", "distributed", "pub-sub", "propagation", "invalidation"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Distributed Cache Problem",
+        "anchor": "distributed-problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a single-server setup, invalidating a cache key is straightforward: delete the key from the local Redis instance. In a **distributed system**, you may have multiple Redis nodes, multiple application instances, or even multiple data centers. An invalidation on one node does not automatically propagate to the others, so you can end up with stale data persisting in some caches long after the source has changed."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Propagating invalidation reliably is one of the harder problems in distributed caching. The goal is simple — ensure every cache instance agrees on what is fresh — but achieving it requires careful coordination between services."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Invalidation Propagation",
+            "definition": "The process of distributing an invalidation event from the originator to all cache nodes that may hold the affected key."
+          },
+          {
+            "term": "Pub/Sub",
+            "definition": "Redis Publish/Subscribe, a messaging pattern where publishers broadcast messages to subscribers on a channel."
+          },
+          {
+            "term": "Eventual Consistency",
+            "definition": "A consistency model where all replicas will converge to the same state over time, but may temporarily disagree."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 1: Centralized Redis Pub/Sub",
+        "anchor": "pub-sub"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis **Pub/Sub** lets one instance broadcast an invalidation event to every subscriber. When an application updates data, it publishes an `invalidate` message on a channel. All cache-aware services subscribe to that channel and delete the affected key from their local Redis connection when a message arrives."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-pubsub-invalidation",
+        "caption": "Pub/Sub invalidation: the writer publishes an invalidation event, and all subscribers delete the stale key from their local cache.",
+        "definition": "graph LR\n    A[Service A updates DB] --> B[Publish invalidate:product:42]\n    B --> C[Redis Pub/Sub Channel]\n    C --> D[Service A subscriber]\n    C --> E[Service B subscriber]\n    C --> F[Service C subscriber]\n    D --> G[DEL product:42 in local Redis]\n    E --> H[DEL product:42 in local Redis]\n    F --> I[DEL product:42 in local Redis]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Publishing invalidation events",
+        "content": "After updating a product, publish an invalidation event so all services know to evict the key.",
+        "code": "import Redis from 'ioredis';\nconst publisher = new Redis();\nconst subscriber = new Redis();\n\nasync function updateProductAndPropagate(productId, updates) {\n  await db.products.update({ where: { id: productId }, data: updates });\n\n  await publisher.publish(\n    'cache-invalidation',\n    JSON.stringify({ key: `product:${productId}:details` })\n  );\n}\n\nsubscriber.subscribe('cache-invalidation');\nsubscriber.on('message', (channel, message) => {\n  const { key } = JSON.parse(message);\n  subscriber.del(key);\n});",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 2: Versioned Cache Keys",
+        "anchor": "versioned-keys"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Instead of deleting keys, you can embed a **version** or **generation** number in the cache key itself. When data changes, increment the version in the database. New reads use the updated version and therefore miss the old cache entries, which become orphaned and eventually expire by TTL."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Versioned cache key lookup",
+        "content": "Fetch the current version from the database and use it in the Redis key.",
+        "code": "public async Task<string> GetProductDetailsAsync(int productId, CancellationToken ct)\n{\n    var db = _redis.GetDatabase();\n\n    var version = await _dbContext.Products\n        .Where(p => p.Id == productId)\n        .Select(p => p.CacheVersion)\n        .SingleAsync(ct);\n\n    var key = $\"product:{productId}:v{version}:details\";\n    var cached = await db.StringGetAsync(key);\n\n    if (cached.HasValue) return cached.ToString();\n\n    var product = await _dbContext.Products.FindAsync([productId], ct);\n    var json = JsonSerializer.Serialize(product);\n    await db.StringSetAsync(key, json, TimeSpan.FromMinutes(10));\n\n    return json;\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Combine strategies",
+        "text": "Use versioned keys for invalidation across services, and TTLs for automatic cleanup of orphaned entries. Together they provide both consistency and memory safety."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Strategy 3: Centralized Cache Cluster",
+        "anchor": "centralized-cluster"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If all application instances share a single Redis cluster or a Redis Cluster, invalidation is trivial because there is only one source of truth. The challenge shifts from propagation to **consistency within the cluster** — ensure all reads go through the same Redis endpoint and that replication lag does not cause stale reads."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "When to Use Each Strategy",
+        "items": [
+          "**Shared Redis**: Simplest option; use when all services can reach the same Redis endpoint.",
+          "**Pub/Sub**: Best for multi-instance or multi-service architectures with local Redis caches.",
+          "**Versioned keys**: Excellent for read-heavy services where writes are infrequent.",
+          "**Hybrid**: Combine shared Redis for hot keys with versioned keys for globally distributed reads."
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "In distributed systems, invalidation on one node does not automatically reach other nodes.",
+          "Redis Pub/Sub broadcasts invalidation events to every subscriber.",
+          "Versioned cache keys replace keys instead of deleting them, achieving invalidation without coordination.",
+          "A shared Redis cluster removes propagation entirely but introduces network dependency."
+        ],
+        "takeaway": "Distributed invalidation is a coordination problem — pick a strategy that matches your architecture's consistency requirements."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Redis Pub/Sub Documentation",
+      "url": "https://redis.io/docs/latest/develop/interact/pub-sub/",
+      "type": "article",
+      "description": "Official Redis guide to Pub/Sub messaging patterns and use cases."
+    },
+    {
+      "title": "Cache Invalidation in Distributed Systems",
+      "url": "https://aws.amazon.com/builders-library/cache-invalidation-without-a-tracking-application/",
+      "type": "article",
+      "description": "AWS builders library article on practical cache invalidation strategies for distributed applications."
+    }
+  ]
+}

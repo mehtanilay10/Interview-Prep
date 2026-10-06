@@ -1,0 +1,123 @@
+{
+  "id": "lesson-redis-023",
+  "slug": "multi-region-caching",
+  "moduleSlug": "distributed-caching",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Multi-Region Caching Strategies",
+  "description": "Design multi-region caching architectures that minimize latency while maintaining data consistency across geographic locations.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "multi-region", "geo-replication", "latency", "consistency"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Multi-region caching places Redis instances close to users in different geographic locations. The central challenge is balancing latency reduction against data consistency. Choosing the right replication strategy depends on your application's tolerance for stale reads versus its latency requirements." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Active-Active vs Active-Passive Replication" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "In an active-passive setup, a single primary region handles all writes, and secondary regions replicate data asynchronously. In active-active (multi-master), each region accepts writes, requiring conflict resolution. Redis Enterprise supports active-active geo-replication with conflict-free replicated data types (CRDTs), while open-source Redis requires careful application-level conflict handling." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "info", "title": "Latency vs Consistency Trade-off", "text": "Users in Europe hitting a US primary will see ~100ms additional latency for writes. Active-passive replication reduces read latency but writes still go to the primary. Active-active removes the write latency penalty but introduces conflict resolution complexity." }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "multi-region-topology",
+        "caption": "Multi-region Redis caching architecture with active-passive replication",
+        "definition": "flowchart TD\n    subgraph \"US-East (Primary)\"\n        US_P[\"Primary Redis\n(Accepts Writes)\"]\n        US_R[\"Replica\n(Read Replica)\"]\n    end\n    subgraph \"EU-West (Secondary)\"\n        EU_R[\"Replica\n(Async Replicated)\"]\n        EU_CACHE[\"Local Cache Layer\n(Local read caching)\"]\n    end\n    subgraph \"APAC (Secondary)\"\n        APAC_R[\"Replica\n(Async Replicated)\"]\n        APAC_CACHE[\"Local Cache Layer\n(Local read caching)\"]\n    end\n    US_P -->|async replication| EU_R\n    US_P -->|async replication| APAC_R\n    APP_EU[\"EU Users\"] --> EU_CACHE\n    APP_EU --> EU_R\n    APP_APAC[\"APAC Users\"] --> APAC_CACHE\n    APP_APAC --> APAC_R\n    APP_US[\"US Users\"] --> US_P\n    APP_US --> US_R"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Read and Write Routing Strategies" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "In multi-region setups, routing reads to the nearest replica dramatically reduces latency. However, reads from replicas may be stale due to asynchronous replication. The staleness window depends on the replication link latency and throughput. Applications must accept eventual consistency for local reads or implement read-your-writes consistency by routing subsequent reads to the primary." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Multi-Region Cache Routing in Node.js",
+        "language": "javascript",
+        "code": "const regionConfig = {\n  'us-east-1': { primary: true, redis: 'us-primary.redis.cache' },\n  'eu-west-1': { primary: false, redis: 'eu-replica.redis.cache' },\n  'ap-southeast-1': { primary: false, redis: 'apac-replica.redis.cache' }\n};\n\nasync function getCachedUser(userId, userRegion) {\n  const config = regionConfig[userRegion];\n  const redis = createClient({ url: config.redis });\n\n  // Try local replica first (eventually consistent)\n  let data = await redis.get(`user:${userId}:profile`);\n\n  if (!data) {\n    // Fallback to primary for strong consistency\n    const primaryRedis = createClient({\n      url: regionConfig['us-east-1'].redis\n    });\n    data = await primaryRedis.get(`user:${userId}:profile`);\n    // Backfill local cache\n    await redis.set(`user:${userId}:profile`, data, { EX: 3600 });\n  }\n\n  return JSON.parse(data);\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Conflict Resolution" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "When the same key is modified in multiple regions, conflicts arise. Strategies include last-write-wins (using timestamps), version vectors, or application-specific merge logic. Redis Enterprise CRDTs provide automatic conflict resolution for common data types like counters and sets without application intervention." }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Multi-Region Consistency Models",
+        "cards": [
+          {
+            "title": "Strong Consistency",
+            "description": "All reads see the latest write, regardless of region.",
+            "pros": ["No stale reads", "Simpler application logic"],
+            "cons": ["High write latency for distant users", "Requires synchronous replication"]
+          },
+          {
+            "title": "Eventual Consistency",
+            "description": "Writes propagate asynchronously; reads may be temporarily stale.",
+            "pros": ["Low write latency", "Works well for caches"],
+            "cons": ["Users may see outdated data", "Requires staleness tolerance"]
+          },
+          {
+            "title": "Session Consistency",
+            "description": "A user always reads their own writes; other users may see stale data.",
+            "pros": ["Good UX for logged-in users", "Balanced performance"],
+            "cons": ["Requires sticky routing per user", "More complex routing logic"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Geo-Replication", "definition": "Asynchronous replication of data between Redis instances in different geographic regions." },
+          { "term": "CRDT", "definition": "Conflict-free Replicated Data Type — a data structure that can be replicated across nodes and merged automatically without conflicts." },
+          { "term": "Read-Your-Writes Consistency", "definition": "A guarantee that a user will always see their own writes reflected in subsequent reads." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Multi-region caching reduces latency by placing replicas near users",
+          "Active-passive replication is simpler but all writes go to the primary",
+          "Active-active requires conflict resolution and is available in Redis Enterprise",
+          "Read-your-writes consistency requires routing subsequent reads to the primary region"
+        ],
+        "takeaway": "Choose your multi-region strategy based on your consistency requirements: caches can tolerate eventual consistency, while user session stores often need session consistency."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Enterprise Geo-Replication", "url": "https://redis.io/docs/latest/rc/autoscaling/geo-replication/", "type": "article" },
+        { "title": "Designing Data-Intensive Applications — Consistency and Consensus", "url": "https://dataintensive.net/", "type": "course" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Enterprise Geo-Replication", "url": "https://redis.io/docs/latest/rc/autoscaling/geo-replication/", "type": "article" },
+    { "title": "Designing Data-Intensive Applications — Consistency and Consensus", "url": "https://dataintensive.net/", "type": "course" }
+  ]
+}

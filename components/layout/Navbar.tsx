@@ -8,6 +8,7 @@ import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChar
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
+import { SearchErrorBoundary } from "@/components/ui/SearchErrorBoundary";
 import { cn } from "@/lib/utils";
 import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
@@ -106,14 +107,16 @@ export function Navbar() {
         {searchMode ? (
           <div className="hidden flex-1 items-center justify-center md:flex">
             <div className="relative w-full max-w-2xl transition-all duration-300 ease-in-out">
-              <SearchSuggestions
-                ref={searchInputRef}
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onSearch={handleSearch}
-                placeholder="Search lessons, modules, topics..."
-                size="md"
-              />
+              <SearchErrorBoundary>
+                <SearchSuggestions
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onSearch={handleSearch}
+                  placeholder="Search lessons, modules, topics..."
+                  size="md"
+                />
+              </SearchErrorBoundary>
             </div>
             <button
               type="button"
@@ -238,14 +241,16 @@ export function Navbar() {
         >
           <nav className="flex flex-col gap-1 px-4 py-3" aria-label="Mobile navigation">
             <PWAInstallButton className="mb-2" />
-            <SearchSuggestions
-              value={searchQuery}
-              onChange={setSearchQuery}
-              onSearch={handleSearch}
-              placeholder="Search lessons, modules, topics..."
-              className="mb-2"
-              size="sm"
-            />
+            <SearchErrorBoundary>
+              <SearchSuggestions
+                value={searchQuery}
+                onChange={setSearchQuery}
+                onSearch={handleSearch}
+                placeholder="Search lessons, modules, topics..."
+                className="mb-2"
+                size="sm"
+              />
+            </SearchErrorBoundary>
             {NAV_LINKS.map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
@@ -254,23 +259,6 @@ export function Navbar() {
                 </Link>
               );
             })}
-            {isLoggedIn ? (
-              <>
-                <Link href="/bookmarks" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
-                  Bookmarks
-                </Link>
-                <Link href="/notes" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
-                  Notes
-                </Link>
-                <Link href="/personalization" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
-                  Personalization
-                </Link>
-              </>
-            ) : (
-              <Link href="/login" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted hover:bg-canvas hover:text-fg-default">
-                Sign in
-              </Link>
-            )}
           </nav>
         </div>
       )}

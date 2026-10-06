@@ -1,0 +1,201 @@
+{
+  "id": "lesson-sd-file-storage",
+  "slug": "design-file-storage",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a file storage system like Google Drive or Dropbox.",
+  "description": "Distributed file storage with upload, download, sharing, versioning, and CDN integration.",
+  "order": 11,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["interview", "system-design", "storage", "cdn"],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a file storage system like Google Drive or Dropbox."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Upload and download files up to several gigabytes",
+          "File sharing with granular permissions (view, edit, admin)",
+          "Version history and rollback",
+          "Folder hierarchy and organization",
+          "Sync across multiple devices",
+          "Real-time collaboration and conflict resolution"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Capacity Estimation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Scale Assumptions",
+        "items": [
+          "100 million total users",
+          "1 billion total files stored",
+          "10 petabytes of total storage",
+          "1 million uploads per minute at peak",
+          "100 petabytes of monthly egress traffic",
+          "Average file size: 10 megabytes"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Upload Flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Large files are split into chunks using a sliding window protocol. Each chunk is uploaded in parallel to multiple storage servers for redundancy. A metadata service tracks chunk locations and assembles the complete file on download. Clients resume interrupted uploads by retrying failed chunks."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-file-arch",
+        "caption": "File upload and CDN delivery flow",
+        "definition": "graph TD\n    A[Client] --> B[Upload Service]\n    B --> C[Chunk Splitter]\n    C --> D[Chunk 1]\n    C --> E[Chunk 2]\n    C --> F[Chunk N]\n    D --> G[Storage Node A]\n    E --> H[Storage Node B]\n    F --> I[Storage Node C]\n    G --> J[Metadata DB]\n    H --> J\n    I --> J\n    J --> K[File Complete]\n\n    L[Client requests download] --> M[CDN Edge]\n    M --> N[Origin Storage]\n    N --> G\n    N --> H\n    N --> I"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Table", "Key Fields", "Description"],
+        "rows": [
+          ["Files", "file_id, owner_id, name, size, mime_type, created_at", "File metadata and ownership"],
+          ["FileChunks", "chunk_id, file_id, chunk_index, storage_node, checksum", "Physical chunk locations and integrity"],
+          ["Folders", "folder_id, owner_id, parent_id, name", "Hierarchical folder structure"],
+          ["Permissions", "resource_id, user_id, permission, granted_by", "Access control list"],
+          ["FileVersions", "version_id, file_id, created_by, created_at", "Version history for rollback"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Large File Handling",
+        "text": "Uploading a 5GB file in one request risks timeouts and data loss. Always use chunked uploads with retry logic and checksums for integrity verification."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage Strategies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Backend and Tiering",
+        "items": [
+          "Hot files: SSD-backed storage with low latency",
+          "Warm files: Standard object storage (S3, GCS)",
+          "Cold files: Archive storage with higher latency and lower cost",
+          "Erasure coding instead of full replication for cost savings",
+          "Deduplication to avoid storing identical chunks across users"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "CDN Integration",
+        "text": "Serve frequently accessed files through a CDN with edge caching. Set short TTLs for mutable files and long TTLs for immutable assets like images and videos."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Horizontal and Global Scale",
+        "items": [
+          "Distribute storage nodes across multiple regions for low latency",
+          "Use consistent hashing to map file IDs to storage nodes",
+          "Replicate chunks across failure domains for durability",
+          "Throttle egress per user to prevent abuse",
+          "Use a separate metadata database with read replicas"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle concurrent edits to the same file?",
+            "answer": "Use operational transformation or conflict-free replicated data types (CRDTs). Present conflicting versions to users for manual resolution."
+          },
+          {
+            "question": "How do you ensure data durability?",
+            "answer": "Replicate each chunk across three or more failure domains. Use checksums on every chunk and periodically verify integrity with background scrubbers."
+          },
+          {
+            "question": "How do you handle versioning efficiently?",
+            "answer": "Use copy-on-write semantics for efficient versioning. Store only the delta between versions and keep snapshots periodically for faster rollback."
+          },
+          {
+            "question": "How do you prevent unauthorized access?",
+            "answer": "Use signed, time-limited URLs for downloads. Verify permissions at the metadata service before issuing any access token."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Chunked uploads with retry and checksums are essential for large files",
+          "Separate metadata from file data for independent scaling",
+          "Use CDN for low-latency downloads of popular files",
+          "Implement versioning with copy-on-write for efficiency",
+          "Multi-region storage provides low latency and disaster recovery"
+        ],
+        "takeaway": "File storage systems must balance latency, durability, and cost through tiered storage and chunk-based transfer protocols."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "interview-qa"
+}

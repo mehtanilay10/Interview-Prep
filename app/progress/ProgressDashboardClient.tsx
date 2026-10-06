@@ -12,6 +12,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, isProblemCourseSlug } from '@/lib/content';
 import type { Lesson, Course } from '@/types';
 
@@ -98,7 +99,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
           setProgress(mapped);
         }
       } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
+        logger.error('ProgressDashboardClient', 'Failed to fetch dashboard data:', err);
       } finally {
         setLoading(false);
       }

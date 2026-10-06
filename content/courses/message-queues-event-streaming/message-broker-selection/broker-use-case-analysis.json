@@ -1,0 +1,210 @@
+{
+  "id": "lesson-mqes-043",
+  "slug": "broker-use-case-analysis",
+  "title": "Broker Use Case Analysis",
+  "description": "Match real-world messaging patterns to the broker that handles them best.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "use-cases",
+    "broker-selection",
+    "rabbitmq",
+    "kafka",
+    "sqs",
+    "architecture"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Broker selection becomes much easier when you start from the problem, not the product. Every messaging scenario has a natural shape: request-reply, fan-out, event sourcing, or background task processing. Each shape stresses different broker capabilities."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Messaging Patterns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Point-to-point messaging, where one producer sends to one consumer, is the simplest pattern. It works equally well with RabbitMQ, Kafka, or SQS. Fan-out, where one event must reach many subscribers, is where brokers diverge. RabbitMQ uses exchanges to route copies to multiple queues. Kafka relies on consumer groups reading the same topic. SQS does not natively fan out—you must combine it with SNS or use EventBridge."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use Case 1: Order Processing Pipeline"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An e-commerce system places an order, charges a card, updates inventory, and sends a confirmation email. Each step must complete reliably, but they do not need to happen in parallel. A work queue pattern fits here: one consumer type processes each stage in sequence."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Recommended Broker",
+        "text": "RabbitMQ is ideal for this pipeline. Its direct exchange routes orders to a single processing queue, and dead-letter exchanges capture failed orders for manual review."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use Case 2: Real-Time Analytics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A streaming analytics pipeline ingests clickstream events, enriches them, and writes aggregated metrics to a dashboard. The volume is high, and multiple analytics jobs need to consume the same raw stream independently."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Kafka consumer group in C#",
+        "content": "using Confluent.Kafka;\n\nvar config = new ConsumerConfig\n{\n    BootstrapServers = \"kafka:9092\",\n    GroupId = \"analytics-job\",\n    AutoOffsetReset = AutoOffsetReset.Earliest\n};\n\nusing var consumer = new ConsumerBuilder<Ignore, string>(config).Build();\nconsumer.Subscribe(\"clickstream\");\n\nwhile (true)\n{\n    var result = consumer.Consume();\n    Console.WriteLine($\"Event: {result.Message.Value} at offset {result.Offset}\");\n    // Multiple independent consumer groups can read the same topic\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Recommended Broker",
+        "text": "Kafka is the natural choice. Multiple consumer groups can read the same topic without competing, and long retention lets you re-process historical data after a bug fix."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use Case 3: Background Job Queue"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A web application needs to offload email sending, image resizing, and report generation so the request thread is not blocked. Jobs should be retried on failure and expire after a deadline."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQS message with visibility timeout (Node.js SDK)",
+        "content": "import { SQSClient, SendMessageCommand, ReceiveMessageCommand } from \"@aws-sdk/client-sqs\";\n\nconst sqs = new SQSClient({ region: \"us-east-1\" });\n\nawait sqs.send(new SendMessageCommand({\n  QueueUrl: process.env.JOB_QUEUE_URL!,\n  MessageBody: JSON.stringify({ type: \"resize-image\", url: \"https://example.com/photo.jpg\" }),\n  DelaySeconds: 0,\n  MessageAttributes: {\n    priority: { DataType: \"Number\", StringValue: \"1\" }\n  }\n}));",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Recommended Broker",
+        "text": "SQS is excellent for this scenario. Visibility timeout handles retries automatically, and dead-letter queues capture jobs that exceed the retry limit without extra code."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Use Case Mapping Summary"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Broker strengths by use case",
+        "cards": [
+          {
+            "title": "RabbitMQ",
+            "description": "Best for request-reply, complex routing, and low-latency work queues where message ordering per queue matters.",
+            "pros": [
+              "Flexible exchange types",
+              "Built-in management UI",
+              "Low latency for small payloads"
+            ],
+            "cons": [
+              "Clustering is complex",
+              "Throughput plateaus at high scale"
+            ]
+          },
+          {
+            "title": "Kafka",
+            "description": "Best for event streaming, log aggregation, and analytics pipelines that need replay and high throughput.",
+            "pros": [
+              "Massive throughput",
+              "Configurable retention",
+              "Native stream processing"
+            ],
+            "cons": [
+              "High operational complexity",
+              "Overkill for simple queues"
+            ]
+          },
+          {
+            "title": "SQS",
+            "description": "Best for background jobs and decoupling microservices on AWS with zero infrastructure to manage.",
+            "pros": [
+              "Fully managed",
+              "Scales automatically",
+              "Dead-letter queues built in"
+            ],
+            "cons": [
+              "No native fan-out",
+              "Limited message size (256 KB standard)"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-043-use-case-map",
+        "definition": "flowchart TB\n    subgraph Patterns\n        A[\"Point-to-Point\"]\n        B[\"Fan-Out\"]\n        C[\"Event Streaming\"]\n        D[\"Background Jobs\"]\n    end\n    subgraph Brokers\n        R[RabbitMQ]\n        K[Kafka]\n        S[SQS]\n    end\n    A --> R & K & S\n    B --> R & K\n    C --> K\n    D --> R & S",
+        "caption": "How common messaging patterns map to broker strengths."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Match the broker to the pattern, not the pattern to the broker.",
+          "RabbitMQ shines for routing-heavy, low-latency pipelines.",
+          "Kafka shines for streaming, replay, and multi-consumer analytics.",
+          "SQS shines for simple background jobs on AWS with zero ops.",
+          "One architecture can use multiple brokers—do not force a single tool across every problem."
+        ],
+        "takeaway": "Use case analysis is the fastest way to cut through broker marketing and find the right fit for your specific problem."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Use Cases and Examples",
+      "url": "https://kafka.apache.org/uses",
+      "type": "article",
+      "author": "Apache Kafka"
+    },
+    {
+      "title": "AWS SQS Use Cases",
+      "url": "https://aws.amazon.com/sqs/features",
+      "type": "article",
+      "author": "AWS"
+    }
+  ],
+  "moduleSlug": "message-broker-selection",
+  "courseSlug": "message-queues-event-streaming"
+}

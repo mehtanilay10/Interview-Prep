@@ -1,0 +1,180 @@
+{
+  "id": "lesson-sdi-056",
+  "slug": "news-feed-design",
+  "moduleSlug": "common-system-designs",
+  "courseSlug": "system-design-interviews",
+  "title": "News Feed Design",
+  "description": "Design a scalable news feed system that aggregates content from followed users and serves personalized timelines at high throughput.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["system-design", "news-feed", "timeline", "social", "feed-ranking", "fanout"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A news feed aggregates content from accounts a user follows and presents it as a reverse-chronological or ranked timeline. Products like Facebook, X, and Instagram serve billions of feed requests daily. The core challenge is generating fresh timelines for hundreds of millions of users while keeping generation latency under 200 ms and reducing read-time aggregation costs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fanout Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Feed generation uses one of two fanout approaches. Push fanout writes the post to every follower's timeline when the author publishes. Pull fanout reads recent posts from every followed account at request time and merges them into a single feed. Push fanout gives fast reads at the cost of expensive writes, while pull fanout keeps writes cheap but makes reads slower and more complex."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Push vs Pull Fanout",
+        "cards": [
+          {
+            "title": "Push Fanout",
+            "pros": ["Fast read times", "Simple read path", "Supports ranking at write time"],
+            "cons": ["Expensive for users with millions of followers", "Wastes storage on inactive users"]
+          },
+          {
+            "title": "Pull Fanout",
+            "pros": ["Cheap writes regardless of follower count", "Storage efficient"],
+            "cons": ["Slow read path with many follows", "Ranking must happen at read time"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hybrid Approach"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most production systems use a hybrid approach. Normal users trigger push fanout so their followers receive instant updates. Celebrities or brand accounts with more than a threshold of followers use pull fanout. At read time, the feed service merges the user's pre-generated timeline with recent posts from a small number of celebrity accounts. This balances write cost against read latency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Timeline Ranking"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Raw chronological feeds are simple but do not maximize engagement. Modern feeds use machine learning to rank posts by predicted affinity. Signals include the user's past interaction rate with the author, content type, recency, and whether the post has been reported. Precompute a ranked feed at generation time for power users. Fall back to a chronological mix for users without enough engagement data."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "news-feed-flow",
+        "caption": "Hybrid push and pull fanout for a news feed",
+        "definition": "flowchart LR\n    A[Author publishes] --> B{Followers > threshold?}\n    B -->|no| C[Push to each follower's timeline in Redis]\n    B -->|yes| D[Skip push fanout]\n    E[User opens feed] --> F[Read precomputed timeline from Redis]\n    E --> G[Fetch recent posts from celebrity accounts]\n    F --> H[Merge and rank]\n    G --> H\n    H --> I[Return ranked feed]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage and Caching"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Store the actual post content in a distributed database like Cassandra. Cache the precomputed timeline IDs in Redis sorted sets with timestamps as scores. A separate search index like Elasticsearch powers the explore and search features. Media attachments go to S3 with a CDN for fast delivery. Use database read replicas to handle heavy analytics queries without impacting the write path."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Avoid stale feeds",
+        "text": "Invalidate or refresh cached timelines when a user unfollows an author or when a post is deleted. Tracking these edge cases prevents ghost posts from appearing in feeds."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Fanout",
+            "definition": "The process of distributing content from one source to many destinations, such as pushing a post to every follower's timeline."
+          },
+          {
+            "term": "Pull Fanout",
+            "definition": "A fanout strategy that aggregates posts at read time by querying every followed account."
+          },
+          {
+            "term": "Affinity Score",
+            "definition": "A machine-learning score predicting how much a user will engage with a post, used to rank feed items."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Push fanout delivers fast reads at the cost of expensive writes for users with many followers",
+          "Pull fanout keeps writes cheap but makes reads slower",
+          "Hybrid approaches combine both strategies for optimal performance",
+          "Rank feeds with machine learning using engagement signals",
+          "Cache timelines in Redis and store post data in Cassandra"
+        ],
+        "takeaway": "A great news feed design balances read latency, write cost, and personalization quality."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle deleted posts in precomputed feeds?",
+            "answer": "Maintain a deletion log and scan precomputed timelines in the background. Remove deleted post IDs from Redis sorted sets asynchronously."
+          },
+          {
+            "question": "How far back should you cache the timeline?",
+            "answer": "Cache the most recent 500 to 1,000 post IDs per user. Older posts can be fetched from the database or rehydrated from a snapshot if needed."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Estimate Fanout Load",
+        "description": "Calculate the write QPS for a push fanout system with 100 million users where the average user has 200 followers and posts 5 times per day.",
+        "expectedOutcome": "Approximately 115,741 fanout writes per second on average; peak at 3x ≈ 347,222 writes/s"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Instagram Feed Architecture",
+      "url": "https://instagram-engineering.com/",
+      "type": "article",
+      "author": "Instagram Engineering",
+      "description": "Engineering blog posts covering Instagram's feed ranking, fanout, and real-time infrastructure."
+    },
+    {
+      "title": "Twitter Timeline Design",
+      "url": "https://www.infoq.com/articles/twitter-design/",
+      "type": "article",
+      "author": "InfoQ",
+      "description": "A detailed look at how Twitter designed its home timeline using hybrid fanout strategies."
+    }
+  ]
+}

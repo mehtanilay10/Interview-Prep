@@ -1,0 +1,102 @@
+{
+  "id": "lesson-redis-026",
+  "slug": "leaderboards-sorted-sets",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Leaderboards Using Sorted Sets",
+  "description": "Build real-time leaderboards with Redis sorted sets, including ranking, pagination, and tie handling.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "sorted-sets", "leaderboards", "gaming", "rankings"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Leaderboards are one of Redis's most celebrated use cases. Redis sorted sets store each member with an associated score and keep everything ordered automatically. This means you can retrieve the top players, find a specific player's rank, or get a paginated slice of the leaderboard in a single round trip. No background jobs, no scheduled recalculations, and no complex SQL queries required." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "How Sorted Sets Work" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "A Redis sorted set is a collection of unique members, each paired with a floating-point score. Redis stores members in a skip list data structure alongside a hash table, which gives you O(log N) inserts and O(log N) rank lookups. The score determines the member's position, and members with identical scores are ordered lexicographically by their member string." }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "info", "title": "Tie Handling", "text": "When two players have the same score, Redis breaks ties by comparing the member strings alphabetically. To make tie-breaking deterministic in a game, you can prepend a timestamp or UUID to the member value." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Adding Scores and Querying Ranks" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "To add a player to the leaderboard, use ZADD with the player's ID as the member and their score as the value. To get the top N players, use ZREVRANGE with the WITHSCORES flag. To find a specific player's rank, use ZREVRANK, which returns a zero-based index. If you need the player's score as well, use ZSCORE." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "The following service manages a game leaderboard.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class LeaderboardService\n{\n    private readonly IDatabase _db;\n    private const string LeaderboardKey = \"leaderboard:global\";\n\n    public LeaderboardService(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n    }\n\n    public async Task UpdateScoreAsync(string playerId, double score)\n    {\n        await _db.SortedSetAddAsync(LeaderboardKey, playerId, score);\n    }\n\n    public async Task<IList<LeaderboardEntry>> GetTopAsync(int count)\n    {\n        var entries = await _db.SortedSetRangeByRankWithScoresAsync(\n            LeaderboardKey, 0, count - 1, Order.Descending);\n\n        return entries.Select((e, index) => new LeaderboardEntry\n        {\n            Rank = index + 1,\n            PlayerId = (string)e.Element!,\n            Score = e.Score\n        }).ToList();\n    }\n\n    public async Task<int?> GetPlayerRankAsync(string playerId)\n    {\n        var rank = await _db.SortedSetRankAsync(\n            LeaderboardKey, playerId, Order.Descending);\n        return rank.HasValue ? (int)(rank.Value + 1) : null;\n    }\n}\n\npublic class LeaderboardEntry\n{\n    public int Rank { get; set; }\n    public string PlayerId { get; set; } = string.Empty;\n    public double Score { get; set; }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis",
+        "content": "The same leaderboard operations in Node.js.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\nconst LEADERBOARD = 'leaderboard:global';\n\nasync function updateScore(playerId, score) {\n  await redis.zadd(LEADERBOARD, score, playerId);\n}\n\nasync function getTop(count) {\n  const entries = await redis.zrevrange(LEADERBOARD, 0, count - 1, 'WITHSCORES');\n  const result = [];\n  for (let i = 0; i < entries.length; i += 2) {\n    result.push({ rank: i / 2 + 1, playerId: entries[i], score: parseFloat(entries[i + 1]) });\n  }\n  return result;\n}\n\nasync function getPlayerRank(playerId) {\n  const rank = await redis.zrevrank(LEADERBOARD, playerId);\n  return rank !== null ? rank + 1 : null;\n}\n\n// Example usage\n(async () => {\n  await updateScore('player-1', 1500);\n  await updateScore('player-2', 2200);\n  console.log(await getTop(10));\n  console.log('Player 1 rank:', await getPlayerRank('player-1'));\n})();"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "leaderboard-query",
+        "caption": "How a leaderboard query flows through Redis sorted sets.",
+        "definition": "flowchart LR\n    A[Client requests top 10] --> B[ZREVRANGE leaderboard 0 9]\n    B --> C[Redis skip list lookup]\n    C --> D[Return ordered members + scores]\n    D --> E[Map to LeaderboardEntry[]]\n    E --> F[Return JSON response]\n    G[Client requests player rank] --> H[ZREVRANK leaderboard playerId]\n    H --> I[Redis rank lookup]\n    I --> J[Return zero-based index]\n    J --> K[Add 1 for human rank]\n    K --> F"
+      }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "tip", "title": "Pagination", "text": "Use ZREVRANGE with offset and count for pagination. For very large leaderboards, consider caching the top 1000 entries in memory and only hitting Redis for deeper pages." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Sorted set", "definition": "A Redis data structure that maps members to scores and keeps them ordered by score." },
+          { "term": "Skip list", "definition": "The underlying data structure for sorted sets, providing O(log N) operations." },
+          { "term": "ZREVRANK", "definition": "Returns the rank of a member in descending score order." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis sorted sets maintain members in score order with O(log N) operations.",
+          "Use ZADD to update scores, ZREVRANGE for top players, and ZREVRANK for a specific player's position.",
+          "Ties are broken lexicographically by the member string, so design your member IDs accordingly."
+        ],
+        "takeaway": "Redis sorted sets eliminate the complexity of building and maintaining real-time leaderboards."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Sorted Sets Documentation", "url": "https://redis.io/docs/latest/develop/data-types/sorted-sets/", "type": "article" },
+        { "title": "Building Leaderboards with Redis", "url": "https://redis.io/blueprint/real-time-leaderboards/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Sorted Sets Documentation", "url": "https://redis.io/docs/latest/develop/data-types/sorted-sets/", "type": "article" },
+    { "title": "Building Leaderboards with Redis", "url": "https://redis.io/blueprint/real-time-leaderboards/", "type": "article" }
+  ]
+}

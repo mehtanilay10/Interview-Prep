@@ -1,0 +1,205 @@
+{
+  "id": "lesson-mqes-015",
+  "slug": "exactly-once-semantics",
+  "moduleSlug": "message-ordering-idempotency",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Exactly-Once Semantics",
+  "description": "Explore exactly-once delivery semantics, the guarantees they provide, and the trade-offs involved in achieving them.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "exactly-once",
+    "at-least-once",
+    "at-most-once",
+    "semantics",
+    "distributed-systems"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Exactly-once semantics (EOS) promise that every message is delivered and processed once and only once, regardless of failures. In practice, true exactly-once is extraordinarily difficult because it requires coordination between the broker, the consumer, and any downstream systems. Most systems settle for effectively exactly-once through idempotency combined with careful protocol design."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Three Delivery Guarantees"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Guarantee",
+          "Meaning",
+          "Failure Behavior",
+          "Example"
+        ],
+        "rows": [
+          [
+            "At-most-once",
+            "Message may be lost but never duplicated",
+            "No retries on failure",
+            "UDP, fire-and-forget HTTP"
+          ],
+          [
+            "At-least-once",
+            "Message never lost but may be duplicated",
+            "Retries with redelivery on failure",
+            "RabbitMQ with manual ack"
+          ],
+          [
+            "Exactly-once",
+            "Message processed exactly once",
+            "Idempotency + transaction coordination",
+            "Kafka transactional API"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why True Exactly-Once Is Hard"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To deliver exactly once, the broker must not lose the message, the consumer must not process it twice, and any downstream effects must not be applied twice. A single transaction across the broker and database is impossible in most architectures because they are separate systems. Kafka solves this with a two-phase commit protocol that spans the consumer offset and the producer transaction."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-eos-architecture",
+        "caption": "Two-phase commit flow for exactly-once in Kafka",
+        "definition": "sequenceDiagram\n    participant P as Producer\n    participant K as Kafka Broker\n    participant C as Consumer\n    participant D as Database\n    P->>K: 1. Begin Transaction\n    P->>K: 2. Send Messages\n    P->>K: 3. Commit Transaction\n    K-->>P: Ack\n    C->>K: 4. Fetch with read_committed\n    C->>D: 5. Begin Transaction\n    C->>D: 6. Process + Write Results\n    C->>D: 7. Commit Transaction\n    C->>K: 8. Commit Offset in Transaction"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Kafka Transactional API"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka's transactional producer and consumer APIs are the most mature implementation of exactly-once semantics in a message broker. The producer writes to a transaction, the consumer reads only committed transactions, and both sides coordinate through the transaction coordinator in the broker."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Kafka exactly-once producer",
+        "content": "Use the KafkaJS transactional API for atomic writes.",
+        "language": "javascript",
+        "code": "const { Kafka, logLevel } = require('kafkajs');\n\nconst kafka = new Kafka({ brokers: ['localhost:9092'] });\nconst producer = kafka.producer({ transactionTimeout: 30000 });\n\nasync function sendTransactional(topic, messages) {\n  await producer.connect();\n\n  await producer.transaction();\n  try {\n    await producer.send({ topic, messages });\n    await producer.commit();\n    console.log('Transaction committed');\n  } catch (err) {\n    await producer.abort();\n    console.error('Transaction aborted:', err);\n    throw err;\n  } finally {\n    await producer.disconnect();\n  }\n}\n\nsendTransactional('payments', [\n  { key: 'order-1', value: JSON.stringify({ status: 'paid' }) }\n]);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "RabbitMQ: Transactional Channel"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RabbitMQ does not support cross-system transactions. Instead, it offers publisher confirms combined with consumer acknowledgements. This gives you at-least-once delivery but requires idempotent consumers to reach effectively exactly-once behavior."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — RabbitMQ with confirms and manual ack",
+        "content": "Combine publisher confirms with manual acknowledgements for maximum reliability.",
+        "language": "csharp",
+        "code": "var factory = new ConnectionFactory\n{\n    HostName = \"localhost\",\n    DispatchConsumersAsync = true\n};\n\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\nchannel.ConfirmSelect();\nchannel.QueueDeclare(\"order-events\", durable: true);\n\nvar consumer = new AsyncEventingBasicConsumer(channel);\nconsumer.Received += async (model, ea) =>\n{\n    var body = ea.Body.ToArray();\n    Console.WriteLine(Encoding.UTF8.GetString(body));\n\n    await Task.Delay(10); // simulate processing\n\n    channel.BasicAck(ea.DeliveryTag, multiple: false);\n};\n\nchannel.BasicConsume(\"order-events\", autoAck: false, consumer: consumer);\n\n// On publish\nchannel.BasicPublish(\"\", \"order-events\", mandatory: true, body: messageBytes);\nchannel.WaitForConfirmsOrDie(); // throws if any message nacked"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Guarantee Comparison",
+        "cards": [
+          {
+            "title": "At-most-once",
+            "description": "Send and forget. No retries, no acks.",
+            "pros": ["Lowest latency", "Simplest implementation"],
+            "cons": ["Messages can be lost on failure", "Unacceptable for financial or critical workflows"]
+          },
+          {
+            "title": "At-least-once",
+            "description": "Retry on failure with redelivery. Requires idempotent consumers.",
+            "pros": ["No message loss", "Supported by all major brokers"],
+            "cons": ["Duplicates reach consumers", "Consumer must handle duplicates"]
+          },
+          {
+            "title": "Effectively Exactly-once",
+            "description": "At-least-once delivery plus idempotent processing and transactional persistence.",
+            "pros": ["No duplicates in practice", "Handles failures correctly"],
+            "cons": ["Highest complexity", "Requires broker-specific APIs"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Is Kafka the only broker with exactly-once?",
+            "answer": "Kafka is the most mature, but Redpanda and Pulsar also implement transactional APIs. RabbitMQ and SQS do not provide native exactly-once semantics — they require idempotency on the consumer side."
+          },
+          {
+            "question": "What does effectively exactly-once mean?",
+            "answer": "It means the system behaves as if it delivers exactly once, but the mechanism is at-least-once delivery combined with idempotent consumers. From the outside, the outcome is identical."
+          },
+          {
+            "question": "Should I use transactions for every message?",
+            "answer": "Transactions add latency and complexity. Use them for financial, inventory, or compliance-critical flows. For analytics or event logging, at-least-once with idempotent consumers is usually sufficient."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Exactly-once is a spectrum, not a binary property",
+          "At-least-once is the common denominator across all brokers",
+          "Kafka transactional API provides the strongest guarantees",
+          "Effectively exactly-once = at-least-once + idempotency"
+        ],
+        "takeaway": "Choose your delivery guarantee based on the cost of duplicates. For most systems, idempotent consumers are the practical path to exactly-once behavior."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka: Exactly-Once Semantics",
+      "url": "https://kafka.apache.org/documentation/#semantics",
+      "type": "article",
+      "author": "Apache Kafka",
+      "description": "Official documentation on Kafka's exactly-once guarantees and transactional API."
+    },
+    {
+      "title": "Confluent: Exactly-Once Is Hard",
+      "url": "https://www.confluent.io/blog/exactly-once-delivery/",
+      "type": "article",
+      "author": "Confluent",
+      "description": "Deep dive into the challenges of achieving exactly-once semantics in distributed messaging."
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "id": "lesson-redis-032",
+  "slug": "cache-tag-invalidation",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Cache Tag Invalidation in ASP.NET Core",
+  "description": "Learn how to implement tag-based cache invalidation to evict groups of related cache entries efficiently when underlying data changes.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "asp.net core",
+    "cache-invalidation",
+    "tags",
+    "redis"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Invalidation Problem",
+        "anchor": "the-invalidation-problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Caching solves the read problem, but invalidation is the real challenge. When a product price changes, every cached page, list, and snippet that contains that product becomes stale. Naive approaches — removing individual cache keys or waiting for TTL — are error-prone and slow. Tag-based invalidation solves this by grouping cache entries under named tags so you can evict all related entries with a single operation."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core does not ship with built-in tag-based invalidation, but the pattern is straightforward: store a reverse index (tag to keys) in Redis, and when data changes, look up the affected keys and remove them."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Tag-Based Invalidation",
+            "definition": "A strategy that groups cache entries by logical tags and evicts all entries sharing a tag in a single operation."
+          },
+          {
+            "term": "Reverse Index",
+            "definition": "A Redis Set that stores the list of cache keys associated with a specific tag. Used to look up keys for bulk deletion."
+          },
+          {
+            "term": "Cache Stampede",
+            "definition": "A surge of requests that hit a cold cache simultaneously after invalidation, overwhelming the data source."
+          },
+          {
+            "term": "Stale-While-Revalidate",
+            "definition": "A strategy that serves expired cache data while refreshing it in the background, preventing stampedes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Tag-Based Invalidation",
+        "anchor": "implementing-tag-invalidation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The implementation has three parts: the tag helper that adds tags when setting cache entries, the reverse-index maintenance that tracks which keys belong to each tag, and the invalidation method that reads the index and removes the entries."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tag-Aware Cache Helper",
+        "content": "A small helper class wraps IDistributedCache and maintains tag indexes in Redis Sets.",
+        "code": "public class TaggedCacheService\n{\n    private readonly IDistributedCache _cache;\n    private readonly IDatabase _redis;\n    private const string TagPrefix = \"tag:\";\n\n    public TaggedCacheService(\n        IDistributedCache cache,\n        IConnectionMultiplexer redis)\n    {\n        _cache = cache;\n        _redis = redis.GetDatabase();\n    }\n\n    public async Task SetAsync(\n        string key,\n        string value,\n        string[] tags,\n        DistributedCacheEntryOptions? options = null)\n    {\n        await _cache.SetStringAsync(key, value, options ?? new());\n\n        foreach (var tag in tags)\n        {\n            await _redis.SetAddAsync($\"{TagPrefix}{tag}\", key);\n        }\n    }\n\n    public async Task InvalidateByTagAsync(string tag)\n    {\n        var setKey = $\"{TagPrefix}{tag}\";\n        var keys = await _redis.SetMembersAsync(setKey);\n\n        var tasks = keys.Select(k => _cache.RemoveAsync(Encoding.UTF8.GetString(k)));\n        await Task.WhenAll(tasks);\n\n        await _redis.KeyDeleteAsync(setKey);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Key Design Choice: Atomic Tag Assignment",
+        "text": "Always add the key to each tag Set in the same operation that writes the cache entry. If you write the cache first and add tags later, a crash in between will leave an orphaned entry with no tag index — it will never be invalidated."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Invalidation Flow",
+        "anchor": "invalidation-flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When an update event fires — for example, a product price is changed in the database — the application calls InvalidateByTagAsync with the product category tag. The method reads all keys stored under that tag from Redis and removes them in parallel. The tag index Set is then deleted to free up Redis memory."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "tag-invalidation-flow",
+        "caption": "Tag-based cache invalidation sequence",
+        "definition": "sequenceDiagram\n    participant App as Application\n    participant Cache as Redis Cache\n    participant TagIdx as Tag Index (Redis Set)\n    App->>Cache: Set(key=products:123, value=..., tags=[category:electronics])\n    Cache-->>TagIdx: SADD tag:category:electronics products:123\n    Note over App,TagIdx: Later: product price changes\n    App->>TagIdx: SMEMBERS tag:category:electronics\n    TagIdx-->>App: [products:123, products:456, ...]\n    App->>Cache: DEL products:123, products:456, ...\n    App->>TagIdx: DEL tag:category:electronics"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling Large Tag Sets",
+        "anchor": "handling-large-tag-sets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "If a tag contains thousands of keys, deleting them all synchronously can block the Redis server. Use SCAN instead of SMEMBERS for large sets, and delete keys in batches using Redis pipelining. For very large datasets, consider sharding tag indexes across multiple Redis keys."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Invalidation Anti-Patterns to Avoid",
+        "items": [
+          "Invalidating by partial key match with KEYS — it blocks Redis in production",
+          "Using a single catch-all tag that accumulates all keys over time",
+          "Forgetting to remove keys from the tag Set after deletion, causing memory leaks",
+          "Relying on TTL alone when you need immediate consistency after writes"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Tag-based invalidation groups related cache entries under named tags",
+          "Redis Sets are ideal for storing the tag-to-keys reverse index",
+          "Always add keys to tag Sets atomically with the cache write operation",
+          "Batch deletions for large tag sets to avoid blocking Redis",
+          "Clear the tag index Set after invalidation to prevent memory leaks"
+        ],
+        "takeaway": "Tag-based invalidation keeps cached data consistent after writes without relying solely on TTL expiration."
+      }
+    },
+    {
+      "type": "further-reading",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Cache invalidation strategies",
+            "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-invalidation",
+            "type": "article"
+          },
+          {
+            "title": "StackExchange.Redis: Set operations",
+            "url": "https://stackexchange.github.io/StackExchange.Redis/",
+            "type": "documentation"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Cache invalidation strategies",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-invalidation",
+      "type": "article"
+    },
+    {
+      "title": "StackExchange.Redis documentation",
+      "url": "https://stackexchange.github.io/StackExchange.Redis/",
+      "type": "documentation"
+    }
+  ]
+}

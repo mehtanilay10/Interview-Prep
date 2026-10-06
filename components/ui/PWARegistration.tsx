@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 declare global {
   interface Window {
@@ -30,7 +31,7 @@ export function PWARegistration() {
         void registration?.update().catch(() => undefined);
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
-          console.error('PWA service worker registration failed.', error);
+          logger.error('PWARegistration', 'Service worker registration failed.', error);
         }
       }
     };

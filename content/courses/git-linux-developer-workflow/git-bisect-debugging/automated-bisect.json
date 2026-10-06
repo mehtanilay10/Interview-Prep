@@ -1,0 +1,150 @@
+{
+  "id": "lesson-git-039",
+  "slug": "automated-bisect",
+  "moduleSlug": "git-bisect-debugging",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Automated Bisect",
+  "description": "Automate git bisect with run commands and scripts to find regressions without manual testing.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["git", "bisect", "automation", "debugging"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git bisect supports automation through the run subcommand and the BISECT_RUN environment variable. Instead of manually testing each commit, you provide a script or command that returns 0 (good), 1 (bad), or 125 (skip). Git runs it at each bisect step automatically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "git bisect run"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "git bisect run <command> executes the command at each bisect step. The command should be a script, test, or any program that exits 0 if the bug is not present and 1 if it is. Exit code 125 tells Git to skip that commit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Automated bisect with a test script",
+        "language": "bash",
+        "code": "# Step 1: Create a test script\ncat > bisect-test.sh << 'EOF'\n#!/bin/bash\n# Run a specific test that reproduces the bug\nnpm test -- --grep \"User login validation\"\n\n# Exit 0 = good (no bug)\n# Exit 1 = bad (bug present)\nEOF\n\nchmod +x bisect-test.sh\n\n# Step 2: Start bisect with run\ngit bisect start\ngit bisect bad HEAD\ngit bisect good v2.1.0\n\n# Step 3: Let Git run the test automatically\ngit bisect run ./bisect-test.sh\n\n# Git reports:\n# abc1234 is the first bad commit"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Return codes"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Exit code", "Meaning", "Bisect action"],
+        "rows": [
+          ["0", "Good — bug not present", "Narrow range toward older commits"],
+          ["1-124", "Bad — bug present", "Narrow range toward newer commits"],
+          ["125", "Skip — cannot test", "Skip this commit"],
+          ["126+", "Script error", "Abort bisect"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Exit 125 aborts the bisect if used incorrectly",
+        "text": "Only return 125 when a commit genuinely cannot be tested (e.g., the build fails for unrelated reasons). Returning 125 for every commit will cause bisect to abort."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Inline commands with run"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For simple checks, you can pass an inline command to bisect run without creating a separate script file."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect run with inline command",
+        "language": "bash",
+        "code": "# Check if a file contains a specific string\ngit bisect start\ngit bisect bad HEAD\ngit bisect good v2.1.0\n\ngit bisect run bash -c '\n  if grep -q \"ERROR: token validation failed\" src/auth/*.cs; then\n    exit 1  # bad\n  else\n    exit 0  # good\n  fi\n'\n\n# Git identifies the commit that introduced the error string"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Automated bisect for build failures"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When the regression is a build failure rather than a runtime bug, your bisect script can check whether the project builds successfully at each commit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect for build regressions",
+        "language": "bash",
+        "code": "cat > bisect-build.sh << 'EOF'\n#!/bin/bash\n# Try to build the project\nnpm run build > /dev/null 2>&1\nBUILD_EXIT=$?\n\nif [ $BUILD_EXIT -eq 0 ]; then\n  echo \"Build succeeded\"\n  exit 0  # good\nelse\n  echo \"Build failed\"\n  exit 1  # bad\nfi\nEOF\n\nchmod +x bisect-build.sh\n\ngit bisect start\ngit bisect bad HEAD\ngit bisect good v2.0.0\ngit bisect run ./bisect-build.sh"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "What if the build is broken at both good and bad commits?",
+            "answer": "You cannot bisect when the good commit is also broken. Find a known-good commit where the build passes and the bug is absent."
+          },
+          {
+            "question": "Can bisect run run tests in parallel?",
+            "answer": "You can write a script that runs tests in parallel, but bisect itself runs sequentially — one commit at a time."
+          },
+          {
+            "question": "Can I use CI builds with bisect?",
+            "answer": "Not directly — bisect checks out commits locally. However, you can use git bisect run to trigger a local build or a subset of tests."
+          },
+          {
+            "question": "What if my bisect script is slow?",
+            "answer": "Optimize the script to run only the specific check needed. Use targeted tests (--grep), cached builds, and incremental test runners."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "git bisect run automates the entire bisect process with a script or command",
+          "Exit 0 = good, exit 1 = bad, exit 125 = skip",
+          "Use targeted tests or checks that run in seconds, not minutes",
+          "For build regressions, check npm run build or dotnet build at each step",
+          "bisect run can use inline commands or external scripts"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["bisect-fundamentals", "bisect-with-scripts"],
+  "furtherReading": [
+    { "title": "Git Bisect Run", "url": "https://git-scm.com/docs/git-bisect#Documentation/git-bisect.txt-ltcommandgt", "type": "article" }
+  ]
+}

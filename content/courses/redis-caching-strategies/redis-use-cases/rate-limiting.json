@@ -1,0 +1,117 @@
+{
+  "id": "lesson-redis-025",
+  "slug": "rate-limiting",
+  "moduleSlug": "redis-use-cases",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Implementing Rate Limiters with Redis",
+  "description": "Build robust rate limiters using Redis to protect APIs from abuse, prevent brute-force attacks, and enforce fair usage policies.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "rate-limiting", "api", "security", "performance"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": { "text": "Rate limiting controls how many requests a client can make in a given time window. Without rate limiting, a single user or bot can overwhelm your API, degrade service for others, or drive up infrastructure costs. Redis is well-suited for rate limiting because its atomic operations and fast performance make it easy to implement accurate counters even under heavy load." }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Common Rate Limiting Algorithms" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "Three algorithms dominate production rate limiting. The fixed window counter divides time into discrete buckets and counts requests per bucket. The sliding window log tracks every request timestamp and prunes old entries. The sliding window counter approximates the sliding window using two overlapping fixed windows, trading a small amount of precision for much lower memory usage. Redis makes all three straightforward to implement." }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Algorithm", "Accuracy", "Memory", "Redis Cost"],
+        "rows": [
+          ["Fixed window", "Low", "Low", "1 INCR + 1 EXPIRE"],
+          ["Sliding window log", "High", "High", "ZADD + ZREMRANGEBYSCORE + ZCARD"],
+          ["Sliding window counter", "Medium", "Low", "2 INCR + 1 EXPIRE"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Sliding Window Counter in Redis" }
+    },
+    {
+      "type": "paragraph",
+      "data": { "text": "The sliding window counter is the most common production choice. For each client, you maintain two keys: one for the current window and one for the previous window. By weighting the previous window's count by how much of it overlaps with the current window, you get a smooth, accurate rate limit without storing every request timestamp." }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) with StackExchange.Redis",
+        "content": "The following code implements a sliding window rate limiter using Redis.",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\npublic class RateLimiter\n{\n    private readonly IDatabase _db;\n\n    public RateLimiter(IConnectionMultiplexer redis)\n    {\n        _db = redis.GetDatabase();\n    }\n\n    public async Task<bool> IsAllowedAsync(string clientId, int limit, TimeSpan window)\n    {\n        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();\n        var previousKey = $\"rate:{clientId}:{now - (long)window.TotalMilliseconds}\";\n        var currentKey = $\"rate:{clientId}:{now}\";\n\n        var previous = await _db.StringGetAsync(previousKey);\n        var current = await _db.StringGetAsync(currentKey);\n\n        var prevCount = previous.HasValue ? (int)previous : 0;\n        var currCount = current.HasValue ? (int)current : 0;\n\n        var overlap = 1 - (now % (long)window.TotalMilliseconds) / (double)window.TotalMilliseconds;\n        var estimatedCount = currCount + (int)(prevCount * overlap);\n\n        if (estimatedCount >= limit)\n        {\n            return false;\n        }\n\n        await _db.StringIncrementAsync(currentKey);\n        await _db.KeyExpireAsync(currentKey, window);\n        return true;\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js with ioredis",
+        "content": "The same sliding window rate limiter in Node.js.",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\nasync function isAllowed(clientId, limit, windowMs) {\n  const now = Date.now();\n  const prevKey = `rate:${clientId}:${now - windowMs}`;\n  const currKey = `rate:${clientId}:${now}`;\n\n  const [prev, curr] = await Promise.all([\n    redis.get(prevKey),\n    redis.get(currKey)\n  ]);\n\n  const prevCount = parseInt(prev || '0', 10);\n  const currCount = parseInt(curr || '0', 10);\n\n  const overlap = 1 - (now % windowMs) / windowMs;\n  const estimated = currCount + Math.floor(prevCount * overlap);\n\n  if (estimated >= limit) {\n    return false;\n  }\n\n  await redis.set(currKey, currCount + 1, 'PX', windowMs);\n  return true;\n}"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "rate-limit-flow",
+        "caption": "Sliding window rate limiter decision flow.",
+        "definition": "flowchart LR\n    A[Incoming request] --> B[Compute client key]\n    B --> C[Read previous window count]\n    C --> D[Read current window count]\n    D --> E[Calculate overlap-weighted total]\n    E --> F{Total >= limit?}\n    F -->|Yes| G[Reject request]\n    F -->|No| H[Increment current counter]\n    H --> I[Set TTL on current key]\n    I --> J[Allow request]\n    G --> K[Return 429 Too Many Requests]\n    J --> L[Return 200 OK]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": { "variant": "warning", "title": "Clock Skew", "text": "Rate limiting depends on synchronized clocks across your servers. If you run multiple application instances, ensure they use UTC and synchronize with NTP to avoid inconsistent window boundaries." }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Rate limit", "definition": "The maximum number of requests allowed within a time window." },
+          { "term": "TTL", "definition": "Time-to-live for Redis keys. Used here to expire old window counters automatically." },
+          { "term": "429 Too Many Requests", "definition": "HTTP status code returned when a client exceeds their rate limit." }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement a Token Bucket Rate Limiter",
+        "description": "Extend the sliding window example into a token bucket algorithm. Tokens refill at a fixed rate, and each request consumes one token. Store the token count and last refill timestamp in Redis, and use Lua or atomic operations to ensure thread safety.",
+        "expectedOutcome": "A rate limiter that allows burst traffic up to the bucket capacity while enforcing a steady-state request rate."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Redis enables accurate, low-latency rate limiting using simple counters and TTL.",
+          "The sliding window counter balances precision and memory usage well.",
+          "Always return a clear 429 response with Retry-After headers for rejected requests."
+        ],
+        "takeaway": "Redis-based rate limiting is a critical defense against API abuse and brute-force attacks."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Rate Limiting Patterns", "url": "https://redis.io/docs/latest/develop/use-cases/rate-limiting/", "type": "article" },
+        { "title": "Rate Limiting with ioredis", "url": "https://github.com/luin/ioredis", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Rate Limiting Patterns", "url": "https://redis.io/docs/latest/develop/use-cases/rate-limiting/", "type": "article" },
+    { "title": "Rate Limiting with ioredis", "url": "https://github.com/luin/ioredis", "type": "article" }
+  ]
+}

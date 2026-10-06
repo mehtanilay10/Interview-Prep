@@ -1,0 +1,167 @@
+{
+  "id": "lesson-redis-047",
+  "slug": "performance-pitfalls",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Common Redis Performance Pitfalls",
+  "description": "Identify and fix the most frequent mistakes that cause Redis to underperform or fail under load.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "anti-patterns", "performance", "troubleshooting", "best-practices"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis is fast by design, but it can still be slowed down by bad patterns. A single KEYS pattern scan, an oversized hash, or a missing index can turn a sub-millisecond cache into a multi-second blocking operation. These pitfalls are often invisible until production traffic reveals them, so knowing what to avoid is as important as knowing how to optimize."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "The KEYS Command"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "KEYS pattern scans every key in the database sequentially. It runs in O(N) time, where N is the total number of keys. On a Redis instance with millions of keys, KEYS can block for seconds or even minutes, blocking all other clients. Never use KEYS in application code. Use SCAN for safe iteration, or maintain secondary indexes with sets."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "error",
+        "title": "Production Anti-Pattern",
+        "text": "If you see KEYS in a code review, replace it immediately. SCAN is safe for production. If you need fast lookups by pattern, build a secondary index with Redis sets at write time."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Large Hashes and Lists"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A single hash with millions of fields causes Redis to allocate large contiguous memory blocks and slows down operations like HGETALL. Similarly, a list with millions of elements forces Redis to traverse the entire list for LRANGE operations. If your data structures grow without bound, you are setting yourself up for latency spikes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Avoiding unbounded growth with bucketing (Node.js)",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\n// Anti-pattern: one unbounded hash\n// HINCRBY user:123:metrics page_views 1\n// After 1M days, this hash has 1M fields\n\n// Better: bucket by time\nasync function recordPageView(userId) {\n  const bucket = Math.floor(Date.now() / 86400000); // daily bucket\n  const key = 'user:' + userId + ':pv:' + bucket;\n  await redis.hincrby(key, 'count', 1);\n  await redis.expire(key, 604800); // 7 days\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Blocking Commands in the Event Loop"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Commands like LRANGE 0 -1 on a massive list, HGETALL on a huge hash, or ZRANGE on a sorted set with millions of members block the Redis event loop. While the command runs, no other client can be served. This is the single most common cause of latency spikes in production Redis. Always bound your range queries."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "blocking-command-impact",
+        "caption": "How a single blocking command affects all clients",
+        "definition": "flowchart TD\n    A[\"Client A\nLRANGE 0 -1\non 10M list\"] -->|blocks| B[\"Redis Event Loop\nblocked for 5s\"]\n    C[\"Client B\nGET hot-key\"] -.->|waiting| B\n    D[\"Client C\nSET session\"] -.->|waiting| B\n    B --> E[\"Latency spike\nfor everyone\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "C# Pitfalls with StackExchange.Redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In C#, blocking calls like .Wait() or .Result on async Redis operations can cause thread-pool starvation. StackExchange.Redis is fully async, and blocking it blocks threads. Always use async/await. Also, avoid creating a new ConnectionMultiplexer per request — it is a connection pool, not a disposable connection."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Avoid blocking async calls (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\nvar db = mux.GetDatabase();\n\n// Bad: blocks thread, causes thread-pool starvation\nstring badValue = db.StringGet(\"key\").ToString();\n\n// Good: async all the way\nstring goodValue = await db.StringGetAsync(\"key\");\n\n// Bad: new pool per request\npublic string GetValue(string key)\n{\n    var mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\n    return mux.GetDatabase().StringGet(key).ToString();\n}\n\n// Good: shared pool as singleton\npublic class RedisService\n{\n    private readonly ConnectionMultiplexer _mux;\n    public RedisService()\n    {\n        _mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\n    }\n    public async Task<string?> GetAsync(string key)\n        => await _mux.GetDatabase().StringGetAsync(key);\n}"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Replace KEYS with SCAN or secondary indexes",
+          "Bound all range queries with LIMIT or time buckets",
+          "Use async/await exclusively in C# async Redis code",
+          "Share ConnectionMultiplexer across your application",
+          "Set maxmemory-policy before running out of memory"
+        ],
+        "title": "Quick fix checklist"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Pitfall", "Impact", "Fix"],
+        "rows": [
+          ["KEYS pattern", "Blocks all clients", "Use SCAN"],
+          ["HGETALL on large hash", "O(N) latency spike", "Use HRANDFIELD or HSCAN"],
+          ["Blocking async calls", "Thread-pool starvation", "Use async/await"],
+          ["New connection per request", "Connection exhaustion", "Share ConnectionMultiplexer"],
+          ["No maxmemory eviction", "OOM crash", "Set maxmemory-policy allkeys-lru"]
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "How do I find blocking commands in my application?", "answer": "Enable SLOWLOG GET 128 to see recently executed slow commands. Use MONITOR for real-time tracing, but only briefly — MONITOR adds overhead." },
+          { "question": "Is SCAN safe for production?", "answer": "Yes. SCAN iterates safely using a cursor, returning only a small batch of keys per call. It does not block other clients, though individual calls still have some cost." },
+          { "question": "What is the best eviction policy for a cache?", "answer": "allkeys-lru evicts the least recently used keys from all data, which is ideal for caches. Use volatile-lru only if you need to protect keys without TTL from eviction." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "NEVER use KEYS in production — SCAN is safe",
+          "Bound range queries to prevent blocking the event loop",
+          "Use async/await in C# to avoid thread-pool starvation",
+          "Share ConnectionMultiplexer instead of creating new ones",
+          "Configure LRU eviction before you need it"
+        ],
+        "takeaway": "Performance pitfalls are often simple mistakes with huge consequences. The safest approach is to assume every command can block, every structure can grow unbounded, and every async call should be awaited."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Slowlog Documentation", "url": "https://redis.io/docs/latest/develop/command-keys/slowlog/", "type": "article" },
+        { "title": "StackExchange.Redis Performance Tips", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#performance", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Slowlog Documentation", "url": "https://redis.io/docs/latest/develop/command-keys/slowlog/", "type": "article" },
+    { "title": "StackExchange.Redis Performance Tips", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#performance", "type": "article" }
+  ]
+}

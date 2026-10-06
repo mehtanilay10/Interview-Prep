@@ -1,0 +1,162 @@
+{
+  "id": "lesson-redis-038",
+  "slug": "express-caching",
+  "moduleSlug": "caching-in-nodejs",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Caching in Express.js Applications",
+  "description": "Apply Redis caching directly to Express route handlers and middleware for faster API responses.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 13,
+  "tags": [
+    "express",
+    "redis",
+    "api",
+    "middleware",
+    "caching"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Express is the most widely used Node.js web framework. Adding caching to Express routes is one of the highest-impact optimizations available to a backend engineer. A single Redis GET before a database call can reduce a 50 ms DB query to a 1-2 ms cache hit, transforming user-facing latency without changing business logic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "The Cache-Aside Pattern in Express",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The cache-aside (lazy loading) pattern keeps the cache outside the data source. The route handler first checks the cache. On a hit, it returns the cached response. On a miss, it fetches from the database and writes the result to the cache before returning. This pattern is simple, resilient to cache failures, and gives you full control over invalidation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Cache-aside route handler",
+        "content": "A GET route that checks Redis before querying the database.",
+        "language": "typescript",
+        "code": "import express from 'express';\nimport Redis from 'ioredis';\n\nconst app = express();\nconst redis = new Redis();\nconst CACHE_TTL = 300;\n\napp.get('/api/products/:id', async (req, res) => {\n  const cacheKey = `product:${req.params.id}`;\n\n  // Try cache first\n  const cached = await redis.get(cacheKey);\n  if (cached) {\n    return res.json(JSON.parse(cached));\n  }\n\n  // Cache miss — fetch from DB\n  const product = await db.products.findById(req.params.id);\n  if (!product) {\n    return res.status(404).json({ error: 'Not found' });\n  }\n\n  // Populate cache for next request\n  await redis.set(\n    cacheKey,\n    JSON.stringify(product),\n    'EX',\n    CACHE_TTL\n  );\n\n  res.json(product);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Storing Full Responses vs Raw Data",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can cache either the raw database document or the fully serialized Express JSON response. Caching the raw document keeps the cache agnostic to API format changes. Caching the full response is faster because serialization is skipped entirely. Choose based on whether your API format changes more often than your data model."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Cache Granularity Options",
+        "cards": [
+          {
+            "title": "Raw Document",
+            "description": "Cache the database record directly.",
+            "pros": ["Format-agnostic", "Easier to invalidate"],
+            "cons": ["Still needs JSON serialization", "Exposes internal schema"]
+          },
+          {
+            "title": "Full Response",
+            "description": "Cache the complete JSON response string.",
+            "pros": ["Fastest path to client", "No serialization on hit"],
+            "cons": ["Must invalidate on format changes", "Larger memory footprint"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Controlling Cache Keys",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Good cache key design prevents collisions and makes invalidation predictable. Include the route identity, resource ID, and any query parameters that affect the response. Avoid including timestamps or user-specific data in shared keys unless you intend to vary by user."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Cache key guidelines",
+        "items": [
+          "Use a consistent namespace prefix: product:42 or user:42:preferences",
+          "Include query params that change the response: products?category=books becomes products:category:books",
+          "Never include auth tokens or session IDs in shared keys",
+          "Keep keys under 250 bytes — Redis stores each key as a separate allocation"
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-express-cache-flow",
+        "definition": "flowchart LR\n    A[Client] --> B[Express Route]\n    B --> C{REDIS GET}\n    C -- Hit --> D[Return 200 JSON]\n    C -- Miss --> E[DB Query]\n    E --> F[REDIS SET EX 300]\n    F --> D",
+        "caption": "Express request flow with Redis cache-aside"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Stale Data Risk",
+        "text": "Redis SET does not automatically invalidate when your database changes. Pair your cache writes with a delete-on-update strategy (or use a pub/sub invalidation channel) to keep cache and database in sync."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Add Caching to a Blog API",
+        "description": "Add Redis caching to a GET /api/posts/:id Express route.",
+        "steps": [
+          "Create a Redis client using ioredis with lazyConnect.",
+          "Build a cache key helper: makeCacheKey('post', id).",
+          "Check Redis for a cached post before hitting the database.",
+          "On a miss, fetch the post and SET it with a 5-minute TTL.",
+          "Add a try/catch block that falls back to the DB if Redis is unreachable.",
+          "Write a unit test that mocks redis.get to return null and asserts the DB was called."
+        ],
+        "expectedOutcome": "A working Express route with cache-aside logic, a cache-miss fallback, and graceful Redis error handling."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache-aside is the most common pattern for Express + Redis integration.",
+          "Design cache keys with clear namespaces and include query parameters.",
+          "Always handle Redis failures gracefully — the app must work without the cache."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Express.js Performance Best Practices",
+      "url": "https://expressjs.com/en/advanced/best-practice-performance.html",
+      "type": "article"
+    },
+    {
+      "title": "Redis Caching Strategy Guide",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article"
+    }
+  ]
+}

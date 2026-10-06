@@ -1,0 +1,182 @@
+{
+  "id": "lesson-redis-041",
+  "slug": "cache-middleware",
+  "moduleSlug": "caching-in-nodejs",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Building Cache Middleware for Express",
+  "description": "Create reusable Express middleware to cache GET responses automatically using Redis.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 14,
+  "tags": [
+    "express",
+    "middleware",
+    "redis",
+    "reusable",
+    "nodejs"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Middleware is Express.js's most powerful abstraction: it intercepts requests before they reach route handlers and responses before they reach the client. A cache middleware wraps this pattern by checking Redis on inbound requests and short-circuiting the response on a hit. Well-written cache middleware is reusable, declarative, and keeps caching logic completely separate from business logic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "The Middleware Contract",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Express middleware is a function with the signature `(req, res, next) => void`. For caching, the middleware runs before the route handler. It reads the request URL and optionally the query string to build a cache key. If the key exists in Redis, it sends the cached response and skips `next()`. Otherwise, it calls `next()` and intercepts `res.json` to store the response body on completion."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-middleware-contract",
+        "definition": "sequenceDiagram\n    participant C as Client\n    participant M as Cache Middleware\n    participant R as Redis\n    participant H as Route Handler\n\n    C->>M: GET /api/products/42\n    M->>R: GET product:42\n    alt Cache Hit\n        R-->>M: JSON body\n        M-->>C: 200 JSON (from cache)\n    else Cache Miss\n        M->>H: next()\n        H-->>M: res.json(data)\n        M->>R: SET product:42 EX 300\n        M-->>C: 200 JSON\n    end",
+        "caption": "Cache middleware sequence diagram"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Implementing the Middleware",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The implementation below intercepts the response end event to capture the body. It builds cache keys from the request method, original URL, and any query parameters. Only GET requests are cached; mutations (POST, PUT, DELETE) are passed through without caching."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "cacheMiddleware implementation",
+        "content": "Reusable middleware factory for Express.",
+        "language": "typescript",
+        "code": "import { Request, Response, NextFunction } from 'express';\nimport Redis from 'ioredis';\n\nexport function cacheMiddleware(\n  redis: Redis,\n  ttlSeconds: number = 300\n) {\n  return async (req: Request, res: Response, next: NextFunction) => {\n    if (req.method !== 'GET') return next();\n\n    const cacheKey = `http:${req.originalUrl}`;\n    const cached = await redis.get(cacheKey);\n\n    if (cached) {\n      res.setHeader('X-Cache', 'HIT');\n      return res.json(JSON.parse(cached));\n    }\n\n    // Capture response body\n    const originalJson = res.json.bind(res);\n    const chunks: Buffer[] = [];\n\n    res.json = (body: unknown) => {\n      chunks.push(Buffer.from(JSON.stringify(body)));\n      return originalJson(body);\n    };\n\n    res.on('finish', async () => {\n      if (res.statusCode < 400) {\n        const body = JSON.parse(chunks.join('').toString());\n        await redis.set(cacheKey, JSON.stringify(body), 'EX', ttlSeconds);\n      }\n    });\n\n    res.setHeader('X-Cache', 'MISS');\n    next();\n  };\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use X-Cache Header",
+        "text": "Always return an X-Cache header (HIT or MISS). This lets you verify caching behavior in the browser or API client and debug production issues without Redis access."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Applying Middleware Selectively",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Not every route benefits from caching. Public read-only endpoints (product catalogs, FAQ pages) are perfect candidates. User-specific or mutation routes should bypass the cache. Use route-level middleware application to avoid accidental data leakage between users."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Applying middleware to specific routes",
+        "content": "Use the middleware factory on routes that benefit from caching.",
+        "language": "typescript",
+        "code": "import express from 'express';\nimport { cacheMiddleware } from './cache-middleware';\nimport Redis from 'ioredis';\n\nconst app = express();\nconst redis = new Redis();\n\n// Public routes — cache aggressively\napp.get('/api/products', cacheMiddleware(redis, 600));\napp.get('/api/products/:id', cacheMiddleware(redis, 600));\n\n// User-specific routes — no caching\napp.get('/api/me', (req, res) => {\n  res.json({ userId: req.user.id });\n});\n\n// Mutation routes — no caching\napp.post('/api/orders', (req, res) => {\n  // Create order logic\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Handling Cache Invalidation on Writes",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When your application mutates data, the corresponding cache entry becomes stale. The simplest approach is to delete the relevant keys immediately after the mutation succeeds. For dependent resources (e.g., a product list after a product update), use a cache tag or pattern-based deletion with SCAN + DEL or Redis keyspace notifications."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Invalidating cache after a mutation",
+        "content": "Delete related cache keys after updating a product.",
+        "language": "typescript",
+        "code": "app.put('/api/products/:id', async (req, res) => {\n  const { id } = req.params;\n\n  await db.products.update(id, req.body);\n\n  // Invalidate the specific product and list views\n  await redis.del(`product:${id}`);\n  await redis.del('products:list:page:1');\n  await redis.del('products:list:page:2');\n\n  res.json({ success: true });\n});"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Always Invalidate After Writes",
+        "text": "A cache that is never invalidated serves stale data to clients. The standard rule: if you write to the database, delete the cache. If you write to the cache, ensure the database update succeeds first."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Middleware design rules",
+        "items": [
+          "Only cache idempotent GET requests",
+          "Never cache responses with Set-Cookie headers",
+          "Respect Cache-Control: no-store by short-circuiting",
+          "Set X-Cache header for observability",
+          "Use a consistent namespace prefix in cache keys"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Should I apply the middleware globally?",
+            "answer": "Prefer route-level application. A global cache middleware can accidentally cache private user data or error responses if a handler throws."
+          },
+          {
+            "question": "How do I handle cache warmup?",
+            "answer": "On deployment, issue GET requests to critical routes or use a warmup script that SETs known keys with full TTLs so the first real users see instant responses."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache middleware intercepts GET requests, short-circuits hits, and stores misses.",
+          "Always separate public and private routes when applying caching middleware.",
+          "Pair cache writes with DELETE calls on mutations to prevent stale data.",
+          "Use the X-Cache header to make caching behavior visible to developers and operators."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Express Middleware Guide",
+      "url": "https://expressjs.com/en/guide/using-middleware.html",
+      "type": "article"
+    },
+    {
+      "title": "HTTP Caching: A Guide for Developers",
+      "url": "https://inphonet.com/blog/http-caching-a-guide-for-developers/",
+      "type": "article"
+    }
+  ]
+}

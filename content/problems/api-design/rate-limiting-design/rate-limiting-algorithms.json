@@ -1,0 +1,187 @@
+{
+  "id": "lesson-api-design-problems-rate-limiting-design-rate-limiting-algorithms",
+  "slug": "rate-limiting-algorithms",
+  "moduleSlug": "rate-limiting-design",
+  "courseSlug": "api-design-problems",
+  "title": "Rate Limiting Algorithms",
+  "description": "Compare token bucket, leaky bucket, sliding window, and fixed window algorithms for API rate limiting with their trade-offs.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["rate-limiting", "algorithms", "token-bucket", "sliding-window"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limiting algorithms control how many requests a client can make in a given time window. Each algorithm has different memory footprints, boundary accuracy, and burst capabilities. Choosing the right one depends on your traffic pattern and operational complexity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Algorithm Comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Algorithm", "Memory Usage", "Burst Capability", "Boundary Accuracy", "Recommended Use"],
+        "rows": [
+          ["Token Bucket", "O(1) (2 fields)", "Yes — up to bucket capacity", "High — refills continuously", "Industry standard for general REST APIs"],
+          ["Leaky Bucket", "O(1) (queue depth)", "No — strictly smooths output", "High — processes at fixed rate", "Network shaping, not API rate limiting"],
+          ["Fixed Window", "O(1) (counter + timestamp)", "Yes — entire window resets", "Low — boundary burst at window edges", "Simple APIs, internal services"],
+          ["Sliding Window (Log)", "O(N) (all timestamps)", "Yes — within window", "Very High — exact count", "Accurate but memory-heavy"],
+          ["Sliding Window (Approx)", "O(1) (weighted counters)", "Yes — within window", "High — smooths boundary burst", "Production APIs needing accuracy without log memory"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Bucket Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Token bucket is the most widely used algorithm. It stores a bucket of tokens that refills at a constant rate. Each request consumes one token. When the bucket is empty, requests are rejected until tokens refill."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Capacity: maximum tokens the bucket can hold (defines burst size)",
+          "Refill rate: tokens added per second (defines sustained rate)",
+          "Cost: each request consumes 1 token (or more for expensive operations)",
+          "State: two fields — current tokens and last refill timestamp"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Token Bucket State Transitions"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Token bucket refill and request logic",
+        "content": "Pseudo-code showing how a token bucket processes requests.",
+        "code": "struct TokenBucket {\n    capacity: 100      // max tokens\n    refillRate: 10      // 10 tokens/sec\n    tokens: 50           // current tokens\n    lastRefill: timestamp\n}\n\nfunction allowRequest(bucket): (allowed, remaining, retryAfter) {\n    now = currentTime()\n    elapsed = now - bucket.lastRefill\n    tokensToAdd = elapsed * bucket.refillRate\n    bucket.tokens = min(bucket.capacity, bucket.tokens + tokensToAdd)\n    bucket.lastRefill = now\n\n    if bucket.tokens >= 1 {\n        bucket.tokens -= 1\n        return (true, bucket.tokens, 0)\n    }\n\n    retryAfter = (1 - bucket.tokens) / bucket.refillRate\n    return (false, 0, retryAfter)\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Fixed Window Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Fixed window counting is the simplest algorithm. It counts requests in fixed-length windows (e.g., 60-second intervals). The main problem is boundary burst: a client can send the limit at 0.9s and again at 1.1s, doubling the effective rate."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Window: fixed duration (e.g., 60s)",
+          "Counter: increments per request, resets at window boundary",
+          "Boundary burst: up to 2x the limit can be sent across a boundary",
+          "Mitigation: combine with a secondary token bucket to smooth transitions"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Sliding Window Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Sliding window eliminates boundary burst by weighting requests across window boundaries. The exact approach stores all timestamps (memory-heavy). The approximate approach uses two counters with a weighted blend."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "The approximate sliding window",
+        "text": "The approximate sliding window is the best production compromise. It uses O(1) memory with two counters and eliminates most boundary burst. It is accurate within 1% of the exact approach."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Approximate Sliding Window"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Approximate sliding window with weighted counters",
+        "content": "Weight the previous and current window counters by overlap percentage.",
+        "code": "struct SlidingWindow {\n    windowSize: 60       // seconds\n    maxRequests: 100\n    prevCount: 80          // requests in previous window\n    currCount: 20          // requests in current window\n    currWindowStart: timestamp\n}\n\nfunction allowRequest(window): (allowed, remaining) {\n    now = currentTime()\n    elapsed = now - window.currWindowStart\n\n    if elapsed >= window.windowSize {\n        // Rotate window\n        window.prevCount = window.currCount\n        window.currCount = 0\n        window.currWindowStart = now\n        elapsed = 0\n    }\n\n    // Weighted count: prev window decays by elapsed fraction\n    overlap = (window.windowSize - elapsed) / window.windowSize\n    weightedCount = window.prevCount * overlap + window.currCount\n\n    if weightedCount < window.maxRequests {\n        window.currCount++\n        return (true, window.maxRequests - weightedCount - 1)\n    }\n\n    return (false, 0)\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Which algorithm should I use?",
+            "answer": "Use token bucket for general API rate limiting. Use sliding window (approximate) if you need accurate boundary enforcement. Use fixed window only for simple internal services where boundary burst is acceptable."
+          },
+          {
+            "question": "Should I use different limits per endpoint?",
+            "answer": "Yes. Expensive endpoints (search, export) should have lower limits. Cheap endpoints (health checks, GET /status) should have higher limits or no limit. Use a per-endpoint rate limit key."
+          },
+          {
+            "question": "How do I handle distributed rate limiting?",
+            "answer": "Store rate limit state in a shared Redis cluster. Use Redis Lua scripts for atomic operations. The algorithm logic stays the same; only the storage layer changes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Token bucket is the industry standard — use it as your default.",
+          "Fixed window is simple but has a boundary burst problem.",
+          "Approximate sliding window gives O(1) accuracy without log storage.",
+          "Algorithm choice is independent of storage; swap Redis for a distributed store."
+        ],
+        "takeaway": "Rate limiting algorithms are about the trade-off between simplicity, accuracy, and memory. Token bucket wins on simplicity; approximate sliding window wins on accuracy without complexity."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "token-bucket-implementation",
+    "sliding-window-implementation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Stripe Rate Limiting Architecture",
+      "url": "https://stripe.com/blog/rate-limiters",
+      "type": "article",
+      "author": "Stripe",
+      "description": "How Stripe implements token bucket and sliding window rate limiting."
+    }
+  ]
+}

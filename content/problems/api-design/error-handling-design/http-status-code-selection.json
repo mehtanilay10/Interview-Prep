@@ -1,0 +1,155 @@
+{
+  "id": "lesson-api-design-problems-error-handling-design-http-status-code-selection",
+  "slug": "http-status-code-selection",
+  "moduleSlug": "error-handling-design",
+  "courseSlug": "api-design-problems",
+  "title": "HTTP Status Code Selection",
+  "description": "Select the correct HTTP status codes for every API operation, including 2xx success, 3xx redirects, 4xx client errors, and 5xx server errors.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["http", "status-codes", "errors", "rest"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "HTTP status codes are the primary error communication mechanism in REST APIs. Using the wrong code confuses clients, breaks retry logic, and makes debugging harder. This lesson maps every common API operation to the correct status code."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Status Code Decision Matrix"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Code", "Meaning", "When to Use", "Body Should Contain"],
+        "rows": [
+          ["200 OK", "Success", "GET, PUT, PATCH completed", "Resource representation"],
+          ["201 Created", "Resource created", "POST that creates a resource", "New resource + Location header"],
+          ["204 No Content", "Success, no body", "DELETE, PUT with empty response", "Empty body"],
+          ["301 Moved Permanently", "Resource moved", "Endpoint relocated permanently", "Empty body or link"],
+          ["302 Found", "Temporary redirect", "Login redirect, non-GET after POST", "Empty body"],
+          ["400 Bad Request", "Malformed request", "Invalid JSON, missing required fields", "Validation errors"],
+          ["401 Unauthorized", "Missing or invalid auth", "No token, expired token, bad signature", "Error details"],
+          ["403 Forbidden", "Insufficient permissions", "Authenticated but not allowed", "Error details"],
+          ["404 Not Found", "Resource does not exist", "Invalid ID, deleted resource", "Error details"],
+          ["409 Conflict", "State conflict", "Duplicate email, version mismatch", "Conflict details"],
+          ["422 Unprocessable", "Semantic errors", "Valid JSON but invalid business data", "Field-level errors"],
+          ["429 Too Many Requests", "Rate limited", "Exceeded rate limit", "Retry-After header"],
+          ["500 Internal Error", "Server crashed", "Unhandled exception", "Generic error, no stack trace"],
+          ["502 Bad Gateway", "Upstream failed", "Downstream service unavailable", "Retry suggestion"],
+          ["503 Service Unavailable", "Overloaded", "Rate limit exceeded, maintenance", "Retry-After header"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Error Response Format"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Consistent error response structure across all 4xx and 5xx codes",
+        "content": "Use a consistent JSON structure so clients can parse errors without special-casing each code.",
+        "code": "{\n  \"error\": {\n    \"code\": \"ValidationFailed\",\n    \"message\": \"The request contains invalid fields.\",\n    \"statusCode\": 422,\n    \"requestId\": \"req_abc123\",\n    \"timestamp\": \"2026-10-06T15:30:00Z\",\n    \"details\": [\n      {\n        \"field\": \"email\",\n        \"issue\": \"Must be a valid email address\",\n        \"value\": \"not-an-email\"\n      },\n      {\n        \"field\": \"age\",\n        \"issue\": \"Must be at least 18\",\n        \"value\": 15\n      }\n    ],\n    \"documentationUrl\": \"/docs/errors#ValidationFailed\"\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Anti-patterns to avoid",
+        "items": [
+          "Returning 200 OK with an error field in the body — this breaks HTTP semantics",
+          "Returning 500 for validation errors — clients cannot programmatically distinguish validation from server failure",
+          "Returning 404 for authorization failures — this leaks information about which IDs exist",
+          "Returning different error structures per endpoint — clients need a unified parser"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "404 vs 403 for auth",
+        "text": "Return 404 (not 403) for resources the user does not have permission to see. This prevents attackers from enumerating valid IDs by observing whether a resource exists."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: POST /users — Handling Various Outcomes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Different outcomes for the same endpoint",
+        "content": "A well-designed endpoint returns the correct status code for every possible outcome.",
+        "code": "// 1. Missing auth token -> 401\nHTTP/1.1 401 Unauthorized\n\n// 2. Token valid but user lacks 'admin' scope -> 403\nHTTP/1.1 403 Forbidden\n\n// 3. Valid request, new user created -> 201\nHTTP/1.1 201 Created\nLocation: /users/usr_991\n\n// 4. Duplicate email -> 409\nHTTP/1.1 409 Conflict\n{\n  \"error\": {\n    \"code\": \"DuplicateEmail\",\n    \"message\": \"Email already registered.\",\n    \"existingUserId\": \"usr_123\"\n  }\n}\n\n// 5. Invalid email format -> 422\nHTTP/1.1 422 Unprocessable Entity\n{\n  \"error\": {\n    \"code\": \"ValidationFailed\",\n    \"details\": [\n      { \"field\": \"email\", \"issue\": \"Invalid format\" }\n    ]\n  }\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I ever return 200 for a failed operation?",
+            "answer": "No. A 200 OK signals success. If the operation failed, return the appropriate 4xx or 5xx code. Clients use status codes for control flow; mixing success and failure in 200 breaks retry and logging logic."
+          },
+          {
+            "question": "When should I use 422 vs 400?",
+            "answer": "Use 400 for syntactic errors (malformed JSON, missing required headers). Use 422 for semantic errors (valid JSON but invalid business data, failed validation rules)."
+          },
+          {
+            "question": "Is it okay to return 500 with a stack trace?",
+            "answer": "Never in production. Stack traces leak internal architecture details that attackers can exploit. Return a generic error message and log the full trace server-side with the request ID."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Status codes are part of the API contract; choose them deliberately.",
+          "Use 200 for success, 4xx for client errors, 5xx for server errors.",
+          "Never return 200 for failures.",
+          "Use a consistent error body structure across all error codes."
+        ],
+        "takeaway": "HTTP status codes are the most reliable error signal in a distributed system. Get them right and your clients can write correct retry, fallback, and debugging logic automatically."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "error-response-format",
+    "validation-errors"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 7807: Problem Details for HTTP APIs",
+      "url": "https://datatracker.ietf.org/doc/html/rfc7807",
+      "type": "article",
+      "author": "IETF",
+      "description": "Standard format for HTTP API error responses."
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "id": "lesson-api-design-problems-rate-limiting-design-token-bucket-implementation",
+  "slug": "token-bucket-implementation",
+  "moduleSlug": "rate-limiting-design",
+  "courseSlug": "api-design-problems",
+  "title": "Token Bucket Implementation",
+  "description": "Implement a production-grade token bucket rate limiter in Redis with atomic Lua scripts and proper response headers.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": ["token-bucket", "redis", "lua", "implementation"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A token bucket implementation must be atomic under concurrent access. Using Redis Lua scripts ensures the refill, decrement, and decision happen in a single operation. This prevents race conditions where two simultaneous requests see the same token balance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Redis Data Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Store one hash per rate limit key. The hash tracks the bucket state. TTL is set to the bucket capacity divided by refill rate to keep storage bounded."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Field", "Type", "Meaning", "Example"],
+        "rows": [
+          ["tokens", "Float", "Current token balance", "42.5"],
+          ["last_refill", "Float (unix ms)", "Last refill timestamp", "1728203400000"],
+          ["capacity", "Float", "Max tokens (stored for reference)", "100"],
+          ["refill_rate", "Float", "Tokens per second", "10"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Token Bucket Lua Script"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis Lua script for atomic token bucket",
+        "content": "The script runs atomically on Redis. No race conditions are possible.",
+        "code": "-- KEYS[1] = rate limit key (e.g., rate:user:123)\n-- ARGV[1] = capacity (e.g., 100)\n-- ARGV[2] = refill rate per second (e.g., 10)\n-- ARGV[3] = now in milliseconds\n\nlocal key = KEYS[1]\nlocal capacity = tonumber(ARGV[1])\nlocal refill_rate = tonumber(ARGV[2])\nlocal now = tonumber(ARGV[3])\n\nlocal bucket = redis.call('HMGET', key, 'tokens', 'last_refill')\nlocal tokens = tonumber(bucket[1]) or capacity\nlocal last_refill = tonumber(bucket[2]) or now\n\n-- Calculate elapsed time and refill\nlocal elapsed = math.max(0, now - last_refill) / 1000\nlocal tokens_to_add = elapsed * refill_rate\ntokens = math.min(capacity, tokens + tokens_to_add)\n\n-- Try to consume 1 token\nlocal allowed = 0\nlocal remaining = 0\nlocal retry_after = 0\n\nif tokens >= 1 then\n    tokens = tokens - 1\n    allowed = 1\n    remaining = tokens\nelse\n    retry_after = math.ceil((1 - tokens) / refill_rate)\nend\n\n-- Update state\nredis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)\nredis.call('EXPIRE', key, math.ceil(capacity / refill_rate))\n\nreturn { allowed, remaining, retry_after }",
+        "language": "lua"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Express.js Middleware"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rate limiter middleware using Redis and Lua",
+        "content": "Apply rate limiting per API key or user ID with standard rate limit headers.",
+        "code": "const rateLimit = async (req, res, next) => {\n  const identifier = req.user?.id || req.ip;\n  const key = `rate:${identifier}`;\n  const capacity = 100;\n  const refillRate = 10;\n  const now = Date.now();\n\n  const result = await redis.evalsa(\n    tokenBucketScript,\n    1,\n    key,\n    capacity,\n    refillRate,\n    now\n  );\n\n  const [allowed, remaining, retryAfter] = result;\n\n  res.set('X-RateLimit-Limit', capacity);\n  res.set('X-RateLimit-Remaining', Math.floor(remaining));\n  res.set('X-RateLimit-Reset', Math.ceil(now / 1000 + retryAfter));\n\n  if (!allowed) {\n    res.set('Retry-After', retryAfter);\n    return res.status(429).json({\n      type: 'https://api.example.com/errors/rate-limited',\n      title: 'Rate Limited',\n      status: 429,\n      requestId: req.id,\n      retryAfter\n    });\n  }\n\n  next();\n};",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rate Limit Response Headers"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Header", "Meaning", "Example"],
+        "rows": [
+          ["X-RateLimit-Limit", "Maximum requests allowed in window", "100"],
+          ["X-RateLimit-Remaining", "Requests remaining in current window", "42"],
+          ["X-RateLimit-Reset", "Unix timestamp when limit resets", "1728203460"],
+          ["Retry-After", "Seconds to wait before retrying", "6"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Burst Handling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Token bucket naturally supports bursts because the bucket can accumulate tokens during idle periods. A client that is idle for 10 seconds with a rate of 10/s builds up 100 tokens, allowing a burst of 100 requests instantly."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Per-endpoint limits",
+        "text": "Use different rate limit keys per endpoint tier: /api/search might be 10 req/min, while /api/health is unlimited. Combine per-user and per-endpoint dimensions in the Redis key: rate:user:123:search."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Do I need Lua scripts if I use Redis single-threaded mode?",
+            "answer": "Yes. Even single-threaded Redis can interleave commands from different clients. Without a Lua script, two clients could read the same token balance, both see tokens > 0, and both consume. The Lua script makes the read-modify-write atomic."
+          },
+          {
+            "question": "What if Redis is down?",
+            "answer": "Fail open (allow requests) if availability is critical, or fail closed (reject all requests) if protecting downstream is critical. Most APIs fail open during Redis outages to avoid total service unavailability."
+          },
+          {
+            "question": "How do I reset a user's rate limit?",
+            "answer": "Delete the Redis key: DEL rate:user:123. The next request will create a fresh bucket with full capacity. Use this for support resets."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Token bucket state lives in a Redis hash with two numeric fields.",
+          "Lua scripts make refill and decrement atomic under concurrency.",
+          "Return standard rate limit headers so clients can self-regulate.",
+          "Fail open on Redis outages unless protecting downstream is critical."
+        ],
+        "takeaway": "A token bucket in Redis is one Lua script away from production. The script is the entire concurrency story — get it right and your rate limiter is correct under any load pattern."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "rate-limiting-algorithms",
+    "distributed-rate-limiting"
+  ],
+  "furtherReading": [
+    {
+      "title": "Redis Rate Limiting with Lua",
+      "url": "https://redis.io/docs/manual/programmability/eval/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Official guide to atomic Lua scripting in Redis."
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "id": "lesson-api-design-problems-rest-api-design-scenarios-file-upload-api",
+  "slug": "file-upload-api",
+  "moduleSlug": "rest-api-design-scenarios",
+  "courseSlug": "api-design-problems",
+  "title": "File Upload API Design",
+  "description": "Design a file upload API supporting chunked uploads, resumable transfers, virus scanning, and metadata extraction for large files.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["upload", "multipart", "resumable", "storage"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "File upload APIs must handle large files, unreliable networks, and security scanning. Simple multipart form uploads fail for files over 100MB. You need chunked uploads, resumable transfers, and a clear lifecycle from upload initiation to final storage."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Upload Lifecycle"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Initiate — client requests an upload URL and receives an upload ID",
+          "Upload chunks — client sends file parts (5-10MB each)",
+          "Verify — client asks the server to verify all chunks arrived",
+          "Complete — server assembles chunks, runs virus scan, and stores the final file"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: TUS Resumable Upload Protocol"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resumable upload flow using TUS-style chunked uploads",
+        "content": "TUS is an open protocol for resumable uploads. The client requests an upload, sends chunks, and can resume after network failures.",
+        "code": "# Step 1: Initiate upload\nPOST /uploads\nUpload-Length: 104857600\nUpload-Metadata: filename dGVzdC5tcDM=\n\nResponse: 201 Created\nLocation: /uploads/upload_991\nUpload-Expires: 2026-10-06T16:00:00Z\n\n# Step 2: Upload chunk 1 (5MB)\nPATCH /uploads/upload_991\nContent-Type: application/offset+octet-stream\nUpload-Offset: 0\n[binary chunk data]\n\nResponse: 204 No Content\nUpload-Offset: 5242880\n\n# Step 3: Upload chunk 2\nPATCH /uploads/upload_991\nContent-Type: application/offset+octet-stream\nUpload-Offset: 5242880\n[binary chunk data]\n\nResponse: 204 No Content\nUpload-Offset: 10485760",
+        "language": "text"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "API Endpoints"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Endpoint", "Method", "Purpose", "Response"],
+        "rows": [
+          ["/uploads", "POST", "Create upload session", "201 + Location header"],
+          ["/uploads/{id}", "PATCH", "Upload chunk", "204 + Upload-Offset"],
+          ["/uploads/{id}", "GET", "Check upload status", "200 + Upload-Offset"],
+          ["/uploads/{id}/complete", "POST", "Assemble and finalize", "201 + File resource"],
+          ["/uploads/{id}", "DELETE", "Cancel upload", "204"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Security Considerations"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Scan every chunk as it arrives; do not wait for assembly",
+          "Enforce file size limits per user tier (free: 100MB, pro: 10GB)",
+          "Validate content type server-side; never trust client-provided MIME types",
+          "Store files outside the web root with signed, time-limited download URLs",
+          "Use CORS to restrict upload origins to your frontend domain"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Virus scanning is mandatory",
+        "text": "Never expose uploaded files to other users without scanning. Integrate ClamAV or a cloud-based malware scanner in the chunk processing pipeline. A single malicious file can compromise your entire infrastructure."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Complete File Resource"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "POST /uploads/{id}/complete — Finalize upload",
+        "content": "After all chunks are uploaded, the client requests completion. The server assembles the file, runs virus scan, extracts metadata, and returns the canonical file resource.",
+        "code": "POST /uploads/upload_991/complete\n\nResponse: 201 Created\n{\n  \"id\": \"file_abc123\",\n  \"filename\": \"demo.mp4\",\n  \"contentType\": \"video/mp4\",\n  \"size\": 104857600,\n  \"checksum\": \"sha256:abc123...\",\n  \"metadata\": {\n    \"duration\": 120.5,\n    \"width\": 1920,\n    \"height\": 1080,\n    \"codec\": \"h264\"\n  },\n  \"status\": \"ready\",\n  \"downloadUrl\": \"/files/file_abc123/download?token=xyz\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I upload directly to S3 or through my API server?",
+            "answer": "For files over 10MB, use pre-signed S3 URLs. Your API generates the upload URL and validates the final file. This keeps your API servers fast and avoids scaling bottlenecks."
+          },
+          {
+            "question": "What chunk size should I use?",
+            "answer": "5-10MB chunks balance retry cost and overhead. Smaller chunks reduce wasted uploads on failure but increase the number of requests. Larger chunks reduce overhead but waste more on retry."
+          },
+          {
+            "question": "How do I handle upload resumption after a network drop?",
+            "answer": "The client stores the upload ID and last successful offset. On reconnect, it sends PATCH with Upload-Offset set to the last received value. The server appends from that point."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Large files need chunked, resumable uploads, not single-shot multipart.",
+          "Scan chunks as they arrive; never trust client content types.",
+          "Use pre-signed storage URLs for files over 10MB.",
+          "Upload IDs must be non-guessable to prevent enumeration."
+        ],
+        "takeaway": "A production upload API treats large files as a streaming problem, not a request body problem. Chunk, scan, and store outside the web root."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "e-commerce-api",
+    "search-api"
+  ],
+  "furtherReading": [
+    {
+      "title": "TUS Resumable Upload Protocol",
+      "url": "https://tus.io/",
+      "type": "tool",
+      "description": "Open protocol for resumable server-side uploads."
+    }
+  ]
+}

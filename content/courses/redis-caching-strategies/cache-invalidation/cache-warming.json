@@ -1,0 +1,176 @@
+{
+  "id": "lesson-redis-017",
+  "slug": "cache-warming",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Cache Warming Strategies",
+  "description": "Learn how to pre-populate a Redis cache before high-traffic events to avoid cold-start penalties and cache stampedes.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 17,
+  "tags": ["redis", "warming", "cold-start", "preloading", "resilience"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is Cache Warming?",
+        "anchor": "what-is-warming"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Cache warming** is the practice of loading data into a cache before it is requested by users. A cold cache — one that has just started, been flushed, or never received a particular key — forces every request to hit the database until the cache fills up. Warming eliminates that cold-start penalty by pre-loading the most important keys."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Warming is especially important before predictable traffic spikes: Black Friday sales, product launches, or scheduled report generation. It is also useful after Redis restarts, RDB restores, or deployments that flush the cache."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Warming",
+            "definition": "Pre-loading data into a cache so that user requests find a warm, populated cache instead of an empty one."
+          },
+          {
+            "term": "Cold Start",
+            "definition": "The period when a cache is empty or missing critical keys, causing requests to fall through to the database."
+          },
+          {
+            "term": "Stale-While-Revalidate",
+            "definition": "A caching strategy that serves expired data while refreshing it in the background."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Warm the Cache",
+        "anchor": "when-to-warm"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common Triggers",
+        "items": [
+          "**Application startup** — Load reference data like countries, currencies, or feature flags.",
+          "**Pre-deployment** — Before swapping traffic to a new version, warm caches so the first users do not trigger a stampede.",
+          "**Scheduled events** — Load product catalogs, pricing, or inventory before a sale goes live.",
+          "**After Redis failover** — Re-populate critical keys after a node replacement or promotion.",
+          "**CI/CD pipelines** — Seed caches in staging environments so integration tests behave like production."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Warming Techniques",
+        "anchor": "techniques"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The simplest technique is a **warming script** that iterates over a list of known hot keys and writes them to Redis. More sophisticated systems use a **warming service** that runs continuously, keeps track of key popularity, and refreshes entries before they expire."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Simple warming script",
+        "content": "Load a list of hot product IDs from the database and write them to Redis.",
+        "code": "import Redis from 'ioredis';\nconst redis = new Redis();\n\nasync function warmProductCache() {\n  const hotProducts = await db.product.findMany({\n    where: { isHot: true },\n    select: { id: true, name: true, price: true }\n  });\n\n  const pipeline = redis.pipeline();\n  for (const product of hotProducts) {\n    pipeline.setex(\n      `product:${product.id}:details`,\n      600,\n      JSON.stringify(product)\n    );\n  }\n\n  await pipeline.exec();\n  console.log(`Warmed ${hotProducts.length} product keys`);\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Warming Architecture",
+        "anchor": "architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-warming-architecture",
+        "caption": "Cache warming flow: a warming job loads hot keys into Redis before user traffic arrives.",
+        "definition": "graph LR\n    A[Warming Job Trigger] --> B{Source of Hot Keys?}\n    B -->|Database Query| C[Fetch Hot Keys]\n    B -->|Config File| D[Read Key List]\n    B -->|Analytics| E[Read Top-N Keys]\n    C --> F[Write to Redis]\n    D --> F\n    E --> F\n    F --> G[Redis Ready for Traffic]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Background warming with ASP.NET Core IHostedService",
+        "content": "Run a warming job at startup to load feature flags and reference data into Redis.",
+        "code": "public class CacheWarmingService : BackgroundService\n{\n    private readonly IServiceProvider _services;\n    private readonly IConnectionMultiplexer _redis;\n\n    public CacheWarmingService(IServiceProvider services, IConnectionMultiplexer redis)\n    {\n        _services = services;\n        _redis = redis;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        await WarmFeatureFlagsAsync(stoppingToken);\n        await WarmCountriesAsync(stoppingToken);\n    }\n\n    private async Task WarmFeatureFlagsAsync(CancellationToken ct)\n    {\n        using var scope = _services.CreateScope();\n        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n        var redisDb = _redis.GetDatabase();\n\n        var flags = await db.FeatureFlags.ToListAsync(ct);\n        var pipe = redisDb.CreateBatch();\n\n        foreach (var flag in flags)\n        {\n            pipe.StringSetAsync(\n                $\"feature:flag:{flag.Name}\",\n                JsonSerializer.Serialize(flag),\n                TimeSpan.FromHours(1)\n            );\n        }\n\n        await pipe.ExecuteAsync(ct);\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Warm incrementally",
+        "text": "If you have millions of keys, do not try to warm them all at once. Warm the top 1% of hot keys, then use background jobs to gradually fill in the rest."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Stale-While-Revalidate",
+        "anchor": "stale-while-revalidate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Stale-while-revalidate** is a variation where you continue serving an expired cache entry while a background job fetches fresh data. The user never waits for a cache miss, and the cache updates itself asynchronously. This pattern is popular in CDNs and HTTP caches, but it also works for Redis when combined with a lightweight background scheduler."
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache warming pre-loads hot keys so users never hit a cold cache.",
+          "Warm on startup, before deployments, and before predictable traffic spikes.",
+          "Use batch operations to warm efficiently without overwhelming Redis.",
+          "Combine warming with TTL and jittered TTLs for a robust caching strategy."
+        ],
+        "takeaway": "Warming turns Redis from a reactive cache into a proactive one — be ready before the traffic arrives."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Cache Warming Best Practices",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/#cache-warming",
+      "type": "article",
+      "description": "Redis strategies for keeping caches warm and avoiding cold-start penalties."
+    },
+    {
+      "title": "Stale-While-Revalidate Pattern",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#stale-while-revalidate",
+      "type": "article",
+      "description": "MDN explanation of stale-while-revalidate, a pattern that can be applied beyond HTTP caches."
+    }
+  ]
+}

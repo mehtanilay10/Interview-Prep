@@ -1,0 +1,240 @@
+{
+  "id": "lesson-sd-distributed-cache",
+  "slug": "design-distributed-cache",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a distributed caching system like Redis or Memcached.",
+  "description": "High-availability distributed cache with consistent hashing, replication, and eviction policies.",
+  "order": 14,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["interview", "system-design", "cache", "distributed"],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a distributed caching system like Redis or Memcached."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "High availability with automatic failover",
+          "Data consistency across cache replicas",
+          "Configurable eviction policies (LRU, LFU, TTL)",
+          "Support for large values and bulk operations",
+          "Cluster mode for horizontal scaling",
+          "Pub/sub for cache invalidation events"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Capacity Estimation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Scale Assumptions",
+        "items": [
+          "1 million QPS across all cache nodes",
+          "100 terabytes of cached data",
+          "Average object size: 1 kilobyte",
+          "99.99% availability target",
+          "P99 latency under 1 millisecond",
+          "10% cache miss rate acceptable"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The system uses consistent hashing to distribute keys across cache nodes. Each node maintains a primary replica and one or more secondary replicas for high availability. A gossip protocol monitors node health and triggers failover. An eviction engine runs periodically to enforce memory limits using the configured policy."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-cache-arch",
+        "caption": "Distributed cache with consistent hashing and replication",
+        "definition": "graph TD\n    A[Client] --> B[Cache Proxy]\n    B --> C{Hash Key}\n    C -->|Hash A| D[Node 1]\n    C -->|Hash B| E[Node 2]\n    C -->|Hash C| F[Node 3]\n    D --> G[Replica 1A]\n    D --> H[Replica 1B]\n    E --> I[Replica 2A]\n    E --> J[Replica 2B]\n    F --> K[Replica 3A]\n    F --> L[Replica 3B]\n\n    M[Gossip Protocol] --> D\n    M --> E\n    M --> F\n\n    N[Config Service] --> B\n    O[Monitoring] --> D\n    O --> E\n    O --> F"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Entity", "Key Fields", "Description"],
+        "rows": [
+          ["CacheNode", "node_id, address, status, capacity, used", "Individual cache server"],
+          ["CacheKey", "key_hash, node_id, value, ttl, created_at", "Cached key-value pair"],
+          ["Replica", "replica_id, primary_node_id, node_id, lag_ms", "Replica metadata"],
+          ["EvictionPolicy", "policy_name, max_memory, ttl_default", "Node-level eviction configuration"],
+          ["GossipMember", "member_id, address, heartbeat, incarnation", "Cluster membership state"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Consistent Hashing",
+        "text": "Use virtual nodes in consistent hashing to evenly distribute keys when nodes are added or removed. This minimizes data movement during cluster changes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Eviction Policies"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Memory Management Strategies",
+        "items": [
+          "LRU (Least Recently Used): Evicts items not accessed recently",
+          "LFU (Least Frequently Used): Evicts items with low access counts",
+          "TTL-based: Expires items after a time-to-live duration",
+          "Random: Evicts random items for simplicity under high load",
+          "Size-based: Prioritizes evicting large objects first"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Consistency Strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choose between strong consistency, eventual consistency, and session consistency based on use case. Strong consistency ensures all replicas return the same value but increases latency. Eventual consistency allows replicas to diverge temporarily but provides lower latency and higher availability."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Cache Consistency",
+        "text": "Use write-through or write-behind strategies to keep cache consistent with the source of truth. Write-through ensures consistency but adds write latency. Write-behind improves write throughput but risks data loss."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Consistency Models",
+        "cards": [
+          {
+            "title": "Strong Consistency",
+            "description": "All reads return the most recent write. Requires quorum writes.",
+            "pros": ["Data always fresh", "Simple mental model"],
+            "cons": ["Higher latency", "Lower availability during failures"]
+          },
+          {
+            "title": "Eventual Consistency",
+            "description": "Replicas converge over time. Reads may return stale data.",
+            "pros": ["Low latency", "High availability"],
+            "cons": ["Stale reads possible", "Complex invalidation logic"]
+          },
+          {
+            "title": "Session Consistency",
+            "description": "Within a session, reads see their own writes. Balances consistency and performance.",
+            "pros": ["Good UX", "Reasonable latency"],
+            "cons": ["Session management overhead", "Cross-session staleness"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Horizontal Scaling Strategies",
+        "items": [
+          "Use consistent hashing with virtual nodes for even distribution",
+          "Add read replicas to handle read-heavy workloads",
+          "Partition data by key prefix for isolation",
+          "Use proxy layer to abstract cluster topology from clients",
+          "Monitor hit ratio and eviction rates to tune memory allocation"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle cache stampedes?",
+            "answer": "Use cache locks, request coalescing, or probabilistic early expiration. Distribute cache expiry times to avoid thundering herds."
+          },
+          {
+            "question": "How do you handle node failures?",
+            "answer": "Use automatic failover to replicas. Consistent hashing redistributes only the failed node's keys, minimizing impact on other nodes."
+          },
+          {
+            "question": "How do you handle cache warming?",
+            "answer": "Preload hot keys after node restarts or deployments. Use background jobs to rebuild caches gradually to avoid overwhelming the database."
+          },
+          {
+            "question": "What is the optimal cache size?",
+            "answer": "Size the cache to hold the working set with a 10-20% buffer. Monitor hit ratio and eviction rate. A hit ratio below 80% suggests the cache is too small."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Consistent hashing with virtual nodes minimizes data movement",
+          "Replication provides high availability but requires consistency trade-offs",
+          "Eviction policies should match access patterns (LRU for recency, LFU for frequency)",
+          "Cache stampedes require proactive mitigation strategies",
+          "Monitor hit ratio and eviction rate to size caches correctly"
+        ],
+        "takeaway": "Distributed caches require careful trade-offs between consistency, availability, and memory efficiency through consistent hashing and replication."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "interview-qa"
+}

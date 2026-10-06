@@ -1,0 +1,198 @@
+{
+  "id": "lesson-redis-012",
+  "slug": "ttl-expiration",
+  "moduleSlug": "cache-invalidation",
+  "courseSlug": "redis-caching-strategies",
+  "title": "TTL and Expiration Strategies",
+  "description": "Learn how to use Redis TTL (time-to-live) to automatically expire stale data and keep your cache fresh without manual intervention.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "ttl", "expiration", "caching"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is TTL?",
+        "anchor": "what-is-ttl"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every key in Redis can have a **Time-To-Live (TTL)** — an expiration timestamp after which Redis automatically deletes the key. TTL is the simplest and most common form of cache invalidation. Instead of deciding when to remove stale data, you tell Redis how long the data should live, and Redis handles the rest."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Setting a TTL is critical because cached data inevitably becomes stale. Without an expiration strategy, your application will serve outdated information — or worse, the cache will grow until Redis runs out of memory. A well-chosen TTL balances data freshness against cache hit rate."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "TTL (Time-To-Live)",
+            "definition": "The remaining time before a Redis key expires and is automatically deleted."
+          },
+          {
+            "term": "EXPIRE",
+            "definition": "A Redis command that sets a TTL on an existing key in seconds."
+          },
+          {
+            "term": "PX",
+            "definition": "A Redis command modifier that accepts milliseconds instead of seconds (e.g., PEXPIRE, PSETEX)."
+          },
+          {
+            "term": "Persistent Key",
+            "definition": "A key with no TTL set; it remains in Redis until explicitly deleted."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Setting TTL in Redis",
+        "anchor": "setting-ttl-in-redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis provides several commands for expiration. You can set a TTL when creating a key, or add one to an existing key. If you need to remove the expiration, set the TTL to zero or use the PERSIST command."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis TTL commands",
+        "content": "Set a key with a 60-second TTL, then check how much time remains before expiration.",
+        "code": "SET user:123:profile '{\"name\":\"Alice\",\"role\":\"admin\"}' EX 60\n\n# Check remaining TTL in seconds (-2 means key does not exist, -1 means no TTL)\nTTL user:123:profile\n\n# Remove TTL and make the key persistent\nPERSIST user:123:profile",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "TTL in Application Code",
+        "anchor": "ttl-in-application-code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most Redis client libraries expose TTL as a parameter on the write operation. In C# using StackExchange.Redis, you pass a TimeSpan to the StringSetAsync method. In Node.js using ioredis, you can pass the EX or PX option directly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# (.NET) — Setting TTL with StackExchange.Redis",
+        "content": "Cache a user profile with a 5-minute TTL using async Redis operations.",
+        "code": "using StackExchange.Redis;\n\npublic async Task CacheUserProfileAsync(UserProfile profile, CancellationToken ct)\n{\n    var db = _redis.GetDatabase();\n    var key = $\"user:{profile.Id}:profile\";\n    var json = JsonSerializer.Serialize(profile);\n\n    await db.StringSetAsync(key, json, TimeSpan.FromMinutes(5));\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Setting TTL with ioredis",
+        "content": "Cache an API response with a 30-second TTL using ioredis.",
+        "code": "import Redis from 'ioredis';\nconst redis = new Redis();\n\nasync function cacheApiResponse(key, data) {\n  const ttlSeconds = 30;\n  await redis.setex(key, ttlSeconds, JSON.stringify(data));\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "TTL Expiration Flow",
+        "anchor": "ttl-expiration-flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "diagram-ttl-flow",
+        "caption": "Flow of a cache read when a key has a TTL: Redis checks if the key still exists, returns it if valid, or triggers a miss if it has expired.",
+        "definition": "graph LR\n    A[Client Request] --> B{Key exists?}\n    B -->|Yes| C{TTL expired?}\n    C -->|No| D[Return Cached Value]\n    C -->|Yes| E[Return null / miss]\n    B -->|No| E\n    E --> F[Fetch from DB]\n    F --> G[Write to Redis with new TTL]\n    G --> H[Return Fresh Value]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Choosing the Right TTL",
+        "anchor": "choosing-the-right-ttl"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "General Guidelines",
+        "items": [
+          "**Static reference data** (countries, currencies): days or weeks.",
+          "**User session data**: 15–60 minutes depending on idle timeout.",
+          "**API response caching**: 30 seconds to 5 minutes for frequently changing data.",
+          "**Real-time or rapidly changing data**: 5–60 seconds, or use manual invalidation instead."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Watch out for clock drift",
+        "text": "Redis expires keys using an internal clock. If your application server's clock drifts significantly, TTL-based invalidation may expire keys earlier or later than expected. Always sync servers with NTP."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can I see all keys with a TTL?",
+            "answer": "Redis does not have a direct command to list all expiring keys, but Redis 7.0+ adds the EXPIRATION family of commands that provide more insight. For key-level checks, use the TTL command on individual keys."
+          },
+          {
+            "question": "What happens when Redis runs out of memory and has no eviction policy?",
+            "answer": "If maxmemory is set but no eviction policy is configured, Redis will return errors on write commands when memory is full. Always configure an eviction policy alongside TTL-based expiration."
+          }
+        ]
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "TTL is an expiration timestamp that causes Redis to automatically delete a key after a set duration.",
+          "Use SET ... EX for seconds, or PEXPIRE for millisecond precision.",
+          "In application code, pass a TimeSpan (C#) or EX/PX option (Node.js) when writing to Redis.",
+          "Choose TTL values that match how frequently your data changes."
+        ],
+        "takeaway": "TTL gives Redis the responsibility of keeping your cache clean — set it and let Redis do the rest."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Redis Key Expiration Documentation",
+      "url": "https://redis.io/docs/latest/develop/use-commands/key-expiry/",
+      "type": "article",
+      "description": "Official guide to key expiration, TTL, and persistence commands in Redis."
+    }
+  ]
+}

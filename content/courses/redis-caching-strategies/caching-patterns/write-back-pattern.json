@@ -1,0 +1,196 @@
+{
+  "id": "lesson-redis-009",
+  "slug": "write-back-pattern",
+  "moduleSlug": "caching-patterns",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Write-Back Pattern",
+  "description": "Explore write-back (write-behind) caching, where writes are committed to Redis first and flushed to the database asynchronously.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 14,
+  "tags": [
+    "redis",
+    "caching",
+    "write-back",
+    "write-behind",
+    "asynchronous",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Write-back caching, also called write-behind, reverses the normal write priority. Instead of updating the database first, the application writes to Redis and returns immediately. A background process later flushes accumulated writes to the database. This decouples the user-facing write latency from the database write latency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works",
+        "anchor": "how-it-works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a write request arrives, the application stores the new value in Redis with a special marker or in a dedicated write queue. The HTTP response is sent immediately. A separate background worker, running on a timer or triggered by queue length, reads pending writes and applies them to the database in batches."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Write flow:",
+        "items": [
+          "Application writes the new value to Redis and marks it as dirty.",
+          "Redis acknowledges the write and the application returns success.",
+          "A background worker polls Redis for dirty keys or reads from a write queue.",
+          "The worker applies the pending writes to the database.",
+          "After a successful database write, the dirty marker is removed."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Read flow",
+        "anchor": "read-flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reads always query Redis because it holds the latest written data. The database is treated as a durable archive rather than the live source of truth. If the background worker fails, dirty data remains in Redis and can be retried later without data loss."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "write-back-flow",
+        "caption": "Write-back background flush flow",
+        "definition": "sequenceDiagram\n    participant App\n    participant Redis\n    participant Worker\n    participant DB\n    App->>Redis: SET product:10 <new-data>\n    Redis-->>App: OK\n    Note over App: Response returned immediately\n    loop Every 2 seconds\n        Worker->>Redis: Get dirty keys\n        Redis-->>Worker: [product:10]\n        Worker->>DB: UPDATE Products SET ... WHERE Id = 10\n        DB-->>Worker: OK\n        Worker->>Redis: REM dirty:product:10"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Node.js Example with ioredis and a Background Flush",
+        "anchor": "nodejs-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "javascript example",
+        "language": "javascript",
+        "code": "// Write-back in Node.js\nconst Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);\n\nasync function writeProduct(product) {\n  const key = `product:${product.id}`;\n  await redis.set(key, JSON.stringify(product));\n  await redis.sAdd('dirty:products', key);\n  return product;\n}\n\nasync function flushDirtyProducts() {\n  const dirtyKeys = await redis.sMembers('dirty:products');\n  for (const key of dirtyKeys) {\n    const data = await redis.get(key);\n    const product = JSON.parse(data);\n    await db('products').where('id', product.id).update(product);\n    await redis.sRem('dirty:products', key);\n  }\n}\n\n// Run every 5 seconds\nsetInterval(flushDirtyProducts, 5000);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example with a Background Timer",
+        "anchor": "csharp-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "csharp example",
+        "language": "csharp",
+        "code": "// Write-back in C#\nusing StackExchange.Redis;\nusing System.Text.Json;\n\npublic class WriteBackProductService\n{\n    private readonly IDatabase _redis;\n    private readonly AppDbContext _db;\n\n    public WriteBackProductService(IConnectionMultiplexer redis, AppDbContext db)\n    {\n        _redis = redis.GetDatabase();\n        _db = db;\n    }\n\n    public async Task SaveProductAsync(Product product)\n    {\n        var json = JsonSerializer.Serialize(product);\n        await _redis.StringSetAsync($\"product:{product.Id}\", json);\n        await _redis.SetAddAsync(\"dirty:products\", $\"product:{product.Id}\");\n    }\n\n    public async Task FlushDirtyProductsAsync()\n    {\n        var dirtyKeys = await _redis.SetMembersAsync(\"dirty:products\");\n        foreach (var key in dirtyKeys)\n        {\n            var data = await _redis.StringGetAsync(key);\n            var product = JsonSerializer.Deserialize<Product>(data!);\n            _db.Products.Update(product!);\n            await _db.SaveChangesAsync();\n            await _redis.SetRemoveAsync(\"dirty:products\", key);\n        }\n    }\n}\n\n// Register a timer in Program.cs\n// using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));\n// while (await timer.WaitForNextTickAsync(ct))\n//     await service.FlushDirtyProductsAsync(ct);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Data Loss Risk",
+        "text": "If Redis crashes before the background worker flushes dirty writes, those writes are lost because they never reached the database. Write-back is not suitable for data that cannot be recreated."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Dirty Key",
+            "definition": "A Redis key whose value has changed but has not yet been persisted to the database."
+          },
+          {
+            "term": "Write Queue",
+            "definition": "A Redis set or list used to track keys that need to be flushed to the database by the background worker."
+          },
+          {
+            "term": "Eventual Consistency",
+            "definition": "A consistency model where the database eventually catches up with the cache, but readers may see stale data during the flush window."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Questions",
+        "items": [
+          {
+            "question": "What is the biggest downside of write-back?",
+            "answer": "The risk of data loss if Redis fails before dirty writes are flushed. It is only appropriate for data that can be recreated or rebuilt."
+          },
+          {
+            "question": "How large should the flush interval be?",
+            "answer": "It depends on your durability requirements. A shorter interval reduces data-loss exposure but increases database load. Typical values range from 1 to 30 seconds."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Write-back decouples write latency from the database.",
+          "Redis is the live source of truth; the database lags behind.",
+          "A background worker batches and flushes dirty writes.",
+          "Data loss is possible if Redis fails before flushing."
+        ],
+        "takeaway": "Write-back maximizes write throughput and is ideal for write-intensive, non-critical workloads."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Write-Back Logger",
+        "description": "Application logs are written at high volume. Durability is less important than throughput.",
+        "steps": [
+          "Create a Redis write queue for log entries.",
+          "Write incoming log entries to Redis and add their keys to a dirty set.",
+          "Run a background flush every 3 seconds that bulk-inserts into the database.",
+          "Simulate a Redis restart and measure how many entries are lost.",
+          "Add a cap on the dirty set size to bound memory usage."
+        ],
+        "expectedOutcome": "Log writes return immediately, and the database receives batched inserts on the flush schedule."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Microsoft: Write-Behind Cache Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/write-behind-cache",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Cloud design pattern reference for write-behind caching."
+    },
+    {
+      "title": "Redis: Durability and Persistence",
+      "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Redis persistence options and their impact on data durability."
+    }
+  ]
+}

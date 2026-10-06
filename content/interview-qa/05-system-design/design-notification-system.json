@@ -1,0 +1,227 @@
+{
+  "id": "lesson-sd-notification-system",
+  "slug": "design-notification-system",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a multi-channel notification system.",
+  "description": "Scalable notification system supporting push, email, SMS, and scheduled delivery with high reliability.",
+  "order": 15,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["interview", "system-design", "notifications", "queue"],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a multi-channel notification system supporting push, email, SMS, and scheduled delivery."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Send notifications via push, email, SMS, and in-app channels",
+          "Schedule notifications for future delivery",
+          "Respect user notification preferences per channel",
+          "Track delivery status (sent, delivered, failed, bounced)",
+          "Support templated and personalized messages",
+          "Implement retry logic for transient failures"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Capacity Estimation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Scale Assumptions",
+        "items": [
+          "500 million total users",
+          "100 million notifications per day",
+          "10,000 notifications per second at peak",
+          "Average notification size: 1 kilobyte",
+          "50% push, 30% email, 20% SMS split",
+          "1 terabyte of notification logs per year"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The system uses a queue-based architecture for decoupling and scalability. A notification API accepts requests and writes them to a message queue. Multiple workers consume from the queue and handle delivery through channel-specific providers. A scheduler service manages delayed notifications. A delivery tracker records status updates from providers."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-notif-arch",
+        "caption": "Queue-based multi-channel notification system",
+        "definition": "graph TD\n    A[API Server] --> B[Notification Queue]\n    B --> C[Push Worker]\n    B --> D[Email Worker]\n    B --> E[SMS Worker]\n    B --> F[Scheduler Worker]\n\n    C --> G[FCM / APNs]\n    D --> H[Email Provider]\n    E --> I[SMS Provider]\n    F --> J[Delayed Queue]\n    J --> B\n\n    G --> K[Delivery Tracker]\n    H --> K\n    I --> K\n    K --> L[Status DB]\n\n    M[User Preferences] --> C\n    M --> D\n    M --> E"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Table", "Key Fields", "Description"],
+        "rows": [
+          ["Notifications", "notification_id, user_id, channel, template_id, status, created_at", "Individual notification record"],
+          ["NotificationPreferences", "user_id, channel, enabled, quiet_hours_start, quiet_hours_end", "Per-user channel settings"],
+          ["Templates", "template_id, channel, subject, body, variables", "Message templates with placeholders"],
+          ["DeliveryStatus", "status_id, notification_id, provider, external_id, status, timestamp", "Delivery tracking from providers"],
+          ["ScheduledNotifications", "scheduled_id, notification_id, scheduled_at, recurring", "Delayed and recurring notifications"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Quiet Hours",
+        "text": "Always check user quiet hours before sending notifications. Schedule delivery for after quiet hours rather than blocking entirely to avoid missing time-sensitive alerts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reliability"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Delivery Guarantees",
+        "items": [
+          "Use at-least-once delivery with idempotent processing",
+          "Implement exponential backoff with jitter for retries",
+          "Route failed notifications to a dead-letter queue for inspection",
+          "Track provider health and failover to backup providers",
+          "Rate-limit per user to avoid notification spam"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Provider Fallback",
+        "text": "Maintain backup providers for critical channels. If the primary email provider fails, route through a secondary provider while alerting operations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Horizontal Scaling Strategies",
+        "items": [
+          "Partition notification queues by channel for independent scaling",
+          "Use separate worker pools per channel for resource isolation",
+          "Shard delivery status tables by user_id or date",
+          "Cache notification preferences to reduce database lookups",
+          "Use a distributed scheduler for high-volume delayed notifications"
+        ]
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Channel Trade-offs",
+        "cards": [
+          {
+            "title": "Push Notifications",
+            "description": "Real-time delivery through FCM or APNs. Best for immediate alerts.",
+            "pros": ["Instant delivery", "High engagement"],
+            "cons": ["Requires app install", "Platform limitations"]
+          },
+          {
+            "title": "Email",
+            "description": "Reliable delivery through SMTP providers. Best for non-urgent, rich content.",
+            "pros": ["High deliverability", "Rich formatting", "No app required"],
+            "cons": ["Slower delivery", "Lower engagement"]
+          },
+          {
+            "title": "SMS",
+            "description": "Immediate delivery through SMS providers. Best for critical alerts.",
+            "pros": ["Universal reach", "Very high open rate"],
+            "cons": ["Expensive", "Character limits", "Opt-out rates"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle provider rate limits?",
+            "answer": "Implement client-side rate limiting and use token buckets per provider. Monitor provider quotas and queue notifications when limits are reached."
+          },
+          {
+            "question": "How do you prevent notification fatigue?",
+            "answer": "Use frequency capping, smart batching, and user preference management. Allow users to set do-not-disturb windows and notification categories."
+          },
+          {
+            "question": "How do you handle time zones and quiet hours?",
+            "answer": "Store user time zones and convert scheduled times to UTC. Check quiet hours before delivery and reschedule if necessary."
+          },
+          {
+            "question": "How do you ensure delivery during high traffic?",
+            "answer": "Use durable message queues, separate worker pools per channel, and exponential backoff with jitter. Monitor queue depth and scale workers dynamically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Queue-based architecture decouples API from delivery for scalability",
+          "Use separate worker pools per channel for resource isolation",
+          "Track delivery status for debugging and analytics",
+          "Respect user preferences including quiet hours and frequency caps",
+          "Implement retry logic with exponential backoff and dead-letter queues"
+        ],
+        "takeaway": "Multi-channel notification systems require queue-based decoupling, channel-specific workers, and careful handling of delivery guarantees and user preferences."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "interview-qa"
+}

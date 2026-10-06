@@ -1,0 +1,203 @@
+{
+  "id": "lesson-sd-unique-id-generator",
+  "slug": "design-unique-id-generator",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a globally unique ID generator.",
+  "description": "Generate unique, sortable IDs across distributed systems using UUID, Snowflake, or database sequences.",
+  "order": 13,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["interview", "system-design", "distributed", "ids"],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a service that generates globally unique IDs across distributed systems."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Globally unique IDs across all data centers",
+          "IDs sortable by creation time",
+          "No coordination between generators",
+          "High throughput with low latency",
+          "IDs that are safe for URLs and database keys",
+          "Support for multiple data centers and regions"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approaches"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Several approaches exist: UUID v4 provides randomness but is not sortable. Snowflake IDs encode timestamp, worker ID, and sequence for sortability. Database sequences guarantee uniqueness but require coordination. Multi-master allocation pre-allocates ranges to reduce coordination."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-id-arch",
+        "caption": "Snowflake ID structure and generation service",
+        "definition": "graph TD\n    A[Client Request] --> B[ID Generator Service]\n    B --> C{Approach}\n\n    C -->|Snowflake| D[Timestamp]\n    D --> E[Worker ID]\n    E --> F[Sequence]\n    F --> G[64-bit ID]\n\n    C -->|UUID| H[Random Bits]\n    H --> I[128-bit ID]\n\n    C -->|DB Sequence| J[Database]\n    J --> K[Auto-increment]\n    K --> L[Numeric ID]\n\n    M[Data Center A] --> N[Worker 1]\n    M --> O[Worker 2]\n    P[Data Center B] --> Q[Worker 3]\n    P --> R[Worker 4]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Entity", "Key Fields", "Description"],
+        "rows": [
+          ["IdGeneratorConfig", "generator_id, data_center_id, worker_id, last_timestamp", "Generator identity and state"],
+          ["IdRangeAllocation", "allocation_id, generator_id, range_start, range_end, expires_at", "Pre-allocated ID ranges"],
+          ["IdGenerationLog", "id_value, generator_id, created_at, metadata", "Audit trail for ID generation"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Clock Skew",
+        "text": "Clock skew can cause duplicate or out-of-order IDs. Use NTP synchronization and reject IDs if local clock is behind the last timestamp."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Clock Synchronization"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Handling Clock Issues",
+        "items": [
+          "Use NTP to synchronize clocks across all servers",
+          "Reject IDs if the local clock is behind the last generated timestamp",
+          "Wait for clock catchup if skew exceeds a threshold",
+          "Use a separate worker ID per server to avoid collisions",
+          "Monitor clock drift and alert on anomalies"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Trade-offs"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "ID Generation Approaches",
+        "cards": [
+          {
+            "title": "UUID v4",
+            "description": "128-bit random identifiers. No coordination needed. Not sortable.",
+            "pros": ["No coordination", "Extremely low collision probability"],
+            "cons": ["Not sortable", "Larger storage footprint", "Poor index performance"]
+          },
+          {
+            "title": "Snowflake",
+            "description": "64-bit sortable IDs with timestamp, worker ID, and sequence. Twitter-inspired.",
+            "pros": ["Sortable by time", "Compact", "High throughput"],
+            "cons": ["Requires worker ID allocation", "Clock skew sensitive"]
+          },
+          {
+            "title": "Database Sequence",
+            "description": "Auto-incrementing integers from a centralized database.",
+            "pros": ["Simple", "Guaranteed unique", "Sortable"],
+            "cons": ["Single point of failure", "Coordination overhead", "Not distributed-friendly"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scaling"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Horizontal Scaling Strategies",
+        "items": [
+          "Use pre-allocated ID ranges to reduce coordination frequency",
+          "Assign unique worker IDs per data center and server",
+          "Replicate ID generator state for high availability",
+          "Cache recently generated IDs for low-latency access",
+          "Monitor ID consumption rates to detect allocation failures"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Why not just use database auto-increment?",
+            "answer": "Auto-increment requires a single database, creating a bottleneck and single point of failure. It does not scale across multiple data centers."
+          },
+          {
+            "question": "Can two Snowflake generators create the same ID?",
+            "answer": "No, as long as each generator has a unique worker ID and the clock never goes backwards within the same millisecond."
+          },
+          {
+            "question": "How do you handle server restarts with Snowflake?",
+            "answer": "Persist the last timestamp and worker ID. On restart, wait until the local clock catches up to the last timestamp before generating new IDs."
+          },
+          {
+            "question": "Should IDs be exposed to users?",
+            "answer": "Avoid exposing sequential IDs in URLs. Use Snowflake or UUID to prevent enumeration attacks and information leakage about business volume."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Snowflake-style IDs provide sortable, unique identifiers without coordination",
+          "Clock synchronization is critical for timestamp-based ID generation",
+          "Pre-allocate ID ranges to reduce coordination overhead",
+          "Avoid exposing sequential IDs to prevent enumeration attacks",
+          "Use different ID strategies based on scale and coordination requirements"
+        ],
+        "takeaway": "Globally unique ID generation requires balancing uniqueness guarantees, sortability, and distributed coordination overhead."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [],
+  "courseSlug": "interview-qa"
+}

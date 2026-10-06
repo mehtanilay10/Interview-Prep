@@ -1,0 +1,176 @@
+{
+  "id": "lesson-mqes-027",
+  "slug": "kafka-configuration",
+  "moduleSlug": "event-streaming-kafka",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Kafka Configuration",
+  "description": "Learn the key broker, producer, and consumer configuration properties for production-ready Kafka deployments.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 35,
+  "tags": [
+    "kafka",
+    "configuration",
+    "tuning",
+    "brokers",
+    "operations"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka's behavior is controlled through thousands of configuration properties spread across brokers, producers, and consumers. Getting the right settings is essential for throughput, durability, and operational stability. This lesson covers the most impactful properties for production workloads."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Broker Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Broker settings affect cluster behavior, replication, and disk usage. The most critical properties control how leaders are elected, how data is retained, and how many concurrent connections the broker will accept."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Property",
+          "Default",
+          "Recommended",
+          "Description"
+        ],
+        "rows": [
+          [
+            "log.dirs",
+            "/tmp/kafka-logs",
+            "Multiple dedicated disks",
+            "Directories where Kafka stores partition logs. Use separate disks for better I/O throughput."
+          ],
+          [
+            "num.partitions",
+            "1",
+            "3–12 per topic",
+            "Default number of partitions for auto-created topics. Set explicitly per topic in production."
+          ],
+          [
+            "default.replication.factor",
+            "1",
+            "3",
+            "Default replication factor for auto-created topics. Use 3 in production for fault tolerance."
+          ],
+          [
+            "min.insync.replicas",
+            "1",
+            "2",
+            "Minimum number of replicas that must acknowledge a write for the producer to consider it successful."
+          ],
+          [
+            "log.retention.hours",
+            "168",
+            "168 or business need",
+            "How long to retain log segments before deleting them."
+          ],
+          [
+            "num.io.threads",
+            "8",
+            "16–32",
+            "Number of threads for background I/O operations. Increase for high-throughput clusters."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Producer Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Producer settings control batching, compression, and delivery guarantees. The `acks` property is the most important for durability: it determines how many replicas must confirm a write before the producer receives an acknowledgment."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "High-Throughput Producer Configuration (C#)",
+        "content": "Optimized Confluent.Kafka producer settings for throughput and reliability.",
+        "language": "csharp",
+        "code": "var config = new ProducerConfig\n{\n    BootstrapServers = \"broker-1:9092,broker-2:9092\",\n    Acks = Acks.All, // Wait for all in-sync replicas\n    Lingerms = 5, // Batch small messages for up to 5ms\n    BatchSize = 16384, // 16 KB batch size\n    CompressionType = CompressionType.Lz4,\n    EnableIdempotence = true, // Safe retries without duplicates\n    MaxInFlight = 5, // Retries without reordering (requires idempotence)\n    Retries = int.MaxValue\n};\n\nusing var producer = new ProducerBuilder<string, string>(config).Build();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Enable Idempotence",
+        "text": "Always set `enable.idempotence=true` in production. It adds sequence numbers to messages, preventing duplicates even when retries occur."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Consumer Configuration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Consumer settings control how often offsets are committed, how partitions are assigned, and how the consumer recovers from failures. The `max.poll.records` property limits the number of records returned in a single poll call, preventing long-running processing from blocking rebalances."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resilient Consumer Configuration (C#)",
+        "content": "Confluent.Kafka consumer settings for production resilience.",
+        "language": "csharp",
+        "code": "var config = new ConsumerConfig\n{\n    BootstrapServers = \"broker-1:9092,broker-2:9092\",\n    GroupId = \"payment-processors\",\n    AutoOffsetReset = AutoOffsetReset.Earliest,\n    EnableAutoCommit = false, // Manual commit for safety\n    MaxPollIntervalMs = 300000, // 5 minutes\n    SessionTimeoutMs = 30000, // 30 seconds\n    EnablePartitionEof = true\n};\n\nusing var consumer = new ConsumerBuilder<string, string>(config).Build();\nconsumer.Subscribe(\"payments\");"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "kafka-config-flow",
+        "definition": "flowchart LR\n    subgraph Producer Config\n        P1[acks] --> P1V{acks=all?}\n        P1V -->|yes| P1H[High durability]\n        P1V -->|no| P1L[Lower latency]\n        P2[linger.ms] --> P2H[Higher throughput]\n        P3[compression.type] --> P3S[Smaller messages]\n    end\n\n    subgraph Consumer Config\n        C1[enable.auto.commit] --> C1M[Manual commit]\n        C2[max.poll.records] --> C2L[Limit batch size]\n        C3[session.timeout.ms] --> C3D[Failure detection]\n    end\n\n    P1H --> K[(Kafka Cluster)]\n    P1L --> K\n    P2H --> K\n    P3S --> K\n    C1M --> K\n    C2L --> K\n    C3D --> K",
+        "caption": "Key producer and consumer configuration paths"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Configuration Checklist",
+        "points": [
+          "Set `min.insync.replicas=2` and `acks=all` for durable writes.",
+          "Enable producer idempotence to prevent duplicates on retry.",
+          "Use manual offset commits in consumers for at-least-once processing.",
+          "Tune `num.io.threads` and `num.network.threads` based on hardware."
+        ],
+        "takeaway": "Configuration is the difference between a Kafka cluster that survives a broker failure and one that does not."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Broker Configuration",
+      "url": "https://kafka.apache.org/documentation/#brokerconfigs",
+      "type": "article",
+      "description": "Complete reference for all Kafka broker configuration properties."
+    },
+    {
+      "title": "Confluent Production Best Practices",
+      "url": "https://docs.confluent.io/platform/current/installation/configuration/prod.html",
+      "type": "article",
+      "description": "Confluent's guide to production-ready Kafka configuration and operations."
+    }
+  ]
+}

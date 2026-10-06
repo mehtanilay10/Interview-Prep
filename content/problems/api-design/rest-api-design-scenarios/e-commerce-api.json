@@ -1,0 +1,184 @@
+{
+  "id": "lesson-api-design-problems-rest-api-design-scenarios-e-commerce-api",
+  "slug": "e-commerce-api",
+  "moduleSlug": "rest-api-design-scenarios",
+  "courseSlug": "api-design-problems",
+  "title": "E-Commerce API Design",
+  "description": "Design a RESTful e-commerce API covering products, carts, orders, and checkout with proper HTTP semantics and resource relationships.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["e-commerce", "rest", "resources", "checkout"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You are designing a public e-commerce API for a multi-vendor marketplace. The API must support product browsing, cart management, checkout, and order history. Third-party developers will integrate with your API, so consistency and discoverability matter."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core Resource Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "REST APIs expose nouns as resources. Start by identifying the domain objects and their relationships. In e-commerce, the primary resources are Products, Carts, Orders, and Customers."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Primary resources",
+        "items": [
+          "Products — catalog items with variants, pricing, and inventory",
+          "Carts — shopping carts scoped to a customer or session",
+          "CartItems — line items within a cart",
+          "Orders — immutable purchase records created from a cart",
+          "Customers — user profiles with shipping and billing addresses"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "URL Structure"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use hierarchical paths that reflect ownership. Sub-resources appear after the parent resource. Avoid verbs in URLs; use HTTP methods to express actions."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Action", "HTTP Method", "URL", "Description"],
+        "rows": [
+          ["List products", "GET", "/products", "Paginated catalog with optional filters"],
+          ["Get product", "GET", "/products/{id}", "Single product detail"],
+          ["Create cart", "POST", "/carts", "New empty cart for session or customer"],
+          ["Add item", "POST", "/carts/{id}/items", "Add product variant to cart"],
+          ["Get cart", "GET", "/carts/{id}", "Current cart state with totals"],
+          ["Checkout", "POST", "/orders", "Create order from cart (cart consumed)"],
+          ["List orders", "GET", "/customers/{id}/orders", "Customer order history"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Product Catalog Response"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "GET /products?category=electronics&limit=10&offset=0",
+        "content": "Paginated product list with HATEOAS links for related resources.",
+        "code": "{\n  \"data\": [\n    {\n      \"id\": \"prod_881\",\n      \"name\": \"Wireless Headphones\",\n      \"slug\": \"wireless-headphones\",\n      \"price\": {\n        \"amount\": 12999,\n        \"currency\": \"USD\"\n      },\n      \"inventory\": {\n        \"available\": 42,\n        \"reserved\": 3\n      },\n      \"variants\": [\n        { \"id\": \"var_1\", \"color\": \"Black\", \"sku\": \"WH-881-BLK\" },\n        { \"id\": \"var_2\", \"color\": \"Silver\", \"sku\": \"WH-881-SLV\" }\n      ],\n      \"_links\": {\n        \"self\": { \"href\": \"/products/prod_881\" },\n        \"variants\": { \"href\": \"/products/prod_881/variants\" }\n      }\n    }\n  ],\n  \"meta\": {\n    \"limit\": 10,\n    \"offset\": 0,\n    \"total\": 128\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Checkout Flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Checkout is a state transition: Cart -> Order. The POST to /orders creates the order and invalidates the cart. This prevents double-checkout and keeps the order immutable."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Cart consumption",
+        "text": "Never allow a cart to be reused after checkout. Return HTTP 409 Conflict if the cart is already converted to an order. This prevents accidental duplicate purchases."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "POST /orders — Create order from cart",
+        "content": "The request body references the cart ID and shipping address. The server validates inventory, creates the order, and decrements stock atomically.",
+        "code": "POST /orders\n{\n  \"cartId\": \"cart_abc123\",\n  \"shippingAddress\": {\n    \"line1\": \"123 Main St\",\n    \"city\": \"Seattle\",\n    \"state\": \"WA\",\n    \"postalCode\": \"98101\",\n    \"country\": \"US\"\n  },\n  \"paymentMethod\": {\n    \"type\": \"card\",\n    \"token\": \"pmtok_visa_4410\"\n  },\n  \"idempotencyKey\": \"order_991_uuid\"\n}\n\nResponse: 201 Created\n{\n  \"id\": \"ord_991\",\n  \"status\": \"confirmed\",\n  \"total\": 14999,\n  \"estimatedDelivery\": \"2026-10-13\",\n  \"items\": [ ... ],\n  \"_links\": {\n    \"self\": { \"href\": \"/orders/ord_991\" },\n    \"invoice\": { \"href\": \"/orders/ord_991/invoice\" }\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Designing for Idempotency"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Use an idempotency key (Idempotency-Key header or request body field) for all write operations",
+          "Return the cached response on duplicate requests instead of processing again",
+          "Store idempotency keys with a TTL (24-72 hours) to bound storage",
+          "Return 422 Unprocessable Entity if the idempotency key conflicts with a different request body"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should the API expose internal product IDs or slugs?",
+            "answer": "Use opaque IDs (prod_881) in URLs. Slugs are nice for SEO but should be optional. If you support slugs, always fall back to the ID lookup if the slug changes."
+          },
+          {
+            "question": "How should I handle product variants?",
+            "answer": "Treat variants as a sub-resource: GET /products/{id}/variants. Each variant has its own SKU and inventory. The parent product aggregates pricing and availability."
+          },
+          {
+            "question": "What status code should checkout return on success?",
+            "answer": "201 Created with a Location header pointing to the new order resource. The response body should contain the full order representation."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Model nouns as resources; use HTTP methods for actions.",
+          "Consume carts on checkout to prevent duplicate purchases.",
+          "Idempotency keys make payment integrations safe and retryable.",
+          "Use HATEOAS links to make the API self-documenting."
+        ],
+        "takeaway": "A well-designed e-commerce API treats every resource as a noun, keeps URLs stable, and makes checkout a single irreversible state transition."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "file-upload-api",
+    "search-api"
+  ],
+  "furtherReading": [
+    {
+      "title": "REST API Design Best Practices",
+      "url": "https://swagger.io/resources/articles/best-practices-in-api-design/",
+      "type": "article",
+      "author": "SmartBear",
+      "description": "Industry-standard conventions for naming, versioning, and structuring REST endpoints."
+    }
+  ]
+}

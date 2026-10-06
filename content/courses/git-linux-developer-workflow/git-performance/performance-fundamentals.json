@@ -1,0 +1,178 @@
+{
+  "id": "lesson-git-050",
+  "slug": "performance-fundamentals",
+  "moduleSlug": "git-performance",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Performance Fundamentals",
+  "description": "Understand what makes Git slow and the strategies for keeping repositories fast.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["git", "performance", "repository"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git performance issues typically stem from three sources: a large number of files, a long history with many commits, and large binary files. Understanding which factor is causing the slowdown tells you which optimization to apply: shallow clones, partial clones, sparse checkout, or Git LFS."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Measuring Git performance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Before optimizing, measure where the time is spent. Use git count-objects to see object count and disk usage. Use git rev-list --count to see total commits. Use time git <command> to measure wall-clock time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Measure repository size and object count",
+        "language": "bash",
+        "code": "# Count loose objects and disk usage\ngit count-objects -vH\n\n# Output:\n# count: 15234\n# size: 238.50 MiB\n# in-pack: 48201\n# pack-size: 312.34 MiB\n\n# Count total commits\ngit rev-list --count HEAD\n\n# Time a Git command\ntime git log --oneline --all > /dev/null\n\n# Check disk usage of .git directory\ndu -sh .git"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What makes Git slow"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Git performance bottlenecks",
+        "items": [
+          "**Too many files**: Git must stat every file on checkout",
+          "**Too much history**: Full clones download the entire commit history",
+          "**Large binaries**: Git stores every version of every binary, bloating the repo",
+          "**Too many refs**: Large numbers of branches and tags slow down many commands",
+          "**Unpacked objects**: Loose objects are slower to read than packed objects"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performance optimization strategies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Match the optimization to the bottleneck. If history is the problem, use shallow clones. If disk usage is the problem, pack loose objects. If binary files are the problem, use Git LFS. If you only need part of the repo, use sparse checkout."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Bottleneck", "Strategy", "Command"],
+        "rows": [
+          ["Too much history", "Shallow clone", "git clone --depth 1"],
+          ["Need history selectively", "Partial clone", "git clone --filter=blob:none"],
+          ["Need subset of files", "Sparse checkout", "git sparse-checkout init"],
+          ["Large binaries", "Git LFS", "git lfs install + git lfs track"],
+          ["Loose objects", "Pack objects", "git gc --aggressive"],
+          ["Too many refs", "Prune refs", "git remote prune origin"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Packing loose objects"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Over time, Git accumulates many loose objects — individual files in .git/objects/. These are slower to read and take more disk space than packed objects. Run git gc to pack loose objects and remove unreachable objects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pack loose objects with git gc",
+        "language": "bash",
+        "code": "# Run garbage collection to pack objects\ngit gc --aggressive\n\n# This:\n# 1. Packs loose objects into .git/objects/pack/\n# 2. Removes unreachable objects\n# 3. Prunes reflog entries older than 90 days\n# 4. Optimizes the repository for speed\n\n# Verify the result\ngit count-objects -vH"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Git runs gc automatically",
+        "text": "Git runs gc automatically when loose objects exceed certain thresholds. You rarely need to run it manually unless you notice a sudden slowdown after a large operation like a rebase or filter-branch."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reducing clone time for CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In CI environments, every second counts. Use shallow clones or partial clones to reduce the data transferred during checkout."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Shallow clone in CI",
+        "language": "bash",
+        "code": "# GitHub Actions: shallow clone\n# .github/workflows/ci.yml\n- uses: actions/checkout@v4\n  with:\n    fetch-depth: 1  # shallow clone\n\n# GitLab CI: shallow clone\n# .gitlab-ci.yml\ngitlab_ci:\n  script:\n    - git clone --depth 1 https://gitlab.com/example/project.git\n\n# Without fetch-depth, actions/checkout fetches full history\n# which can add 10-30 seconds for large repositories"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Does git gc affect the working directory?",
+            "answer": "No. git gc only modifies .git/objects/ and other internal files. It does not touch your working directory or staging area."
+          },
+          {
+            "question": "Can I run git gc on a bare repository?",
+            "answer": "Yes. git gc is often run on bare repositories (shared remotes) to keep them fast. Use git gc --aggressive for deep optimization."
+          },
+          {
+            "question": "Does shallow clone support pushing?",
+            "answer": "No. Shallow clones cannot push because they do not have the full history. Use a full clone for branches you need to push from."
+          },
+          {
+            "question": "How often should I run git gc?",
+            "answer": "Let Git run it automatically. Git runs gc when the number of loose objects exceeds the threshold (default 6700). You can also set git config gc.auto to control this."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Measure first: use git count-objects, git rev-list --count, and time",
+          "Bottlenecks are history, files, binaries, or refs",
+          "git gc packs loose objects and removes unreachable data",
+          "Use shallow clones in CI to reduce checkout time",
+          "Match the optimization strategy to the specific bottleneck"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["shallow-clones", "repository-maintenance"],
+  "furtherReading": [
+    { "title": "Git Performance", "url": "https://git-scm.com/docs/git-gc", "type": "article" }
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "id": "lesson-mqes-032",
+  "slug": "windowing-aggregation",
+  "moduleSlug": "stream-processing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Windowing and Aggregation",
+  "description": "Group events into time windows and compute meaningful aggregations over unbounded streams.",
+  "order": 4,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["windowing", "aggregation", "kafka-streams", "ksqldb", "time"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "Streams are **unbounded**: they have no natural end. To compute aggregations such as counts, sums, or averages, you must group events into finite **windows**. Windowing turns an infinite stream into manageable chunks that can be aggregated and emitted as finite results. The choice of window type — tumbling, hopping, or session — determines how events are grouped and when results are produced." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "Window Types" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "A **tumbling window** is a fixed-size, non-overlapping time box. Events that fall into the same minute belong to the same tumbling window; events in the next minute belong to the next window. A **hopping window** is also fixed-size but overlaps with previous windows by a configurable advance interval, enabling moving-average calculations. A **session window** is dynamic: it groups events by activity and closes after a period of inactivity." }
+    },
+    {
+      "type": "table",
+      "id": "t1",
+      "data": {
+        "headers": ["Window Type", "Size", "Overlap", "Use Case"],
+        "rows": [
+          ["Tumbling", "Fixed (e.g. 1 min)", "None", "Per-minute counts, billing batches"],
+          ["Hopping", "Fixed (e.g. 5 min)", "Configurable step", "Rolling averages, sliding metrics"],
+          ["Session", "Dynamic", "None (gap-based)", "User activity sessions"],
+          ["Sliding", "Fixed (e.g. 1 min)", "Event-driven", "Recent-event rankings"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 3, "text": "Aggregations in Kafka Streams" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p3",
+      "data": { "text": "Kafka Streams provides built-in aggregation operators: `count`, `sum`, `min`, `max`, and `average`. These operators are applied to a grouped stream or table and materialize results into a state store. The state store is backed by a local RocksDB instance and a Kafka changelog topic for fault tolerance. When a window closes, the final result is forwarded to downstream processors." }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Windowed Aggregation in C# with Kafka Streams",
+        "content": "Although Kafka Streams is a Java library, the concepts map directly to any stream processor. Below is pseudocode showing how windowing logic is expressed conceptually in C# for clarity.",
+        "code": "// Conceptual windowed aggregation in C#\npublic class WindowedCounter\n{\n    private readonly Dictionary<Window, long> _counts = new();\n\n    public void Process(ClickEvent evt, TimeSpan windowSize)\n    {\n        var windowStart = new DateTime(\n            evt.Timestamp.Year,\n            evt.Timestamp.Month,\n            evt.Timestamp.Day,\n            evt.Timestamp.Hour,\n            evt.Timestamp.Minute,\n            0);\n\n        var window = new Window(windowStart, windowStart.Add(windowSize));\n        _counts[window] = _counts.GetValueOrDefault(window) + 1;\n    }\n\n    public IReadOnlyDictionary<Window, long> GetResults() => _counts;\n}\n\npublic record Window(DateTime Start, DateTime End);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "Late and Out-of-Order Events" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p4",
+      "data": { "text": "In distributed systems, events often arrive late due to network delays, clock skew, or backpressure. Stream processors handle this with **event-time** semantics and **watermarks**. An event-time timestamp is set by the producer; the watermark signals that no events with earlier timestamps are expected. Kafka Streams allows a configurable **grace period** during which late events can still update an existing window before it is finalized." }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "warning", "title": "Beware of Unbounded State", "text": "Windowed aggregations materialize state for every open window. If you use very long windows with high cardinality keys, your state stores can grow quickly. Always set appropriate retention periods and monitor RocksDB disk usage." }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-032-1",
+        "caption": "Tumbling vs hopping windows on an event timeline",
+        "definition": "gantt\n  title Tumbling (1 min) vs Hopping (1 min, step 30s)\n  dateFormat  HH:mm:ss\n  section Tumbling\n  Window 1 (00:00-00:01) :a1, 00:00:00, 1m\n  Window 2 (00:01-00:02) :a2, 00:01:00, 1m\n  Window 3 (00:02-00:03) :a3, 00:02:00, 1m\n  section Hopping\n  Hop 1 (00:00-00:01)   :b1, 00:00:00, 1m\n  Hop 2 (00:00:30-01:30) :b2, 00:00:30, 1m\n  Hop 3 (00:01-02:01)   :b3, 00:01:00, 1m"
+      }
+    },
+    {
+      "type": "example",
+      "id": "e2",
+      "data": {
+        "title": "ksqlDB Windowed Aggregation",
+        "content": "Define a tumbling-window aggregation in ksqlDB to count order events per minute.",
+        "code": "CREATE TABLE orders_per_minute AS\n  SELECT\n    order_id,\n    COUNT(*) AS order_count,\n    SUM(amount) AS total_amount\n  FROM orders\n  WINDOW TUMBLING (SIZE 1 MINUTE)\n  GROUP BY order_id;\n\n-- Query live results\nSELECT * FROM orders_per_minute EMIT CHANGES;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "faq-block",
+      "id": "f1",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "What is the difference between tumbling and sliding windows?", "answer": "Tumbling windows are non-overlapping fixed-size buckets. Sliding windows are also fixed-size but are triggered by each event, producing results for every event pair within the window duration." },
+          { "question": "How do I tune the grace period?", "answer": "Set the grace period slightly larger than your expected maximum network delay. A common default is a few minutes, but high-throughput systems with low latency may use seconds." },
+          { "question": "Can I emit partial window results before the window closes?", "answer": "Yes. Both Kafka Streams and ksqlDB can emit interim results using suppress operators or by setting a retention period. However, true suppression (emitting only final results) requires explicit configuration." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "id": "s1",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Tumbling windows produce non-overlapping fixed-size buckets",
+          "Hopping windows produce overlapping results for rolling analytics",
+          "Session windows adapt to user activity patterns",
+          "Late events are handled via grace periods and watermarks"
+        ],
+        "takeaway": "Windowing is the bridge between unbounded streams and bounded, actionable aggregations."
+      }
+    },
+    {
+      "type": "exercise",
+      "id": "ex1",
+      "data": {
+        "title": "Exercise: Implement Windowed Aggregation",
+        "description": "Build a windowed aggregation that computes a 5-minute rolling sum of order amounts using ksqlDB.",
+        "steps": [
+          "Create a stream named 'orders' with fields: order_id, amount, and timestamp",
+          "Write a CREATE TABLE AS query with a hopping window of 5 minutes and a 30-second advance",
+          "Run a push query and verify that overlapping windows show different sums",
+          "Produce a late event and observe whether it updates an existing window or is rejected",
+          "Document the observed behavior and explain the impact of the grace period setting"
+        ],
+        "expectedOutcome": "A ksqlDB table showing rolling order totals across overlapping 5-minute windows"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Windowing in Kafka Streams", "url": "https://kafka.apache.org/33/documentation/streams/developer-guide/dsl-api.html#windowing", "type": "article", "author": "Apache Kafka", "description": "Official developer guide covering tumbling, hopping, session, and sliding windows." },
+    { "title": "Stream Processing with ksqlDB", "url": "https://docs.ksqldb.io/en/latest/developer-guide/joins/aggregations/", "type": "article", "author": "Confluent", "description": "ksqlDB documentation on windowed aggregations and time semantics." }
+  ],
+  "courseSlug": "message-queues-event-streaming"
+}

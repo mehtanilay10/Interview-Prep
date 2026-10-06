@@ -1,0 +1,169 @@
+{
+  "id": "lesson-mqes-036",
+  "slug": "event-store-design",
+  "moduleSlug": "event-sourcing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Event Store Design",
+  "description": "Understand how to design an event store, including schema, append operations, and reading event streams.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": [
+    "event-store",
+    "event-sourcing",
+    "database-design",
+    "append-only"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An event store is a database optimized for a specific access pattern: appending events to a stream and reading them in order. Unlike a traditional database that supports arbitrary queries and updates, an event store is append-only. This constraint makes it easier to reason about consistency, replication, and retention."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Core Data Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "At minimum, an event store needs three things: a stream identifier to group events by aggregate, a globally unique sequence number to establish order, and the event payload itself. A typical event record also includes the event type, timestamp, and correlation ID for tracing across services."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Column",
+          "Purpose",
+          "Notes"
+        ],
+        "rows": [
+          [
+            "StreamId",
+            "Groups events by aggregate",
+            "e.g., GUID of the order entity"
+          ],
+          [
+            "GlobalPosition",
+            "Uniquely orders all events",
+            "Monotonically increasing; never reused"
+          ],
+          [
+            "EventType",
+            "Identifies the event kind",
+            "e.g., OrderPlaced, PaymentReceived"
+          ],
+          [
+            "Payload",
+            "Serialized event data",
+            "JSON, Avro, or Protobuf"
+          ],
+          [
+            "Timestamp",
+            "When the event occurred",
+            "UTC datetime from the producer"
+          ],
+          [
+            "CorrelationId",
+            "Traces a single command",
+            "Links all events from one operation"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Append Operation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Appending an event should be idempotent and optimistic. The client provides the expected current version of the stream. If the stream has not changed since the client last read it, the append succeeds. If another writer modified the stream in between, the append fails with a concurrency conflict. This pattern prevents lost updates without distributed locks."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Append with Optimistic Concurrency (C#)",
+        "content": "Append an event to an event store stream, checking the expected version first.",
+        "code": "public async Task AppendAsync(\n    string streamId,\n    IEvent @event,\n    long expectedVersion,\n    CancellationToken ct)\n{\n    var sql = @\"\n        INSERT INTO Events (StreamId, GlobalPosition, EventType, Payload, Timestamp, CorrelationId)\n        VALUES (@StreamId, @GlobalPosition, @EventType, @Payload, @Timestamp, @CorrelationId)\n    \";\n\n    var rows = await _db.ExecuteAsync(\n        sql,\n        new\n        {\n            StreamId = streamId,\n            GlobalPosition = await GetNextPositionAsync(),\n            EventType = @event.GetType().Name,\n            Payload = JsonSerializer.Serialize(@event),\n            Timestamp = DateTime.UtcNow,\n            CorrelationId = @event.CorrelationId\n        },\n        ct);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading a Stream"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reading is straightforward: query all events for a stream in global position order. For a new subscriber, you read from position zero. For a subscriber that has already processed events, you use a checkpoint and read from there. This at-least-once delivery model means consumers must be idempotent."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading a Stream in Node.js",
+        "content": "Fetch all events for a stream in order using a simple query.",
+        "code": "async function readStream(streamId, fromPosition = 0) {\n  const result = await db.query(\n    `SELECT * FROM events WHERE stream_id = $1 AND global_position >= $2 ORDER BY global_position ASC`,\n    [streamId, fromPosition]\n  );\n  return result.rows.map(row => ({\n    position: row.global_position,\n    type: row.event_type,\n    data: JSON.parse(row.payload),\n    timestamp: row.timestamp\n  }));\n}",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Idempotency is Required",
+        "text": "Because subscribers may receive the same event more than once, your projection and handler logic must handle duplicates gracefully. Use the event's global position as an idempotency key when writing to read models."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "es-store-schema",
+        "caption": "Event store write path with optimistic concurrency",
+        "definition": "flowchart LR\n    A[Client] --> B[Read Stream Version]\n    B --> C{Version Match?}\n    C -->|Yes| D[Append Event]\n    C -->|No| E[Concurrency Conflict]\n    D --> F[Return New Position]\n    E --> G[Retry or Reject]"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Event stores are append-only by design.",
+          "Use a global position for total ordering across all streams.",
+          "Optimistic concurrency prevents lost updates without locks.",
+          "Consumers must be idempotent because delivery is at-least-once."
+        ],
+        "takeaway": "A well-designed event store is simple internally: append, read by stream, and never update."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "event-sourcing-fundamentals",
+    "snapshots-replay"
+  ],
+  "furtherReading": [
+    {
+      "title": "EventStoreDB Getting Started",
+      "url": "https://developers.eventstore.com/getting-started/",
+      "type": "article"
+    },
+    {
+      "title": "Append-Only Log Pattern",
+      "url": "https://martinfowler.com/bliki/AppendOnlyLog.html",
+      "type": "article"
+    }
+  ]
+}

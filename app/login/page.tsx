@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { Bookmark, CheckCircle2, BarChart3 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -12,7 +13,7 @@ export default function LoginPage() {
     try {
       await signIn('google', { callbackUrl: '/' });
     } catch (err) {
-      console.error('Sign in error:', err);
+      logger.error('login', 'Sign in error', err);
       setIsLoading(false);
     }
   };

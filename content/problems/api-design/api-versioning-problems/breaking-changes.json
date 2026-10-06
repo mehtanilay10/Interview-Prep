@@ -1,0 +1,147 @@
+{
+  "id": "lesson-api-design-problems-api-versioning-problems-breaking-changes",
+  "slug": "breaking-changes",
+  "moduleSlug": "api-versioning-problems",
+  "courseSlug": "api-design-problems",
+  "title": "Breaking Changes",
+  "description": "Identify, classify, and handle breaking API changes including removed fields, renamed endpoints, and changed semantics.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["breaking-changes", "compatibility", "contracts", "migration"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A breaking change is any modification to an API contract that causes existing clients to fail. Not all changes are obvious: adding a required field, changing a field type, or tightening validation can all break clients silently."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Change Classification"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Change Type", "Breaking?", "Example", "Client Impact"],
+        "rows": [
+          ["Add optional field", "No", "Add middleName to UserResponse", "None — clients ignore new field"],
+          ["Add required field", "Yes", "Add phoneNumber to POST /users", "Clients without phoneNumber get 422"],
+          ["Remove field", "Yes", "Remove legacyStatus from response", "Clients reading legacyStatus get null"],
+          ["Rename field", "Yes", "Rename fullName to displayName", "Clients reading fullName get 404 or null"],
+          ["Change field type", "Yes", "Change price from string to integer", "JSON parse fails or wrong precision"],
+          ["Change enum values", "Yes", "Remove status=active, use status=enabled", "Clients switch on old enum get 400"],
+          ["Change HTTP status", "Yes", "Return 201 instead of 200", "Clients asserting on 200 fail"],
+          ["Tighten validation", "Yes", "Require email format on previously free-form field", "Existing payloads get 422"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Detecting Breaking Changes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Breaking change: changing field type from string to object",
+        "content": "A seemingly minor refactor can break every client. Use consumer-driven contract testing to catch these before production.",
+        "code": "// v1 — price is a string for display\n{\n  \"id\": \"prod_881\",\n  \"price\": \"$149.99\",\n  \"currency\": \"USD\"\n}\n\n// v2 — price is now an object for machine readability\n// This breaks every client that does: const price = data.price;\n{\n  \"id\": \"prod_881\",\n  \"price\": {\n    \"amount\": 14999,\n    \"currency\": \"USD\"\n  }\n}\n\n// Consumer test fails:\n// expect(data.price).toBe('$149.99');\n// TypeError: data.price is not a string",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Safe Change Patterns"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Add new fields as nullable or with defaults — never make them required in the same version",
+          "Deprecate fields before removing them: mark deprecated=true, return data for 12 months, then remove",
+          "Add new API versions for breaking changes instead of modifying existing endpoints",
+          "Use union types in strongly typed languages: return OldType | NewType during migration",
+          "Document breaking changes in a changelog with migration guides"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The additive-only rule",
+        "text": "If you must modify an existing contract without versioning, the only safe operations are: adding optional fields, adding new enum values, and widening accepted ranges. Everything else requires a new version or a deprecation cycle."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Contract Test with Pact"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pact consumer test catching a breaking change",
+        "content": "Consumer-driven contract tests verify that the provider still satisfies the consumer's expectations before deployment.",
+        "code": "// Consumer test — defines the expected contract\nawait pact\n  .given('user 123 exists')\n  .uponReceiving('a request for user 123')\n  .withRequest({\n    method: 'GET',\n    path: '/users/123',\n    headers: { 'API-Version': '1' }\n  })\n  .willRespondWith({\n    status: 200,\n    headers: { 'Content-Type': 'application/json' },\n    body: {\n      id: like('123'),\n      username: like('alice'),\n      email: like('alice@example.com')\n      // If provider removes 'username', this test fails\n    }\n  })\n  .execute(async () => {\n    await api.getUser('123');\n  });",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How do I handle breaking changes in a public API?",
+            "answer": "Never make breaking changes without a new version. Publish a deprecation notice 12 months in advance. Return 409 Conflict if a client uses a deprecated field and provide a migration path."
+          },
+          {
+            "question": "What if a breaking change is urgent (security patch)?",
+            "answer": "Security fixes are an exception. Communicate the urgency clearly, provide a hotfix version, and offer extended support for the previous version. Document the CVE and timeline."
+          },
+          {
+            "question": "How do I communicate breaking changes to third-party developers?",
+            "answer": "Use a changelog, email notifications, webhook events, and in-API response headers (Sunset, Deprecation). Provide a migration guide with code examples for every breaking change."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Breaking changes require a new version or a deprecation cycle.",
+          "Contract tests catch breaking changes before they reach production.",
+          "Deprecate before remove: mark, monitor, then delete.",
+          "Security fixes are the only acceptable emergency breaking change."
+        ],
+        "takeaway": "Treat your API contract like a public interface. Change it with the same care you would give a published SDK. If consumers depend on it, breaking it is a product decision, not just a technical one."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "deprecation-strategy",
+    "content-negotiation"
+  ],
+  "furtherReading": [
+    {
+      "title": "Pact Contract Testing",
+      "url": "https://pact.io/",
+      "type": "tool",
+      "description": "Consumer-driven contract testing framework for API compatibility."
+    }
+  ]
+}

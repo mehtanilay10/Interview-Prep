@@ -1,0 +1,162 @@
+{
+  "id": "lesson-mqes-037",
+  "slug": "snapshots-replay",
+  "moduleSlug": "event-sourcing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Snapshots and Replay",
+  "description": "Learn how snapshots speed up aggregate loading and how to safely replay events to rebuild state.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": [
+    "event-sourcing",
+    "snapshots",
+    "replay",
+    "performance"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Replaying every event from scratch is fine when an aggregate has ten events. It becomes painful when there are ten thousand. Snapshots solve this by capturing the state of an aggregate at a point in time. When loading the aggregate, you load the latest snapshot and replay only the events that occurred after it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Snapshots Matter"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without snapshots, every read of a long-lived aggregate touches every event in its history. This hurts latency and wastes CPU. Snapshots turn O(n) replay into O(1) plus a small tail of recent events. The trade-off is storage: snapshots take space, and you must decide when and how often to take them."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Snapshot Triggers",
+        "items": [
+          "After every N events (e.g., every 100 events)",
+          "On specific business events that mark a phase change",
+          "When the aggregate is persisted and the event count exceeds a threshold",
+          "On a scheduled job scanning aggregates that exceed the threshold"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Snapshot Data Model"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A snapshot is typically stored alongside events, keyed by stream ID. It records the aggregate state and the global position of the last event included in that state. When rebuilding the aggregate, the loader reads the snapshot, deserializes the state, and replays events from the next position forward."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Snapshot Record in C#",
+        "content": "A snapshot captures the aggregate state and the event position up to which it is valid.",
+        "code": "public record Snapshot(\n    string StreamId,\n    long GlobalPosition,\n    string StateJson,\n    DateTime CreatedAt\n);\n\npublic record OrderSnapshot(\n    Guid OrderId,\n    OrderStatus Status,\n    decimal Total,\n    List<OrderItem> Items,\n    long Version\n);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Loading an Aggregate with Snapshots"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rebuilding an Aggregate (C#)",
+        "content": "Load the latest snapshot, then replay only the events that came after it.",
+        "code": "public async Task<Order> LoadAsync(Guid orderId, CancellationToken ct)\n{\n    var snapshot = await _repo.GetLatestSnapshotAsync(orderId, ct);\n    var fromVersion = snapshot?.Version ?? -1;\n    var state = snapshot != null \n        ? JsonSerializer.Deserialize<OrderState>(snapshot.StateJson)! \n        : new OrderState(orderId);\n    var events = await _eventStore.ReadStreamAsync(\n        orderId.ToString(), fromVersion + 1, ct);\n    foreach (var e in events) state.Apply(e);\n    return new Order(state);\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Replay for Debugging"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Replay is not only for production reads. Replaying events into a separate environment lets you reproduce bugs, test new projection logic, or validate schema migrations. Because events are immutable, replay always produces the same result given the same code. This is a powerful debugging tool that most traditional databases cannot match."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "es-snapshot-replay",
+        "caption": "Loading an aggregate with a snapshot",
+        "definition": "flowchart LR\n    A[Request Aggregate] --> B{Snapshot Exists?}\n    B -->|Yes| C[Load Snapshot]\n    B -->|No| D[Start from Empty State]\n    C --> E[Read Events After Snapshot]\n    D --> E\n    E --> F[Replay Events]\n    F --> G[Return Aggregate]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep Snapshots Lightweight",
+        "text": "Only store the data needed to rebuild the aggregate. Do not cache derived values that can be recomputed during replay. If your snapshot grows too large, consider snapshotting more frequently with smaller deltas."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can I delete old snapshots?",
+            "answer": "Yes. Once you have newer snapshots covering the same stream, old ones are safe to delete. Some teams run a nightly cleanup job that keeps only the latest N snapshots per stream."
+          },
+          {
+            "question": "What if a snapshot and an event conflict?",
+            "answer": "Snapshots should never conflict with events because they are just a cache of state at a point in time. Always trust the events for correctness and treat snapshots as an optimization that can be rebuilt at any time."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Snapshots reduce O(n) replay to O(1) plus a small event tail.",
+          "Trigger snapshots after a fixed number of events or business milestones.",
+          "Replay is deterministic and invaluable for debugging and migration testing.",
+          "Snapshots are a cache, not the source of truth. Events are always authoritative."
+        ],
+        "takeaway": "Snapshots trade storage for latency; replay trades compute for observability."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "event-sourcing-fundamentals",
+    "event-store-design"
+  ],
+  "furtherReading": [
+    {
+      "title": "Greg Young on Snapshots",
+      "url": "https://leanpub.com/esgeneral",
+      "type": "course"
+    },
+    {
+      "title": "Event Sourcing Pattern - Azure Architecture Center",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing",
+      "type": "article"
+    }
+  ]
+}

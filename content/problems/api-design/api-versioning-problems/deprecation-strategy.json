@@ -1,0 +1,168 @@
+{
+  "id": "lesson-api-design-problems-api-versioning-problems-deprecation-strategy",
+  "slug": "deprecation-strategy",
+  "moduleSlug": "api-versioning-problems",
+  "courseSlug": "api-design-problems",
+  "title": "Deprecation Strategy",
+  "description": "Build a complete API deprecation workflow using headers, monitoring, client notifications, and automated enforcement.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["deprecation", "sunset", "versioning", "migration"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Deprecation is the process of retiring an old API version while giving clients time to migrate. Without a formal deprecation strategy, old versions accumulate indefinitely. With one, you can clean up technical debt on a predictable schedule."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deprecation Lifecycle"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Announce — publish deprecation notice with sunset date and migration guide",
+          "Warn — return Deprecation and Sunset headers on old endpoints",
+          "Monitor — track v1 traffic; identify slow adopters",
+          "Enforce — return 410 Gone after sunset date",
+          "Remove — delete old code and infrastructure"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Standard Headers"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Header", "Value", "Meaning"],
+        "rows": [
+          ["Deprecation", "true", "This endpoint is deprecated"],
+          ["Sunset", "RFC 8594 date", "Date when the endpoint will be removed"],
+          ["Link", "</v2/users>; rel=successor-version", "URL of the replacement endpoint"],
+          ["Link", "</docs/migration>; rel=help", "Migration documentation URL"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Deprecation Filter in ASP.NET Core"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global deprecation filter returning Sunset headers",
+        "content": "Apply a result filter to all v1 endpoints to signal deprecation and guide clients to v2.",
+        "code": "public class DeprecationFilter : IResultFilter\n{\n    private readonly DateTime _sunsetDate = new DateTime(2026, 10, 31);\n\n    public void OnResultExecuting(ResultExecutingContext context)\n    {\n        var version = context.HttpContext.GetRequestedApiVersion();\n        if (version != null && version.MajorVersion == 1)\n        {\n            var response = context.HttpContext.Response;\n            response.Headers.Deprecation = \"true\";\n            response.Headers.Sunset = _sunsetDate.ToString(\"r\");\n            response.Headers.Append(\"Link\",\n                \", </v2/users>; rel=\\\"successor-version\\\", \" +\n                \"</docs/migration/v1-to-v2>; rel=\\\"help\\\"\");\n        }\n    }\n\n    public void OnResultExecuted(ResultExecutedContext context) { }\n}\n\n// Apply globally in Program.cs:\nbuilder.Services.AddControllers(options =>\n    options.Filters.Add<DeprecationFilter>());",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Client Migration Dashboard"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Track which clients are still using deprecated versions. Use the User-Agent header, API keys, or a custom X-Client-ID header to identify integrations."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "List all clients making >100 requests/day to deprecated endpoints",
+          "Send email notifications at 12 months, 6 months, 3 months, and 1 month before sunset",
+          "Provide a migration guide with code examples for each client SDK",
+          "Offer extended support contracts for enterprise clients who cannot migrate on time"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Deprecation without a date is just nostalgia",
+        "text": "Publishing deprecation warnings without a sunset date has no effect. Clients will ignore the warning indefinitely. Always pair Deprecation: true with a specific Sunset date."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: 410 Gone After Sunset"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Post-sunset response for v1 clients",
+        "content": "After the sunset date, old endpoints return 410 Gone with a structured error body.",
+        "code": "HTTP/1.1 410 Gone\nDeprecation: true\nSunset: Sat, 31 Oct 2026 23:59:59 GMT\nLink: </v2/users>; rel=\"successor-version\"\nContent-Type: application/json\n\n{\n  \"error\": {\n    \"code\": \"DeprecatedVersionGone\",\n    \"message\": \"v1 was sunset on 2026-10-31.\",\n    \"sunsetDate\": \"2026-10-31T23:59:59Z\",\n    \"successorVersion\": \"v2\",\n    \"migrationGuide\": \"/docs/migration/v1-to-v2\"\n  }\n}",
+        "language": "text"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How long should a deprecation period last?",
+            "answer": "12 months is standard for public APIs. For internal APIs with controlled clients, 3-6 months is sufficient. Enterprise contracts may require 18-24 months."
+          },
+          {
+            "question": "Can I restart the deprecation clock?",
+            "answer": "Avoid restarting. It erodes trust. If you must extend, communicate the reason clearly and provide a firm new sunset date. Repeated extensions signal poor planning."
+          },
+          {
+            "question": "What if a client keeps calling v1 after sunset?",
+            "answer": "Return 410 Gone with a structured error. If the client has a paid support contract, offer a grace period. Do not silently keep v1 running; it creates security and maintenance debt."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Deprecation is a contract, not a suggestion.",
+          "Pair Deprecation: true with a firm Sunset date.",
+          "Track client migration progress and notify slow adopters.",
+          "410 Gone is the professional way to end a version."
+        ],
+        "takeaway": "A deprecation strategy is how you pay down technical debt without surprising your users. Announce early, warn loudly, and enforce on schedule."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "breaking-changes",
+    "url-versioning"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 8594: Sunset Header",
+      "url": "https://datatracker.ietf.org/doc/html/rfc8594",
+      "type": "article",
+      "author": "IETF",
+      "description": "Standard for the Sunset header to indicate API deprecation."
+    }
+  ]
+}

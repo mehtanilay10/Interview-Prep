@@ -1,0 +1,193 @@
+{
+  "id": "lesson-sdi-058",
+  "slug": "rate-limiter-design",
+  "moduleSlug": "common-system-designs",
+  "courseSlug": "system-design-interviews",
+  "title": "Rate Limiter Design",
+  "description": "Design a distributed rate limiter that protects APIs from abuse, enforces fair usage policies, and scales horizontally across multiple servers.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["system-design", "rate-limiting", "api-gateway", "token-bucket", "algorithms", "throttling"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rate limiters control how many requests a client can make in a given time window. They protect APIs from abuse, prevent cascading failures, and ensure fair usage across consumers. In interviews, rate limiter design tests your understanding of distributed algorithms, edge caching, and the trade-offs between strict enforcement and low latency."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Algorithms"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Rate Limiting Algorithms",
+        "items": [
+          "Token Bucket: Tokens accumulate at a fixed rate; each request consumes one token",
+          "Leaky Bucket: Requests queue and are processed at a fixed rate, smoothing burst traffic",
+          "Fixed Window Counter: Count requests in fixed time intervals such as per minute",
+          "Sliding Window Log: Track exact request timestamps for accurate enforcement"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Token Bucket Deep Dive"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The token bucket algorithm is the most widely used rate limiter because it naturally allows bursts up to the bucket capacity while enforcing a steady long-term rate. Every token bucket has a capacity and a refill rate. For example, a capacity of 10 with a refill rate of 1 per second allows bursts of 10 requests but never more than 1 request per second on average. Clients with bursty traffic benefit most from token buckets."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "token-bucket",
+        "caption": "Token bucket rate limiting flow",
+        "definition": "flowchart LR\n    A[Incoming Request] --> B{Tokens > 0?}\n    B -->|yes| C[Consume 1 token]\n    C --> D[Allow Request]\n    B -->|no| E[Reject with 429]\n    F[Refill Timer] --> G[Add tokens at rate R]\n    G --> A"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Distributed Rate Limiting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a distributed system, rate limiters must coordinate state across multiple API servers. Storing counters in a local process breaks when traffic hits different servers. Use a shared Redis cluster with atomic increment operations to maintain consistent counters. For the highest throughput, place a lightweight rate limiter at the edge using API gateways or CDN edge functions, then enforce stricter limits at the application layer."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Clock skew and synchronization",
+        "text": "In distributed environments, servers may have slightly different clocks. Use Redis with monotonic TTLs and rely on Redis server time rather than client time to prevent clock skew from bypassing rate limits."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Multi-Level Rate Limiting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Enforce rate limits at multiple granularities. A global limit protects your infrastructure from overall overload. A per-user limit prevents any single consumer from monopolizing resources. A per-endpoint limit protects expensive operations such as search or file upload. Combine these layers with different algorithms: token buckets for user limits, fixed windows for global limits, and sliding windows for expensive endpoints."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Algorithm", "Pros", "Cons", "Best For"],
+        "rows": [
+          ["Token Bucket", "Allows bursts, simple to implement", "Hard to coordinate in distributed systems", "Per-user API limits"],
+          ["Leaky Bucket", "Smooths traffic, prevents bursts", "Drops requests on overflow", "Video streaming, ingress queues"],
+          ["Fixed Window", "Cheap to compute, minimal state", "Burst at window boundaries", "Global API caps"],
+          ["Sliding Window Log", "Accurate, no boundary bursts", "High memory overhead", "Strict compliance, B2B APIs"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementation Considerations"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Return standard HTTP headers such as X-RateLimit-Limit, X-RateLimit-Remaining, and Retry-After so clients can adapt their behavior. Log rate-limited requests to identify abusive clients. Use IP addresses for unauthenticated endpoints and user IDs for authenticated endpoints. Consider geo-based rate limits if your users are concentrated in specific regions to prevent regional outages from exhausting global quotas."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Token Bucket",
+            "definition": "A rate limiting algorithm that uses a bucket of tokens refilled at a steady rate; each request consumes a token."
+          },
+          {
+            "term": "Atomic Increment",
+            "definition": "A Redis operation that increments a counter safely across concurrent requests, preventing race conditions."
+          },
+          {
+            "term": "Retry-After",
+            "definition": "An HTTP header telling clients how long to wait before retrying after being rate limited."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Token buckets allow controlled bursts while enforcing average rate limits",
+          "Use Redis for distributed counters with atomic operations",
+          "Layer rate limits globally, per user, and per endpoint",
+          "Return standard rate limit headers for client-friendly behavior",
+          "Place lightweight edge limits alongside strict application-layer enforcement"
+        ],
+        "takeaway": "An effective rate limiter balances strict enforcement, low latency, and client transparency across every layer of the stack."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle burst traffic without dropping legitimate requests?",
+            "answer": "Use a token bucket with a reasonable capacity that absorbs short bursts. Monitor burst patterns and adjust capacity based on normal traffic profiles."
+          },
+          {
+            "question": "What if Redis is down?",
+            "answer": "Fail open or fail closed depending on your threat model. Many services fail open to preserve availability but log violations for later analysis."
+          }
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design a Rate Limiter",
+        "description": "Design a rate limiter for a public API that allows 100 requests per minute per API key, using Redis as the backing store.",
+        "expectedOutcome": "Use a Redis sorted set with timestamps as scores and remove entries older than 60 seconds before counting."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Rate Limiting at Cloudflare",
+      "url": "https://blog.cloudflare.com/counting-things-a-lot-of-different-things/",
+      "type": "article",
+      "author": "Cloudflare",
+      "description": "How Cloudflare counts and rate limits billions of requests per day across its global edge network."
+    },
+    {
+      "title": "Sliding Window Rate Limiting",
+      "url": "https://engineering.klaviyo.com/sliding-window-rate-limiting-1e6b3406cd9f",
+      "type": "article",
+      "author": "Klaviyo Engineering",
+      "description": "A practical implementation of sliding window rate limiting for high-throughput APIs."
+    }
+  ]
+}

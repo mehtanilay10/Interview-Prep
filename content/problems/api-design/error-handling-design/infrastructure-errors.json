@@ -1,0 +1,166 @@
+{
+  "id": "lesson-api-design-problems-error-handling-design-infrastructure-errors",
+  "slug": "infrastructure-errors",
+  "moduleSlug": "error-handling-design",
+  "courseSlug": "api-design-problems",
+  "title": "Infrastructure Errors",
+  "description": "Design error responses for infrastructure failures including database outages, downstream service failures, and gateway timeouts.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["infrastructure", "timeouts", "circuit-breaker", "resilience"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Infrastructure errors happen when your API cannot fulfill a request due to downstream failures, not client mistakes. These errors should be transient-safe, include retry guidance, and never leak internal architecture details."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Infrastructure Error Types"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Error", "HTTP Status", "Retry?", "Root Cause"],
+        "rows": [
+          ["Database connection lost", "503", "Yes, after backoff", "DB pool exhaustion, network partition"],
+          ["Downstream timeout", "504 Gateway Timeout", "Yes, with backoff", "Payment API, search service slow"],
+          ["Downstream error", "502 Bad Gateway", "Yes", "Returned 500 or 503 from payment API"],
+          ["Circuit breaker open", "503", "Yes, after reset", "Too many downstream failures"],
+          ["Rate limit from downstream", "429", "Yes, honor Retry-After", "Payment processor rate limit"],
+          ["Server out of memory", "503", "Yes", "GC pressure, memory leak"],
+          ["Graceful shutdown", "503", "Yes, after delay", "Deploy, pod termination"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Downstream Timeout Response"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "504 Gateway Timeout with retry guidance",
+        "content": "The API proxies a request to a downstream payment service that times out.",
+        "code": "GET /payments/ord_991\n\nResponse: 504 Gateway Timeout\n{\n  \"type\": \"https://api.example.com/errors/gateway-timeout\",\n  \"title\": \"Gateway Timeout\",\n  \"status\": 504,\n  \"requestId\": \"req_gw_001\",\n  \"message\": \"The payment service did not respond in time.\",\n  \"retry\": {\n    \"shouldRetry\": true,\n    \"retryAfterMs\": 2000,\n    \"maxRetries\": 3\n  },\n  \"documentationUrl\": \"https://docs.example.com/errors/gateway-timeout\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Timeout Strategy"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Set strict timeouts on all downstream calls: 3s for DB, 5s for APIs, 10s for file operations",
+          "Return 504 immediately when a downstream call times out; do not wait for a response that will never come",
+          "Include Retry-After: 2 (seconds) on 503 responses to give the infrastructure time to recover",
+          "Do not retry non-idempotent requests (POST without idempotency key) on timeout"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Circuit Breaker State"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "503 when circuit breaker is open",
+        "content": "After 5 consecutive downstream failures, the circuit breaker opens and returns 503 immediately.",
+        "code": "POST /orders\n\nResponse: 503 Service Unavailable\n{\n  \"type\": \"https://api.example.com/errors/service-unavailable\",\n  \"title\": \"Service Unavailable\",\n  \"status\": 503,\n  \"requestId\": \"req_cb_001\",\n  \"message\": \"The payment service is temporarily unavailable.\",\n  \"retry\": {\n    \"shouldRetry\": true,\n    \"retryAfterMs\": 5000,\n    \"maxRetries\": 3,\n    \"circuitState\": \"open\"\n  },\n  \"documentationUrl\": \"https://status.example.com\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Not To Expose"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Never leak in error responses",
+        "items": [
+          "Internal service names (payment-service, user-db)",
+          "Stack traces or line numbers",
+          "Database connection strings or credentials",
+          "Server hostnames or IP addresses",
+          "Third-party provider error messages verbatim"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "error",
+        "title": "Infrastructure errors are not your fault",
+        "text": "A 503 from your API is not a bug in your code. It is a signal that the system is temporarily overloaded. Clients that receive 503 should retry with backoff, not give up and show a generic error page."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I return 500 or 502 for downstream failures?",
+            "answer": "Use 502 Bad Gateway when the downstream returned a non-success response. Use 504 Gateway Timeout when the downstream did not respond in time. Use 503 Service Unavailable when your own server is overloaded."
+          },
+          {
+            "question": "How do I prevent retry storms?",
+            "answer": "Use exponential backoff with jitter: retry after 1s, 2s, 4s with +/- 30% random jitter. Do not retry immediately after failure. For 503, honor the Retry-After header."
+          },
+          {
+            "question": "Should I expose the downstream error message?",
+            "answer": "Never. Map downstream errors to your own error codes and messages. A downstream 500 might mean anything; your client only needs to know that the operation failed and can be retried."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Infrastructure errors must be transient-safe and include retry guidance.",
+          "Use 502 for downstream errors, 504 for timeouts, 503 for overload.",
+          "Never expose internal service names or stack traces.",
+          "Circuit breakers prevent retry storms from overwhelming downstream."
+        ],
+        "takeaway": "Infrastructure errors are opportunities to build resilience. Design them so clients automatically back off and recover without human intervention."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "http-status-code-selection",
+    "error-response-format"
+  ],
+  "furtherReading": [
+    {
+      "title": "Resilience Patterns in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Circuit breakers, retries, and timeouts in distributed systems."
+    }
+  ]
+}

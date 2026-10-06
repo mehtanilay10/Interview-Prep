@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { CalloutBox } from '@/components/ui/CalloutBox';
 import { cn } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
+import { isContentBlock, isLesson, isModule } from '@/lib/typeGuards';
 import { ImageModal } from './ImageModal';
 
 const ShikiHighlighter = dynamic(
@@ -119,6 +120,7 @@ function CustomCodeBlock({ code, language }: { code: string; language?: string }
 
 function ImageBlock({ block }: { block: ContentBlock & { type: 'image' } }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [broken, setBroken] = useState(false);
   return (
     <figure className="my-6 flex justify-center">
       <button
@@ -127,12 +129,19 @@ function ImageBlock({ block }: { block: ContentBlock & { type: 'image' } }) {
         className="cursor-zoom-in rounded-lg border border-border bg-canvas-subtle p-1 transition hover:border-accent-fg focus:outline-none focus:ring-2 focus:ring-accent-fg focus:ring-offset-2"
         aria-label={`Click to enlarge ${block.data.alt}`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={block.data.src}
-          alt={block.data.alt}
-          className="max-h-[50vh] w-auto max-w-[150%] object-contain"
-        />
+        {broken ? (
+          <div className="flex h-32 w-32 items-center justify-center rounded bg-canvas text-xs text-fg-muted">Image unavailable</div>
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={block.data.src}
+            alt={block.data.alt}
+            loading="lazy"
+            decoding="async"
+            onError={() => setBroken(true)}
+            className="max-h-[50vh] w-auto max-w-[150%] object-contain"
+          />
+        )}
       </button>
       {block.data.caption && (
         <figcaption className="mt-2 text-center text-xs text-fg-muted">
@@ -230,10 +239,12 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       );
 
     case 'heading': {
-      const data = (block as { data?: { level: 2 | 3 | 4; text: string; anchor?: string } }).data;
-      const level = data?.level ?? (block as { level?: 2 | 3 | 4 }).level;
-      const text = data?.text ?? (block as { text?: string }).text;
-      const anchor = data?.anchor;
+      if (!isContentBlock(block) || block.type !== 'heading') {
+        return null;
+      }
+      const level = block.data.level;
+      const text = block.data.text;
+      const anchor = block.data.anchor;
       if (!level || !text) return null;
       const Tag = `h${level}` as 'h2' | 'h3' | 'h4';
       const sizeMap = { 2: 'text-xl', 3: 'text-lg', 4: 'text-base' };
@@ -548,33 +559,48 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       return <ImageBlock key={idx} block={block} />;
 
     default:
-      return null;
+      throw new Error(`Unsupported content block type: ${(block as ContentBlock).type}`);
   }
 }
 
 function normalizeBlock(block: ContentBlock): ContentBlock {
   if ('data' in block && block.data) {
-    if (block.type === 'comparison-cards' && (block.data as any).items && !(block.data as any).cards) {
+    const legacyData = block.data as unknown as Record<string, unknown>;
+    if (
+      block.type === 'comparison-cards' &&
+      'items' in legacyData &&
+      !('cards' in legacyData)
+    ) {
+      const items = legacyData.items as Array<{ title: string; description: string; pros?: string[]; cons?: string[]; tags?: string[] }>;
       return {
         ...block,
         data: {
           title: block.data.title,
-          cards: (block.data as any).items as { title: string; description: string; pros?: string[]; cons?: string[]; tags?: string[] }[],
+          cards: items,
         },
-      } as ContentBlock;
+      };
     }
-    if (block.type === 'summary-box' && (block.data as any).items && !(block.data as any).points) {
+    if (
+      block.type === 'summary-box' &&
+      'items' in legacyData &&
+      !('points' in legacyData)
+    ) {
+      const items = legacyData.items as Array<{ text: string }>;
       return {
         ...block,
         data: {
           title: block.data.title,
-          points: ((block.data as any).items as { text: string }[]).map((i) => i.text),
+          points: items.map((i) => i.text),
           takeaway: block.data.takeaway,
         },
-      } as ContentBlock;
+      };
     }
-    if (block.type === 'summary-box' && (block.data as any).text && !(block.data as any).points) {
-      const text = (block.data as any).text;
+    if (
+      block.type === 'summary-box' &&
+      'text' in legacyData &&
+      !('points' in legacyData)
+    ) {
+      const text = legacyData.text;
       return {
         ...block,
         data: {
@@ -582,16 +608,21 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
           points: Array.isArray(text) ? text : [text],
           takeaway: block.data.takeaway,
         },
-      } as ContentBlock;
+      };
     }
-    if (block.type === 'faq-block' && (block.data as any).faqs && !(block.data as any).items) {
+    if (
+      block.type === 'faq-block' &&
+      'faqs' in legacyData &&
+      !('items' in legacyData)
+    ) {
+      const faqs = legacyData.faqs as Array<{ question: string; answer: string }>;
       return {
         ...block,
         data: {
           title: block.data.title,
-          items: (block.data as any).faqs as { question: string; answer: string }[],
+          items: faqs,
         },
-      } as ContentBlock;
+      };
     }
     return block;
   }

@@ -1,0 +1,173 @@
+{
+  "id": "lesson-api-design-problems-rest-api-design-scenarios-booking-api",
+  "slug": "booking-api",
+  "moduleSlug": "rest-api-design-scenarios",
+  "courseSlug": "api-design-problems",
+  "title": "Booking API Design",
+  "description": "Design a booking API for reservations, availability, and cancellations with conflict prevention and idempotent holds.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["booking", "availability", "reservations", "idempotency"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Booking APIs must prevent double-booking while remaining responsive under high concurrency. A flight, hotel room, or event seat can only be sold once. You need atomic holds, timeouts, and a clear state machine for reservations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resource Model"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Resources",
+        "items": [
+          "Venues — hotels, theaters, or event locations",
+          "Resources — rooms, seats, or tables within a venue",
+          "Availability — date/time slots when a resource is bookable",
+          "Bookings — reservations with status and expiry"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Booking States"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A booking transitions through states to prevent abuse and allow cleanup of abandoned reservations."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "HELD — temporary reservation (TTL: 10 minutes)",
+          "CONFIRMED — payment received, booking finalized",
+          "CANCELLED — user or system cancelled",
+          "EXPIRED — hold timed out without payment"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Create a Hold"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "POST /holds — Reserve a resource without payment",
+        "content": "A hold is an atomic reservation with a TTL. If the client does not confirm within the TTL, the hold expires and the resource becomes available again.",
+        "code": "POST /holds\n{\n  \"resourceId\": \"seat_A_12\",\n  \"eventId\": \"evt_881\",\n  \"customerId\": \"user_123\",\n  \"ttlSeconds\": 600,\n  \"idempotencyKey\": \"hold_991_uuid\"\n}\n\nResponse: 201 Created\n{\n  \"id\": \"hold_991\",\n  \"status\": \"HELD\",\n  \"expiresAt\": \"2026-10-06T15:12:31Z\",\n  \"resource\": {\n    \"id\": \"seat_A_12\",\n    \"label\": \"Section A, Row 12, Seat 1\"\n  },\n  \"_links\": {\n    \"confirm\": { \"href\": \"/holds/hold_991/confirm\" },\n    \"cancel\": { \"href\": \"/holds/hold_991/cancel\" }\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Concurrency Control"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Two clients must never receive confirmation for the same resource. Use atomic operations in your data store. Redis Lua scripts or SQL advisory locks are common patterns."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Strategy", "Mechanism", "Pros", "Cons", "Use Case"],
+        "rows": [
+          ["Redis Lua script", "Atomic check-and-set", "Sub-millisecond, highly concurrent", "Ephemeral; needs DB backup", "High-volume events"],
+          ["SQL advisory lock", "pg_advisory_xact_lock", "Durable, transactional", "Slower, ties up DB connection", "Low-volume bookings"],
+          ["Pessimistic row lock", "SELECT FOR UPDATE", "Zero double-booking risk", "Connection exhaustion under load", "Flash sales with low concurrency"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Confirm a Hold"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "POST /holds/{id}/confirm",
+        "content": "Confirming a hold requires a payment token. The server validates the hold is still valid, processes payment, and converts the hold to a confirmed booking.",
+        "code": "POST /holds/hold_991/confirm\n{\n  \"paymentToken\": \"pmtok_visa_4410\",\n  \"idempotencyKey\": \"booking_991_uuid\"\n}\n\nResponse: 201 Created\n{\n  \"id\": \"booking_991\",\n  \"status\": \"CONFIRMED\",\n  \"resourceId\": \"seat_A_12\",\n  \"eventId\": \"evt_881\",\n  \"total\": 15000,\n  \"currency\": \"USD\",\n  \"ticket\": {\n    \"qrCode\": \"data:image/png;base64,iVBOR...\",\n    \"barcode\": \"991882\"\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Hold expiry enforcement",
+        "text": "Use a background job or Redis key expiry event to release expired holds automatically. Do not rely on clients to cancel. If a hold expires, return 404 on subsequent confirm attempts."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Can a user hold multiple seats at once?",
+            "answer": "Yes, but enforce a per-user hold limit (e.g., max 6 seats) to prevent scalping. Use a transaction to validate and hold all seats atomically."
+          },
+          {
+            "question": "What happens if payment succeeds but the hold expired?",
+            "answer": "Payment should be processed inside the same atomic transaction as hold confirmation. If the hold is invalid, refund immediately and return 409 Conflict."
+          },
+          {
+            "question": "Should I expose internal resource IDs to clients?",
+            "answer": "Use opaque, non-guessable IDs for holds and bookings. Sequential IDs enable scraping and scalping. UUIDs or ULIDs are preferred."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Booking is a state machine: HELD -> CONFIRMED -> CANCELLED/EXPIRED.",
+          "Atomic holds prevent double-booking under concurrent requests.",
+          "Background expiry cleanup keeps inventory accurate without client cooperation.",
+          "Idempotency keys make payment retries safe."
+        ],
+        "takeaway": "The core problem in booking APIs is concurrency. Solve it with atomic holds, enforce expiry server-side, and make payment a single atomic transition."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "e-commerce-api",
+    "file-upload-api"
+  ],
+  "furtherReading": [
+    {
+      "title": "Designing a Hotel Booking API",
+      "url": "https://stripe.com/blog/idempotency",
+      "type": "article",
+      "author": "Stripe",
+      "description": "How Stripe handles idempotency and concurrency in payment-linked reservations."
+    }
+  ]
+}

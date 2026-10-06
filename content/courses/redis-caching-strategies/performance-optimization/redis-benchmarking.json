@@ -1,0 +1,153 @@
+{
+  "id": "lesson-redis-046",
+  "slug": "redis-benchmarking",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Benchmarking Redis Performance",
+  "description": "Measure Redis throughput and latency accurately using redis-benchmark and custom load-testing strategies.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "benchmarking", "latency", "throughput", "performance-testing"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Benchmarking Redis tells you how fast your instance can handle requests before it becomes a bottleneck. The built-in redis-benchmark tool is the standard starting point, but accurate benchmarking requires controlling variables like pipeline depth, command complexity, and network conditions. Without discipline, benchmarks can mislead you into under-provisioning or over-provisioning your Redis infrastructure."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Using redis-benchmark"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The redis-benchmark tool ships with Redis and simulates N clients sending M requests each. It reports throughput in operations per second and latency in milliseconds. For realistic results, run it from the same network as your application, use pipelining to match your production pattern, and test with your actual key sizes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Basic redis-benchmark commands",
+        "language": "bash",
+        "code": "# Run with 50 parallel clients, 100k requests each\nredis-benchmark -h localhost -p 6379 \\\n  -c 50 -n 100000 \\\n  -t SET,GET \\\n  --csv\n\n# Pipelined benchmark with depth 10\nredis-benchmark -h localhost -p 6379 \\\n  -c 50 -n 100000 \\\n  -P 10 \\\n  -t SET,GET\n\n# With 1KB values to test realistic payloads\necho 'rand:10:1024' | \\\n  redis-benchmark -h localhost -p 6379 \\\n  -c 50 -n 50000 -P 5 \\\n  -t SET,GET"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Custom Benchmarking in C#"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For application-specific workloads, write a small benchmark harness that mimics your production access pattern. Measure both throughput and latency percentiles — average latency hides tail latency that can affect user experience."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Redis latency percentile benchmark (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\nusing System.Diagnostics;\n\nvar mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\nvar db = mux.GetDatabase();\n\nint iterations = 100_000;\nvar latencies = new List<double>();\n\nfor (int i = 0; i < iterations; i++)\n{\n    var sw = Stopwatch.StartNew();\n    string key = \"bench:\" + i;\n    string value = \"val:\" + i;\n    await db.StringGetSetAsync(key, value);\n    sw.Stop();\n    latencies.Add(sw.Elapsed.TotalMilliseconds);\n}\n\nlatencies.Sort();\ndouble p50 = latencies[(int)(iterations * 0.5)];\ndouble p99 = latencies[(int)(iterations * 0.99)];\ndouble p999 = latencies[(int)(iterations * 0.999)];\n\nConsole.WriteLine(\"P50: \" + p50.ToString(\"F3\") + \" ms\");\nConsole.WriteLine(\"P99: \" + p99.ToString(\"F3\") + \" ms\");\nConsole.WriteLine(\"P99.9: \" + p999.ToString(\"F3\") + \" ms\");"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "benchmark-workflow",
+        "caption": "Systematic benchmarking workflow for Redis",
+        "definition": "flowchart LR\n    A[\"Define workload\n(SET/GET ratios\nkey sizes)\"] --> B[\"Run baseline\nwith redis-benchmark\nsingle client\"]\n    B --> C[\"Scale clients\nand pipeline depth\"]\n    C --> D[\"Collect\nP50/P99 latency\nand throughput\"]\n    D --> E{Throughput\nplateaued?}\n    E -->|No| C\n    E -->|Yes| F[\"Profile with\nMONITOR or\nslowlog get\"]\n    F --> G[\"Identify\nbottleneck\nCPU/memory/network\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Measure"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Throughput in operations per second (ops/sec)",
+          "Latency percentiles: P50, P99, P99.9",
+          "Redis CPU usage during the test",
+          "Memory usage and eviction count",
+          "Client-side connection errors and timeouts"
+        ],
+        "title": "Essential benchmark metrics"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Warm-Up Effect",
+        "text": "Redis performance improves after the first few thousand requests as the kernel buffer cache fills. Always discard the first 5-10 seconds of a benchmark to measure steady-state performance, not cold-start behavior."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Benchmarking Mistakes"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "Running from a different machine than your application, ignoring network latency",
+          "Using a single client, which does not reflect concurrency",
+          "Testing with tiny keys when your production keys are large",
+          "Trusting average latency without looking at P99",
+          "Benchmarking an idle instance when your production Redis has background saves"
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Throughput", "definition": "The number of operations completed per second. Higher is better, but only if latency remains acceptable." },
+          { "term": "Tail latency", "definition": "The slowest requests, typically measured at P99 or higher. Tail latency often determines user experience more than average." },
+          { "term": "Pipeline depth", "definition": "The number of commands sent in a single network flush. Deeper pipelines increase throughput but also increase response size." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Use redis-benchmark for quick baseline checks",
+          "Write custom benchmarks to match your real workload",
+          "Measure P50, P99, and P99.9, not just average",
+          "Warm up the instance before collecting metrics",
+          "Profile with MONITOR or slowlog after throughput plateaus"
+        ],
+        "takeaway": "Benchmarking is not a one-time task. Re-run benchmarks after every infrastructure change, client upgrade, or data-size increase to catch regressions before they hit production."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Benchmarking Guide", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/benchmarks/", "type": "article" },
+        { "title": "Redis Latency Monitoring", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/latency-monitoring/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Benchmarking Guide", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/benchmarks/", "type": "article" },
+    { "title": "Redis Latency Monitoring", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/latency-monitoring/", "type": "article" }
+  ]
+}

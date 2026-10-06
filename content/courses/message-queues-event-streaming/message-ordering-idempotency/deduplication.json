@@ -1,0 +1,203 @@
+{
+  "id": "lesson-mqes-016",
+  "slug": "deduplication",
+  "moduleSlug": "message-ordering-idempotency",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Message Deduplication",
+  "description": "Learn deduplication strategies to detect and discard duplicate messages in distributed queue systems.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "deduplication",
+    "duplicates",
+    "message-id",
+    "bloom-filter",
+    "idempotency"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Deduplication is the practice of identifying when the same message has been received more than once and safely ignoring subsequent copies. It sits at the intersection of idempotency and message ordering: without deduplication, an idempotent consumer is a safeguard, but deduplication at the broker or consumer level can reduce waste and simplify downstream logic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Where to Deduplicate"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Deduplication layers",
+        "items": [
+          "Broker-level: the broker discards duplicates before delivery",
+          "Consumer-level: the consumer checks each message before processing",
+          "Application-level: business logic absorbs duplicates gracefully"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Broker-Level Deduplication"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Amazon SQS FIFO queues support content-based deduplication natively. When enabled, SQS computes a SHA-256 hash of the message body and stores it for five minutes. If another message with the same body arrives within that window, SQS silently drops it. For custom deduplication, supply a MessageDeduplicationId yourself."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — SQS FIFO with content-based deduplication",
+        "content": "Enable content-based deduplication on the queue and send messages without manually computing IDs.",
+        "language": "csharp",
+        "code": "using Amazon.SQS;\nusing Amazon.SQS.Model;\n\npublic class SqsFifoDedup\n{\n    private readonly IAmazonSQS _sqs;\n    private readonly string _queueUrl;\n\n    public SqsFifoDedup(IAmazonSQS sqs, string queueUrl)\n    {\n        _sqs = sqs;\n        _queueUrl = queueUrl;\n    }\n\n    public async Task SendAsync(string groupId, string body)\n    {\n        // Content-based dedup enabled on queue; no deduplicationId needed\n        await _sqs.SendMessageAsync(new SendMessageRequest\n        {\n            QueueUrl = _queueUrl,\n            MessageBody = body,\n            MessageGroupId = groupId\n        });\n    }\n}\n\n// Queue setup via AWS CLI:\n// aws sqs create-queue \\\n//   --queue-name orders.fifo \\\n//   --attributes FifoQueue=true,ContentBasedDeduplication=true"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Consumer-Level Deduplication"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When the broker does not support deduplication, the consumer must handle it. A common pattern is to maintain a set of recently seen message IDs in Redis or the database. The Bloom filter is a memory-efficient alternative when you can tolerate a small false-positive rate."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Bloom filter for message deduplication",
+        "content": "Use the 'bloom-filters' package to check for duplicates with minimal memory.",
+        "language": "javascript",
+        "code": "const { BloomFilter } = require('bloom-filters');\nconst redis = require('ioredis');\n\n// In-memory Bloom filter with ~1% false positive rate\nconst filter = new BloomFilter(100000, 0.01);\nconst redisKey = 'msg:dedup:seen';\n\nasync function isDuplicate(messageId) {\n  if (filter.has(messageId)) {\n    // Double-check Redis to avoid false-positive discards\n    const exists = await redis.sismember(redisKey, messageId);\n    return exists;\n  }\n\n  const added = await redis.sadd(redisKey, messageId);\n  if (added) {\n    await redis.expire(redisKey, 3600);\n    filter.add(messageId);\n    return false;\n  }\n\n  return true;\n}\n\n// Usage in consumer\nif (await isDuplicate(msg.messageId)) {\n  await channel.ack(msg);\n  return; // skip duplicate\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deduplication Data Structures"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Structure",
+          "Lookup",
+          "Storage",
+          "False Positives",
+          "Best For"
+        ],
+        "rows": [
+          [
+            "Hash Set (Redis)",
+            "O(1)",
+            "High",
+            "None",
+            "Exact deduplication with persistence"
+          ],
+          [
+            "Bloom Filter",
+            "O(1)",
+            "Very Low",
+            "Configurable",
+            "High throughput, approximate check"
+          ],
+          [
+            "Cuckoo Filter",
+            "O(1)",
+            "Low",
+            "Configurable",
+            "Space-efficient with deletions"
+          ],
+          [
+            "Sorted Set (TTL)",
+            "O(log N)",
+            "Medium",
+            "None",
+            "Time-windowed deduplication"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-dedup-flow",
+        "caption": "Consumer deduplication flow with Redis-backed message ID tracking",
+        "definition": "flowchart TD\n    M[Message Arrives] --> E{ID Exists in Redis?}\n    E -->|Yes| D[Discard / Ack]\n    E -->|No| P[Process Message]\n    P --> S[Add ID to Redis Set]\n    S --> W[Set TTL to 1 hour]\n    W --> A[Ack Message]\n    style D fill:#ffebee\n    style A fill:#e8f5e9"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Deduplication Window Limits",
+        "text": "SQS FIFO deduplication only covers a five-minute window. Outside that window, identical messages are treated as distinct. Design your producers to keep deduplication IDs stable and collisions low."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can I rely on content-based deduplication alone?",
+            "answer": "Only if messages are truly identical. If timestamps or trace IDs differ, content-based deduplication will not catch them. Use explicit MessageDeduplicationId when possible."
+          },
+          {
+            "question": "Should I deduplicate at the broker or consumer?",
+            "answer": "Broker-level deduplication reduces network traffic and consumer load. Consumer-level is more flexible and works with any broker. Many production systems use both."
+          },
+          {
+            "question": "What happens if the Bloom filter has a false positive?",
+            "answer": "A legitimate message is discarded. Mitigate this by following the Bloom check with a Redis set lookup, which is exact."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "SQS FIFO supports native content-based deduplication with a 5-minute window",
+          "Redis sets provide exact deduplication with TTL-based expiry",
+          "Bloom filters reduce memory usage at the cost of false positives",
+          "Combine layers: broker dedup + consumer dedup + idempotent writes"
+        ],
+        "takeaway": "Deduplication is cheaper than processing duplicates. Choose the right data structure for your scale and accuracy requirements."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "AWS: SQS FIFO Content-Based Deduplication",
+      "url": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html#FIFO-queues-deduplication",
+      "type": "article",
+      "author": "AWS Documentation",
+      "description": "How SQS computes and uses content-based deduplication IDs."
+    },
+    {
+      "title": "Redis: SET Command with TTL",
+      "url": "https://redis.io/docs/latest/commands/sadd/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Using Redis sets and key expiry for message deduplication."
+    }
+  ]
+}

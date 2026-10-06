@@ -1,0 +1,164 @@
+{
+  "id": "lesson-api-design-problems-rest-api-design-scenarios-social-media-api",
+  "slug": "social-media-api",
+  "moduleSlug": "rest-api-design-scenarios",
+  "courseSlug": "api-design-problems",
+  "title": "Social Media API Design",
+  "description": "Design a social media API for posts, comments, follows, and feeds with efficient pagination and relationship modeling.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["social-media", "feeds", "pagination", "relationships"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Social media APIs have unique challenges: high-volume writes, complex relationships (follows, likes, blocks), and feeds that must scale to millions of users. You need a resource model that supports both public and private interactions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Resource Relationships"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Core resources",
+        "items": [
+          "Users — profiles with visibility settings",
+          "Posts — text, image, or video content authored by a user",
+          "Comments — threaded replies to posts",
+          "Follows — directed edge from follower to followee",
+          "Likes — reactions on posts or comments",
+          "Feeds — personalized timelines derived from follows"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Pagination Strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Feeds can contain millions of items. Offset pagination breaks when new posts arrive during pagination. Use cursor-based pagination with a stable, monotonic sort key (created_at or Snowflake ID)."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Strategy", "Pros", "Cons", "Best For"],
+        "rows": [
+          ["Offset pagination", "Simple, supports arbitrary page numbers", "Breaks on concurrent inserts, slow on large offsets", "Admin dashboards, small lists"],
+          ["Cursor pagination", "Stable under concurrent inserts, fast deep pagination", "No random access, requires sort key", "Feeds, activity streams, timelines"],
+          ["Keyset pagination", "Fastest for sorted data, stable", "Requires unique sort column", "Sorted leaderboards, event logs"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Cursor-based Feed"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "GET /users/{id}/feed?limit=20&cursor=eyJpZCI6MTIzNX0",
+        "content": "Cursor pagination uses opaque base64-encoded cursors containing the last item's sort key.",
+        "code": "GET /users/me/feed?limit=20&cursor=eyJpZCI6MTIzNX0\n\nResponse: 200 OK\n{\n  \"data\": [\n    {\n      \"id\": \"post_881\",\n      \"authorId\": \"user_123\",\n      \"content\": \"Just shipped a new API design course!\",\n      \"mediaType\": \"text\",\n      \"likeCount\": 42,\n      \"commentCount\": 7,\n      \"createdAt\": \"2026-10-06T14:22:31Z\"\n    }\n  ],\n  \"pagination\": {\n    \"nextCursor\": \"eyJpZCI6ODgxIn0\",\n    \"hasMore\": true\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow Graph Design"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The follow relationship is a directed edge. Store it in a graph-optimized store or a relational junction table. Index both (follower_id, followee_id) and (followee_id, follower_id) for bidirectional lookups."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Feed fan-out patterns",
+        "text": "Use push fan-out (write to all followers' timelines at post creation) for regular users with <10K followers. Use pull fan-out (query follows on read) for celebrities with millions of followers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Create Post"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "POST /posts",
+        "content": "Creating a post triggers async fan-out to followers' timelines.",
+        "code": "POST /posts\n{\n  \"content\": \"Building distributed systems is fun!\",\n  \"visibility\": \"public\",\n  \"media\": [\n    {\n      \"type\": \"image\",\n      \"url\": \"https://cdn.example.com/uploads/img_991.jpg\",\n      \"width\": 1920,\n      \"height\": 1080\n    }\n  ]\n}\n\nResponse: 201 Created\n{\n  \"id\": \"post_991\",\n  \"authorId\": \"user_123\",\n  \"content\": \"Building distributed systems is fun!\",\n  \"visibility\": \"public\",\n  \"createdAt\": \"2026-10-06T14:22:31Z\",\n  \"_links\": {\n    \"self\": { \"href\": \"/posts/post_991\" },\n    \"comments\": { \"href\": \"/posts/post_991/comments\" }\n  }\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "How do I handle blocked users in feeds?",
+            "answer": "Maintain a block list per user. Before inserting a post into a user's feed, check if the post author is blocked. Push fan-out should skip blocked relationships."
+          },
+          {
+            "question": "Should I use GraphQL instead of REST for feeds?",
+            "answer": "GraphQL works well for mobile clients that need variable field selection. REST with cursor pagination is simpler to operate and cache at the edge. Many social platforms offer both."
+          },
+          {
+            "question": "How do I prevent duplicate posts in a feed?",
+            "answer": "Use the post ID as a unique key in the timeline cache. Before inserting, check if the ID already exists. Idempotent writes prevent duplicate fan-out on retries."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Cursor pagination is essential for stable feeds under concurrent writes.",
+          "Use push fan-out for normal users and pull for celebrities.",
+          "Treat relationships as first-class resources with their own endpoints.",
+          "Visibility and block lists must be enforced at write time, not read time."
+        ],
+        "takeaway": "Social APIs are write-heavy and relationship-driven. Design for fan-out scale from the start, or you will rebuild your feed infrastructure twice."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "e-commerce-api",
+    "search-api"
+  ],
+  "furtherReading": [
+    {
+      "title": "Designing Feeds with Fan-out",
+      "url": "https://ably.com/blog/feed-design-push-pull-hybrid",
+      "type": "article",
+      "author": "Ably",
+      "description": "Push, pull, and hybrid feed fan-out strategies compared."
+    }
+  ]
+}

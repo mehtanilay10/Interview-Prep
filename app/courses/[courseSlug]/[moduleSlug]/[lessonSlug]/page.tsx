@@ -27,6 +27,7 @@ import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
+import { CourseErrorBoundary } from '@/components/course/CourseErrorBoundary';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -85,7 +86,8 @@ export default async function CourseLessonDetailPage({ params }: Params) {
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
 
   return (
-    <NotesModalProvider courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug}>
+    <CourseErrorBoundary>
+      <NotesModalProvider courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug}>
       <div className="flex min-h-screen">
         {/* Desktop sidebar */}
         <aside
@@ -227,5 +229,6 @@ export default async function CourseLessonDetailPage({ params }: Params) {
       </div>
     </div>
     </NotesModalProvider>
+    </CourseErrorBoundary>
   );
 }

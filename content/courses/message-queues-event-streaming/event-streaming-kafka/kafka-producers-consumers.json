@@ -1,0 +1,140 @@
+{
+  "id": "lesson-mqes-024",
+  "slug": "kafka-producers-consumers",
+  "moduleSlug": "event-streaming-kafka",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Kafka Producers and Consumers",
+  "description": "Learn how to produce and consume messages in Kafka using C# and Node.js clients.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "kafka",
+    "producers",
+    "consumers",
+    "confluent",
+    "kafkajs"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka producers publish messages to topics, while consumers read them back. Mastering the producer and consumer APIs is the first step to building reliable event-driven systems. Both clients offer rich configuration for batching, compression, acknowledgment semantics, and offset management."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Producers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A Kafka producer sends records to a topic. Each record has a key, value, timestamp, and optional headers. Producers are thread-safe and can be reused across your application. They batch records for efficiency and compress payloads before sending them to the broker."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Producer in C# (Confluent.Kafka)",
+        "content": "Producing messages to a Kafka topic using the Confluent.Kafka library.",
+        "language": "csharp",
+        "code": "using Confluent.Kafka;\n\nvar config = new ProducerConfig\n{\n    BootstrapServers = \"localhost:9092\",\n    Acks = Acks.Leader, // Wait for leader acknowledgment\n    CompressionType = CompressionType.Snappy\n};\n\nusing var producer = new ProducerBuilder<Null, string>(config).Build();\n\ntry\n{\n    var message = new Message<Null, string>\n    {\n        Value = \"User signed up: user-123\",\n        Timestamp = new Timestamp(DateTime.UtcNow)\n    };\n\n    var result = await producer.ProduceAsync(\"user-events\", message);\n    Console.WriteLine($\"Delivered to {result.TopicPartitionOffset}\");\n}\ncatch (ProduceException<Null, string> ex)\n{\n    Console.WriteLine($\"Delivery failed: {ex.Error.Reason}\");\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Producer in Node.js (kafkajs)",
+        "content": "Producing messages to a Kafka topic using the KafkaJS library.",
+        "language": "javascript",
+        "code": "const { Kafka } = require('kafkajs');\n\nconst kafka = new Kafka({\n  clientId: 'order-service',\n  brokers: ['localhost:9092']\n});\n\nconst producer = kafka.producer();\n\nasync function sendOrder() {\n  await producer.connect();\n\n  await producer.send({\n    topic: 'orders',\n    messages: [\n      {\n        key: 'order-456',\n        value: JSON.stringify({ orderId: 456, total: 99.50 }),\n        timestamp: Date.now().toString()\n      }\n    ]\n  });\n\n  console.log('Order message sent');\n  await producer.disconnect();\n}\n\nsendOrder().catch(console.error);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Consumers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Consumers pull messages from topics by subscribing to one or more topics. Each consumer in a group reads from a distinct set of partitions. Consumers track their position using offsets, which can be committed automatically or manually."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Consumer in C# (Confluent.Kafka)",
+        "content": "Consuming messages from a Kafka topic using the Confluent.Kafka library.",
+        "language": "csharp",
+        "code": "using Confluent.Kafka;\n\nvar config = new ConsumerConfig\n{\n    BootstrapServers = \"localhost:9092\",\n    GroupId = \"order-processors\",\n    AutoOffsetReset = AutoOffsetReset.Earliest\n};\n\nusing var consumer = new ConsumerBuilder<Ignore, string>(config).Build();\nconsumer.Subscribe(\"orders\");\n\nvar cts = new CancellationTokenSource();\nConsole.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };\n\ntry\n{\n    while (!cts.IsCancellationRequested)\n    {\n        var result = consumer.Consume(cts.Token);\n        Console.WriteLine($\"Received: {result.Message.Value} from offset {result.Offset}\");\n        consumer.Commit(result); // Manual commit\n    }\n}\nfinally\n{\n    consumer.Close();\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Consumer in Node.js (kafkajs)",
+        "content": "Consuming messages from a Kafka topic using the KafkaJS library.",
+        "language": "javascript",
+        "code": "const { Kafka } = require('kafkajs');\n\nconst kafka = new Kafka({\n  clientId: 'analytics-service',\n  brokers: ['localhost:9092']\n});\n\nconst consumer = kafka.consumer({ groupId: 'analytics-readers' });\n\nasync function runConsumer() {\n  await consumer.connect();\n\n  await consumer.subscribe({ topic: 'user-events', fromBeginning: true });\n\n  await consumer.run({\n    eachMessage: async ({ topic, partition, message }) => {\n      console.log(`Received: ${message.value} from partition ${partition}`);\n    }\n  });\n}\n\nrunConsumer().catch(console.error);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep Consumers Running",
+        "text": "Consumer instances should run continuously in production. Use process managers or container orchestrators like Kubernetes to restart crashed consumers automatically."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Should I use auto-commit or manual commit?",
+            "answer": "Manual commit gives you full control and prevents data loss during processing failures. Auto-commit is simpler but can skip messages if a consumer crashes between commits."
+          },
+          {
+            "question": "Can I have multiple consumers in the same process?",
+            "answer": "Yes. Both Confluent.Kafka and kafkajs allow multiple consumer instances in one process. Just be aware of thread-safety and offset-commit coordination."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Producers publish records to topics with keys, values, and timestamps.",
+          "Consumers subscribe to topics and track progress with offsets.",
+          "Confluent.Kafka is the standard .NET client; kafkajs is popular for Node.js.",
+          "Manual offset commits provide the strongest delivery guarantees."
+        ],
+        "takeaway": "Mastering producers and consumers is the foundation of every Kafka integration."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Confluent Kafka Clients",
+      "url": "https://docs.confluent.io/platform/current/clients/index.html",
+      "type": "article",
+      "description": "Official documentation for Kafka client libraries including .NET and Node.js."
+    },
+    {
+      "title": "KafkaJS Documentation",
+      "url": "https://kafka.js.org/",
+      "type": "article",
+      "description": "Documentation and examples for the KafkaJS Node.js client."
+    }
+  ]
+}

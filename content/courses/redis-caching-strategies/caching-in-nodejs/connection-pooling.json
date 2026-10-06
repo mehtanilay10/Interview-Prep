@@ -1,0 +1,187 @@
+{
+  "id": "lesson-redis-040",
+  "slug": "connection-pooling",
+  "moduleSlug": "caching-in-nodejs",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Connection Pooling Strategies",
+  "description": "Pool and manage Redis connections efficiently across threads, workers, and serverless functions.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "connection-pooling",
+    "redis",
+    "performance",
+    "nodejs",
+    "scaling"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each Redis client instance opens a single TCP socket. In a high-throughput service, that one connection becomes a bottleneck: Redis processes commands sequentially, so concurrent requests queue behind it. Connection pooling gives your application multiple sockets, enabling true parallel command execution and dramatically improving throughput."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Redis Single-Threaded Model",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis processes commands on a single thread per instance, but it achieves concurrency by multiplexing across many client connections. Each active connection contributes one command at a time. A single client can therefore issue multiple pipelined commands, but only one is in flight per socket. More connections mean more concurrent work."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-redis-single-threaded",
+        "definition": "flowchart LR\n    subgraph Node.js Process\n        A[Client 1] --> B[Pool]\n        C[Client 2] --> B\n        D[Client 3] --> B\n    end\n    B -->|Socket 1| E[Redis Event Loop]\n    B -->|Socket 2| E\n    B -->|Socket 3| E\n    E --> F[(Redis Data Store)]",
+        "caption": "Multiple Node.js clients sharing a pool of Redis sockets"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Pooling with ioredis",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ioredis does not include a built-in connection pool, but you can create one using `generic-pool`, a minimal Node.js pool implementation. Each pool entry holds a pre-connected Redis client. When your code needs Redis, it borrows a client, uses it, then returns it to the pool."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Building a Redis connection pool",
+        "content": "Use generic-pool to manage Redis client instances.",
+        "language": "typescript",
+        "code": "import Redis from 'ioredis';\nimport { createPool } from 'generic-pool';\n\nconst MIN_CONNECTIONS = 2;\nconst MAX_CONNECTIONS = 10;\n\nconst pool = createPool(\n  {\n    create: async (): Promise<Redis> => {\n      const client = new Redis({\n        host: process.env.REDIS_HOST,\n        port: parseInt(process.env.REDIS_PORT ?? '6379'),\n        password: process.env.REDIS_PASSWORD,\n        lazyConnect: true,\n      });\n      await client.connect();\n      return client;\n    },\n    destroy: async (client: Redis) => {\n      await client.quit();\n    },\n  },\n  {\n    min: MIN_CONNECTIONS,\n    max: MAX_CONNECTIONS,\n    autostart: true,\n  }\n);\n\nexport async function withRedis<T>(\n  fn: (client: Redis) => Promise<T>\n): Promise<T> {\n  const client = await pool.acquire();\n  try {\n    return await fn(client);\n  } finally {\n    pool.release(client);\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Sizing the Pool",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Pool size directly affects Redis memory and CPU usage. Each connection consumes about 40 KB of memory on the Redis server. The practical formula is: max connections equals the number of Node.js application instances multiplied by the number of concurrent request handlers per instance, capped at your Redis instance's `maxclients` limit (default 10,000 on most managed providers)."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Scenario",
+          "Pool Size",
+          "Notes"
+        ],
+        "rows": [
+          ["Single process, 4 CPU cores", "4-8", "Match to concurrent async handlers"],
+          ["10 app servers", "5-10 per server", "Total 50-100 connections to Redis"],
+          ["Serverless (Lambda)", "2-3 per function", "Warm containers share pools across invocations"],
+          ["Redis Cluster (6 nodes)", "10-20 per shard", "ioredis distributes across slots automatically"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Avoid Over-Provisioning",
+        "text": "Setting max connections to 100 when your workload only needs 10 wastes Redis memory and increases the chance of hitting maxclients during failover. Start small and measure."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "text": "Serverless and Lambda",
+        "level": "h2"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In serverless environments, connection reuse across warm invocations is the key to low latency. A pool initialized at module scope persists for the lifetime of the warm container. Set min to 1-2 so the pool stays warm between invocations, and max to 3-5 to avoid opening too many connections during sudden traffic spikes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Serverless-ready pool initialization",
+        "content": "Initialize the pool once at module scope for Lambda reuse.",
+        "language": "typescript",
+        "code": "// redis-pool.ts — initialized once per warm Lambda container\nimport { createPool } from 'generic-pool';\nimport Redis from 'ioredis';\n\nexport const redisPool = createPool(\n  {\n    create: async () => {\n      const client = new Redis({\n        host: process.env.REDIS_HOST,\n        port: parseInt(process.env.REDIS_PORT ?? '6379'),\n        password: process.env.REDIS_PASSWORD,\n        lazyConnect: true,\n      });\n      await client.connect();\n      return client;\n    },\n    destroy: async (client) => client.quit(),\n  },\n  {\n    min: 1,\n    max: 3,\n    idleTimeoutMillis: 30000,\n  }\n);"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Connection Pool",
+            "definition": "A collection of pre-initialized connections that can be borrowed and returned, avoiding the overhead of creating a new socket per operation."
+          },
+          {
+            "term": "maxclients",
+            "definition": "The Redis configuration limit on simultaneous client connections, defaulting to 10,000 on most managed providers."
+          },
+          {
+            "term": "Failover",
+            "definition": "The process of promoting a replica to primary when the primary node becomes unavailable."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Should I use connection pooling for every Redis client?",
+            "answer": "Use pooling when your application handles concurrent requests or runs multiple instances. For simple scripts or CLI tools, a single client is fine."
+          },
+          {
+            "question": "What happens if the pool is exhausted?",
+            "answer": "generic-pool returns a promise that resolves when another client is released. Use a timeout to avoid hanging indefinitely."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Each Redis client uses one TCP socket; pooling enables parallel commands.",
+          "Size pools based on actual concurrent request volume, not maximum possible load.",
+          "In serverless, initialize the pool once at module scope for warm-container reuse.",
+          "Monitor Redis maxclients and scale your pool before reaching the limit."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "generic-pool Documentation",
+      "url": "https://github.com/coopernurse/node-pool",
+      "type": "tool"
+    },
+    {
+      "title": "Redis Memory Optimization",
+      "url": "https://redis.io/docs/latest/operate/oss-and-native/management/memory-optimization/",
+      "type": "article"
+    }
+  ]
+}

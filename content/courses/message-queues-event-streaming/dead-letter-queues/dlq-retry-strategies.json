@@ -1,0 +1,104 @@
+{
+  "id": "lesson-mqes-019",
+  "slug": "dlq-retry-strategies",
+  "moduleSlug": "dead-letter-queues",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "DLQ Retry Strategies and Backoff",
+  "description": "Learn retry patterns including exponential backoff, fixed delay, and circuit breakers to handle transient failures without overwhelming downstream services.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["dlq", "retry", "backoff", "resilience", "circuit-breaker", "message-queue"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "Not every failure is permanent. Network blips, temporary outages, and rate limits often clear up on their own. Retry strategies let your system attempt processing again without human intervention, while backoff schedules prevent retries from hammering a struggling service." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "Common Retry Patterns" }
+    },
+    {
+      "type": "bullet-list",
+      "id": "b1",
+      "data": {
+        "title": "Retry Strategies",
+        "items": [
+          "Immediate retry: try again right away; useful for rare, transient glitches but risks tight retry loops",
+          "Fixed delay retry: wait a constant interval between attempts; simple and predictable",
+          "Exponential backoff: double the wait time after each failure (1s, 2s, 4s, 8s); reduces load on recovering services",
+          "Exponential backoff with jitter: add randomness to avoid thundering herd when many clients retry simultaneously",
+          "Circuit breaker: stop sending requests after repeated failures and open the circuit for a cooldown period"
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "Exponential backoff with jitter is the most robust default. Jitter prevents synchronized retries that can create sudden traffic spikes. A typical pattern uses a base delay of 1 second, caps the delay at 60 seconds, and adds up to 1 second of randomness." }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 3, "text": "Implementing Exponential Backoff in C#" }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Exponential Backoff Retry Policy (C#)",
+        "content": "The Polly library provides a fluent API for retry policies. This example retries on transient exceptions with exponential backoff and jitter.",
+        "code": "using Polly;\nusing System.Net.Http;\n\nvar jitterer = new Random();\n\nvar retryPolicy = Policy\n    .Handle<HttpRequestException>()\n    .OrResult<HttpResponseMessage>(r => (int)r.StatusCode == 503)\n    .WaitAndRetryAsync(\n        retryCount: 5,\n        sleepDurationProvider: attempt =>\n        {\n            var exponentialDelay = TimeSpan.FromSeconds(Math.Pow(2, attempt));\n            var jitter = TimeSpan.FromMilliseconds(jitterer.Next(0, 1000));\n            return exponentialDelay + jitter;\n        },\n        onRetry: (outcome, timespan, attempt, context) =>\n        {\n            Console.WriteLine($\"Retry {attempt} after {timespan.TotalSeconds:F1}s\");\n            return Task.CompletedTask;\n        }\n    );\n\nvar response = await retryPolicy.ExecuteAsync(() => httpClient.GetAsync(\"https://api.example.com/orders\"));",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "Implementing Exponential Backoff in Node.js" }
+    },
+    {
+      "type": "example",
+      "id": "e2",
+      "data": {
+        "title": "Exponential Backoff Retry Helper (Node.js)",
+        "content": "A simple async retry function with exponential backoff and jitter for Node.js services.",
+        "code": "async function retryWithBackoff(fn, maxRetries = 5) {\n  for (let attempt = 0; attempt < maxRetries; attempt++) {\n    try {\n      return await fn();\n    } catch (error) {\n      if (attempt === maxRetries - 1) throw error;\n      const exponentialDelay = Math.pow(2, attempt) * 1000;\n      const jitter = Math.random() * 1000;\n      const delay = exponentialDelay + jitter;\n      console.log(`Retry ${attempt + 1} after ${delay.toFixed(0)}ms`);\n      await new Promise(resolve => setTimeout(resolve, delay));\n    }\n  }\n}\n\n// Usage\nconst result = await retryWithBackoff(() =>\n  fetch('https://api.example.com/orders').then(r => {\n    if (!r.ok) throw new Error(`HTTP ${r.status}`);\n    return r.json();\n  })\n);",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-019-1",
+        "caption": "Exponential backoff retry flow",
+        "definition": "flowchart TD\n    A[Receive Message] --> B[Attempt Processing]\n    B -->|Success| C[Delete / Ack]\n    B -->|Transient Failure| D{Retry Count < Max?}\n    D -->|Yes| E[Wait: 2^n + jitter]\n    E --> B\n    D -->|No| F[Send to DLQ]\n    F --> G[Stop Processing]\n    style C fill:#c8e6c9,stroke:#333\n    style F fill:#ffccbc,stroke:#333\n    style E fill:#fff9c4,stroke:#333"
+      }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "warning", "title": "Retry Storms", "text": "Without jitter, many failed messages retry at the same time, creating a traffic spike that can worsen the outage. Always add randomness to your delay." }
+    },
+    {
+      "type": "faq-block",
+      "id": "f1",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Should I retry every failure?", "answer": "No. Retry only transient errors like network timeouts or 503 responses. Permanent errors such as 400 Bad Request or validation failures should go straight to the DLQ." },
+          { "question": "What is a good max retry count?", "answer": "Three to five retries is typical. More retries delay detection of persistent problems and increase end-to-end latency." },
+          { "question": "How does jitter prevent retry storms?", "answer": "Jitter spreads retry attempts across a time window instead of bunching them together. This keeps traffic smooth when many messages fail at once." }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Polly Retry Policies", "url": "https://www.pollydocs.org/policies/retry.html", "type": "article", "author": "Polly", "description": "Documentation for the .NET resilience library, covering retry, backoff, and circuit-breaker policies." },
+    { "title": "Exponential Backoff and Jitter", "url": "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/", "type": "article", "author": "AWS", "description": "AWS blog post explaining why jitter matters and how to implement it safely." }
+  ]
+}

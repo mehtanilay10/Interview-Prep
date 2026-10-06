@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export default function Error({
   error,
@@ -15,7 +16,7 @@ export default function Error({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    console.error('Application error:', error);
+    logger.error('error', 'Application error', error);
   }, [error]);
 
   const errorMessage = error?.message || 'Unknown error';

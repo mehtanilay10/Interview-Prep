@@ -1,0 +1,157 @@
+{
+  "id": "lesson-mqes-003",
+  "slug": "azure-service-basics",
+  "moduleSlug": "message-queue-fundamentals",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Azure Service Bus Basics",
+  "description": "Explore Azure Service Bus queues and topics for enterprise messaging in cloud-native .NET applications.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "service-bus", "cloud", "enterprise", "messaging", ".net"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "Azure Service Bus is a fully managed enterprise message broker provided by Microsoft Azure. It supports queues for point-to-point communication and topics with subscriptions for publish-subscribe scenarios. It is widely used in .NET and enterprise applications for reliable, transactional messaging." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "Queues vs Topics" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "A Service Bus queue delivers messages to a single consumer group. A topic expands this model by allowing multiple subscriptions. Each subscription receives a copy of every message published to the topic. Subscriptions can include filters, SQL rules, and actions, making topics a powerful tool for event broadcasting." }
+    },
+    {
+      "type": "table",
+      "id": "t1",
+      "data": {
+        "headers": ["Capability", "Queue", "Topic + Subscription"],
+        "rows": [
+          ["Consumer model", "Single consumer group", "Multiple subscriptions"],
+          ["Use case", "Work item distribution", "Event broadcasting"],
+          ["Message filtering", "No", "Yes (SQL filter rules)"],
+          ["Sessions", "Yes (FIFO within session)", "Yes"],
+          ["Duplicate detection", "Yes", "Yes"],
+          ["Transactions", "Yes (receive + send)", "Yes (send + dead-letter)"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 3, "text": "Sending and Receiving in C# (.NET)" }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Sending a Message with Azure.Messaging.ServiceBus",
+        "content": "The Azure.Messaging.ServiceBus NuGet package is the recommended client for .NET. Below is a simple producer that sends a message to a Service Bus queue.",
+        "code": "using Azure.Messaging.ServiceBus;\n\nvar connectionString = \"<your-service-bus-connection-string>\";\nvar queueName = \"order-processing\";\n\nawait using var client = new ServiceBusClient(connectionString);\nServiceBusSender sender = client.CreateSender(queueName);\n\nServiceBusMessage message = new ServiceBusMessage(JsonSerializer.Serialize(\n    new { OrderId = 101, Product = \"Laptop\", Amount = 1299 }))\n{\n    Subject = \"OrderCreated\",\n    MessageId = Guid.NewGuid().ToString()\n};\n\nawait sender.SendMessageAsync(message);\nConsole.WriteLine(\"Message sent to Service Bus queue\");",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "id": "e2",
+      "data": {
+        "title": "Receiving Messages from a Queue",
+        "content": "The ServiceBusProcessor automatically handles message reception, completion, and error handling with event-driven callbacks.",
+        "code": "using Azure.Messaging.ServiceBus;\n\nvar connectionString = \"<your-service-bus-connection-string>\";\nvar queueName = \"order-processing\";\n\nawait using var client = new ServiceBusClient(connectionString);\nServiceBusProcessor processor = client.CreateProcessor(queueName, new ServiceBusProcessorOptions());\n\nprocessor.ProcessMessageAsync += async args =>\n{\n    string body = args.Message.Body.ToString();\n    Console.WriteLine($\"Received: {body}\");\n\n    await args.CompleteMessageAsync(args.Message);\n};\n\nprocessor.ProcessErrorAsync += args =>\n{\n    Console.WriteLine($\"Error: {args.Exception.Message}\");\n    return Task.CompletedTask;\n};\n\nawait processor.StartProcessingAsync();\nConsole.ReadKey();\nawait processor.StopProcessingAsync();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "tip", "title": "Use Topics for Event Routing", "text": "Topics with subscriptions and filter rules let you route the same event to multiple downstream systems without the publisher knowing about them. Each subscription acts as a virtual queue for a specific consumer group." }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "Sessions for Ordered Processing" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p3",
+      "data": { "text": "Service Bus sessions enable first-in-first-out (FIFO) processing within a session identifier. Messages in the same session are processed by a single consumer at a time, preserving order. This is useful for scenarios like per-user order processing where all messages for a given user must be handled sequentially." }
+    },
+    {
+      "type": "key-terms",
+      "id": "kt1",
+      "data": {
+        "terms": [
+          { "term": "Namespace", "definition": "The top-level container for Service Bus resources (queues, topics, subscriptions). Created with an Azure subscription." },
+          { "term": "Topic", "definition": "A logical channel that supports one-to-many communication via subscriptions." },
+          { "term": "Subscription", "definition": "A virtual queue under a topic that receives copies of all published messages, optionally filtered." },
+          { "term": "Session", "definition": "A grouping identifier that ensures FIFO processing by a single consumer at a time." }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-003-1",
+        "caption": "Azure Service Bus topic with multiple subscriptions",
+        "definition": "flowchart LR\n    P[Publisher] -->|Send| T[Service Bus Topic: orders]\n    T -->|All messages| S1[Subscription: email-service]\n    T -->|All messages| S2[Subscription: analytics]\n    T -->|All messages| S3[Subscription: fulfillment]\n    S1 --> C1[Email Consumer]\n    S2 --> C2[Analytics Consumer]\n    S3 --> C3[Fulfillment Consumer]\n    style T fill:#0078d4,stroke:#333,color:#fff\n    style S1 fill:#4fc3f7,stroke:#333\n    style S2 fill:#4fc3f7,stroke:#333\n    style S3 fill:#4fc3f7,stroke:#333"
+      }
+    },
+    {
+      "type": "callout",
+      "id": "c2",
+      "data": { "variant": "info", "title": "Premium vs Standard Tiers", "text": "Premium tier offers dedicated resources, higher throughput, and geo-disaster recovery. Standard tier is cost-effective for development and low-volume workloads. Choose Premium for production SLAs above 99.9 percent." }
+    },
+    {
+      "type": "faq-block",
+      "id": "f1",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Should I use Service Bus or Storage Queues?", "answer": "Use Service Bus for enterprise scenarios requiring transactions, sessions, duplicate detection, and pub/sub. Use Storage Queues for simple, lightweight point-to-point messaging at massive scale." },
+          { "question": "What is the message size limit?", "answer": "Standard tier limits messages to 256 KB. Premium tier supports up to 100 MB with partitioned entities or 1 GB with express entities." },
+          { "question": "How does Azure guarantee message durability?", "answer": "Service Bus stores messages redundantly across Azure Storage. In Premium tier, messages are stored on SSDs for sub-millisecond latency." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "id": "s1",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Queues deliver messages to a single consumer group",
+          "Topics with subscriptions enable publish-subscribe patterns",
+          "Sessions provide FIFO ordering within a session identifier",
+          "Premium tier offers higher throughput and dedicated resources"
+        ],
+        "takeaway": "Azure Service Bus is a mature enterprise broker; use queues for point-to-point and topics for event broadcasting."
+      }
+    },
+    {
+      "type": "exercise",
+      "id": "ex1",
+      "data": {
+        "title": "Hands-on: Create a Service Bus Queue",
+        "description": "Create an Azure Service Bus Standard namespace, add a queue named 'orders', and send a JSON message from a .NET console application. Verify the message appears in the Azure Portal Service Bus Explorer.",
+        "steps": [
+          "Create a Service Bus Standard namespace in the Azure Portal",
+          "Add a queue named 'orders' with max size 1 GB",
+          "Install the Azure.Messaging.ServiceBus NuGet package",
+          "Write a .NET console app that sends a message and prints the MessageId",
+          "Open Service Bus Explorer in the portal and confirm the message count"
+        ],
+        "expectedOutcome": "You have a working Service Bus queue with a producer that successfully sends and a consumer that receives messages."
+      }
+    }
+  ],
+  "relatedLessons": ["rabbitmq-fundamentals", "sqs-basics", "message-structure"],
+  "furtherReading": [
+    { "title": "Azure Service Bus Documentation", "url": "https://learn.microsoft.com/en-us/azure/service-bus-messaging/", "type": "article", "author": "Microsoft", "description": "Comprehensive docs covering queues, topics, subscriptions, sessions, and .NET SDKs." },
+    { "title": "Azure for ASP.NET Developers", "url": "https://learn.microsoft.com/en-us/training/paths/azure-for-aspnet-developers/", "type": "course", "author": "Microsoft Learn", "description": "Free learning path covering Service Bus, Storage, Key Vault, and other Azure services for .NET developers." }
+  ]
+}

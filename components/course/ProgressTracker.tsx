@@ -121,6 +121,9 @@ export const ProgressTracker = memo(function ProgressTracker({
           )}
         </button>
       </div>
+      <div aria-live="polite" className="sr-only">
+        {done ? 'Lesson marked as complete' : 'Lesson marked as incomplete'}
+      </div>
       {showSignIn && <SignInPrompt onDismiss={() => setShowSignIn(false)} />}
     </div>
   );

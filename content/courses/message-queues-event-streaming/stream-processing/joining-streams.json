@@ -1,0 +1,156 @@
+{
+  "id": "lesson-mqes-033",
+  "slug": "joining-streams",
+  "moduleSlug": "stream-processing",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Joining Streams",
+  "description": "Combine data from multiple streams and tables using stream-stream and stream-table joins.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["joins", "kafka-streams", "ksqldb", "stream-processing", "enrichment"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "**Joins** in stream processing combine records from two or more data sources based on a common key. Unlike database joins that operate over static tables, stream joins must handle unbounded data, out-of-order arrival, and evolving state. Kafka Streams and ksqlDB support three fundamental join types: **stream-stream**, **stream-table**, and **table-table**, each with distinct semantics and state requirements." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "Join Types" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "A **stream-stream join** correlates events from two streams within a defined join window. An **inner** stream-stream join only emits results when matching keys exist in both streams within the window; a **left** join emits the left stream record even when no match is found. A **stream-table join** enriches each incoming stream record with the current value from a table, typically used to add reference data such as user profiles or product metadata." }
+    },
+    {
+      "type": "key-terms",
+      "id": "kt1",
+      "data": {
+        "terms": [
+          { "term": "Stream-Stream Join", "definition": "Joins two streams by key within a time window, emitting results when matching events arrive." },
+          { "term": "Stream-Table Join", "definition": "Joins each stream event with the current value from a table, used for enrichment." },
+          { "term": "Table-Table Join", "definition": "Joins two tables by key, similar to a database join but continuously updated." },
+          { "term": "Join Window", "definition": "The maximum time difference allowed between two events for them to be considered joinable." }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 3, "text": "Stream-Table Join for Enrichment" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p3",
+      "data": { "text": "Stream-table joins are the most common pattern in real-time pipelines. Imagine a stream of **order events** and a table of **customer profiles**. For every incoming order, the processor looks up the customer's tier and region from the table and emits an enriched order record. Because the table is continuously updated from its own changelog topic, enrichment data stays fresh without re-scanning historical orders." }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Stream-Table Join in ksqlDB",
+        "content": "Enrich an orders stream with a customers table to attach customer tier and region to every order event.",
+        "code": "CREATE STREAM orders (\n  order_id VARCHAR,\n  customer_id VARCHAR,\n  amount DOUBLE,\n  order_ts VARCHAR\n) WITH (\n  KAFKA_TOPIC = 'orders',\n  VALUE_FORMAT = 'JSON',\n  TIMESTAMP = 'order_ts'\n);\n\nCREATE TABLE customers (\n  customer_id VARCHAR PRIMARY KEY,\n  tier VARCHAR,\n  region VARCHAR\n) WITH (\n  KAFKA_TOPIC = 'customers',\n  VALUE_FORMAT = 'JSON'\n);\n\nCREATE STREAM enriched_orders AS\n  SELECT o.order_id,\n         o.customer_id,\n         c.tier,\n         c.region,\n         o.amount\n  FROM orders o\n  LEFT JOIN customers c\n    ON o.customer_id = c.customer_id;\n\nSELECT * FROM enriched_orders EMIT CHANGES;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "State Management in Joins" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p4",
+      "data": { "text": "Both stream-stream and stream-table joins require state stores. A stream-stream join maintains a windowed state store for the keys in the left stream and probes it with records from the right stream. A stream-table join keeps the full table in memory or RocksDB, so it is efficient for moderately sized reference data. For very large tables, consider using a **GlobalKTable** in Kafka Streams to replicate the table on every partition, trading memory for latency." }
+    },
+    {
+      "type": "example",
+      "id": "e2",
+      "data": {
+        "title": "Stream-Table Join in Kafka Streams (Java)",
+        "content": "Enrich a KStream of orders with a GlobalKTable of product prices using the Java DSL.",
+        "code": "StreamsBuilder builder = new StreamsBuilder();\n\nKStream<String, Order> orders = builder.stream(\"orders\");\nGlobalKTable<String, Product> products = builder.globalTable(\"products\");\n\norders.join(\n    products,\n    (order, product) -> {\n        order.setPrice(product.getPrice());\n        return order;\n    },\n    Materialized.<String, Order, KeyValueStore<Bytes, byte[]>>as(\"orders-enriched-store\")\n);",
+        "language": "java"
+      }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "info", "title": "Co-partitioning Requirement", "text": "For stream-stream and table-table joins in Kafka Streams, both sides must be co-partitioned: the same key must hash to the same partition on both topics. Use the same number of partitions and a compatible serializer to ensure records with the same key land on the same task instance." }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-033-1",
+        "caption": "Stream-table join enriches orders with customer data",
+        "definition": "flowchart LR\n    Orders[(Orders Stream)] --> Join[Stream-Table Join]\n    Customers[(Customers Table)] --> Join\n    Join --> Enriched[Enriched Orders Stream]\n    Join --> State[(State Store: Customers)]\n    style Join fill:#f9f,stroke:#333,stroke-width:2px\n    style State fill:#bbf,stroke:#333,stroke-width:1px"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "id": "bl1",
+      "data": {
+        "title": "Join Best Practices",
+        "items": [
+          "Use stream-table joins for enrichment with reference data; they are the simplest and most scalable.",
+          "Keep stream-stream join windows as short as possible to limit state growth.",
+          "Define a grace period to tolerate late events without silently dropping them.",
+          "Monitor state store size and RocksDB memory usage for long-running join topologies."
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "id": "f1",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          { "question": "Can I join a stream with a table in C# without Kafka Streams?", "answer": "Not natively. Kafka Streams is a Java library. For .NET, consume the stream and table as separate topics, materialize the table with a local store such as RocksDB or a database, and perform the join in application code." },
+          { "question": "What happens when a late event arrives after the join window has closed?", "answer": "The event is dropped unless you configured a grace period. Late events that fall outside the grace period do not trigger a join result and should be logged for monitoring." },
+          { "question": "Is there a limit on table size for stream-table joins?", "answer": "Kafka Streams stores the table in RocksDB, so it can exceed available RAM. However, very large tables impact latency. For multi-gigabyte reference data, evaluate using an external key-value store or a GlobalKTable with careful sizing." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "id": "s1",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Stream-stream joins correlate events within a time window",
+          "Stream-table joins enrich events with current reference data",
+          "All joins require state stores and careful co-partitioning",
+          "Grace periods and window sizes control state growth and late-data handling"
+        ],
+        "takeaway": "Joins turn isolated streams into rich, correlated datasets, but they require explicit choices about windowing, state, and partitioning."
+      }
+    },
+    {
+      "type": "exercise",
+      "id": "ex1",
+      "data": {
+        "title": "Exercise: Enrich a Stream with a Join",
+        "description": "Build a ksqlDB pipeline that joins an orders stream with a products table and emits enriched order events.",
+        "steps": [
+          "Create a 'products' topic with JSON records containing product_id, name, and category",
+          "Create a TABLE from the products topic with product_id as the primary key",
+          "Create a STREAM from the orders topic with product_id and quantity",
+          "Write a CREATE STREAM AS query that LEFT JOINs orders with the products table",
+          "Produce test orders and verify enriched output includes product name and category"
+        ],
+        "expectedOutcome": "A ksqlDB enriched stream containing order and product fields for every incoming order"
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Kafka Streams Joins", "url": "https://kafka.apache.org/33/documentation/streams/developer-guide/dsl-api.html#joins", "type": "article", "author": "Apache Kafka", "description": "Official guide to stream-stream, stream-table, and table-table join semantics." },
+    { "title": "ksqlDB Joins", "url": "https://docs.ksqldb.io/en/latest/developer-guide/joins/", "type": "article", "author": "Confluent", "description": "ksqlDB documentation on inner, left, and outer joins across streams and tables." }
+  ],
+  "courseSlug": "message-queues-event-streaming"
+}

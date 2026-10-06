@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { logger } from '@/lib/logger';
+import { retryWithBackoff } from '@/lib/retry';
 
 type LessonNote = {
   courseSlug: string;
@@ -13,10 +15,12 @@ type LessonNote = {
 
 async function fetchNotesFromServer(): Promise<LessonNote[] | null> {
   try {
-    const res = await fetch('/api/user/notes');
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.notes ?? [];
+    return await retryWithBackoff(async () => {
+      const res = await fetch('/api/user/notes');
+      if (!res.ok) throw new Error(`Failed to fetch notes: ${res.status}`);
+      const data = await res.json();
+      return data.notes ?? [];
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch {
     return null;
   }
@@ -24,13 +28,18 @@ async function fetchNotesFromServer(): Promise<LessonNote[] | null> {
 
 async function syncNoteToServer(note: LessonNote): Promise<void> {
   try {
-    await fetch('/api/user/notes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(note),
-    });
+    await retryWithBackoff(async () => {
+      const res = await fetch('/api/user/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(note),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to sync note: ${res.status}`);
+      }
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true });
   } catch (err) {
-    console.warn('[useLessonNotes] Failed to sync to server', err);
+    logger.warn('useLessonNotes', 'Failed to sync to server', err);
   }
 }
 
@@ -45,13 +54,15 @@ export function useLessonNotes() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverNotesRef = useRef(serverNotes);
   serverNotesRef.current = serverNotes;
+  const hasLoadedNotesRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || serverNotes) return;
+    if (!isLoggedIn || hasLoadedNotesRef.current) return;
+    hasLoadedNotesRef.current = true;
     setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
@@ -81,6 +92,7 @@ export function useLessonNotes() {
       setServerNotes(null);
       setSyncedToServer(false);
       setIsInitialLoad(true);
+      hasLoadedNotesRef.current = false;
     }
   }, [isLoggedOut]);
 
@@ -129,11 +141,16 @@ export function useLessonNotes() {
         const next = prev ? prev.filter((n) => !(n.courseSlug === courseSlug && n.moduleSlug === moduleSlug && n.lessonSlug === lessonSlug)) : [];
         return next;
       });
-      fetch('/api/user/notes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),
-      }).catch(() => undefined);
+      retryWithBackoff(async () => {
+        const res = await fetch('/api/user/notes', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to delete note: ${res.status}`);
+        }
+      }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true }).catch(() => undefined);
     },
     [isLoggedIn]
   );

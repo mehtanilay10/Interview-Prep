@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import Image from 'next/image';
 
 interface ImageModalProps {
@@ -19,6 +20,8 @@ const ZOOM_STEP = 0.25;
 export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

@@ -1,0 +1,197 @@
+{
+  "id": "lesson-redis-010",
+  "slug": "read-through-pattern",
+  "moduleSlug": "caching-patterns",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Read-Through Pattern",
+  "description": "Learn read-through caching, where Redis automatically loads missing data from the database so the application sees only one consistent interface.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "redis",
+    "caching",
+    "read-through",
+    "transparent",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Read-through caching abstracts the data source behind Redis. The application reads from a single interface, and Redis is responsible for loading missing values from the database. This is typically implemented with Redis modules, caching proxies, or application-level wrappers that hide the cache-miss logic from callers."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works",
+        "anchor": "how-it-works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In a read-through architecture, the caller issues a simple GET request. If the key is present, Redis returns it. If the key is absent, Redis automatically fetches the data from the configured backing store, caches it, and returns it. The caller does not need to know whether the data came from Redis or the database."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Read flow:",
+        "items": [
+          "Application requests data by key from Redis.",
+          "Redis finds the key and returns the value directly.",
+          "If the key is missing, Redis loads the value from the database.",
+          "Redis stores the loaded value under the same key.",
+          "Redis returns the value to the application."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Write flow",
+        "anchor": "write-flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Writes usually bypass Redis and go directly to the database, then invalidate the corresponding Redis key. Because Redis does not own writes, the application must still manage write consistency. Read-through mainly simplifies the read path, not the write path."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "read-through-flow",
+        "caption": "Read-through abstraction layer",
+        "definition": "sequenceDiagram\n    participant App\n    participant Redis as Redis (Cache)\n    participant DB as Database\n    App->>Redis: GET order:1001\n    alt Cache hit\n        Redis-->>App: order JSON\n    else Cache miss (auto-loaded)\n        Redis->>DB: SELECT * FROM Orders WHERE Id = 1001\n        DB-->>Redis: order row\n        Redis->>Redis: SET order:1001 <json> EX 600\n        Redis-->>App: order JSON"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Implementing Read-Through in Application Code",
+        "anchor": "application-impl"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Open-source Redis does not include a built-in read-through database loader, but you can implement the same behavior in application code. The key idea is to wrap Redis access so that cache-miss loading is transparent to the caller."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "csharp example",
+        "language": "csharp",
+        "code": "// Read-through wrapper in C#\npublic class ReadThroughCache<T>\n{\n    private readonly IDatabase _redis;\n    private readonly AppDbContext _db;\n    private readonly string _prefix;\n\n    public ReadThroughCache(IConnectionMultiplexer redis, AppDbContext db, string prefix)\n    {\n        _redis = redis.GetDatabase();\n        _db = db;\n        _prefix = prefix;\n    }\n\n    public async Task<T?> GetAsync(string key, Func<AppDbContext, Task<T?>> dbLoader)\n    {\n        var cached = await _redis.StringGetAsync($\"{_prefix}:{key}\");\n        if (cached.HasValue)\n            return JsonSerializer.Deserialize<T>(cached!);\n\n        var value = await dbLoader(_db);\n        if (value is not null)\n        {\n            var json = JsonSerializer.Serialize(value);\n            await _redis.StringSetAsync($\"{_prefix}:{key}\", json, TimeSpan.FromMinutes(10));\n        }\n        return value;\n    }\n}\n\n// Usage\nvar orderCache = new ReadThroughCache<Order>(redis, db, \"order\");\nvar order = await orderCache.GetAsync(\"1001\", ctx => ctx.Orders.FindAsync(1001));"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Node.js Example with a Cache Wrapper",
+        "anchor": "nodejs-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "javascript example",
+        "language": "javascript",
+        "code": "// Read-through wrapper in Node.js\nconst Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);\n\nclass ReadThroughCache {\n  constructor(prefix, ttlSeconds) {\n    this.prefix = prefix;\n    this.ttl = ttlSeconds;\n  }\n\n  async get(key, dbLoader) {\n    const cacheKey = `${this.prefix}:${key}`;\n    const cached = await redis.get(cacheKey);\n    if (cached) return JSON.parse(cached);\n\n    const value = await dbLoader();\n    if (value) {\n      await redis.setex(cacheKey, this.ttl, JSON.stringify(value));\n    }\n    return value;\n  }\n}\n\nconst orderCache = new ReadThroughCache('order', 600);\n\nasync function getOrder(id) {\n  return orderCache.get(id, () => db('orders').where('id', id).first());\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Keep It Transparent",
+        "text": "The goal of read-through is to hide cache logic from business code. By wrapping Redis access in a generic class, you keep your domain services clean and make the caching policy easy to change in one place."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Transparent Caching",
+            "definition": "A caching strategy where callers interact with a single interface and do not need to handle cache misses directly."
+          },
+          {
+            "term": "Cache Proxy",
+            "definition": "An intermediary that intercepts read requests and manages cache loading behind the scenes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Questions",
+        "items": [
+          {
+            "question": "Does read-through reduce code complexity?",
+            "answer": "Yes. By centralizing cache-loading logic in a wrapper or proxy, individual services avoid repeating try-cache-load patterns. This reduces bugs and makes policy changes easier."
+          },
+          {
+            "question": "What is the difference between read-through and cache-aside?",
+            "answer": "Cache-aside requires each caller to handle cache misses. Read-through hides the miss-handling behind a single interface, so callers always see a simple get operation."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Read-through presents a single data-access interface backed by Redis.",
+          "Cache misses are loaded and cached automatically by the wrapper.",
+          "It reduces duplicated cache-miss logic across services.",
+          "Writes are still managed directly against the database."
+        ],
+        "takeaway": "Read-through is ideal when you want caching without scattering cache logic through your codebase."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Read-Through Order Cache",
+        "description": "Refactor an existing order service to use read-through caching.",
+        "steps": [
+          "Create a generic ReadThroughCache<T> wrapper.",
+          "Replace direct Redis GET calls with the wrapper in the order service.",
+          "Verify that cache misses still load and cache order data correctly.",
+          "Measure the reduction in duplicated cache-miss code.",
+          "Add logging so you can see when the wrapper loads from the database."
+        ],
+        "expectedOutcome": "The order service no longer contains explicit cache-miss loading logic."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Microsoft: Cache-Aside vs. Read-Through",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Comparison of cache-aside and read-through patterns."
+    },
+    {
+      "title": "Redis: Caching Patterns Overview",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Redis.io overview of common caching patterns and when to use them."
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "id": "lesson-redis-042",
+  "slug": "redis-pipelining",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Redis Pipelining for Throughput",
+  "description": "Reduce round-trip latency by sending multiple Redis commands in a single network request using pipelining.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 15,
+  "tags": ["redis", "pipelining", "performance", "networking"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every Redis command normally follows a request-response cycle: your application sends a command, Redis processes it, and Redis sends the result back before the next command can be sent. This round-trip is expensive when network latency is high. Redis pipelining removes that bottleneck by allowing your client to send many commands in rapid succession without waiting for individual responses, then read all results together at the end."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Pipelining Matters"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you execute 100 commands sequentially, your application spends most of its time waiting for the network. If each round-trip takes 1 millisecond, 100 commands take roughly 100 milliseconds just in network latency. With pipelining, those 100 commands can be sent in a fraction of that time, and Redis returns all 100 responses in one burst. The throughput increase is dramatic — often 5x to 10x for bulk operations."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "pipelining-compare",
+        "caption": "Sequential requests vs pipelined requests to Redis",
+        "definition": "sequenceDiagram\n    participant App\n    participant Network\n    participant Redis\n    note over App,Redis: Sequential\n    App->>Network: SET key1\n    Network->>Redis: SET key1\n    Redis->>Network: OK\n    Network->>App: OK\n    App->>Network: SET key2\n    Network->>Redis: SET key2\n    Redis->>Network: OK\n    Network->>App: OK\n    App->>Network: SET key3\n    Network->>Redis: SET key3\n    Redis->>Network: OK\n    Network->>App: OK\n    note over App,Redis: Pipelined\n    App->>Network: SET key1\n    App->>Network: SET key2\n    App->>Network: SET key3\n    Network->>Redis: SET key1, SET key2, SET key3\n    Redis->>Network: OK, OK, OK\n    Network->>App: OK, OK, OK"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Atomicity Limit",
+        "text": "Pipelining is not atomic. All commands in a pipeline are executed in order by Redis, but if another client modifies a key between your pipeline commands, your results reflect that reality. Use transactions or Lua scripts when you need atomicity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Implementing Pipelining in Code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Most Redis clients support pipelining out of the box. In StackExchange.Redis for C#, you can use the CreateBatch API. In Node.js with ioredis, pipelining is implicit when you chain commands before calling exec."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pipelining with StackExchange.Redis (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\nvar db = mux.GetDatabase();\n\n// Create a batch (pipeline)\nvar batch = db.CreateBatch();\n\nvar tasks = new List<Task<RedisResult>>();\n\nfor (int i = 0; i < 1000; i++)\n{\n    // Queue commands without waiting\n    tasks.Add(based.ExecuteAsync(\n        RedisCommand.SET,\n        $\"user:{i}:name\",\n        $\"User {i}\"));\n}\n\n// Send all commands at once\nbatch.Execute();\n\n// Await all responses\nvar results = await Task.WhenAll(tasks);\nConsole.WriteLine($\"Completed {results.Length} SET commands\");"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pipelining with ioredis (Node.js)",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\nconst pipeline = redis.pipeline();\n\nfor (let i = 0; i < 1000; i++) {\n  pipeline.set(`user:${i}:name`, `User ${i}`);\n}\n\n// All commands are sent in one network flush\nconst results = await pipeline.exec();\nconsole.log(`Completed ${results.length} SET commands`);\n\n// results is an array of [error, reply] tuples\nresults.forEach(([err, reply], index) => {\n  if (err) console.error(`Failed at index ${index}:`, err);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "When to Use Pipelining"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Bulk imports or migrations touching thousands of keys",
+          "Batch analytics where individual latency does not matter",
+          "Warming caches with many known keys at startup",
+          "Any high-latency network between client and Redis"
+        ],
+        "title": "Best use cases"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "Round-trip time (RTT)", "definition": "The time it takes for a request to travel from client to server and back again. Pipelining reduces the number of RTTs from N to 1." },
+          { "term": "Batch", "definition": "A group of commands sent together in a single flush. StackExchange.Redis uses CreateBatch for this purpose." },
+          { "term": "Throughput", "definition": "The number of operations completed per second. Pipelining maximizes throughput by hiding RTT behind command processing." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Pipelining sends multiple commands in one network flush",
+          "It is not atomic — use transactions for atomic guarantees",
+          "Best for bulk operations on high-latency networks",
+          "Most Redis clients support pipelining with minimal code changes"
+        ],
+        "takeaway": "Pipelining is the simplest optimization for bulk Redis workloads. If you are executing many independent commands in sequence, you are likely leaving throughput on the table."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Pipelining Documentation", "url": "https://redis.io/docs/latest/develop/interact/pipelining/", "type": "article" },
+        { "title": "StackExchange.Redis Batch API", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#batches", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Pipelining Documentation", "url": "https://redis.io/docs/latest/develop/interact/pipelining/", "type": "article" },
+    { "title": "StackExchange.Redis Batch API", "url": "https://github.com/StackExchange/StackExchange.Redis/blob/main/docs/basics.md#batches", "type": "article" }
+  ]
+}

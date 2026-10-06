@@ -1,0 +1,164 @@
+{
+  "id": "lesson-mqes-044",
+  "slug": "broker-performance",
+  "title": "Broker Performance",
+  "description": "Understand throughput, latency, and batching trade-offs across RabbitMQ, Kafka, and SQS.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "performance",
+    "throughput",
+    "latency",
+    "kafka",
+    "rabbitmq",
+    "sqs"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Performance is often the deciding factor in broker selection, but raw throughput numbers tell only part of the story. A broker that delivers one million messages per second with five seconds of latency is worse than one that delivers fifty thousand messages per second with sub-millisecond latency for interactive applications. You must measure against your actual workload."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Throughput and Latency Characteristics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Kafka is optimized for sustained high throughput. It batches messages on the producer side, compresses them on the wire, and appends them sequentially to disk. The result is millions of messages per second across a cluster, but individual message latency is typically one to ten milliseconds. RabbitMQ is optimized for low latency and flexible routing. Each message is routed individually through exchanges, which adds overhead but keeps latency in the sub-millisecond to single-millisecond range. SQS throughput is effectively unbounded because AWS manages the infrastructure, but end-to-end latency can vary from tens to hundreds of milliseconds depending on region and load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Batching and Compression"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Batching is the single most impactful tuning lever for Kafka throughput. The producer batches messages in memory and sends them when the batch is full or the batch age exceeds a threshold. Compression (LZ4, Snappy, or ZSTD) reduces the bytes on the wire and the disk footprint. Too aggressive batching increases latency; too little batching wastes throughput."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Kafka producer with batching and compression in C#",
+        "content": "using Confluent.Kafka;\n\nvar config = new ProducerConfig\n{\n    BootstrapServers = \"kafka:9092\",\n    CompressionType = CompressionType.Lz4,\n    LingerMs = 5,\n    BatchSize = 16384\n};\n\nusing var producer = new ProducerBuilder<Null, string>(config).Build();\n\nfor (int i = 0; i < 1000; i++)\n{\n    producer.Produce(\"orders\", new Message<Null, string>\n    {\n        Value = $\"{{\\\"orderId\\\": {i}}}\"\n    });\n}\nproducer.Flush(TimeSpan.FromSeconds(5));",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Persistent Connections and Amortization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Connection overhead matters more than most developers expect. Opening a TCP connection and performing TLS negotiation can take several milliseconds. In high-throughput scenarios, reuse connections aggressively. RabbitMQ and Kafka both support persistent channels; SQS uses HTTP/2 internally but each request still carries overhead. In .NET applications, reuse the same SqsClient or Kafka Producer instance across requests instead of creating one per operation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reusing an SQS client in Node.js",
+        "content": "import { SQSClient } from \"@aws-sdk/client-sqs\";\n\n// Create once at startup, reuse everywhere\nconst sqs = new SQSClient({ region: \"us-east-1\" });\n\nexport async function enqueueJob(body: string) {\n  await sqs.send(new SendMessageCommand({\n    QueueUrl: process.env.QUEUE_URL!,\n    MessageBody: body\n  }));\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mqes-044-throughput-latency",
+        "definition": "flowchart TB\n    A[\"Workload Profile\"] --> B{\"High throughput\n> 100K msg/sec?\"}\n    B -->|Yes| C[Kafka]\n    B -->|No| D{\"Low latency\n< 5ms critical?\"}\n    D -->|Yes| E[RabbitMQ]\n    D -->|No| F{\"Managed preferred?\"}\n    F -->|Yes| G[SQS]\n    F -->|No| E\n\n    C --> H[\"Tune batch.size\nlinger.ms, compression\"]\n    E --> I[\"Use direct exchanges\nkeep queues uncluttered\"]\n    G --> J[\"Batch send API\nreuse SQSClient\"]",
+        "caption": "Performance-driven broker selection and tuning priorities."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Metric",
+          "RabbitMQ",
+          "Kafka",
+          "SQS Standard"
+        ],
+        "rows": [
+          [
+            "Typical throughput",
+            "10K–100K msg/sec/node",
+            "100K–1M+ msg/sec/cluster",
+            "Nearly unlimited"
+          ],
+          [
+            "Typical latency",
+            "< 1ms to 5ms",
+            "1ms to 10ms",
+            "10ms to 200ms"
+          ],
+          [
+            "Batching model",
+            "Per-message dispatch",
+            "Producer batch + compression",
+            "BatchSend API"
+          ],
+          [
+            "Persistence",
+            "Configurable durability",
+            "Sequential disk append",
+            "S3-backed storage"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Benchmark Carefully",
+        "text": "Synthetic benchmarks rarely reflect production traffic. Message size, consumer count, network topology, and disk speed all change the outcome. Always benchmark with your actual payload size and consumer count."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Kafka wins on raw throughput; RabbitMQ wins on low latency for small workloads.",
+          "Batch size, linger time, and compression are the most impactful Kafka tuning knobs.",
+          "Reuse TCP connections and client instances—connection overhead compounds quickly.",
+          "SQS throughput is effectively unbounded, but latency is higher and less predictable.",
+          "Benchmark with real payloads and consumer counts, not synthetic single-threaded tests."
+        ],
+        "takeaway": "Performance is a function of workload shape, not just broker choice. Tune the broker to your actual traffic patterns, not the other way around."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Producer Performance Tuning",
+      "url": "https://kafka.apache.org/documentation/#producerconfigs",
+      "type": "article",
+      "author": "Apache Kafka"
+    },
+    {
+      "title": "RabbitMQ Performance Metrics",
+      "url": "https://www.rabbitmq.com/docs/monitoring",
+      "type": "article",
+      "author": "RabbitMQ"
+    }
+  ],
+  "moduleSlug": "message-broker-selection",
+  "courseSlug": "message-queues-event-streaming"
+}

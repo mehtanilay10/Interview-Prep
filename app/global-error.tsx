@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronUp, Copy, Home } from 'lucide-react';
 import Link from 'next/link';
+import { logger } from '@/lib/logger';
 
 export default function GlobalError({
   error,
@@ -15,7 +16,7 @@ export default function GlobalError({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    console.error('Global application error:', error);
+    logger.error('global-error', 'Global application error', error);
   }, [error]);
 
   const errorMessage = error?.message || 'Unknown error';

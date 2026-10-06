@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { getCurrentUser, requireAuth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { BookmarksClient } from './BookmarksClient';
+import { BookmarkErrorBoundary } from '@/components/bookmarks/BookmarkErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Bookmarks | Interview Prep',
@@ -14,5 +15,9 @@ export default async function BookmarksPage() {
     redirect('/login');
   }
 
-  return <BookmarksClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />;
+  return (
+    <BookmarkErrorBoundary>
+      <BookmarksClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />
+    </BookmarkErrorBoundary>
+  );
 }

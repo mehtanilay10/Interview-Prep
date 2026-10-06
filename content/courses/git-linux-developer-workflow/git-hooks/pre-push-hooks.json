@@ -1,0 +1,150 @@
+{
+  "id": "lesson-git-034",
+  "slug": "pre-push-hooks",
+  "moduleSlug": "git-hooks",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Pre-Push Hooks",
+  "description": "Use pre-push hooks to run full test suites and expensive checks before code reaches the remote.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["git", "hooks", "pre-push", "testing"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pre-push hook runs after git push sends data to the remote but before the remote actually accepts it. It receives the remote name and URL as arguments and is the right place to run expensive checks that would slow down pre-commit."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pre-push arguments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pre-push hook receives two arguments: the name of the remote (e.g., 'origin') and the URL of the remote. It also reads hook input from stdin in the format: <local-ref> <local-sha1> <remote-ref> <remote-sha1>."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-push hook with full test suite",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/pre-push\n\n# Read refs from stdin (ignored here, but available)\nwhile read local_ref local_sha remote_ref remote_sha; do\n  echo \"Pushing $local_ref to $remote_ref\"\ndone\n\n# Run the full test suite\necho \"Running full test suite before push...\"\nnpm run test:ci\nTEST_EXIT=$?\n\nif [ $TEST_EXIT -ne 0 ]; then\n  echo \"\\nTests failed. Push aborted.\"\n  echo \"Fix failing tests before pushing, or use --no-verify to skip.\"\n  exit 1\nfi\n\necho \"All tests passed. Proceeding with push.\"\nexit 0"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Pre-push runs after the transfer starts",
+        "text": "Git starts transferring objects to the remote before pre-push runs. If the hook fails, the transfer is cancelled and no refs are updated. Large pushes will have already consumed bandwidth."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What to put in pre-push"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Full test suite (unit, integration, E2E)",
+          "Build verification (compile, typecheck, bundle)",
+          "Security scans (dependency audit, vulnerability check)",
+          "Database migration linting",
+          "Performance regression checks"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Filtering what to push"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The pre-push hook can examine which branches are being pushed and skip checks for certain branches (e.g., feature branches that are already covered by CI on the remote). Parse stdin to determine which refs are being pushed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Skip pre-push for WIP branches",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/pre-push\n\nSKIP_PATTERN=\"^wip/\"\n\nwhile read local_ref local_sha remote_ref remote_sha; do\n  BRANCH=$(basename \"$local_ref\")\n  \n  if [[ \"$BRANCH\" =~ $SKIP_PATTERN ]]; then\n    echo \"Skipping pre-push checks for WIP branch: $BRANCH\"\n    continue\n  fi\n  \n  echo \"Running pre-push checks for: $BRANCH\"\n  npm run test:ci\n  if [ $? -ne 0 ]; then\n    echo \"Tests failed. Push aborted.\"\n    exit 1\n  fi\ndone\n\nexit 0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Pre-push with Husky"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Husky also supports pre-push hooks. Create .husky/pre-push and add your commands. Husky handles making the file executable and passing arguments correctly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Husky pre-push hook",
+        "language": "bash",
+        "code": "# .husky/pre-push\n\nnpx --no-install lint-staged\n\n# Run only on CI\nif [ \"$CI\" = \"true\" ]; then\n  npm run test:ci\nfi\n\n# Verify typecheck passes\nnpx tsc --noEmit"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I prevent all pushes with pre-push?",
+            "answer": "Yes. Return exit 1 to block the push entirely. This is useful for enforcing that all code must pass certain checks before reaching the remote."
+          },
+          {
+            "question": "Does pre-push run for all remotes?",
+            "answer": "Yes, by default. You can check the remote name argument to apply different rules to different remotes."
+          },
+          {
+            "question": "What if pre-push fails on a large push?",
+            "answer": "The hook failure aborts the push, but some objects may have already been transferred. Use --no-verify to push anyway if the remote checks will catch the same issues."
+          },
+          {
+            "question": "Can pre-push hooks access the remote branch?",
+            "answer": "Yes. The remote_ref from stdin tells you which remote branch is being updated. Use this to conditionally run different checks based on the target branch."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "pre-push runs before the remote accepts the push — ideal for expensive checks",
+          "Receives remote name/URL as arguments and refs from stdin",
+          "Run full test suites, builds, and security scans here",
+          "Return exit 1 to block the push and display an error",
+          "Use Husky to manage pre-push hooks consistently across the team"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["pre-commit-hooks", "commit-msg-hooks"],
+  "furtherReading": [
+    { "title": "Git Pre-Push Hook", "url": "https://git-scm.com/docs/githooks#_pre_push", "type": "article" }
+  ]
+}

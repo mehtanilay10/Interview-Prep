@@ -1,0 +1,164 @@
+{
+  "id": "lesson-api-design-problems-error-handling-design-business-logic-errors",
+  "slug": "business-logic-errors",
+  "moduleSlug": "error-handling-design",
+  "courseSlug": "api-design-problems",
+  "title": "Business Logic Errors",
+  "description": "Handle domain-specific errors like conflicts, constraint violations, and state transitions with precise HTTP status codes and actionable error messages.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["business-errors", "conflicts", "domain", "state"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Business logic errors occur when a request is syntactically valid but violates a domain rule. Examples include booking an already-sold seat, transferring money with insufficient balance, or canceling an order that has already shipped. These errors need specific status codes and clear explanations."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Business Errors"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Error", "HTTP Status", "Error Code", "Client Action"],
+        "rows": [
+          ["Duplicate email", "409 Conflict", "DuplicateEmail", "Choose another email"],
+          ["Order already shipped", "409 Conflict", "OrderShipped", "Cannot cancel shipped orders"],
+          ["Insufficient balance", "422 Unprocessable", "InsufficientFunds", "Add funds or reduce amount"],
+          ["Resource locked by another user", "409 Conflict", "ResourceLocked", "Wait and retry"],
+          ["Order not in cancellable state", "422", "InvalidStateTransition", "Check order status"],
+          ["Promo code expired", "422", "PromoExpired", "Remove or replace code"],
+          ["Payment method declined", "402 Payment Required", "PaymentDeclined", "Use another payment method"],
+          ["Schedule conflict", "409 Conflict", "ScheduleConflict", "Pick another time slot"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Conflict Error Response"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "409 Conflict when booking an already-sold seat",
+        "content": "The error tells the client which resource is conflicted and what the current state is.",
+        "code": "POST /bookings\n{\n  \"seatId\": \"A_12\",\n  \"eventId\": \"evt_881\"\n}\n\nResponse: 409 Conflict\n{\n  \"type\": \"https://api.example.com/errors/conflict\",\n  \"title\": \"Conflict\",\n  \"status\": 409,\n  \"requestId\": \"req_conflict_001\",\n  \"message\": \"Seat A_12 is no longer available.\",\n  \"resource\": {\n    \"type\": \"seat\",\n    \"id\": \"A_12\",\n    \"currentStatus\": \"SOLD\"\n  },\n  \"suggestion\": \"Select another seat or check the seating map.\",\n  \"documentationUrl\": \"https://docs.example.com/errors/conflict\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "State Machine Errors"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Many business errors are invalid state transitions. Model your entities as state machines and return the current state and allowed transitions in the error response."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Define valid states explicitly in your domain model",
+          "Return 422 when a transition is not allowed from the current state",
+          "Include the current state and allowed next states in the error body",
+          "Use a generic 'InvalidStateTransition' code and document the mapping"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "422 when attempting an invalid state transition",
+        "content": "Order transitions: PENDING -> CONFIRMED -> SHIPPED -> DELIVERED. Cannot cancel after SHIPPED.",
+        "code": "POST /orders/ord_991/cancel\n\nResponse: 422 Unprocessable Entity\n{\n  \"type\": \"https://api.example.com/errors/invalid-state-transition\",\n  \"title\": \"Invalid State Transition\",\n  \"status\": 422,\n  \"requestId\": \"req_state_001\",\n  \"message\": \"Cannot cancel order in SHIPPED state.\",\n  \"currentState\": \"SHIPPED\",\n  \"allowedTransitions\": [\"DELIVERED\", \"RETURNED\"],\n  \"documentationUrl\": \"https://docs.example.com/orders#states\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparison: 409 vs 422"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Code", "Use When", "Example"],
+        "rows": [
+          ["409 Conflict", "Resource state prevents the operation", "Seat already sold, duplicate email"],
+          ["422 Unprocessable", "Valid request but violates business rules", "Insufficient funds, wrong state"],
+          ["402 Payment Required", "Payment declined or missing", "Card declined, subscription expired"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "409 is for resource conflicts, not validation",
+        "text": "409 Conflict means the resource state prevents the operation. Use it for duplicates and locks. Use 422 for semantic errors like insufficient funds where the request is valid but the business rule fails."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I return the current resource state in 409 errors?",
+            "answer": "Yes. Include the current state in the resource object. This lets the client refresh and show the updated state without an extra GET request."
+          },
+          {
+            "question": "How do I handle idempotent retries for business errors?",
+            "answer": "Use idempotency keys for all write operations. If the same request is retried, return the same result. For 409 errors, the second retry should still fail with 409."
+          },
+          {
+            "question": "Should I distinguish between 'already exists' and 'conflict with another user'?",
+            "answer": "Yes. Use separate error codes: DuplicateEmail for uniqueness violations, ResourceLocked for concurrent modification by another user. Clients handle these differently."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Business errors need specific codes, not generic messages.",
+          "Include the current state and allowed transitions in state-machine errors.",
+          "Use 409 for conflicts, 422 for semantic violations.",
+          "Idempotency keys make retries safe even for business errors."
+        ],
+        "takeaway": "Business logic errors are where your API's domain expertise shows. Make them specific, actionable, and safe to retry."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "http-status-code-selection",
+    "validation-errors"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 7807: Problem Details",
+      "url": "https://datatracker.ietf.org/doc/html/rfc7807",
+      "type": "article",
+      "author": "IETF",
+      "description": "Standard for structured error responses."
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "id": "lesson-mqes-022",
+  "slug": "automated-dlq-processing",
+  "moduleSlug": "dead-letter-queues",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Automated DLQ Reprocessing",
+  "description": "Build automated pipelines to inspect, fix, and replay messages from dead-letter queues safely using schedulers, idempotent reprocessing, and audit trails.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["dlq", "automation", "reprocessing", "replay", "idempotency", "scheduler"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "p1",
+      "data": { "text": "Manual DLQ review does not scale. When dozens or hundreds of messages fail, engineers need an automated pipeline that inspects the payload, applies fixes, and replays the message safely. Automated DLQ processing reduces mean time to recovery while preserving the audit trail and business rules that manual replay often bypasses." }
+    },
+    {
+      "type": "heading",
+      "id": "h1",
+      "data": { "level": 2, "text": "Designing an Automated Reprocessing Pipeline" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p2",
+      "data": { "text": "A robust pipeline has four stages: inspect the message for root cause, transform or enrich the payload if needed, replay the message into the main queue, and record the outcome for compliance. Each stage must be idempotent so that replays do not create duplicate side effects." }
+    },
+    {
+      "type": "bullet-list",
+      "id": "b1",
+      "data": {
+        "title": "Pipeline Stages",
+        "items": [
+          "Inspect: read the message body, headers, and error metadata from the DLQ",
+          "Transform: fix known issues such as missing fields, expired tokens, or stale references",
+          "Replay: publish the corrected message to the main queue with a unique message ID",
+          "Audit: log the replay attempt, outcome, and any manual overrides"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h2",
+      "data": { "level": 2, "text": "Idempotency and Duplicate Prevention" }
+    },
+    {
+      "type": "paragraph",
+      "id": "p3",
+      "data": { "text": "Replaying a message should never create duplicate orders, double-charge a customer, or send the same notification twice. Use idempotency keys stored in a database or cache. If the consumer sees a duplicate key, it skips processing and returns success." }
+    },
+    {
+      "type": "callout",
+      "id": "c1",
+      "data": { "variant": "warning", "title": "Replay Without Idempotency Is Dangerous", "text": "If your consumer is not idempotent, automated replay can corrupt data. Always validate idempotency before enabling automated DLQ reprocessing in production." }
+    },
+    {
+      "type": "heading",
+      "id": "h3",
+      "data": { "level": 3, "text": "Automated DLQ Replay with AWS Lambda and SQS" }
+    },
+    {
+      "type": "example",
+      "id": "e1",
+      "data": {
+        "title": "Scheduled Lambda That Replays SQS DLQ Messages (Node.js)",
+        "content": "An EventBridge rule triggers a Lambda function on a schedule. The Lambda reads up to 10 messages from the DLQ, applies transformations, and sends them back to the main queue.",
+        "code": "import { SQSClient, ReceiveMessageCommand, DeleteMessageBatchCommand, SendMessageCommand } from '@aws-sdk/client-sqs';\n\nexport const handler = async () => {\n  const dlq = new SQSClient({ region: 'us-east-1' });\n  const mainQueue = new SQSClient({ region: 'us-east-1' });\n\n  const received = await dlq.send(new ReceiveMessageCommand({\n    QueueUrl: process.env.DLQ_URL!,\n    MaxNumberOfMessages: 10,\n    WaitTimeSeconds: 5\n  }));\n\n  for (const msg of received.Messages ?? []) {\n    const body = JSON.parse(msg.Body!);\n\n    // Transform: fix known issues\n    if (!body.customerId) body.customerId = 'UNKNOWN';\n    if (body.amount < 0) body.amount = Math.abs(body.amount);\n\n    // Replay to main queue with idempotency key\n    await mainQueue.send(new SendMessageCommand({\n      QueueUrl: process.env.MAIN_QUEUE_URL!,\n      MessageBody: JSON.stringify(body),\n      MessageDeduplicationId: msg.MessageId\n    }));\n\n    // Delete from DLQ after successful replay\n    await dlq.send(new DeleteMessageBatchCommand({\n      QueueUrl: process.env.DLQ_URL!,\n      Entries: [{ Id: msg.MessageId!, ReceiptHandle: msg.ReceiptHandle! }]\n    }));\n\n    console.log(`Replayed message ${msg.MessageId}`);\n  }\n};",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "h4",
+      "data": { "level": 3, "text": "Automated DLQ Processing with RabbitMQ and .NET" }
+    },
+    {
+      "type": "example",
+      "id": "e2",
+      "data": {
+        "title": "Background Service That Replays RabbitMQ DLQ (C#)",
+        "content": "A hosted service consumes from the DLQ, applies corrections, and publishes back to the main exchange.",
+        "code": "public class DlqReplayService : BackgroundService\n{\n    private readonly IModel _dlqChannel;\n    private readonly IModel _mainChannel;\n    private readonly ILogger<DlqReplayService> _logger;\n\n    public DlqReplayService(IConnection connection, ILogger<DlqReplayService> logger)\n    {\n        _dlqChannel = connection.CreateModel();\n        _mainChannel = connection.CreateModel();\n        _logger = logger;\n    }\n\n    protected override Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        _dlqChannel.BasicConsume(queue: \"orders.dlq\", autoAck: false, consumer: new EventingBasicConsumer(_dlqChannel)\n        {\n            Received += async (sender, ea) =>\n            {\n                var body = ea.Body.ToArray();\n                var message = JsonSerializer.Deserialize<OrderMessage>(body)!;\n\n                // Transform known bad data\n                if (string.IsNullOrEmpty(message.CustomerId))\n                    message.CustomerId = \"UNKNOWN\";\n\n                // Publish to main exchange with original correlation id\n                var props = _mainChannel.CreateBasicProperties();\n                props.MessageId = ea.BasicProperties.MessageId;\n                props.CorrelationId = ea.BasicProperties.CorrelationId;\n\n                _mainChannel.BasicPublish(\n                    exchange: \"orders-exchange\",\n                    routingKey: \"orders.created\",\n                    basicProperties: props,\n                    body: JsonSerializer.SerializeToUtf8Bytes(message));\n\n                _dlqChannel.BasicAck(ea.DeliveryTag, multiple: false);\n                _logger.LogInformation(\"Replayed message {MessageId}\", props.MessageId);\n            }\n        });\n\n        return Task.CompletedTask;\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "mermaid",
+      "id": "m1",
+      "data": {
+        "id": "mermaid-mqes-022-1",
+        "caption": "Automated DLQ reprocessing pipeline",
+        "definition": "flowchart LR\n    DLQ[Dead-Letter Queue] -->|Consume| S[Scheduler / Lambda]\n    S -->|Inspect| T{Transform?}\n    T -->|Yes| X[Fix Payload]\n    T -->|No| R[Replay to Main Queue]\n    X --> R\n    R -->|With Idempotency Key| MQ[Main Queue]\n    R -->|Log outcome| A[Audit Log]\n    A -->|Compliance| DB[(Database)]\n    style X fill:#fff9c4,stroke:#333\n    style MQ fill:#c8e6c9,stroke:#333\n    style DB fill:#e3f2fd,stroke:#333"
+      }
+    },
+    {
+      "type": "exercise",
+      "id": "ex1",
+      "data": {
+        "title": "Build a Safe DLQ Replay Script",
+        "description": "Write a script or service that reads messages from a DLQ, applies a safe transformation, and publishes them to the main queue with idempotency keys.",
+        "steps": [
+          "Set up a main queue and DLQ in your chosen broker.",
+          "Write a producer that intentionally sends 5 malformed messages to trigger the DLQ.",
+          "Build a replay consumer that reads from the DLQ.",
+          "Add a transformation step that fixes the known issue in the malformed messages.",
+          "Publish fixed messages to the main queue with a deduplication key.",
+          "Verify the main queue processes the replayed messages without duplicates."
+        ],
+        "expectedOutcome": "Malformed messages are automatically repaired and replayed exactly once, with an audit trail showing the replay event."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "AWS Lambda with SQS Event Source Mapping", "url": "https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html", "type": "article", "author": "AWS", "description": "How to configure Lambda to process SQS queues, including DLQs and batch item failures." },
+    { "title": "RabbitMQ Shovel and Federation", "url": "https://www.rabbitmq.com/docs/shovel", "type": "article", "author": "RabbitMQ", "description": "RabbitMQ plugins for moving messages between brokers or queues, useful for DLQ replay workflows." }
+  ]
+}

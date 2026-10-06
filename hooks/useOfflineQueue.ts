@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { logger } from '@/lib/logger';
 
 type OfflineQueueItem = {
   courseSlug: string;
@@ -30,7 +31,7 @@ async function syncQueueToServer(item: OfflineQueueItem): Promise<void> {
       body: JSON.stringify(item),
     });
   } catch (err) {
-    console.warn('[useOfflineQueue] Failed to sync to server', err);
+    logger.warn('useOfflineQueue', 'Failed to sync to server', err);
   }
 }
 
@@ -45,13 +46,15 @@ export function useOfflineQueue() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const serverQueueRef = useRef(serverQueue);
   serverQueueRef.current = serverQueue;
+  const hasLoadedQueueRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || serverQueue) return;
+    if (!isLoggedIn || hasLoadedQueueRef.current) return;
+    hasLoadedQueueRef.current = true;
     setIsInitialLoad(true);
     setSyncedToServer(false);
     let cancelled = false;
@@ -81,10 +84,11 @@ export function useOfflineQueue() {
       setServerQueue(null);
       setSyncedToServer(false);
       setIsInitialLoad(true);
+      hasLoadedQueueRef.current = false;
     }
   }, [isLoggedOut]);
 
-  const activeQueue = isLoggedIn && serverQueue ? serverQueue : [];
+  const activeQueue = useMemo(() => (isLoggedIn && serverQueue ? serverQueue : []), [isLoggedIn, serverQueue]);
 
   const isQueued = useCallback(
     (courseSlug: string, moduleSlug: string, lessonSlug: string): boolean => {

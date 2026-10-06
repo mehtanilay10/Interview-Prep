@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface MermaidModalProps {
   svgHtml: string;
@@ -12,7 +13,7 @@ interface MermaidModalProps {
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 5;
-const ZOOM_STEP = 0.25;
+const ZOOM_STEP = 0.5;
 
 function getDiagramBackground(svgHtml: string, theme: 'light' | 'dark'): string {
   const bgMap: Record<string, { light: string; dark: string }> = {
@@ -67,6 +68,8 @@ export function MermaidModal({ svgHtml, caption, onClose }: MermaidModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [systemDark, setSystemDark] = useState(false);
+
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -127,7 +130,7 @@ export function MermaidModal({ svgHtml, caption, onClose }: MermaidModalProps) {
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-2 shrink-0 bg-canvas/90 dark:bg-canvas-subtle/90 backdrop-blur">
           {caption && (
-            <p className="flex-1 truncate text-sm text-fg-muted">{caption}</p>
+            <p className="flex-1 truncate text-sm text-fg-muted mb-0">{caption}</p>
           )}
 
           <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -189,7 +192,7 @@ export function MermaidModal({ svgHtml, caption, onClose }: MermaidModalProps) {
         {/* Footer caption */}
         {caption && (
           <div className="border-t border-border px-4 py-2 shrink-0 bg-canvas/90 dark:bg-canvas-subtle/90 backdrop-blur">
-            <p className="text-xs text-center text-fg-subtle">{caption}</p>
+            <p className="text-xs text-center text-fg-subtle m-0.5">{caption}</p>
           </div>
         )}
       </div>

@@ -38,6 +38,9 @@ export function BookmarkButton({
         <Bookmark className={`h-3.5 w-3.5 ${bookmarked ? 'fill-current' : ''}`} aria-hidden="true" />
         {bookmarked ? 'Bookmarked' : 'Bookmark'}
       </button>
+      <div aria-live="polite" className="sr-only">
+        {bookmarked ? 'Bookmark removed' : 'Bookmark added'}
+      </div>
       {showSignIn && <SignInPrompt onDismiss={() => setShowSignIn(false)} />}
     </>
   );

@@ -1,0 +1,196 @@
+{
+  "id": "lesson-redis-007",
+  "slug": "cache-aside-pattern",
+  "moduleSlug": "caching-patterns",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Cache-Aside Pattern",
+  "description": "Learn the cache-aside (lazy loading) pattern, the most common Redis caching strategy for read-heavy applications.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
+  "tags": [
+    "redis",
+    "caching",
+    "cache-aside",
+    "lazy-loading",
+    "read-pattern",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cache-aside is the most widely used caching pattern. The application is responsible for reading and writing data from both the cache and the underlying database. When a cache miss occurs, the application fetches the data from the database, stores it in Redis, and returns it to the caller. On subsequent reads for the same key, the cached value is served immediately."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How It Works",
+        "anchor": "how-it-works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The name cache-aside describes the relationship between the cache and the data store: they operate independently. The cache does not automatically populate itself. Instead, the application acts as the intermediary. This makes the pattern simple to reason about and easy to debug."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Read flow:",
+        "items": [
+          "Application requests data by key from Redis.",
+          "If the key exists (cache hit), return the value immediately.",
+          "If the key is missing (cache miss), query the database.",
+          "Store the database result in Redis with an expiration.",
+          "Return the result to the caller."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Write flow",
+        "anchor": "write-flow"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Writes always go to the database first. After a successful write, the stale cache entry is either deleted or updated. This ensures the cache never becomes the source of truth. A common approach is to simply remove the key from Redis so the next read will fetch fresh data."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "cache-aside-flow",
+        "caption": "Cache-aside read and write flow",
+        "definition": "sequenceDiagram\n    participant App\n    participant Redis\n    participant DB\n    App->>Redis: GET user:42\n    alt Cache hit\n        Redis-->>App: user JSON\n    else Cache miss\n        App->>DB: SELECT * FROM Users WHERE Id = 42\n        DB-->>App: user row\n        App->>Redis: SET user:42 <json> EX 300"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "C# Example with StackExchange.Redis",
+        "anchor": "csharp-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "csharp example",
+        "language": "csharp",
+        "code": "// Cache-aside in C#\nusing StackExchange.Redis;\nusing System.Text.Json;\n\npublic class UserService\n{\n    private readonly IDatabase _redis;\n    private readonly AppDbContext _db;\n\n    public UserService(IConnectionMultiplexer redis, AppDbContext db)\n    {\n        _redis = redis.GetDatabase();\n        _db = db;\n    }\n\n    public async Task<User?> GetUserAsync(int id)\n    {\n        var cached = await _redis.StringGetAsync($\"user:{id}\");\n        if (cached.HasValue)\n        {\n            return JsonSerializer.Deserialize<User>(cached!);\n        }\n\n        var user = await _db.Users.FindAsync(id);\n        if (user is null) return null;\n\n        var json = JsonSerializer.Serialize(user);\n        await _redis.StringSetAsync($\"user:{id}\", json, TimeSpan.FromMinutes(5));\n        return user;\n    }\n\n    public async Task UpdateUserAsync(User user)\n    {\n        _db.Users.Update(user);\n        await _db.SaveChangesAsync();\n        await _redis.KeyDeleteAsync($\"user:{user.Id}\");\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Node.js Example with ioredis",
+        "anchor": "nodejs-example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "javascript example",
+        "language": "javascript",
+        "code": "// Cache-aside in Node.js\nconst Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);\n\nasync function getUser(id) {\n  const cached = await redis.get(`user:${id}`);\n  if (cached) return JSON.parse(cached);\n\n  const user = await db('users').where('id', id).first();\n  if (!user) return null;\n\n  await redis.setex(`user:${id}`, 300, JSON.stringify(user));\n  return user;\n}\n\nasync function updateUser(user) {\n  await db('users').where('id', user.id).update(user);\n  await redis.del(`user:${user.id}`);\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "When to Use Cache-Aside",
+        "text": "Cache-aside is ideal for read-heavy workloads where data changes infrequently. It is the safest default pattern because it guarantees the database remains the source of truth."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Cache Miss",
+            "definition": "A request for a key that does not exist in Redis, triggering a database lookup."
+          },
+          {
+            "term": "Cache Hit",
+            "definition": "A request for a key that exists in Redis, allowing the application to return data without touching the database."
+          },
+          {
+            "term": "TTL (Time To Live)",
+            "definition": "An expiration time set on a Redis key. After the TTL elapses, Redis automatically removes the key."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Questions",
+        "items": [
+          {
+            "question": "What happens if Redis goes down?",
+            "answer": "The application should catch the Redis exception and fall back to the database. Cache-aside gracefully degrades because the database is always the source of truth."
+          },
+          {
+            "question": "Should I use TTL or manual invalidation?",
+            "answer": "Both. Use a TTL as a safety net to eventually evict stale data, and use manual deletion after writes to keep the cache fresh between expirations."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Cache-aside keeps the cache and database independent.",
+          "Reads populate the cache on a miss; writes invalidate stale entries.",
+          "Always set a TTL to prevent stale data from persisting forever.",
+          "Graceful degradation ensures the app works even if Redis is unavailable."
+        ],
+        "takeaway": "Cache-aside is the safest, most common pattern for read-heavy data."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Implement Cache-Aside for Products",
+        "description": "Build a cache-aside service for a product catalog. Products change rarely, so the cache should stay warm.",
+        "steps": [
+          "Create a Redis connection using StackExchange.Redis or ioredis.",
+          "Implement GetProductById that checks Redis first, then the database.",
+          "Serialize the product to JSON and cache it with a 10-minute TTL.",
+          "Implement UpdateProduct that writes to the database and deletes the Redis key.",
+          "Simulate a Redis outage and confirm the app still returns data from the database."
+        ],
+        "expectedOutcome": "Product reads are served from Redis after the first request, and updates invalidate the cache immediately."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Microsoft: Cache-Aside Pattern",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft",
+      "description": "Official cloud design patterns documentation for cache-aside."
+    },
+    {
+      "title": "Redis: Caching Best Practices",
+      "url": "https://redis.io/docs/latest/develop/use-cases/caching/",
+      "type": "article",
+      "author": "Redis",
+      "description": "Redis.io guide on caching use cases and best practices."
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "id": "lesson-git-035",
+  "slug": "commit-msg-hooks",
+  "moduleSlug": "git-hooks",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Commit Message Hooks",
+  "description": "Enforce conventional commits and commit message standards with commit-msg hooks.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": ["git", "hooks", "commit-msg", "conventional-commits"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The commit-msg hook validates the commit message after the user enters it but before the commit is created. It receives the path to a temporary file containing the commit message as its argument. Use it to enforce conventional commits, maximum length, and required prefixes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Conventional commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Conventional Commits is a specification for commit messages that enables automated changelogs, semantic versioning, and structured release notes. The format is: <type>(<scope>): <description>. Common types include feat, fix, docs, style, refactor, test, chore, and perf."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Commit-msg hook for conventional commits",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/commit-msg\n\nCOMMIT_MSG_FILE=$1\nCOMMIT_MSG=$(cat \"$COMMIT_MSG_FILE\")\n\n# Conventional Commits regex\ntype=\"feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert\"\nscope=\"\\(\\([a-zA-Z0-9/_-]\\+\\)\\)?\"\npattern=\"^$type$scope: .\\{1,72\\}\\$\"\n\nif ! echo \"$COMMIT_MSG\" | grep -qE \"$pattern\"; then\n  echo \"\"\n  echo \"Invalid commit message format.\"\n  echo \"Expected: <type>(<scope>): <description>\"\n  echo \"Types: $type\"\n  echo \"\"\n  echo \"Your message:\"\n  echo \"$COMMIT_MSG\"\n  echo \"\"\n  exit 1\nfi\n\necho \"Commit message valid.\"\nexit 0"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Use commitlint for robust validation",
+        "text": "Writing regex-based commit message validation is error-prone. Use the commitlint tool, which implements the Conventional Commits specification fully and integrates with Husky."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Using commitlint with Husky"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "commitlint is a tool that checks commit messages against configurable rules. Install it with the conventional-config preset for out-of-the-box conventional commits support."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Set up commitlint with Husky",
+        "language": "bash",
+        "code": "# Install commitlint and its conventional config\nnpm install --save-dev @commitlint/cli @commitlint/config-conventional\n\n# Create commitlint config\ncat > commitlint.config.js << 'EOF'\nmodule.exports = {\n  extends: ['@commitlint/config-conventional'],\n  rules: {\n    'type-enum': [2, 'always', [\n      'feat', 'fix', 'docs', 'style', 'refactor',\n      'perf', 'test', 'build', 'ci', 'chore', 'revert'\n    ]],\n    'subject-case': [2, 'never', ['upper-case']],\n    'subject-max-length': [2, 'always', 72]\n  }\n}\nEOF\n\n# Add commit-msg hook with Husky\nnpx husky add .husky/commit-msg \"npx --no-install commitlint --edit $1\"\n\ngit add commitlint.config.js .husky/commit-msg\ngit commit -m \"chore: add commitlint configuration\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "prepare-commit-msg hook"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The prepare-commit-msg hook runs before the editor opens. It can pre-populate the commit message based on the branch name, ticket number, or a template. This reduces friction while still maintaining standards."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-populate commit message from branch name",
+        "language": "bash",
+        "code": "#!/bin/bash\n# .git/hooks/prepare-commit-msg\n\nCOMMIT_MSG_FILE=$1\nCOMMIT_SOURCE=$2\nSHA=$3\n\n# Only modify messages from git commit (not merges, squashes, etc.)\nif [ \"$COMMIT_SOURCE\" = \"\" ] || [ \"$COMMIT_SOURCE\" = \"message\" ]; then\n  BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)\n  \n  # Extract ticket ID from branch (e.g., feature/JIRA-123-description)\n  TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1)\n  \n  if [ -n \"$TICKET\" ]; then\n    # Prepend ticket ID to first line\n    FIRST_LINE=$(head -1 \"$COMMIT_MSG_FILE\")\n    echo \"[$TICKET] $FIRST_LINE\" > \"$COMMIT_MSG_FILE\"\n  fi\nfi\n\nexit 0"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I bypass commit-msg validation?",
+            "answer": "Yes, with git commit --no-verify. Use this only for emergency cases. Regular bypassing defeats the purpose of the hook."
+          },
+          {
+            "question": "Does commit-msg run on merge commits?",
+            "answer": "Yes, unless you configure it not to. Merge commits often have auto-generated messages that may not follow your convention. Use prepare-commit-msg to customize merge messages."
+          },
+          {
+            "question": "What is the difference between prepare-commit-msg and commit-msg?",
+            "answer": "prepare-commit-msg runs before the editor opens and can modify the message. commit-msg runs after the user edits and saves, and only validates."
+          },
+          {
+            "question": "Can I use conventional commits without a hook?",
+            "answer": "You can, but enforcement requires discipline. Hooks guarantee consistency across all contributors and prevent accidental format violations."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "commit-msg validates the commit message after editing but before commit creation",
+          "Use Conventional Commits format: <type>(<scope>): <description>",
+          "Use commitlint for robust, configurable message validation",
+          "prepare-commit-msg can pre-populate messages from branch names",
+          "Hooks are bypassed with --no-verify — use sparingly"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["pre-commit-hooks", "husky-lint-staged"],
+  "furtherReading": [
+    { "title": "Conventional Commits", "url": "https://www.conventionalcommits.org/", "type": "article" },
+    { "title": "commitlint", "url": "https://commitlint.js.org/", "type": "tool" }
+  ]
+}

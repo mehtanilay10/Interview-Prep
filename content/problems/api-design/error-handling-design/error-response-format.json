@@ -1,0 +1,164 @@
+{
+  "id": "lesson-api-design-problems-error-handling-design-error-response-format",
+  "slug": "error-response-format",
+  "moduleSlug": "error-handling-design",
+  "courseSlug": "api-design-problems",
+  "title": "Error Response Format",
+  "description": "Design a consistent, machine-readable error response format that includes error codes, field-level details, and documentation links.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["errors", "format", "validation", "diagnostics"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A consistent error response format lets clients handle failures programmatically. Every error should include a machine-readable code, a human-readable message, a unique request ID for support, and a documentation URL."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Standard Error Schema"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Follow RFC 7807 (Problem Details) or extend it with additional fields for better developer experience."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RFC 7807-compatible error response",
+        "content": "Minimal standard format with custom extensions.",
+        "code": "{\n  \"type\": \"https://api.example.com/errors/validation-failed\",\n  \"title\": \"Validation Failed\",\n  \"status\": 422,\n  \"detail\": \"The request body contains invalid fields.\",\n  \"instance\": \"/users\",\n  \"requestId\": \"req_abc123\",\n  \"timestamp\": \"2026-10-06T15:30:00Z\",\n  \"errors\": [\n    {\n      \"field\": \"email\",\n      \"issue\": \"Must be a valid email address\",\n      \"value\": \"not-an-email\"\n    }\n  ],\n  \"documentationUrl\": \"https://docs.example.com/errors/validation-failed\"\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Error Code Registry"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Code", "HTTP Status", "Meaning", "Client Action"],
+        "rows": [
+          ["BadRequest", 400, "Malformed request", "Fix request format"],
+          ["Unauthorized", 401, "Missing or invalid auth", "Re-authenticate"],
+          ["Forbidden", 403, "Insufficient permissions", "Contact admin"],
+          ["NotFound", 404, "Resource does not exist", "Verify resource ID"],
+          ["Conflict", 409, "State conflict", "Resolve and retry"],
+          ["ValidationFailed", 422, "Semantic validation error", "Fix field values"],
+          ["RateLimited", 429, "Too many requests", "Wait and retry with backoff"],
+          ["InternalError", 500, "Unexpected server failure", "Retry with exponential backoff"],
+          ["ServiceUnavailable", 503, "Overloaded or maintenance", "Retry after delay"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation Errors with Field-Level Detail"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Validation errors must tell the client exactly which field failed and why. A generic 'validation failed' message forces clients to inspect the entire request body."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "422 with field-level validation errors",
+        "content": "Each error entry names the field, the specific issue, and the received value.",
+        "code": "POST /users\n{\n  \"email\": \"not-an-email\",\n  \"password\": \"123\",\n  \"age\": 15\n}\n\nResponse: 422 Unprocessable Entity\n{\n  \"type\": \"https://api.example.com/errors/validation-failed\",\n  \"title\": \"Validation Failed\",\n  \"status\": 422,\n  \"requestId\": \"req_def456\",\n  \"errors\": [\n    {\n      \"field\": \"email\",\n      \"issue\": \"Must be a valid email address\",\n      \"value\": \"not-an-email\"\n    },\n    {\n      \"field\": \"password\",\n      \"issue\": \"Must be at least 8 characters\",\n      \"value\": \"123\"\n    },\n    {\n      \"field\": \"age\",\n      \"issue\": \"Must be at least 18\",\n      \"value\": 15\n    }\n  ]\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Global Error Handler Pattern"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Centralize error formatting in a global exception handler so every endpoint returns the same structure automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Global error handler in Express.js",
+        "content": "Middleware that intercepts all errors and formats them consistently.",
+        "code": "app.use((err, req, res, next) => {\n  const requestId = req.id || 'unknown';\n\n  if (err.name === 'ValidationError') {\n    return res.status(422).json({\n      type: 'https://api.example.com/errors/validation-failed',\n      title: 'Validation Failed',\n      status: 422,\n      requestId,\n      timestamp: new Date().toISOString(),\n      errors: err.errors\n    });\n  }\n\n  if (err.name === 'UnauthorizedError') {\n    return res.status(401).json({\n      type: 'https://api.example.com/errors/unauthorized',\n      title: 'Unauthorized',\n      status: 401,\n      requestId,\n      message: 'Missing or invalid API key.'\n    });\n  }\n\n  // Default 500\n  console.error(`[${requestId}]`, err);\n  return res.status(500).json({\n    type: 'https://api.example.com/errors/internal',\n    title: 'Internal Server Error',\n    status: 500,\n    requestId,\n    message: 'An unexpected error occurred.'\n  });\n});",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Include a request ID",
+        "text": "Every error response must include a unique request ID. Clients include this ID in support tickets. You use it to look up the exact server-side log entry without asking the client for timing, IP, or request details."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I include the stack trace in error responses?",
+            "answer": "Never in production. Stack traces leak internal class names, file paths, and dependency versions. Log them server-side with the request ID and return only the error code and message."
+          },
+          {
+            "question": "How do I handle errors from downstream services?",
+            "answer": "Map downstream errors to your own error codes. Do not expose internal service names or error messages. Return 502 Bad Gateway or 504 Gateway Timeout with your own error format."
+          },
+          {
+            "question": "Should error codes be stable or can they change?",
+            "answer": "Error codes are part of your API contract. Once published, never change or remove them. You can add new codes, but existing ones must remain forever."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Use RFC 7807 as the base and extend with requestId and documentationUrl.",
+          "Validation errors must include field-level detail.",
+          "Never expose stack traces or internal service names.",
+          "Error codes are stable API contracts."
+        ],
+        "takeaway": "Error responses are the API contract when things go wrong. Make them as machine-readable and actionable as your success responses."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "http-status-code-selection",
+    "validation-errors"
+  ],
+  "furtherReading": [
+    {
+      "title": "RFC 7807: Problem Details for HTTP APIs",
+      "url": "https://datatracker.ietf.org/doc/html/rfc7807",
+      "type": "article",
+      "author": "IETF",
+      "description": "Official standard for structured HTTP error responses."
+    }
+  ]
+}

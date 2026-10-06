@@ -1,0 +1,136 @@
+{
+  "id": "lesson-mqes-028",
+  "slug": "kafka-exactly-once-processing",
+  "moduleSlug": "event-streaming-kafka",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Exactly-Once Processing in Kafka",
+  "description": "Implement idempotent producers, transactions, and exactly-once semantics in Kafka.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 35,
+  "tags": [
+    "kafka",
+    "exactly-once",
+    "idempotence",
+    "transactions",
+    "semantics"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Exactly-once semantics (EOS) ensure each message is processed exactly once, even when failures or retries occur. Kafka achieves EOS through idempotent producers, atomic transactions, and transactional offset commits. Together, these mechanisms eliminate duplicate and lost messages in complex pipelines."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Idempotent Producers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "By default, a Kafka producer assigns a random sequence number per message. On retry, the broker may reject duplicates because it sees a different sequence number for the same partition. Enabling idempotence assigns a persistent producer ID (PID) and monotonically increasing sequence numbers, allowing the broker to deduplicate retries automatically."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent Producer in C#",
+        "content": "Configuring an idempotent producer with Confluent.Kafka to prevent duplicates on retry.",
+        "language": "csharp",
+        "code": "var config = new ProducerConfig\n{\n    BootstrapServers = \"broker-1:9092\",\n    EnableIdempotence = true, // Adds PID and sequence numbers\n    Acks = Acks.All,\n    MaxInFlight = 5 // Safe because idempotence prevents reordering\n};\n\nusing var producer = new ProducerBuilder<string, string>(config).Build();\n\n// Even if this call retries, the broker will deduplicate\nawait producer.ProduceAsync(\"payments\", new Message<string, string>\n{\n    Key = \"payment-789\",\n    Value = JsonSerializer.Serialize(new { Id = 789, Amount = 150.00 })\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transactions"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Transactions extend idempotence to multiple partitions and topics. A transactional producer writes to several partitions atomically, so either all messages are visible or none are. This is critical for read-process-write patterns where a consumer reads from one topic, processes the data, and writes results to another."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Transactional Producer in C#",
+        "content": "Writing to multiple topics atomically using Confluent.Kafka transactions.",
+        "language": "csharp",
+        "code": "var config = new ProducerConfig\n{\n    BootstrapServers = \"broker-1:9092\",\n    TransactionalId = \"payment-processor-tx\" // Unique per transactional producer\n};\n\nusing var producer = new ProducerBuilder<string, string>(config).Build();\nproducer.InitTransactions(TimeSpan.FromSeconds(10));\n\ntry\n{\n    producer.BeginTransaction();\n\n    await producer.ProduceAsync(\"payments\", new Message<string, string>\n    {\n        Key = \"tx-1\",\n        Value = \"Processed payment for order 1\"\n    });\n\n    await producer.ProduceAsync(\"audit\", new Message<string, string>\n    {\n        Key = \"tx-1\",\n        Value = \"Audit: payment 1 processed at \" + DateTime.UtcNow\n    });\n\n    producer.CommitTransaction();\n}\ncatch (Exception)\n{\n    producer.AbortTransaction();\n    throw;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transactional Consumers"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "To participate in exactly-once pipelines, consumers must read committed messages only and commit their offsets within the same transaction as any output they produce. The `isolation.level=read_committed` setting ensures the consumer sees only messages from completed transactions."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Transactional Consumer in Node.js (kafkajs)",
+        "content": "Consuming committed messages and producing transactional output with KafkaJS.",
+        "language": "javascript",
+        "code": "const { Kafka } = require('kafkajs');\n\nconst kafka = new Kafka({ clientId: 'tx-consumer', brokers: ['localhost:9092'] });\nconst consumer = kafka.consumer({ groupId: 'read-committed-group' });\nconst producer = kafka.producer({ transactionalId: 'tx-consumer-prod' });\n\nasync function run() {\n  await consumer.connect();\n  await producer.connect();\n  await producer.initTransactions();\n\n  await consumer.subscribe({ topic: 'input-topic', fromBeginning: true });\n\n  await consumer.run({\n    eachMessage: async ({ message }) => {\n      await producer.beginTransaction();\n\n      try {\n        const processed = transform(message.value.toString());\n        await producer.send({ topic: 'output-topic', messages: [{ value: processed }] });\n        await producer.commitTransaction();\n      } catch (err) {\n        await producer.abortTransaction();\n        throw err;\n      }\n    }\n  });\n}\n\nrun();"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "exactly-once-flow",
+        "definition": "sequenceDiagram\n    participant P as Producer\n    participant B as Kafka Broker\n    participant C as Consumer\n\n    P->>B: Init Transactions\n    P->>B: Begin Transaction\n    P->>B: Produce Message (tx-id)\n    P->>B: Commit Transaction\n    B->>C: Poll (read_committed)\n    C->>C: Process Message\n    C->>B: Send Output + Commit Offset (in transaction)\n    B->>C: Transaction Committed",
+        "caption": "End-to-end exactly-once flow with transactions"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Performance Trade-off",
+        "text": "Exactly-once semantics add latency because transactions require extra coordination with the broker. For workloads where occasional duplicates are acceptable, idempotent producers without transactions may provide better throughput."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Idempotent producers use PIDs and sequence numbers to deduplicate retries.",
+          "Transactions atomically write to multiple partitions and topics.",
+          "Consumers must set `isolation.level=read_committed` to participate in EOS.",
+          "Use EOS when duplicate or lost messages are unacceptable, such as in financial systems."
+        ],
+        "takeaway": "Exactly-once processing turns Kafka into a reliable backbone for critical data pipelines."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Kafka Exactly-Once Semantics",
+      "url": "https://kafka.apache.org/documentation/#semantics",
+      "type": "article",
+      "description": "Official documentation on Kafka's delivery guarantees and exactly-once semantics."
+    },
+    {
+      "title": "Confluent Transactions Guide",
+      "url": "https://docs.confluent.io/platform/current/developer-guide/transactions.html",
+      "type": "article",
+      "description": "How to implement exactly-once processing with Kafka transactions in client applications."
+    }
+  ]
+}

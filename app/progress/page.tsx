@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { getCurrentUser, requireAuth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ProgressDashboardClient } from './ProgressDashboardClient';
+import { ProgressErrorBoundary } from '@/components/progress/ProgressErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Progress Dashboard | Interview Prep',
@@ -14,5 +15,9 @@ export default async function ProgressPage() {
     redirect('/login');
   }
 
-  return <ProgressDashboardClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />;
+  return (
+    <ProgressErrorBoundary>
+      <ProgressDashboardClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />
+    </ProgressErrorBoundary>
+  );
 }

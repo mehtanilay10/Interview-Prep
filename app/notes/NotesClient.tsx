@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StickyNote } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { getLessonBySlug } from '@/lib/content';
 
 interface LessonNote {
@@ -67,7 +68,7 @@ export function NotesClient({ user }: NotesClientProps) {
           setNotes(data.notes || []);
         }
       } catch (err) {
-        console.error('Failed to fetch notes:', err);
+        logger.error('NotesClient', 'Failed to fetch notes:', err);
       } finally {
         setLoading(false);
       }

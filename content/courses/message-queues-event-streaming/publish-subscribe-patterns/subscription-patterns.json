@@ -1,0 +1,222 @@
+{
+  "id": "lesson-mqes-010",
+  "slug": "subscription-patterns",
+  "moduleSlug": "publish-subscribe-patterns",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Durable vs Transient Subscriptions",
+  "description": "Learn the difference between durable and transient subscriptions and when to use each for reliable messaging.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 14,
+  "tags": [
+    "subscriptions",
+    "durable",
+    "transient",
+    "reliability",
+    "messaging"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a consumer subscribes to a message queue, it chooses between a **durable** and **transient** (non-durable) subscription. This choice determines whether the queue — and by extension the subscription — survives a broker restart. Durable subscriptions are the backbone of reliable messaging systems, while transient subscriptions are useful for short-lived consumers like background workers or ad-hoc listeners."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Makes a Subscription Durable?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A durable subscription requires two conditions: (1) the queue itself must be declared as `durable: true`, and (2) the exchange that feeds it must also be durable. A transient subscription uses an `exclusive` or `auto-delete` queue, which the broker removes when the consumer disconnects. Broker restarts wipe auto-delete queues, along with any messages stored inside them."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Auto-Delete Is Not Durable",
+        "text": "Declaring a queue with auto-delete means the broker removes it when the last consumer unsubscribes. This is convenient for temporary workers but dangerous if you expect messages to survive a crash. Always double-check queue arguments when configuring production consumers."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "subscription-diagram",
+        "caption": "Durable vs transient subscription lifecycle across broker restarts",
+        "definition": "sequenceDiagram\n    participant P as Publisher\n    participant E as Exchange\n    participant Q as Queue\n    participant C as Consumer\n    participant B as Broker\n\n    P->>E: Publish message\n    E->>Q: Route to durable queue\n    Q->>Q: Message persists on disk\n\n    Note over B: Broker restarts\n    B->>Q: Durable queue restored\n    Q->>C: Consumer reconnects\n    C->>Q: Message still available\n\n    P->>E: Publish to transient queue\n    E->>Q: Route to auto-delete queue\n    Note over B: Broker restarts\n    B->>Q: Queue deleted; messages lost"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Durable subscriptions are the foundation of reliable messaging architectures. In financial systems, healthcare, and e-commerce, losing a message during a broker restart can result in data loss, missed transactions, or compliance violations. Always use durable queues for these workloads and pair them with publisher confirms to ensure messages reach the broker before the publisher continues."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Transient subscriptions are not without value. They are ideal for request-reply patterns, health-check consumers, and real-time dashboards where a brief data gap during a restart is acceptable. The shorter lifecycle also means fewer resources are consumed on the broker. However, always document which queues are transient so that other engineers do not assume messages are being retained."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Code Example: Durable vs Transient"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The following C# example contrasts a durable subscription with a transient one. The key difference is the `durable` and `exclusive` flags passed when declaring the queue."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Durable subscription",
+        "content": "Declare a durable queue that survives broker restarts and persists messages to disk.",
+        "code": "var factory = new ConnectionFactory() { HostName = \"localhost\" };\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\nchannel.ExchangeDeclare(\"order.events\", ExchangeType.Topic, durable: true);\n\n// Durable: survives broker restarts; non-exclusive: multiple consumers allowed\nchannel.QueueDeclare(\n    queue: \"order-processing-queue\",\n    durable: true,\n    exclusive: false,\n    autoDelete: false);\n\nchannel.QueueBind(\"order-processing-queue\", \"order.events\", \"order.#\");\n\n// Messages published before this consumer starts will be redelivered\nchannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);\nchannel.BasicConsume(\n    queue: \"order-processing-queue\",\n    autoAck: false,\n    consumer: new EventingBasicConsumer(channel));",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Transient (auto-delete) subscription",
+        "content": "An exclusive, auto-delete queue is ideal for short-lived request-reply patterns.",
+        "code": "const amqp = require('amqplib');\n\nasync function transientSubscriber() {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n\n  await ch.assertExchange('order.events', 'topic', { durable: true });\n\n  // exclusive + auto-delete = transient subscription\n  const { queue } = await ch.assertQueue('', { exclusive: true });\n  await ch.bindQueue(queue, 'order.events', 'order.#');\n\n  ch.consume(queue, (msg) => {\n    if (msg.content) {\n      console.log('Transient consumer received:', msg.content.toString());\n    }\n  }, { noAck: true });\n\n  console.log('Transient subscriber active on queue:', queue);\n\n  // After this function exits and connection closes, queue is deleted\n}\n\ntransientSubscriber();",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Durable Subscription",
+            "definition": "A subscription backed by a durable queue that survives broker restarts and replays unacknowledged messages to reconnected consumers."
+          },
+          {
+            "term": "Transient Subscription",
+            "definition": "A subscription backed by an exclusive, auto-delete queue that is removed when the consumer disconnects."
+          },
+          {
+            "term": "Auto-Delete",
+            "definition": "A queue property that causes the broker to delete the queue when its last consumer unsubscribes."
+          },
+          {
+            "term": "Exclusive Queue",
+            "definition": "A queue that can be consumed by only one connection. When that connection closes, the queue is deleted."
+          }
+        ]
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Property",
+          "Durable",
+          "Transient"
+        ],
+        "rows": [
+          [
+            "Queue survives restart",
+            "Yes",
+            "No"
+          ],
+          [
+            "Messages survive restart",
+            "Yes",
+            "No"
+          ],
+          [
+            "Multiple consumers",
+            "Allowed",
+            "Not allowed (exclusive)"
+          ],
+          [
+            "Auto-deleted on disconnect",
+            "No",
+            "Yes"
+          ],
+          [
+            "Use case",
+            "Order processing, audit logs",
+            "RPC reply queues, ad-hoc listeners"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Exercise: Choose the Right Subscription Type",
+        "description": "For each scenario below, decide whether a durable or transient subscription is most appropriate, and justify your choice.",
+        "steps": [
+          "An order processing service that must not lose any order events across broker restarts.",
+          "A request-reply pattern where a client sends a query and waits for one response.",
+          "A real-time dashboard that shows live metrics and can tolerate missing data points during a restart.",
+          "An audit service that archives every message for compliance purposes."
+        ],
+        "expectedOutcome": "A short justification for each scenario showing understanding of durability guarantees and failure modes."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Can I declare a queue as durable in code but the broker discards it anyway?",
+            "answer": "Yes, if the exchange it is bound to is not also declared durable. Both the exchange and queue must be durable for messages to survive a broker restart."
+          },
+          {
+            "question": "What is the difference between exclusive and auto-delete?",
+            "answer": "Exclusive means only one connection can consume from the queue. Auto-delete means the queue is deleted when its last consumer unsubscribes. A queue can be exclusive without auto-delete, or auto-delete without exclusive."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Durable subscriptions survive broker restarts; transient ones do not.",
+          "Both the exchange and queue must be durable for message persistence.",
+          "Transient queues are useful for RPC replies and short-lived consumers.",
+          "Always configure DLQs on durable queues to handle undeliverable messages."
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "RabbitMQ — Queues and Durability",
+          "url": "https://www.rabbitmq.com/docs/queues#durability",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "RabbitMQ documentation on queue durability, exclusive queues, and auto-delete behavior."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ — Queues and Durability",
+      "url": "https://www.rabbitmq.com/docs/queues#durability",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "RabbitMQ documentation on queue durability, exclusive queues, and auto-delete behavior."
+    }
+  ]
+}

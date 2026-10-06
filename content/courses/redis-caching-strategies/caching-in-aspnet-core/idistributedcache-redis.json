@@ -1,0 +1,229 @@
+{
+  "id": "lesson-redis-031",
+  "slug": "idistributedcache-redis",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "IDistributedCache with Redis",
+  "description": "Configure and use IDistributedCache backed by Redis for shared, distributed caching across multiple ASP.NET Core instances.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 15,
+  "tags": [
+    "asp.net core",
+    "idistributedcache",
+    "redis",
+    "distributed-caching"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is IDistributedCache?",
+        "anchor": "what-is-idistributedcache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "IDistributedCache is a higher-level abstraction introduced in ASP.NET Core 2.0. Unlike IMemoryCache, which stores data in the local process, IDistributedCache stores cache entries in an external store such as Redis, SQL Server, or NCache. This means every instance of your application sees the same cached data — essential for cloud-native and scaled-out deployments."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Redis-backed implementation ships in the Microsoft.Extensions.Caching.StackExchangeRedis package. It uses StackExchange.Redis under the hood, the most widely adopted .NET Redis client. The abstraction exposes simple Get, Set, Refresh, and Remove methods, keeping your code independent of any specific store."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "IDistributedCache",
+            "definition": "An interface for distributed cache stores. Implementations exist for Redis, SQL Server, and in-memory."
+          },
+          {
+            "term": "StackExchange.Redis",
+            "definition": "A high-performance Redis client for .NET used by the official Redis distributed cache implementation."
+          },
+          {
+            "term": "ConnectionMultiplexer",
+            "definition": "The core StackExchange.Redis type. It manages a pooled connection to the Redis server and is intended to be reused as a singleton."
+          },
+          {
+            "term": "Distributed Cache Entry",
+            "definition": "A byte[] value stored in Redis with an optional TTL. IDistributedCache handles serialization internally."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Configuring Redis Distributed Cache",
+        "anchor": "configuring-redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Install the package, register the service with your Redis connection string, and inject IDistributedCache wherever you need it. Because the cache entries are byte arrays, you must serialize and deserialize your objects yourself using System.Text.Json or another serializer."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Package Installation",
+        "content": "Install the Redis distributed cache package from NuGet.",
+        "code": "dotnet add package Microsoft.Extensions.Caching.StackExchangeRedis",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering Redis Distributed Cache",
+        "content": "Wire up Redis in Program.cs using AddStackExchangeRedisCache.",
+        "code": "builder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n    options.InstanceName = \"MyApp:\";\n    // InstanceName prefixes all keys so multiple apps can share one Redis server\n});",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Using IDistributedCache",
+        "content": "Set and retrieve a serialized object from Redis. Always wrap Redis calls in try-catch because network failures are possible.",
+        "code": "public class WeatherService\n{\n    private readonly IDistributedCache _cache;\n    private readonly JsonSerializerOptions _jsonOptions = new()\n    {\n        PropertyNamingPolicy = JsonNamingPolicy.CamelCase\n    };\n\n    public WeatherService(IDistributedCache cache)\n    {\n        _cache = cache;\n    }\n\n    public async Task<WeatherForecast[]> GetForecastAsync()\n    {\n    const string key = \"weather-forecast\";\n\n    var cached = await _cache.GetStringAsync(key);\n    if (cached is not null)\n    {\n        return JsonSerializer.Deserialize<WeatherForecast[]>(cached, _jsonOptions)!;\n    }\n\n    var forecast = GenerateForecast();\n    var json = JsonSerializer.Serialize(forecast, _jsonOptions);\n\n    await _cache.SetStringAsync(\n        key,\n        json,\n        new DistributedCacheEntryOptions\n        {\n            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)\n        });\n\n    return forecast;\n}\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Reuse the ConnectionMultiplexer",
+        "text": "AddStackExchangeRedisCache manages the ConnectionMultiplexer internally, so you do not need to create one yourself. If you need direct Redis access for pub/sub or advanced commands, inject IConnectionMultiplexer from the same StackExchange.Redis package."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Comparing IMemoryCache and IDistributedCache",
+        "anchor": "comparison"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "IMemoryCache vs IDistributedCache (Redis)",
+        "cards": [
+          {
+            "title": "IMemoryCache",
+            "description": "Stores data in the local process heap. Extremely fast with no network overhead. Data is lost when the app restarts.",
+            "pros": ["Sub-microsecond access", "No network dependency", "Built-in size limits"],
+            "cons": ["Not shared across instances", "Lost on restart", "Consumes server RAM"]
+          },
+          {
+            "title": "IDistributedCache with Redis",
+            "description": "Stores data in an external Redis server. Visible to every app instance. Survives app restarts.",
+            "pros": ["Shared across instances", "Persists across restarts", "Supports pub/sub eviction"],
+            "cons": ["Network round-trip latency", "Requires Redis infrastructure", "Serialization cost"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "redis-architecture",
+        "caption": "Redis distributed cache architecture across multiple app instances",
+        "definition": "flowchart LR\n    A[App Instance 1] -->|Get / Set| R[(Redis Server)]\n    B[App Instance 2] -->|Get / Set| R\n    C[App Instance 3] -->|Get / Set| R\n    R -->|TTL Expiry| D[Entry Removed]\n    style R fill:#e05252,color:#fff"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Practical Tips",
+        "anchor": "practical-tips"
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "title": "Best Practices",
+        "items": [
+          "Prefix keys with InstanceName to avoid collisions when multiple apps share one Redis server.",
+          "Keep cached values small — large strings increase network latency and memory usage.",
+          "Always set an absolute or sliding expiration unless the value is truly permanent.",
+          "Wrap Redis calls in try-catch and fall back to the database when Redis is unreachable.",
+          "Use SetStringAsync for simple values and SetAsync (with a custom serializer) for complex objects."
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "IDistributedCache provides a common interface over Redis, SQL Server, and other stores",
+          "AddStackExchangeRedisCache handles ConnectionMultiplexer management",
+          "Values are byte arrays — serialize and deserialize on every call",
+          "Redis is shared across all app instances, making it ideal for scaled-out deployments",
+          "Always set TTL to prevent stale entries from accumulating"
+        ],
+        "takeaway": "IDistributedCache with Redis is the standard approach for multi-instance ASP.NET Core applications."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Should I use both IMemoryCache and IDistributedCache together?",
+            "answer": "Yes. A common pattern is to use IMemoryCache as a local L1 cache in front of Redis as the L2 distributed cache. The app checks local memory first, then falls back to Redis, then to the database. Libraries like CacheManager help implement this two-tier pattern."
+          },
+          {
+            "question": "Does IDistributedCache compress values automatically?",
+            "answer": "No. IDistributedCache stores the raw byte array you provide. If you need compression, compress the bytes yourself before calling SetAsync and decompress after GetAsync."
+          }
+        ]
+      }
+    },
+    {
+      "type": "further-reading",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Distributed caching with Redis in ASP.NET Core",
+            "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed",
+            "type": "article"
+          },
+          {
+            "title": "StackExchange.Redis documentation",
+            "url": "https://stackexchange.github.io/StackExchange.Redis/",
+            "type": "documentation"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Distributed caching with Redis in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed",
+      "type": "article"
+    },
+    {
+      "title": "StackExchange.Redis documentation",
+      "url": "https://stackexchange.github.io/StackExchange.Redis/",
+      "type": "documentation"
+    }
+  ]
+}

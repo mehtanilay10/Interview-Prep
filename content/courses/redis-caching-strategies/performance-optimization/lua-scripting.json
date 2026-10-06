@@ -1,0 +1,146 @@
+{
+  "id": "lesson-redis-043",
+  "slug": "lua-scripting",
+  "moduleSlug": "performance-optimization",
+  "courseSlug": "redis-caching-strategies",
+  "title": "Lua Scripting in Redis",
+  "description": "Use Lua scripts to run atomic logic directly inside Redis, reducing round trips and eliminating race conditions.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["redis", "lua", "atomicity", "scripting", "performance"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Redis supports executing Lua scripts via the EVAL command. When Redis receives a script, it loads, compiles, and caches it inside the server process. Subsequent executions of the same script run from the cache, so there is no repeated compilation overhead. More importantly, Redis treats the entire script as an atomic unit: no other command can interleave while the script is running."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Atomic Execution"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This atomic guarantee is what makes Lua scripts powerful. Imagine a rate limiter that must check a counter, increment it, and decide whether to allow a request — all in one indivisible step. With individual Redis commands, a second client could slip between your GET and SET. With Lua, the check and update happen together without interruption."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "lua-atomic-flow",
+        "caption": "Lua script execution is atomic inside Redis",
+        "definition": "flowchart TD\n    A[\"Client A\nEVAL script\"] --> B[\"Redis Server\nLoading...\"]\n    C[\"Client B\nINCR key\"] -.->|blocked| B\n    D[\"Client C\nGET key\n|> D\n    E[\"Script Running\n(read + write)\nAtomic\"] --> F[\"Script Done\nResponses sent\"]\n    B --> E\n    E --> F\n    F --> G[\"Client B resumes\nINCR key runs\"]\n    F --> H[\"Client C resumes\nGET key runs\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Script Caching with SHA1"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every script you send to EVAL is stored in Redis with a SHA1 hash. After the first execution, you can call the script again by its hash using EVALSHA. This avoids resending the full script body and is the preferred pattern in production. Most Redis clients manage EVALSHA transparently, falling back to EVAL only when the script is not yet cached."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Atomic rate limiter with Lua",
+        "language": "javascript",
+        "code": "const Redis = require('ioredis');\nconst redis = new Redis();\n\nconst rateLimiterScript = redis.prepare(\n  'local key = KEYS[1] \\n' +\n  'local limit = tonumber(ARGV[1]) \\n' +\n  'local window = tonumber(ARGV[2]) \\n' +\n  'local current = redis.call('INCR', key) \\n' +\n  'if current == 1 then \\n' +\n  '  redis.call('EXPIRE', key, window) \\n' +\n  'end \\n' +\n  'if current > limit then \\n' +\n  '  return 0 \\n' +\n  'end \\n' +\n  'return 1'\n);\n\nasync function allowRequest(userId, limit = 100, windowSeconds = 60) {\n  const key = `rate-limit:${userId}`;\n  // Atomic: increment and check in one script\n  const allowed = await rateLimiterScript(\n    key,\n    [key, String(limit), String(windowSeconds)]\n  );\n  return allowed === 1;\n}\n\nconst ok = await allowRequest('user-123');\nconsole.log('Request allowed:', ok);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "C# Lua Scripting with StackExchange.Redis"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In C#, you can load a Lua script once and reuse it. StackExchange.Redis supports Lua through the LoadLuaScript method, which returns a LuaScript object ready to execute. This avoids loading the same script repeatedly and keeps your code clean."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Lua script with StackExchange.Redis (C#)",
+        "language": "csharp",
+        "code": "using StackExchange.Redis;\n\nvar mux = ConnectionMultiplexer.Connect(\"localhost:6379\");\nvar db = mux.GetDatabase();\n\n// Load script once\nLuaScript rateLimiter = LuaScript.Prepare(\n    @\"local current = redis.call('INCR', KEYS[1])\n      if current == 1 then\n        redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))\n      end\n      if current > tonumber(ARGV[1]) then\n        return 0\n      end\n      return 1\"\n);\n\nvar loaded = db.LoadLuaScript(rateLimiter);\n\n// Reuse the loaded script\nbool allowed = await loaded.EvaluateAsync(\n    RedisKey.E,\n    new RedisKey[] { $\"rate-limit:user-123\" },\n    new RedisValue[] { 100, 60 }\n) == 1;\n\nConsole.WriteLine($\"Request allowed: {allowed}\");"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Script Timeout",
+        "text": "Redis kills Lua scripts that run longer than lua-time-limit (default 5 seconds). A slow script blocks all other commands. Keep scripts short, avoid unbounded loops, and do not perform blocking operations inside them."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Common Patterns"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Rate limiting with atomic increment and expiry",
+          "Atomic counters that reset after a window",
+          "Optimistic locking with check-and-set",
+          "Batch gets with sorted-set ranking",
+          "Set union and intersection without round trips"
+        ],
+        "title": "Popular Lua use cases"
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          { "term": "EVAL", "definition": "Redis command that sends a Lua script body and executes it immediately." },
+          { "term": "EVALSHA", "definition": "Redis command that executes a cached script by its SHA1 hash, avoiding resending the body." },
+          { "term": "KEYS/ARGV", "definition": "Lua global tables populated by Redis: KEYS contains the key arguments, ARGV contains the rest." }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Lua scripts execute atomically inside Redis",
+          "Scripts are cached by SHA1; EVALSHA avoids resending bodies",
+          "Use Lua for read-modify-write patterns that need atomicity",
+          "Keep scripts short to avoid hitting lua-time-limit"
+        ],
+        "takeaway": "Lua scripting turns Redis into a lightweight transaction engine. When you need atomic read-modify-write without the overhead of WATCH/MULTI/EXEC, a Lua script is usually the right tool."
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        { "title": "Redis Scripting Documentation", "url": "https://redis.io/docs/latest/develop/scripting/", "type": "article" },
+        { "title": "Redis Lua Scripting Best Practices", "url": "https://redis.io/docs/latest/develop/scripting/lua-best-practices/", "type": "article" }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    { "title": "Redis Scripting Documentation", "url": "https://redis.io/docs/latest/develop/scripting/", "type": "article" },
+    { "title": "Redis Lua Scripting Best Practices", "url": "https://redis.io/docs/latest/develop/scripting/lua-best-practices/", "type": "article" }
+  ]
+}

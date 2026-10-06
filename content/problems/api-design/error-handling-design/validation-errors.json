@@ -1,0 +1,173 @@
+{
+  "id": "lesson-api-design-problems-error-handling-design-validation-errors",
+  "slug": "validation-errors",
+  "moduleSlug": "error-handling-design",
+  "courseSlug": "api-design-problems",
+  "title": "Validation Errors",
+  "description": "Design clear, actionable validation error responses with field-level details, localization support, and helpful error codes.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["validation", "errors", "422", "input"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Validation errors are the most common error type clients encounter. A well-designed validation error response tells the client exactly what is wrong and how to fix it, without them having to read your documentation."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation Layers"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Syntactic validation — JSON parse errors, missing required headers (400 Bad Request)",
+          "Type validation — wrong type for field, out-of-range numbers (422 Unprocessable Entity)",
+          "Business validation — conflicting fields, business rule violations (409 Conflict or 422)",
+          "Security validation — SQL injection patterns, XSS payloads, oversized inputs (400 or 422)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example: Comprehensive Validation Error"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "422 with multiple validation errors",
+        "content": "Return all validation errors at once so the client can fix them in a single round-trip.",
+        "code": "POST /users\n{\n  \"email\": \"not-an-email\",\n  \"password\": \"123\",\n  \"age\": 15,\n  \"referralCode\": \"XYZ123\"\n}\n\nResponse: 422 Unprocessable Entity\n{\n  \"type\": \"https://api.example.com/errors/validation-failed\",\n  \"title\": \"Validation Failed\",\n  \"status\": 422,\n  \"requestId\": \"req_validation_001\",\n  \"errors\": [\n    {\n      \"field\": \"email\",\n      \"issue\": \"Must be a valid email address\",\n      \"value\": \"not-an-email\",\n      \"constraint\": \"format:email\"\n    },\n    {\n      \"field\": \"password\",\n      \"issue\": \"Must be at least 8 characters long\",\n      \"value\": \"123\",\n      \"constraint\": \"minLength:8\"\n    },\n    {\n      \"field\": \"age\",\n      \"issue\": \"Must be at least 18\",\n      \"value\": 15,\n      \"constraint\": \"min:18\"\n    },\n    {\n      \"field\": \"referralCode\",\n      \"issue\": \"Referral code has expired\",\n      \"value\": \"XYZ123\",\n      \"constraint\": \"notExpired\"\n    }\n  ]\n}",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation Error Properties"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Property", "Purpose", "Example"],
+        "rows": [
+          ["field", "JSON path to the invalid field", "billing.address.zipCode"],
+          ["issue", "Human-readable explanation", "Must be a valid US ZIP code"],
+          ["value", "The value that was submitted", "ABC"],
+          ["constraint", "Machine-readable rule name", "pattern:\\\\d{5}"],
+          ["location", "Where the field was found", "query, body, header"]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Localization"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Support error message localization via the Accept-Language header. Return error codes that are stable across languages, and let clients map codes to their own localized strings."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Localized error response",
+        "content": "Use Accept-Language to select the error message language.",
+        "code": "POST /users\nAccept-Language: fr-FR\n{\n  \"email\": \"not-an-email\"\n}\n\nResponse: 422 Unprocessable Entity\n{\n  \"type\": \"https://api.example.com/errors/validation-failed\",\n  \"title\": \"Validation Failed\",\n  \"status\": 422,\n  \"errors\": [\n    {\n      \"field\": \"email\",\n      \"issue\": \"L'adresse e-mail n'est pas valide.\",\n      \"constraint\": \"format:email\"\n    }\n  ]\n}\n\n// Client with Accept-Language: en-US sees:\n// \"issue\": \"Must be a valid email address.\"",
+        "language": "json"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Validation Rules Comparison"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": ["Rule Type", "Example", "Error Code", "HTTP Status"],
+        "rows": [
+          ["Required field", "email is required", "required", "422"],
+          ["Type mismatch", "age is string, expected integer", "typeError", "422"],
+          ["Format", "email is not a valid email", "format:email", "422"],
+          ["Minimum length", "password < 8 chars", "minLength:8", "422"],
+          ["Maximum length", "name > 255 chars", "maxLength:255", "422"],
+          ["Pattern", "phone does not match E.164", "pattern", "422"],
+          ["Unique constraint", "email already exists", "unique:email", "409"],
+          ["Range", "age < 18", "min:18", "422"],
+          ["Enum", "status is not active/pending", "enum:status", "422"]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Return all errors at once",
+        "text": "Validate the entire request body before returning. Do not fail on the first error. Clients fix faster when they see every problem in one response."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "Should I use 400 or 422 for validation errors?",
+            "answer": "Use 422. 400 Bad Request is for syntactically malformed requests (invalid JSON, missing headers). 422 Unprocessable Entity is for semantically invalid data that the server cannot process."
+          },
+          {
+            "question": "How deep should field paths go?",
+            "answer": "Use JSON Pointer notation for nested objects: billing/address/zipCode. Keep paths consistent with your JSON structure. Do not use dots if your JSON uses arrays; use [0] notation."
+          },
+          {
+            "question": "Should I expose the submitted value in errors?",
+            "answer": "Yes, but sanitize sensitive fields (passwords, tokens, SSNs). Replace with [REDACTED] to prevent logging sensitive data in client error reporters."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaway",
+        "points": [
+          "Return all validation errors at once, not one at a time.",
+          "Include field path, issue, submitted value, and constraint.",
+          "Use 422 for semantic validation, 400 for syntax.",
+          "Localize error messages but keep error codes stable."
+        ],
+        "takeaway": "Good validation errors are actionable. Clients should be able to fix the problem and retry without reading a single page of documentation."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "http-status-code-selection",
+    "business-logic-errors"
+  ],
+  "furtherReading": [
+    {
+      "title": "JSON Schema Validation",
+      "url": "https://json-schema.org/",
+      "type": "tool",
+      "description": "Standard vocabulary for annotating and validating JSON documents."
+    }
+  ]
+}

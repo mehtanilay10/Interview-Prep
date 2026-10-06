@@ -1,0 +1,216 @@
+{
+  "id": "lesson-redis-030",
+  "slug": "imemorycache",
+  "moduleSlug": "caching-in-aspnet-core",
+  "courseSlug": "redis-caching-strategies",
+  "title": "IMemoryCache for In-Memory Caching",
+  "description": "Learn how to use IMemoryCache in ASP.NET Core to cache frequently accessed data in process memory with expiration policies and callbacks.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 10,
+  "tags": [
+    "asp.net core",
+    "imemorycache",
+    "in-memory",
+    "caching"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What is IMemoryCache?",
+        "anchor": "what-is-imemorycache"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "IMemoryCache is ASP.NET Core's built-in abstraction for storing data in the local process memory. When a controller or service requests data that is expensive to compute or retrieve, you can cache it in memory so subsequent requests return the result instantly — without hitting the database or external service."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "MemoryCache is registered automatically when you call AddMemoryCache() on the IServiceCollection. The runtime stores entries in a concurrent dictionary backed by a least-recently-used (LRU) eviction policy, meaning the least-accessed items are removed first when memory pressure rises."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "IMemoryCache",
+            "definition": "The primary interface for the in-memory cache. Provides Get, Set, TryGetValue, and Remove methods."
+          },
+          {
+            "term": "CacheEntryOptions",
+            "definition": "Fluent options object that controls absolute or sliding expiration, eviction callbacks, and cache entry priority."
+          },
+          {
+            "term": "Sliding Expiration",
+            "definition": "An entry expires only if it has not been accessed within a specified time window. Each access resets the timer."
+          },
+          {
+            "term": "Absolute Expiration",
+            "definition": "An entry expires at a fixed point in time regardless of how often it is accessed."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Registering and Using IMemoryCache",
+        "anchor": "registering-and-using"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Register the service in Program.cs, then inject IMemoryCache into any controller, minimal API endpoint, or service. The TryGetValue pattern avoids the double-lookup problem by checking and returning in a single operation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Registering IMemoryCache",
+        "content": "Add the memory cache service to the DI container in Program.cs. This makes IMemoryCache available everywhere.",
+        "code": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddMemoryCache(options =>\n{\n    options.SizeLimit = 1024; // Limit total cache size in arbitrary units\n    options.CompactionPercentage = 0.2; // Remove 20% when at capacity\n});\n\nvar app = builder.Build();",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Caching with TryGetValue",
+        "content": "The canonical caching pattern: try to get the cached value first, and only compute it if the cache miss occurs.",
+        "code": "public class ProductService\n{\n    private readonly IMemoryCache _cache;\n    private const string CacheKey = \"all-products\";\n\n    public ProductService(IMemoryCache cache)\n    {\n        _cache = cache;\n    }\n\n    public async Task<List<Product>> GetAllProductsAsync()\n    {\n        if (!_cache.TryGetValue(CacheKey, out List<Product> products))\n        {\n            products = await _dbContext.Products.ToListAsync();\n\n            var cacheEntryOptions = new MemoryCacheEntryOptions\n            {\n                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),\n                SlidingExpiration = TimeSpan.FromMinutes(2),\n                Priority = CacheItemPriority.High,\n                Size = 1\n            }\n            .RegisterPostEvictionCallback(\n                (key, value, reason, state) =>\n                {\n                    Console.WriteLine($\"Cache entry evicted: {key}. Reason: {reason}\");\n                });\n\n            _cache.Set(CacheKey, products, cacheEntryOptions);\n        }\n\n        return products;\n    }\n}",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "IMemoryCache is per-instance",
+        "text": "IMemoryCache stores data in the local process. If your app runs on multiple servers or you scale out with Kubernetes, each instance maintains its own separate cache. Use IDistributedCache with Redis when you need a shared cache across instances."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cache Eviction and Post-Eviction Callbacks",
+        "anchor": "eviction-and-callbacks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cache entries leave memory in three ways: they expire, they are evicted under memory pressure, or the code explicitly removes them. RegisterPostEvictionCallback lets you react to every eviction event — useful for logging, metrics, or refreshing data asynchronously."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "imemorycache-flow",
+        "caption": "How a request flows through IMemoryCache",
+        "definition": "flowchart TD\n    A[Client Request] --> B{TryGetValue}\n    B -->|Hit| C[Return Cached Data]\n    B -->|Miss| D[Fetch from Database]\n    D --> E[Set Cache Entry]\n    E --> F[Return Data to Client]\n    C --> F\n    G[Expiration Timer] --> H[Remove Entry]\n    H --> I[Post-Eviction Callback Fires]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Use IMemoryCache",
+        "anchor": "when-to-use"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Good Use Cases",
+        "items": [
+          "Caching reference data that rarely changes (lookup tables, country codes)",
+          "Caching the result of expensive computations within a single server deployment",
+          "Reducing database round-trips for read-heavy endpoints",
+          "Storing per-request state without using HttpContext.Items"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Avoid When",
+        "items": [
+          "Your app runs on multiple servers and needs consistent cache state",
+          "You need cache persistence across application restarts",
+          "Cache size exceeds the memory budget of a single process"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "IMemoryCache lives in the local process — fast but not shared",
+          "Use TryGetValue + Set as the canonical caching pattern",
+          "Configure absolute and sliding expiration on each entry",
+          "Post-eviction callbacks let you react when entries leave memory",
+          "Switch to IDistributedCache when scaling beyond a single instance"
+        ],
+        "takeaway": "IMemoryCache is the simplest performant option for single-instance ASP.NET Core apps."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "What is the default size limit for IMemoryCache?",
+            "answer": "There is no default size limit unless you set one via options.SizeLimit. Without a limit, the cache can grow unbounded until the runtime evicts entries under memory pressure."
+          },
+          {
+            "question": "Is IMemoryCache thread-safe?",
+            "answer": "Yes. The MemoryCache implementation is fully thread-safe. You can call Get and Set from concurrent requests without additional locking."
+          }
+        ]
+      }
+    },
+    {
+      "type": "related-lessons",
+      "data": {
+        "title": "Further Reading",
+        "items": [
+          {
+            "title": "Cache in-memory in ASP.NET Core",
+            "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/memory",
+            "type": "article"
+          },
+          {
+            "title": "Response caching in ASP.NET Core",
+            "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/response",
+            "type": "article"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "Cache in-memory in ASP.NET Core",
+      "url": "https://learn.microsoft.com/en-us/aspnet/core/performance/caching/memory",
+      "type": "article"
+    },
+    {
+      "title": "MemoryCacheEntryOptions Class",
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.caching.memory.memorycacheentryoptions",
+      "type": "reference"
+    }
+  ]
+}

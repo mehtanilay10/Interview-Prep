@@ -1,0 +1,173 @@
+{
+  "id": "lesson-git-058",
+  "slug": "verifying-signatures",
+  "moduleSlug": "git-security",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Verifying Signatures",
+  "description": "Verify GPG and SSH signatures on commits and tags, and enforce signature requirements in your repository.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["git", "security", "signing", "verification"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Verifying signatures ensures that commits and tags were created by the claimed author and have not been modified since. Git provides built-in verification for both GPG and SSH signatures, and platforms like GitHub display verification status in their web UIs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Verifying GPG signatures"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use git log --show-signature to verify GPG signatures on commits. Use git tag -v to verify signed tags. Git checks the signature against the GPG keys in your keyring."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Verify GPG signatures on commits",
+        "language": "bash",
+        "code": "# Show signature status for the last 5 commits\ngit log --show-signature -5\n\n# Verify a specific commit\ngit log --show-signature -1 abc1234\n\n# Output for a verified commit:\n# gpg: Signature made ... using RSA key ID ABCDEF12\n# gpg: Good signature from \"Your Name <your-email@example.com>\"\n\n# Output for an unverified commit:\n# gpg: Signature made ... using RSA key ID ABCDEF12\n# gpg: Can't check signature: No public key\n\n# Import the missing public key to verify:\ngpg --keyserver keyserver.ubuntu.com --recv-keys ABCDEF12"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Verifying SSH signatures"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Git 2.34+ supports SSH-based signing. Use git log --show-signature to verify SSH signatures. Git checks the signature against the public key stored in the commit metadata."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Verify SSH signatures",
+        "language": "bash",
+        "code": "# Configure Git for SSH signing\ngit config --global gpg.format ssh\ngit config --global user.signingkey ~/.ssh/id_ed25519\n\n# Show signature status\ngit log --show-signature -1 HEAD\n\n# Output for SSH-signed commit:\n# gpg: Signature made ... using RSA key ID SHA256:abc123...\n# gpg: Good signature from \"Your Name (ssh key) <your-email@example.com>\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Verifying signed tags"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Signed tags verify the authenticity of a release. Use git tag -v for GPG-signed tags and git verify-tag for SSH-signed tags."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Verify signed tags",
+        "language": "bash",
+        "code": "# Verify a GPG-signed tag\ngit tag -v v2.1.0\n\n# Verify an SSH-signed tag\ngit verify-tag v2.1.0\n\n# Output for a verified tag:\n# gpg: Signature made ... using RSA key ID ABCDEF12\n# gpg: Good signature from \"Your Name <your-email@example.com>\"\n# object abc1234...\n# type commit\n# tag v2.1.0"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enforcing signed commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You can enforce signed commits using a server-side pre-receive hook. This hook rejects pushes that contain unsigned commits. GitHub does not enforce this by default for public repositories; use GitHub Enterprise or a self-hosted Git server for enforcement."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server-side pre-receive hook to enforce signed commits",
+        "language": "bash",
+        "code": "# /opt/git/project.git/hooks/pre-receive\n#!/bin/bash\n\nwhile read oldrev newrev refname; do\n  # Get commits being pushed\n  for commit in $(git rev-list $oldrev..$newrev); do\n    # Check if commit is signed\ngit verify-commit $commit >/dev/null 2>&1\n    if [ $? -ne 0 ]; then\n      echo \"ERROR: Commit $commit is not signed\"\n      exit 1\n    fi\n  done\ndone\n\nexit 0\n\n# Make the hook executable\nchmod +x /opt/git/project.git/hooks/pre-receive"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "GitHub does not enforce signed commits for public repos",
+        "text": "GitHub displays verification status but does not block unsigned pushes for public repositories. Use GitHub Enterprise or a self-hosted Git server with pre-receive hooks if you need enforcement."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Verifying signatures in CI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In CI, verify that all commits in the build are signed. This ensures the build was triggered by a trusted developer and not by a compromised account or unauthorized bot."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Verify signatures in GitHub Actions",
+        "language": "bash",
+        "code": "# .github/workflows/verify-sigs.yml\n- run: |\n    # Import the GPG public key\n    echo \"$GPG_PUBLIC_KEY\" | gpg --import -\n\n    # Verify all commits in the push\ngit rev-list --no-merges ${{ github.event.before }}..${{ github.sha }} | \\\n  while read commit; do\n    git verify-commit $commit || exit 1\n  done\n  env:\n    GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can I verify a signature if I do not have the public key?",
+            "answer": "No. Import the signer's public key from a keyserver (gpg --keyserver keyserver.ubuntu.com --recv-keys <key-id>) or ask the signer to share it directly."
+          },
+          {
+            "question": "What if verification shows 'expired'?",
+            "answer": "The signing key has expired. Ask the signer to extend the expiration or create a new key. Expired keys still verify the commit's authenticity at the time of signing."
+          },
+          {
+            "question": "Can I require signed tags for releases?",
+            "answer": "Yes. Use a server-side hook to reject unsigned tags, or require manual verification during the release process."
+          },
+          {
+            "question": "Does git verify-commit check the commit message?",
+            "answer": "No. It checks the cryptographic signature only. The commit message and content are protected by the signature's hash."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "git log --show-signature verifies GPG and SSH signatures on commits",
+          "git tag -v verifies signed tags",
+          "Import the signer's public key to verify their commits",
+          "Use server-side pre-receive hooks to enforce signed commits",
+          "Verify signatures in CI to ensure builds come from trusted developers"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["security-fundamentals", "gpg-commit-signing"],
+  "furtherReading": [
+    { "title": "Git Signature Verification", "url": "https://git-scm.com/docs/git-verify-commit", "type": "article" }
+  ]
+}

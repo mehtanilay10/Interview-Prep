@@ -1,0 +1,152 @@
+{
+  "id": "lesson-git-040",
+  "slug": "bisect-with-scripts",
+  "moduleSlug": "git-bisect-debugging",
+  "courseSlug": "git-linux-developer-workflow",
+  "title": "Bisect with Scripts",
+  "description": "Write robust bisect scripts for complex regressions, multi-step checks, and partial test suites.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["git", "bisect", "scripts", "debugging"],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For complex regressions, a simple yes/no test is not enough. Bisect scripts can run multi-step checks, inspect logs, check for multiple symptoms, and handle edge cases. A well-written bisect script turns a manual hours-long hunt into a one-liner."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Structure of a bisect script"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A bisect script is any program or script that exits with the appropriate code. It runs at each bisect step, in the checked-out commit's working directory. All paths are relative to that commit."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Multi-step bisect script for API regression",
+        "language": "bash",
+        "code": "#!/bin/bash\n# bisect-api-regression.sh\n\nset -e\n\necho \"Checking API response at commit $(git rev-parse --short HEAD)...\"\n\n# Step 1: Build the project\nnpm run build > /dev/null 2>&1\nif [ $? -ne 0 ]; then\n  echo \"Skipping: build fails at this commit\"\n  exit 125\nfi\n\n# Step 2: Start the server in background\nnode dist/server.js &\nSERVER_PID=$?\nsleep 2\n\n# Step 3: Make the API call and check response\nRESPONSE=$(curl -s http://localhost:3000/api/users/me)\nif echo \"$RESPONSE\" | grep -q \"token_expired\"; then\n  echo \"BUG FOUND: token_expired in response\"\n  exit 1\nelse\n  echo \"OK: no regression\"\n  exit 0\nfi"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Checking for specific symptoms"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When a regression has multiple symptoms, your script can check for all of them and return bad if any symptom is present. This makes the script robust against false negatives."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Multi-symptom bisect script",
+        "language": "bash",
+        "code": "#!/bin/bash\n# bisect-regression.sh\n\nBUG_PRESENT=0\n\n# Check for error message in source\nif grep -r \"NullReferenceException\" src/ 2>/dev/null; then\n  echo \"Symptom: NullReferenceException found in source\"\n  BUG_PRESENT=1\nfi\n\n# Check for failing test\nif npm test -- --grep \"Regression test\" 2>/dev/null | grep -q \"failing\"; then\n  echo \"Symptom: regression test failing\"\n  BUG_PRESENT=1\nfi\n\nif [ $BUG_PRESENT -eq 1 ]; then\n  exit 1  # bad\nelse\n  exit 0  # good\nfi"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Handling non-buildable commits"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Some commits may not build for reasons unrelated to the regression (missing dependencies, migration issues, etc.). Use exit 125 to skip them and continue the search."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect script with build skip logic",
+        "language": "bash",
+        "code": "#!/bin/bash\n# bisect-with-skip.sh\n\n# Install dependencies\nnpm install --silent > /dev/null 2>&1\n\n# Try to build\nnpm run build > /dev/null 2>&1\nBUILD_EXIT=$?\n\nif [ $BUILD_EXIT -ne 0 ]; then\n  echo \"Skipping: build fails at this commit\"\n  exit 125\nfi\n\n# Run the specific regression test\nnpm test -- --grep \"Bug reproduction test\" 2>/dev/null\nif [ $? -eq 0 ]; then\n  echo \"PASS\"\n  exit 0  # good\nelse\n  echo \"FAIL\"\n  exit 1  # bad\nfi"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Test reproducibility is essential",
+        "text": "Bisect only works if your reproduction test is reliable. If the test gives different results on the same commit, bisect will give wrong results. Make your test deterministic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Logging bisect results"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For long-running bisects, log each step's result to a file. This creates an audit trail and helps diagnose bisect failures."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bisect script with logging",
+        "language": "bash",
+        "code": "#!/bin/bash\n# bisect-with-logging.sh\n\nLOG_FILE=\"bisect-results.log\"\nCOMMIT=$(git rev-parse --short HEAD)\n\necho \"--- Testing $COMMIT ---\" >> \"$LOG_FILE\"\n\n# Run test\nnpm test -- --grep \"Regression\" >> \"$LOG_FILE\" 2>&1\nTEST_EXIT=$?\n\necho \"Exit code: $TEST_EXIT\" >> \"$LOG_FILE\"\n\nif [ $TEST_EXIT -eq 0 ]; then\n  echo \"GOOD\" >> \"$LOG_FILE\"\n  exit 0\nelif [ $TEST_EXIT -eq 125 ]; then\n  echo \"SKIP\" >> \"$LOG_FILE\"\n  exit 125\nelse\n  echo \"BAD\" >> \"$LOG_FILE\"\n  exit 1\nfi"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Can my bisect script make network requests?",
+            "answer": "Yes, but be aware that the checked-out commit may not have the server code. Build and start the server in the script if needed."
+          },
+          {
+            "question": "What if my test takes too long?",
+            "answer": "Bisect is only practical if each step takes under a minute. For slow tests, use a targeted reproduction test that checks for the specific symptom."
+          },
+          {
+            "question": "Can I use bisect on a specific file?",
+            "answer": "Yes. git bisect start <bad> <good> -- path/to/file limits the bisect to commits that modified that file."
+          },
+          {
+            "question": "How do I share a bisect script with my team?",
+            "answer": "Commit the script to the repository (e.g., scripts/bisect-regression.sh) so teammates can reproduce your bisect steps."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Bisect scripts run at each step and must exit 0, 1, or 125",
+          "Multi-step scripts can build, start servers, and run integration checks",
+          "Use exit 125 to skip commits that cannot be tested",
+          "Make tests deterministic — bisect relies on consistent results",
+          "Limit bisect to specific files with git bisect start -- <path>"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": ["bisect-fundamentals", "automated-bisect"],
+  "furtherReading": [
+    { "title": "Git Bisect with Automated Scripts", "url": "https://git-scm.com/docs/git-bisect#_bisect_run", "type": "article" }
+  ]
+}

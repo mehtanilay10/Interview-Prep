@@ -1,0 +1,223 @@
+{
+  "id": "lesson-mqes-009",
+  "slug": "header-exchange",
+  "moduleSlug": "publish-subscribe-patterns",
+  "courseSlug": "message-queues-event-streaming",
+  "title": "Header Exchange: Metadata-Based Routing",
+  "description": "Use header exchanges to route messages based on message attributes and metadata rather than routing keys.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 11,
+  "tags": [
+    "rabbitmq",
+    "header-exchange",
+    "routing",
+    "metadata",
+    "messaging"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **header exchange** routes messages by inspecting their headers rather than the routing key. When binding a queue to a header exchange, you specify a set of key-value header pairs. At publish time, the message's headers are compared against these bindings. If the headers match, the message is routed to that queue. This gives you rich, multi-criteria routing that goes beyond simple string keys."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Header Matching Arguments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When binding a queue to a header exchange, you pass arguments that define how matching works. The most important argument is `x-match`: set it to `any` to match if any header pair matches, or `all` to require every header pair to match. You can also set `x-match` per-binding to mix AND and OR logic across different queues."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "header-diagram",
+        "caption": "Header exchange routing messages by matching header attributes",
+        "definition": "graph LR\n    P[Publisher: msg with headers] --> E[headers: task.queue]\n    E -->|format: json, region: us| Q1[queue: us-json-queue]\n    E -->|format: xml, region: eu| Q2[queue: eu-xml-queue]\n    E -->|format: json OR xml, priority: high| Q3[queue: high-priority-queue]\n    Q1 --> C1[Consumer: US Processor]\n    Q2 --> C2[Consumer: EU Processor]\n    Q3 --> C3[Consumer: Priority Handler]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "When to Prefer Header Exchanges"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Header exchanges are useful when the routing decision depends on multiple message attributes rather than a single routing key. For example, a payment-processing pipeline might route messages based on currency, region, and format simultaneously — something a topic exchange with a flat routing key cannot express cleanly."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Another advantage of header exchanges is that routing logic is entirely self-contained within the message itself. Any service that publishes to a header exchange can attach arbitrary metadata without coordinating key formats with consumers. This reduces coupling between producers and consumers, especially in polyglot environments where different services may be written in different languages and frameworks."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Despite their flexibility, header exchanges are less commonly used than direct or topic exchanges. Most teams prefer the simplicity of structured routing keys, which are easier to inspect in broker management tools and log aggregators. Reserve header exchanges for cases where routing truly depends on multi-attribute logic that cannot be expressed cleanly with a dot-separated key."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "C# — Header exchange binding with x-match",
+        "content": "Bind queues to a header exchange using multiple header criteria with x-match logic.",
+        "code": "var factory = new ConnectionFactory() { HostName = \"localhost\" };\nusing var connection = factory.CreateConnection();\nusing var channel = connection.CreateModel();\n\nchannel.ExchangeDeclare(\"task.queue\", ExchangeType.Headers, durable: true);\nchannel.QueueDeclare(\"us-json-queue\", durable: true);\nchannel.QueueDeclare(\"high-priority-queue\", durable: true);\n\n// Bind: require ALL headers to match (format=json AND region=us)\nvar allArgs = new Dictionary<string, object>\n{\n    { \"x-match\", \"all\" },\n    { \"format\", \"json\" },\n    { \"region\", \"us\" }\n};\nchannel.QueueBind(\"us-json-queue\", \"task.queue\", \"\", allArgs);\n\n// Bind: require ANY header to match (format=json OR priority=high)\nvar anyArgs = new Dictionary<string, object>\n{\n    { \"x-match\", \"any\" },\n    { \"format\", \"json\" },\n    { \"priority\", \"high\" }\n};\nchannel.QueueBind(\"high-priority-queue\", \"task.queue\", \"\", anyArgs);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Node.js — Publishing with custom headers",
+        "content": "Set arbitrary headers on the message properties before publishing to a header exchange.",
+        "code": "const amqp = require('amqplib');\n\nasync function publishTask() {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n\n  await ch.assertExchange('task.queue', 'headers', { durable: true });\n\n  const props = {\n    headers: {\n      format: 'json',\n      region: 'us',\n      priority: 'high'\n    }\n  };\n\n  ch.publish(\n    'task.queue',\n    '', // routing key is ignored for header exchanges\n    props,\n    Buffer.from(JSON.stringify({ orderId: 42, total: 99.99 }))\n  );\n\n  console.log('Message published with custom headers');\n}\n\npublishTask();",
+        "language": "javascript"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Performance Consideration",
+        "text": "Header exchanges are slightly slower than direct and topic exchanges because the broker must evaluate header comparisons for every message. For high-throughput paths exceeding 50,000 msg/s, prefer topic exchanges with structured routing keys, which are optimized for string matching."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Exchange Types Compared",
+        "cards": [
+          {
+            "title": "Fanout",
+            "description": "Routes to all bound queues. Routing key is ignored.",
+            "pros": [
+              "Simplest to set up",
+              "Guaranteed broadcast"
+            ],
+            "cons": [
+              "No filtering possible",
+              "Wastes resources if not all consumers need the message"
+            ]
+          },
+          {
+            "title": "Direct",
+            "description": "Routes based on exact routing key match.",
+            "pros": [
+              "Precise routing",
+              "High performance"
+            ],
+            "cons": [
+              "Single-criterion only",
+              "Requires consistent key naming"
+            ]
+          },
+          {
+            "title": "Topic",
+            "description": "Routes based on pattern matching with wildcards.",
+            "pros": [
+              "Flexible multi-level patterns",
+              "Supports broad and narrow subscriptions"
+            ],
+            "cons": [
+              "Pattern design can become complex",
+              "Overly broad patterns degrade performance"
+            ]
+          },
+          {
+            "title": "Header",
+            "description": "Routes based on message header attributes with AND/OR logic.",
+            "pros": [
+              "Multi-criteria routing",
+              "No routing key needed"
+            ],
+            "cons": [
+              "Slower than other exchange types",
+              "Less commonly used — fewer community examples"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Header Exchange",
+            "definition": "An AMQP exchange type that routes messages based on matching message header attributes against binding criteria."
+          },
+          {
+            "term": "x-match",
+            "definition": "A binding argument set to 'all' (AND logic) or 'any' (OR logic) to control how multiple header criteria are evaluated."
+          },
+          {
+            "term": "Message Header",
+            "definition": "A key-value metadata pair attached to a message that carries routing or processing information alongside the body."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Header exchanges route based on message attributes, not routing keys.",
+          "Use x-match=all for AND logic and x-match=any for OR logic.",
+          "Best for multi-criteria routing that cannot be expressed with routing keys alone.",
+          "Slightly slower than direct/topic exchanges — use them thoughtfully."
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Does Azure Service Bus have a header exchange equivalent?",
+            "answer": "Yes — Azure Service Bus topic filters include SqlFilter, CorrelationFilter, and True/False filters. CorrelationFilter is the closest equivalent, matching messages by custom properties set in the BrokeredMessage or ServiceBusMessage."
+          },
+          {
+            "question": "Can I use header exchanges with Kafka?",
+            "answer": "Kafka does not have a header exchange concept natively. Header-based routing is handled at the application level using message headers and consumer group filtering."
+          }
+        ]
+      }
+    },
+    {
+      "type": "furtherReading",
+      "data": [
+        {
+          "title": "RabbitMQ — Header Exchange Documentation",
+          "url": "https://www.rabbitmq.com/tutorials/tutorial-six-python.html",
+          "type": "article",
+          "author": "RabbitMQ",
+          "description": "Official RabbitMQ tutorial covering header exchanges with x-match binding arguments."
+        }
+      ]
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": [
+    {
+      "title": "RabbitMQ — Header Exchange Documentation",
+      "url": "https://www.rabbitmq.com/tutorials/tutorial-six-python.html",
+      "type": "article",
+      "author": "RabbitMQ",
+      "description": "Official RabbitMQ tutorial covering header exchanges with x-match binding arguments."
+    }
+  ]
+}
