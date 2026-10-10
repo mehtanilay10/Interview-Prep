@@ -28,6 +28,13 @@ const FOOTER_LINKS: FooterColumn[] = [
     ],
   },
   {
+    heading: 'Publishing',
+    links: [
+      { href: '/videos', label: 'Video Library' },
+      { href: '/videos/review', label: 'Video Review Queue' },
+    ],
+  },
+  {
     heading: 'About',
     links: [
       { href: 'https://github.com/mehtanilay10/Interview-Prep/', label: 'GitHub', external: true },

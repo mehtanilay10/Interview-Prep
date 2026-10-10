@@ -1,0 +1,94 @@
+name: pipeline-worker
+
+# Runs the compiler stages (script → voice → render → qa → upload unlisted) on a
+# batch of claimed jobs. Every stage writes progress back to Neon, so a cancelled
+# or crashed run costs at most one stage per job, and the next run resumes.
+
+on:
+  schedule:
+    - cron: '15,45 * * * *' # twice an hour
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Number of jobs to claim in this run'
+        required: false
+        default: '20'
+      stages:
+        description: 'Comma-separated stages to run (script,voice,render,qa,upload)'
+        required: false
+        default: 'script,voice,render,qa,upload'
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+      - '.github/workflows/pipeline-worker.yml'
+
+concurrency:
+  group: pipeline-worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350 # under the 6h platform ceiling, leaves headroom for setup
+    env:
+      # Dry run by default in CI: exercises the full compiler (script, narration,
+      # subtitles, scenes, QA) without external services. Set the repository
+      # variable PIPELINE_DRY_RUN=0 to run the real TTS/renderer/uploader.
+      PIPELINE_DRY_RUN: ${{ vars.PIPELINE_DRY_RUN || '1' }}
+      PIPELINE_REPO_ROOT: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install media toolchain (only when not dry-running)
+        if: env.PIPELINE_DRY_RUN == '0'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          npm install sharp --no-save
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Generate content index
+        run: npm run generate:content
+
+      - name: Pre-flight: compiler selftest against the real corpus
+        run: npx tsx pipeline/src/index.ts selftest --sample=3
+
+      - name: Run a batch
+        run: |
+          if [ -n "${{ github.event.inputs.batch }}" ]; then
+            npm run pipeline:worker --silent -- --batch=${{ github.event.inputs.batch }} --stages=${{ github.event.inputs.stages }} --trigger=dispatch
+          else
+            npm run pipeline:worker --silent -- --batch=20 --trigger=schedule
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PIPELINE_SITE_URL: ${{ vars.PIPELINE_SITE_URL }}
+          PIPELINE_LLM_PROVIDER: ${{ vars.PIPELINE_LLM_PROVIDER }}
+          PIPELINE_LLM_API_KEY: ${{ secrets.PIPELINE_LLM_API_KEY }}
+          PIPELINE_TTS_PROVIDER: ${{ vars.PIPELINE_TTS_PROVIDER }}
+          PIPELINE_PIPER_VOICE_MODEL: ${{ vars.PIPELINE_PIPER_VOICE_MODEL }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PLAYLIST_ID: ${{ vars.YOUTUBE_PLAYLIST_ID }}
+
+      - name: Upload work artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-work-${{ github.run_id }}
+          path: .pipeline-work/
+          retention-days: 3
+          if-no-files-found: ignore

@@ -8,6 +8,7 @@ import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
 import cheatsheetContent from '@/content/cheatsheet/content.json';
+import { PROBLEM_COURSE_SLUGS } from '@/lib/contentAreas';
 import type {
   Module,
   Lesson,
@@ -244,10 +245,10 @@ export function searchAll(query: string): SearchResult[] {
   return scored.slice(0, 10).map((s) => s.result);
 }
 
-const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems', 'hld-problems']);
+const PROBLEM_COURSE_SLUGS_SET = new Set<string>(PROBLEM_COURSE_SLUGS);
 
 export function isProblemCourseSlug(slug: string | undefined): boolean {
-  return slug !== undefined && PROBLEM_COURSE_SLUGS.has(slug);
+  return slug !== undefined && PROBLEM_COURSE_SLUGS_SET.has(slug);
 }
 
 export function getSearchResultHref(result: SearchResult): string {

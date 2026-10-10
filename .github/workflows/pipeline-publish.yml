@@ -1,0 +1,48 @@
+name: pipeline-publish
+
+# Flips reviewer-approved videos from unlisted to public, inside the daily
+# YouTube quota budget (decision D6). Approvals accumulate in the database, so
+# this job can run frequently and harmlessly.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # four times a day
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Maximum videos to publish in this run'
+        required: false
+        default: '5'
+  workflow_call: {}
+
+concurrency:
+  group: pipeline-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Publish approved videos (quota-budgeted)
+        run: npm run pipeline:publish --silent -- --batch=${{ github.event.inputs.batch || 5 }} --trigger=schedule
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PIPELINE_PUBLISH_BUDGET_PER_DAY: ${{ vars.PIPELINE_PUBLISH_BUDGET_PER_DAY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}

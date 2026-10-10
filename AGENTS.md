@@ -293,6 +293,58 @@ Fix all errors before calling the task complete. Do not suppress TypeScript erro
 
 ---
 
+## Video pipeline (article → video)
+
+The automated video pipeline lives in `pipeline/` and is deliberately isolated
+from the Next.js app: it has its own `package.json` and `tsconfig.json`, is not
+part of the Vercel build, and must never be imported from `app/`,
+`components/` or `lib/` (the app talks to it only through the shared Neon
+database tables, which are the single source of truth).
+
+Rules:
+
+- **Content stays in `content/`.** The pipeline reads article JSON; it never
+  writes to it. Narration scripts are generated, not authored by hand.
+- **No media in the repository.** Rendered videos, audio, frames and
+  intermediates live in `.pipeline-work/` (gitignored); only YouTube holds
+  published media.
+- **Every published video has a human review record.** The `video_review_decisions`
+  table is the audit trail; nothing becomes public without it.
+- **Secrets never appear in files.** The repository is public, so YouTube OAuth
+  credentials and API keys live only in GitHub Secrets / Vercel env vars.
+- **Shared types come from `types/index.ts`**; pipeline-specific document types
+  live in `pipeline/src/types.ts` with zod schemas.
+
+Commands (all from the repository root):
+
+```bash
+npm run pipeline:discover   # register articles, detect changes, enqueue jobs
+npm run pipeline:worker     # claim and run a batch of staged jobs
+npm run pipeline:publish    # publish approved videos within the quota budget
+npm run pipeline:reconcile  # repair lease/upload/privacy drift
+npm run pipeline:selftest   # run the compiler against the real corpus, no database
+npm run pipeline:typecheck  # typecheck the pipeline package
+npm run pipeline:test       # pipeline unit tests (node:test)
+```
+
+Environments (all optional except the database):
+
+- `DATABASE_URL` / `PIPELINE_DATABASE_URL` — Neon connection string
+- `PIPELINE_LLM_PROVIDER` / `PIPELINE_LLM_API_KEY` — `gemini` uses the free-tier
+  hosted model; `local` (the default without a key) uses the deterministic
+  builder, which rewrites prose and copies code verbatim from the article
+- `PIPELINE_TTS_PROVIDER` — `piper` (needs the Piper binary) or `dryrun`
+  (synthetic audio, for tests and CI)
+- `PIPELINE_DRY_RUN=1` — no network calls, plan-only render
+- `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` / `YOUTUBE_REFRESH_TOKEN` /
+  `YOUTUBE_PLAYLIST_ID` — channel credentials
+- `PIPELINE_PUBLISH_BUDGET_PER_DAY` — daily upload budget (default 6, matching
+  the default YouTube Data API quota); overridable at runtime via the
+  `video_pipeline_settings` table
+- `VIDEO_REVIEWER_EMAILS` — comma-separated Google emails allowed to review and
+  publish videos in the app
+
+
 ## Maintenance scripts
 
 Utility scripts in `scripts/` help keep content consistent:

@@ -356,6 +356,57 @@ export interface SearchResult {
   technology?: string;
 }
 
+// ── Video pipeline narration script ───────────────────────────────────────────────────────────────────────
+// Contract between the pipeline's script stage and the review UI in the app.
+// The pipeline validates this shape at runtime with zod (see pipeline/src/types.ts);
+// the plain interfaces here are the compile-time source of truth shared by both.
+
+export type NarrativeShape = 'explainer' | 'walkthrough';
+
+export type VideoAreaValue = 'courses' | 'problems';
+
+export type VideoVisualCue =
+  | { kind: 'title'; text: string; subtitle?: string }
+  | { kind: 'bullets'; title?: string; items: string[] }
+  | { kind: 'terms'; items: Array<{ term: string; definition: string }> }
+  | { kind: 'code'; code: string; language: string; title?: string }
+  | { kind: 'diagram'; mermaid: string; caption?: string }
+  | { kind: 'quote'; text: string }
+  | { kind: 'summary'; title?: string; points: string[]; takeaway?: string }
+  | { kind: 'cta'; text: string };
+
+export interface VideoScriptSection {
+  id: string;
+  heading: string;
+  narration: string;
+  cues: VideoVisualCue[];
+}
+
+export interface VideoScriptDocument {
+  schemaVersion: number;
+  title: string;
+  description: string;
+  narrative: NarrativeShape;
+  area: VideoAreaValue;
+  language: string;
+  cta: string;
+  sections: VideoScriptSection[];
+}
+
+export interface VideoQaCheck {
+  name: string;
+  ok: boolean;
+  skipped?: boolean;
+  detail: string;
+}
+
+export interface VideoQaReport {
+  ok: boolean;
+  checks: VideoQaCheck[];
+  warnings?: string[];
+  durationMs?: number | null;
+}
+
 // ── Roadmap node ─────────────────────────────────────────────────────────────
 
 export interface RoadmapNode {

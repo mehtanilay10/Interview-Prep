@@ -12,9 +12,11 @@ import {
   getLessonsForCourse,
   extractTOC,
 } from '@/lib/content';
-import { buildLessonMetadata } from '@/lib/seo';
+import { buildLessonMetadata, lessonAbsoluteUrl } from '@/lib/seo';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { FurtherReading } from '@/components/content/FurtherReading';
+import { getPublishedVideoCached } from '@/lib/videoAssets';
+import { LessonVideoEmbed } from '@/components/video/LessonVideoEmbed';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { LessonSidebar } from '@/components/layout/LessonSidebar';
 import { MobileProgressAndContents } from '@/components/course/MobileProgressAndContents';
@@ -84,6 +86,9 @@ export default async function CourseLessonDetailPage({ params }: Params) {
   const relatedLessons = (lesson.relatedLessons ?? [])
     .map((slug) => getLessonBySlug(slug, courseSlug))
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
+
+  // Published video for this lesson (null unless a reviewer approved one).
+  const video = await getPublishedVideoCached('courses', courseSlug, moduleSlug, lessonSlug);
 
   return (
     <CourseErrorBoundary>
@@ -156,6 +161,17 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               category="lessons"
             />
           </div>
+
+          {/* Video lesson (only when a video has been reviewed and published) */}
+          {video && (
+            <LessonVideoEmbed
+              videoId={video.youtubeVideoId}
+              title={video.title}
+              description={video.description}
+              publishedAt={video.publishedAt}
+              articleUrl={lessonAbsoluteUrl('courses', courseSlug, moduleSlug, lessonSlug)}
+            />
+          )}
 
           {/* Content blocks */}
           <div id="lesson-content" className="prose prose-slate dark:prose-invert max-w-none">

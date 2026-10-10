@@ -1,0 +1,51 @@
+name: pipeline-discover
+
+# Registers articles, detects content changes and enqueues video jobs.
+# Cheap: no AI or YouTube calls. Runs nightly and whenever content/ changes.
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 02:00 UTC daily
+  push:
+    branches: [main]
+    paths:
+      - 'content/**'
+      - 'pipeline/**'
+      - '.github/workflows/pipeline-discover.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: pipeline-discover
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Regenerate content index
+        run: npm run generate:content
+
+      - name: Discover articles and enqueue jobs
+        run: npm run pipeline:discover --silent
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PIPELINE_SITE_URL: ${{ vars.PIPELINE_SITE_URL }}
+
+      - name: Summary
+        if: always()
+        run: echo "Discover finished; per-article counts are in the video_articles / video_jobs tables."

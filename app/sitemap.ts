@@ -34,6 +34,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/problems`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/progress`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/videos`, 0.6, 'daily'),
     toSitemapEntry(`${BASE_URL}/bookmarks`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/notes`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/personalization`, 0.7, 'weekly'),

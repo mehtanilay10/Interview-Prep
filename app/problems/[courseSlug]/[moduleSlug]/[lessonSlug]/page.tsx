@@ -26,6 +26,9 @@ import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
+import { getPublishedVideoCached } from '@/lib/videoAssets';
+import { LessonVideoEmbed } from '@/components/video/LessonVideoEmbed';
+import { lessonAbsoluteUrl } from '@/lib/seo';
 
 interface Params {
   params: Promise<{ courseSlug: string; moduleSlug: string; lessonSlug: string }>;
@@ -80,6 +83,9 @@ export default async function ProblemDetailPage({ params }: Params) {
   const relatedLessons = (lesson.relatedLessons ?? [])
     .map((slug) => getLessonBySlug(slug, courseSlug))
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];
+
+  // Published video for this problem (null unless a reviewer approved one).
+  const video = await getPublishedVideoCached('problems', courseSlug, moduleSlug, lessonSlug);
 
   return (
     <NotesModalProvider courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug}>
@@ -153,6 +159,17 @@ export default async function ProblemDetailPage({ params }: Params) {
               category="problems"
             />
           </div>
+
+          {/* Video walkthrough (only when a video has been reviewed and published) */}
+          {video && (
+            <LessonVideoEmbed
+              videoId={video.youtubeVideoId}
+              title={video.title}
+              description={video.description}
+              publishedAt={video.publishedAt}
+              articleUrl={lessonAbsoluteUrl('problems', courseSlug, moduleSlug, lessonSlug)}
+            />
+          )}
 
           {/* Content blocks */}
           <div id="problem-content" className="prose prose-slate dark:prose-invert max-w-none">

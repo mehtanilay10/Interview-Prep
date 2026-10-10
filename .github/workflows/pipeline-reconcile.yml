@@ -1,0 +1,40 @@
+name: pipeline-reconcile
+
+# Repairs drift: jobs whose runner vanished, videos deleted on YouTube, and
+# privacy mismatches. This is what makes the pipeline safe to crash at any point.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Mondays at 04:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: pipeline-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Reconcile database against YouTube
+        run: npm run pipeline:reconcile --silent -- --trigger=schedule
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}

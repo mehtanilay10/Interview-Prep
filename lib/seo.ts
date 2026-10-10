@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
+
+/** Canonical origin, exported so other features (e.g. videos) can build links. */
+export const SITE_BASE_URL = BASE_URL.replace(/\/$/, '');
+
+/** Absolute URL for a lesson page, used in video descriptions and structured data. */
+export function lessonAbsoluteUrl(basePath: string, courseSlug: string, moduleSlug: string, lessonSlug: string): string {
+  return `${SITE_BASE_URL}/${basePath}/${courseSlug}/${moduleSlug}/${lessonSlug}`.replace(/([^:]\/)\/+/g, '$1');
+}
 const SITE_NAME = 'Interview Prep';
 const DEFAULT_DESCRIPTION =
   'AI-powered interview preparation course. Master AI tools, prompting, automation, and modern workflows for technical interviews.';

@@ -20,6 +20,23 @@ const NAV_LINKS = [
   { href: "/interview-questions", label: "Interview Questions" },
 ];
 
+/**
+ * Reviewers (see lib/videoReviewer.ts) additionally get the video pipeline
+ * entry points. This mirrors the server-side allowlist for navigation only —
+ * access is always enforced server-side.
+ */
+const REVIEWER_NAV_LINKS = [
+  { href: "/videos", label: "Videos" },
+  { href: "/videos/review", label: "Review" },
+];
+
+function reviewerEmails(): string[] {
+  return (process.env.NEXT_PUBLIC_VIDEO_REVIEWER_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,6 +49,7 @@ export function Navbar() {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { data: session, status } = useSession();
   const isLoggedIn = status === 'authenticated';
+  const isReviewer = reviewerEmails().includes((session?.user?.email ?? '').toLowerCase());
 
   const handleSearch = (q: string) => {
     router.push(`/search?q=${encodeURIComponent(q)}`);
@@ -130,7 +148,7 @@ export function Navbar() {
           </div>
         ) : (
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
-            {NAV_LINKS.map((link) => {
+            {[...NAV_LINKS, ...(isReviewer ? REVIEWER_NAV_LINKS : [])].map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
                 <Link key={link.href} href={link.href} className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas-subtle hover:text-fg-default")} aria-current={isActive ? "page" : undefined}>
@@ -251,7 +269,7 @@ export function Navbar() {
                 size="sm"
               />
             </SearchErrorBoundary>
-            {NAV_LINKS.map((link) => {
+            {[...NAV_LINKS, ...(isReviewer ? REVIEWER_NAV_LINKS : [])].map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
                 <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className={cn("rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas hover:text-fg-default")}>

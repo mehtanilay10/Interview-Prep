@@ -26,6 +26,248 @@ enum UserTheme {
   system
 }
 
+// ── Video generation pipeline ──────────────────────────────────────────────────
+// Models backing the automated article → video pipeline. All state lives here so
+// that GitHub Actions runners stay disposable: nothing important ever lives in
+// workflow artifacts, caches, or logs.
+
+enum VideoArea {
+  courses
+  problems
+}
+
+enum VideoAssetStatus {
+  pending
+  generating
+  awaiting_review
+  approved
+  rejected
+  uploading
+  published
+  failed
+  stale
+}
+
+enum VideoJobStage {
+  script
+  voice
+  render
+  qa
+  upload
+  publish
+}
+
+enum VideoJobState {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum VideoPrivacyStatus {
+  private
+  unlisted
+  public
+  deleted
+}
+
+enum VideoReviewDecisionKind {
+  approved
+  rejected
+  regeneration_requested
+}
+
+/// One row per article in the corpus (course lesson or problem lesson).
+/// Identity includes the content area because lesson slugs repeat across courses.
+model VideoArticle {
+  id           String     @id @default(uuid()) @db.Uuid
+  area         VideoArea
+  courseSlug   String     @db.Text
+  moduleSlug   String     @db.Text
+  lessonSlug   String     @db.Text
+  title        String     @db.Text
+  description  String?    @db.Text
+  courseTitle  String?    @db.Text
+  moduleTitle  String?    @db.Text
+  difficulty   String?    @db.Text
+  canonicalUrl String     @db.Text
+  contentHash  String     @db.Text
+  deletedAt    DateTime?  @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(6)
+
+  assets VideoAsset[]
+  jobs   VideoJob[]
+
+  @@unique([area, courseSlug, moduleSlug, lessonSlug])
+  @@index([area, courseSlug])
+  @@index([deletedAt])
+  @@map("video_articles")
+}
+
+/// The canonical "article → video" mapping with its versioned lifecycle.
+/// `sourceHash` is the article hash this version was built from; a mismatch with
+/// VideoArticle.contentHash marks the asset stale and triggers regeneration.
+model VideoAsset {
+  id                   String              @id @default(uuid()) @db.Uuid
+  articleId            String              @db.Uuid
+  version              Int                 @default(1)
+  sourceHash           String              @db.Text
+  status               VideoAssetStatus    @default(pending)
+  narrative            String              @db.Text
+  scriptJson           Json?
+  scriptHash           String?             @db.Text
+  voiceModel           String?             @db.Text
+  templateVersion      String              @db.Text
+  durationMs           Int?
+  width                Int?
+  height              Int?
+  fileSizeBytes        BigInt?
+  qaJson               Json?
+  failureCount         Int                 @default(0)
+  lastError            String?             @db.Text
+  reviewClaimEmail     String?             @db.Text
+  reviewClaimExpiresAt DateTime?           @db.Timestamptz(6)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(6)
+
+  article       VideoArticle        @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  jobs          VideoJob[]
+  publications VideoPublication[]
+  decisions     VideoReviewDecision[]
+
+  @@unique([articleId, version])
+  @@index([status, createdAt])
+  @@index([reviewClaimExpiresAt])
+  @@map("video_assets")
+}
+
+/// Unit of work: one stage of one asset version. Claimed atomically with a lease
+/// so duplicate work and duplicate uploads are impossible; attempts and errors
+/// are recorded per attempt.
+model VideoJob {
+  id             String         @id @default(uuid()) @db.Uuid
+  articleId      String         @db.Uuid
+  assetId        String?        @db.Uuid
+  stage          VideoJobStage
+  state          VideoJobState  @default(pending)
+  kind           String         @db.Text
+  attempts       Int            @default(0)
+  maxAttempts    Int            @default(5)
+  priority       Int            @default(100)
+  leaseOwner     String?        @db.Text
+  leaseExpiresAt DateTime?      @db.Timestamptz(6)
+  notBefore      DateTime?      @db.Timestamptz(6)
+  lastError      String?        @db.Text
+  createdAt      DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(6)
+
+  article   VideoArticle     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  asset     VideoAsset?      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  attemptLog VideoJobAttempt[]
+
+  @@index([state, stage, notBefore, priority])
+  @@index([assetId, stage])
+  @@map("video_jobs")
+}
+
+/// Every job execution attempt with its structured outcome and metrics.
+model VideoJobAttempt {
+  id           String    @id @default(uuid()) @db.Uuid
+  jobId        String    @db.Uuid
+  attemptNo    Int
+  startedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  finishedAt   DateTime? @db.Timestamptz(6)
+  outcome      String    @db.Text
+  errorCode    String?   @db.Text
+  errorMessage String?   @db.Text
+  metrics      Json?
+
+  job VideoJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, attemptNo])
+  @@map("video_job_attempts")
+}
+
+/// YouTube side of a video. `youtubeVideoId` is unique and written exactly once,
+/// which is what prevents duplicate uploads when an upload succeeds but the
+/// recording write is interrupted.
+model VideoPublication {
+  id              String             @id @default(uuid()) @db.Uuid
+  assetId         String             @db.Uuid
+  youtubeVideoId  String             @unique @db.Text
+  privacyStatus   VideoPrivacyStatus @default(unlisted)
+  playlistId      String?            @db.Text
+  title           String             @db.Text
+  description     String?            @db.Text
+  uploadedAt      DateTime           @default(now()) @db.Timestamptz(6)
+  publishedAt     DateTime?          @db.Timestamptz(6)
+  lastSyncedAt    DateTime?          @db.Timestamptz(6)
+  uploadAttempts  Int                @default(0)
+  removedAt       DateTime?          @db.Timestamptz(6)
+
+  asset VideoAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([privacyStatus, removedAt])
+  @@map("video_publications")
+}
+
+/// Auditable record of every human decision on a video (approvals are required
+/// before anything becomes public).
+model VideoReviewDecision {
+  id             String                  @id @default(uuid()) @db.Uuid
+  assetId        String                  @db.Uuid
+  reviewerEmail  String                  @db.Text
+  reviewerUserId String?                 @db.Text
+  decision       VideoReviewDecisionKind
+  reason         String?                 @db.Text
+  createdAt      DateTime                @default(now()) @db.Timestamptz(6)
+
+  asset VideoAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, createdAt])
+  @@index([reviewerEmail])
+  @@map("video_review_decisions")
+}
+
+/// One row per pipeline execution (discover / worker / publish / reconcile).
+/// The dashboard reads these instead of CI logs.
+model VideoPipelineRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  kind           String    @db.Text
+  trigger        String    @db.Text
+  startedAt      DateTime  @default(now()) @db.Timestamptz(6)
+  finishedAt     DateTime? @db.Timestamptz(6)
+  jobsClaimed    Int       @default(0)
+  jobsSucceeded  Int       @default(0)
+  jobsFailed     Int       @default(0)
+  articlesSeen   Int       @default(0)
+  articlesAdded  Int       @default(0)
+  articlesStale  Int       @default(0)
+  llmCalls       Int       @default(0)
+  ttsCalls       Int       @default(0)
+  renderSeconds  Int       @default(0)
+  uploads        Int       @default(0)
+  skipped        Int       @default(0)
+  error          String?   @db.Text
+  metrics        Json?
+
+  @@index([kind, startedAt])
+  @@map("video_pipeline_runs")
+}
+
+/// Runtime-tunable settings (e.g. daily publish budget) so quotas can be raised
+/// without a code change.
+model VideoPipelineSetting {
+  key       String   @id @db.Text
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("video_pipeline_settings")
+}
+
 model User {
   id              String                @id @default(uuid()) @db.Text
   email           String?               @unique @db.Text
