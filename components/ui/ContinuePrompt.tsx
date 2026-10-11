@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { X, Play } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { apiFetch } from '@/lib/apiFetch';
 
 const STORAGE_KEY = 'interview_prep_last_path';
 const PROMPT_SHOWN_KEY = 'interview_prep_prompt_shown';
@@ -48,7 +49,7 @@ export function ContinuePrompt() {
       if (pathname !== '/') {
         if (isLoggedIn) {
           try {
-            await fetch('/api/last-path', {
+            await apiFetch('/api/last-path', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ path: pathname }),

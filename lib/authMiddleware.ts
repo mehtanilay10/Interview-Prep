@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { type User } from '@prisma/client';
 import { AuthError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
+import { ensureCsrfCookie, validateCsrf } from '@/lib/csrf';
 
 export async function getAuthenticatedUser() {
   const session = await auth();
@@ -21,12 +22,25 @@ export async function requireAuthenticatedUser() {
 }
 
 export function createApiAuthHandler(
-  handler: (databaseUser: User, request: Request) => Promise<NextResponse>
+  handler: (databaseUser: User, request: Request) => Promise<NextResponse>,
+  options: { requireCsrf?: boolean } = {}
 ) {
+  const { requireCsrf = true } = options;
   return async (request: Request): Promise<NextResponse> => {
     const user = await requireAuthenticatedUser();
     if (user instanceof NextResponse) {
       return user;
+    }
+
+    if (requireCsrf && request.method !== 'GET' && request.method !== 'HEAD') {
+      const csrf = validateCsrf(request);
+      if (!csrf.valid) {
+        const response = NextResponse.json(
+          { code: 'VALIDATION_ERROR', message: csrf.error ?? 'Missing CSRF token' },
+          { status: 400 }
+        );
+        return ensureCsrfCookie(response, request);
+      }
     }
 
     try {
@@ -37,7 +51,11 @@ export function createApiAuthHandler(
         return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
       }
 
-      return handler(databaseUser, request);
+      const response = await handler(databaseUser, request);
+
+      // Ensure the CSRF cookie is present on every response (including errors and GETs).
+      // The client reads this non-httpOnly cookie and echoes it back via the x-csrf-token header.
+      return ensureCsrfCookie(response, request);
     } catch (error) {
       const appError = new DatabaseError('Failed to load user', error);
       logError('authMiddleware', appError);

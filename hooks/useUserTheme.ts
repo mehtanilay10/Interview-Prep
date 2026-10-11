@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { logger } from '@/lib/logger';
+import { apiFetch } from '@/lib/apiFetch';
 
 const STORAGE_KEY = 'interview_prep_theme';
 
@@ -22,7 +23,7 @@ async function fetchThemeFromServer(): Promise<Theme | null> {
 
 async function syncThemeToServer(theme: Theme): Promise<void> {
   try {
-    await fetch('/api/user/theme', {
+    await apiFetch('/api/user/theme', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ theme }),

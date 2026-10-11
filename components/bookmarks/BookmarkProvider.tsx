@@ -6,13 +6,14 @@ import type { BookmarkState, BookmarkItem } from '@/types';
 import { logger } from '@/lib/logger';
 import { syncBookmarksToServer, syncUserData } from '@/lib/userSync';
 import { retryWithBackoff } from '@/lib/retry';
+import { apiFetch } from '@/lib/apiFetch';
 
 const DEFAULT_BOOKMARKS: BookmarkState = { items: [] };
 
 async function fetchBookmarksFromServer(): Promise<BookmarkState | null> {
   try {
     return await retryWithBackoff(async () => {
-      const res = await fetch('/api/bookmarks');
+      const res = await apiFetch('/api/bookmarks');
       if (!res.ok) throw new Error(`Failed to fetch bookmarks: ${res.status}`);
       const data = await res.json();
       return { items: data.items || [] };
@@ -25,7 +26,7 @@ async function fetchBookmarksFromServer(): Promise<BookmarkState | null> {
 async function syncBookmarksToServerFn(bookmarks: BookmarkState): Promise<void> {
   try {
     await retryWithBackoff(async () => {
-      const res = await fetch('/api/bookmarks', {
+      const res = await apiFetch('/api/bookmarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: bookmarks.items }),

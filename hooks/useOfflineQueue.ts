@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
+import { apiFetch } from '@/lib/apiFetch';
 
 type OfflineQueueItem = {
   courseSlug: string;
@@ -25,7 +26,7 @@ async function fetchQueueFromServer(): Promise<OfflineQueueItem[] | null> {
 
 async function syncQueueToServer(item: OfflineQueueItem): Promise<void> {
   try {
-    await fetch('/api/user/offline-queue', {
+    await apiFetch('/api/user/offline-queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
@@ -128,7 +129,7 @@ export function useOfflineQueue() {
           : [];
         return next;
       });
-      fetch('/api/user/offline-queue', {
+      apiFetch('/api/user/offline-queue', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),

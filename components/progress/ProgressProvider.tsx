@@ -6,6 +6,7 @@ import type { CourseProgress, LessonProgress, ProgressState } from '@/types';
 import { logger } from '@/lib/logger';
 import { syncProgressToServer, syncUserData } from '@/lib/userSync';
 import { retryWithBackoff } from '@/lib/retry';
+import { apiFetch } from '@/lib/apiFetch';
 
 const DEFAULT_PROGRESS: ProgressState = {
   lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
@@ -18,7 +19,7 @@ type Category = keyof ProgressState;
 async function fetchProgressFromServer(): Promise<ProgressState | null> {
   try {
     return await retryWithBackoff(async () => {
-      const res = await fetch('/api/progress');
+      const res = await apiFetch('/api/progress');
       if (!res.ok) throw new Error(`Failed to fetch progress: ${res.status}`);
       const data = await res.json();
       const progress: ProgressState = {
@@ -82,7 +83,7 @@ async function syncProgressToServerFn(progress: ProgressState): Promise<void> {
       }
     }
     await retryWithBackoff(async () => {
-      const res = await fetch('/api/progress', {
+      const res = await apiFetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries: allEntries }),
