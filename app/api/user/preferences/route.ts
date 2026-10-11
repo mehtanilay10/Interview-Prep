@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
-import { getOrCreateUser, prisma } from '@/lib/prisma';
+import { createApiAuthHandler } from '@/lib/authMiddleware';
+import { ValidationError, DatabaseError } from '@/lib/errorHandler';
+import { logError } from '@/lib/errorHandler';
+import { rateLimit } from '@/lib/rateLimit';
 import type { UserPreference } from '@prisma/client';
 
 type PreferencesPayload = Partial<Pick<UserPreference, 'fontSize' | 'density' | 'codeFontSize' | 'reducedMotion' | 'autoExpandCode' | 'showCompleted' | 'defaultLanding'>>;
@@ -15,17 +17,8 @@ function isValidPreference(key: string, value: unknown): boolean {
   return false;
 }
 
-async function getDatabaseUser() {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  return getOrCreateUser(user);
-}
-
-export async function GET() {
-  const databaseUser = await getDatabaseUser();
-  if (!databaseUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = createApiAuthHandler(async (databaseUser) => {
+  const { prisma } = await import('@/lib/prisma');
 
   const row = await prisma.userPreference.findUnique({
     where: { userId: databaseUser.id },
@@ -40,17 +33,24 @@ export async function GET() {
     showCompleted: row?.showCompleted ?? true,
     defaultLanding: row?.defaultLanding ?? null,
   });
-}
+});
 
-export async function POST(request: Request) {
-  const databaseUser = await getDatabaseUser();
-  if (!databaseUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const POST = createApiAuthHandler(async (databaseUser, request) => {
+  const { prisma } = await import('@/lib/prisma');
+
+  const rateLimitResult = rateLimit(request, { limit: 30, windowMs: 60_000 });
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimitResult.retryAfterMs ?? 1000) / 1000)) } }
+    );
   }
 
   const body = await request.json().catch(() => null) as PreferencesPayload | null;
   if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    const error = new ValidationError('Invalid payload');
+    logError('preferences:POST', error);
+    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
   const allowedKeys: (keyof PreferencesPayload)[] = ['fontSize', 'density', 'codeFontSize', 'reducedMotion', 'autoExpandCode', 'showCompleted', 'defaultLanding'];
@@ -64,20 +64,29 @@ export async function POST(request: Request) {
   }
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    const error = new ValidationError('No valid fields to update');
+    logError('preferences:POST', error);
+    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const data = await prisma.userPreference.upsert({
-    where: { userId: databaseUser.id },
-    create: {
-      userId: databaseUser.id,
-      ...(updates as PreferencesPayload),
-    },
-    update: {
-      ...(updates as PreferencesPayload),
-      updatedAt: new Date(),
-    },
-  });
+  let data: UserPreference;
+  try {
+    data = await prisma.userPreference.upsert({
+      where: { userId: databaseUser.id },
+      create: {
+        userId: databaseUser.id,
+        ...(updates as PreferencesPayload),
+      },
+      update: {
+        ...(updates as PreferencesPayload),
+        updatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    const dbError = new DatabaseError('Failed to save preferences', error);
+    logError('preferences:POST', dbError);
+    return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
+  }
 
   return NextResponse.json({
     fontSize: data.fontSize ?? null,
@@ -88,4 +97,4 @@ export async function POST(request: Request) {
     showCompleted: data.showCompleted ?? true,
     defaultLanding: data.defaultLanding ?? null,
   });
-}
+});

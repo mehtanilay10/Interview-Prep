@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
 import { retryWithBackoff } from '@/lib/retry';
+import { apiFetch } from '@/lib/apiFetch';
 
 type LessonNote = {
   courseSlug: string;
@@ -29,7 +30,7 @@ async function fetchNotesFromServer(): Promise<LessonNote[] | null> {
 async function syncNoteToServer(note: LessonNote): Promise<void> {
   try {
     await retryWithBackoff(async () => {
-      const res = await fetch('/api/user/notes', {
+      const res = await apiFetch('/api/user/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(note),
@@ -142,7 +143,7 @@ export function useLessonNotes() {
         return next;
       });
       retryWithBackoff(async () => {
-        const res = await fetch('/api/user/notes', {
+        const res = await apiFetch('/api/user/notes', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ courseSlug, moduleSlug, lessonSlug }),

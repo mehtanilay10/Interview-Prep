@@ -1,3 +1,5 @@
+import { apiFetch } from '@/lib/apiFetch';
+
 const PROGRESS_KEY = 'interview_prep_progress';
 const BOOKMARKS_KEY = 'interview_prep_bookmarks';
 const THEME_KEY = 'interview_prep_theme';
@@ -22,7 +24,7 @@ export async function syncProgressToServer(): Promise<void> {
     );
 
     if (entries.length > 0) {
-      await fetch('/api/progress', {
+      await apiFetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries }),
@@ -51,7 +53,7 @@ export async function syncBookmarksToServer(): Promise<void> {
     );
 
     if (items.length > 0) {
-      await fetch('/api/bookmarks', {
+      await apiFetch('/api/bookmarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
@@ -69,7 +71,7 @@ export async function syncThemeToServer(): Promise<void> {
       : null;
     if (!theme) return;
 
-    await fetch('/api/user/theme', {
+    await apiFetch('/api/user/theme', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ theme }),
@@ -86,7 +88,7 @@ export async function syncUserPreferencesToServer(): Promise<void> {
     const preferences = JSON.parse(raw);
     if (!preferences || typeof preferences !== 'object') return;
 
-    await fetch('/api/user/preferences', {
+    await apiFetch('/api/user/preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(preferences),
@@ -101,7 +103,7 @@ export async function syncLastPathToServer(): Promise<void> {
     const path = typeof window !== 'undefined' ? window.localStorage.getItem(LAST_PATH_KEY) : null;
     if (!path) return;
 
-    await fetch('/api/last-path', {
+    await apiFetch('/api/last-path', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),

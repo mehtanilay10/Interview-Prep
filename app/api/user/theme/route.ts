@@ -3,7 +3,6 @@ import { createApiAuthHandler } from '@/lib/authMiddleware';
 import { ValidationError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { rateLimit } from '@/lib/rateLimit';
-import { validateCsrf, generateCsrfToken } from '@/lib/csrf';
 import { ThemePayloadSchema } from '@/lib/validators';
 import type { UserTheme } from '@prisma/client';
 
@@ -24,13 +23,6 @@ export const GET = createApiAuthHandler(async (databaseUser) => {
 
 export const POST = createApiAuthHandler(async (databaseUser, request) => {
   const { prisma } = await import('@/lib/prisma');
-
-  const csrfResult = validateCsrf(request);
-  if (!csrfResult.valid) {
-    const error = new ValidationError(csrfResult.error ?? 'Invalid CSRF token');
-    logError('theme:POST', error);
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
-  }
 
   const rateLimitResult = rateLimit(request, { limit: 10, windowMs: 60_000 });
   if (!rateLimitResult.allowed) {
@@ -76,12 +68,5 @@ export const POST = createApiAuthHandler(async (databaseUser, request) => {
     return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
   }
 
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set('interview_prep_csrf', generateCsrfToken(), {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-  });
-  return response;
+  return NextResponse.json({ ok: true });
 });

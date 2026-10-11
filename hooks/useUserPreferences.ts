@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
+import { apiFetch } from '@/lib/apiFetch';
 
 const STORAGE_KEY = 'interview_prep_preferences';
 
@@ -47,7 +48,7 @@ async function fetchPreferencesFromServer(): Promise<UserPreferences | null> {
 
 async function syncPreferencesToServer(preferences: UserPreferences): Promise<void> {
   try {
-    await fetch('/api/user/preferences', {
+    await apiFetch('/api/user/preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(preferences),
