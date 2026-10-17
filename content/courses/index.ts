@@ -1,5 +1,6 @@
 import type { Course } from "@/types";
 
+import aiBasicsCourse from "./ai-basics/content.json";
 import apiDesignCourse from "../problems/api-design/content.json";
 import apolloCourse from "./apollo/content.json";
 import architectureDecisionLabProblemsCourse from "../problems/architecture-decision-lab-problems/content.json";
@@ -13,7 +14,9 @@ import azureCourse from "./azure/content.json";
 import azureCourse1 from "../problems/azure/content.json";
 import azureForAspnetCourse from "./azure-for-aspnet/content.json";
 import cheatsheetCourse from "../cheatsheet/content.json";
+import claudeCourse from "./claude/content.json";
 import cleanCodeCsharpCourse from "./clean-code-csharp/content.json";
+import codexCourse from "./codex/content.json";
 import csharpCourse from "../problems/csharp/content.json";
 import csharpFundamentalsCourse from "./csharp-fundamentals/content.json";
 import databaseDesignCourse from "../problems/database-design/content.json";
@@ -21,6 +24,7 @@ import designPatternsCourse from "./design-patterns/content.json";
 import devopsCourse from "./devops/content.json";
 import dotnetAiBackendCourse from "./dotnet-ai-backend/content.json";
 import dotnetNugetPackagesCourse from "./dotnet-nuget-packages/content.json";
+import dotnetReactAiLeadCourse from "./dotnet-react-ai-lead/content.json";
 import efCoreCourse from "./ef-core/content.json";
 import frontendPerformanceEngineeringCourse from "./frontend-performance-engineering/content.json";
 import fullStackSeniorProjectsCourse from "../problems/full-stack-senior-projects/content.json";
@@ -57,6 +61,7 @@ import unitTestingDotnetCourse from "./unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";
 
 const rawCoursesPart1 = [
+	aiBasicsCourse,
 	apiDesignCourse,
 	apolloCourse,
 	architectureDecisionLabProblemsCourse,
@@ -70,7 +75,9 @@ const rawCoursesPart1 = [
 	azureCourse1,
 	azureForAspnetCourse,
 	cheatsheetCourse,
+	claudeCourse,
 	cleanCodeCsharpCourse,
+	codexCourse,
 	csharpCourse,
 	csharpFundamentalsCourse,
 	databaseDesignCourse,
@@ -78,6 +85,7 @@ const rawCoursesPart1 = [
 	devopsCourse,
 	dotnetAiBackendCourse,
 	dotnetNugetPackagesCourse,
+	dotnetReactAiLeadCourse,
 	efCoreCourse,
 	frontendPerformanceEngineeringCourse,
 	fullStackSeniorProjectsCourse,

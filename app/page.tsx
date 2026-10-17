@@ -7,8 +7,8 @@ import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
 export const metadata = buildMetadata({
-  title: 'Interview Prep — Interview Preparation',
-  description: 'Interview Prep is an educational platform designed to teach interview skills to everyone, from professionals to students.',
+  title: 'Interview Prep — Master Interview Skills & AI',
+  description: 'Comprehensive learning platform for interview preparation and AI literacy. Learn interview techniques, AI tools, programming, and more — all in one place.',
   path: '/',
 });
 
@@ -20,23 +20,23 @@ export default function HomePage() {
   const featureCards = [
     {
       icon: <BookOpen className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
-      title: 'Interview Roadmap',
-      description: 'Follow a clear path from fundamentals to advanced interview topics. Know exactly what to study next.',
+      title: 'Learning Roadmaps',
+      description: 'Follow clear paths from fundamentals to advanced topics. Know exactly what to study next.',
     },
     {
       icon: <Zap className="h-5 w-5 text-success-fg" aria-hidden="true" />,
       title: 'Practical Focus',
-      description: 'Every lesson connects to real interview scenarios. You\'ll apply what you learn the same day.',
+      description: 'Every lesson connects to real-world scenarios. You\'ll apply what you learn the same day.',
     },
     {
       icon: <MessageSquare className="h-5 w-5 text-done-fg" aria-hidden="true" />,
-      title: 'Mock Interviews',
-      description: 'Practice with realistic interview scenarios and get feedback to improve your performance.',
+      title: 'Interview Questions',
+      description: 'Practice with realistic interview questions and get prepared for technical interviews.',
     },
     {
       icon: <Compass className="h-5 w-5 text-attention-fg" aria-hidden="true" />,
-      title: 'Tool Mastery',
-      description: 'Navigate modern interview tools with confidence. Know which tool to reach for and when.',
+      title: 'AI Tools Mastery',
+      description: 'Master modern AI tools like ChatGPT, Claude, and local AI for productivity.',
     },
     {
       icon: <LayoutGrid className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
@@ -46,16 +46,16 @@ export default function HomePage() {
     {
       icon: <ShieldCheck className="h-5 w-5 text-success-fg" aria-hidden="true" />,
       title: 'Best Practices',
-      description: 'Learn professional standards and techniques that help you succeed in any interview.',
+      description: 'Learn professional standards and techniques that help you succeed in interviews and work.',
     },
   ];
 
   const audience = [
-    { emoji: '👔', label: 'Professionals', desc: 'Prepare faster, think sharper, and stand out in interviews.' },
-    { emoji: '📚', label: 'Career Changers', desc: 'Add strong interview skills to your existing experience and make a great impression.' },
-    { emoji: '🎓', label: 'Students', desc: 'Learn proven techniques that will help you succeed in every professional field.' },
-    { emoji: '✍️', label: 'Writers & Communicators', desc: 'Sharpen your articulation and storytelling for any interview setting.' },
-    { emoji: '🤔', label: 'The Curious', desc: 'Understand what great interviews really take — not just the hype.' },
+    { emoji: '👔', label: 'Professionals', desc: 'Enhance your interview skills and master AI tools for career growth.' },
+    { emoji: '🎓', label: 'Students', desc: 'Build a strong foundation in programming, interviews, and AI literacy.' },
+    { emoji: '🔄', label: 'Career Changers', desc: 'Learn interview techniques and modern tech skills to transition successfully.' },
+    { emoji: '🤖', label: 'AI Enthusiasts', desc: 'Master AI tools, prompting, and automation to boost productivity.' },
+    { emoji: '💻', label: 'Developers', desc: 'Sharpen technical skills, prepare for coding interviews, and learn AI-assisted development.' },
   ];
 
   return (
@@ -70,8 +70,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <SectionHeader
             eyebrow="Who this is for"
-            title="Interview prep for everyone"
-            description="You don't need a technical background. If you're preparing for interviews and want to build confidence, this course was built for you."
+            title="Learning for everyone"
+            description="Whether you're preparing for interviews, learning AI tools, or mastering programming skills — this platform was built for you."
             align="center"
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -103,7 +103,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <SectionHeader
             eyebrow="What's included"
-            title="Everything you need to prepare well"
+            title="Everything you need to learn and grow"
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {featureCards.map((card) => (
@@ -174,24 +174,24 @@ export default function HomePage() {
         <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
           <div className="mx-auto max-w-xl rounded-2xl border border-accent-subtle bg-accent-subtle/40 px-6 py-10">
             <h2 className="mb-3 text-2xl font-bold text-fg-default">
-              Ready to ace your next interview?
+              Ready to start learning?
             </h2>
             <p className="mb-6 text-fg-muted">
-              Start with the first module — no account needed, no cost, no coding required.
+              Start with any course — no account needed, no cost. Master interviews, AI tools, and programming skills.
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href={firstCourse ? `/courses/${firstCourse.slug}` : '/courses'}
                 className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
               >
-                Start Preparing
+                Start Learning
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link
-                href="/interview-questions"
+                href="/roadmaps"
                 className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
               >
-                Practice Questions
+                View Roadmaps
               </Link>
             </div>
           </div>

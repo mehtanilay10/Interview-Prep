@@ -301,6 +301,7 @@ import advancedPatternsModule1 from "../courses/yarn-npm-packages/advanced-patte
 import advancedRebaseModule from "../courses/git-linux-developer-workflow/advanced-rebase/content.json";
 import advancedTopicsModule from "../courses/postgresql/advanced-topics/content.json";
 import advancedTypeModelingRuntimeSafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
+import aiBasicsModule from "../courses/ai-basics/content.json";
 import airbnbBookingModule from "../problems/lld/airbnb-booking/content.json";
 import airbnbBookingHldModule from "../problems/hld/airbnb-booking-hld/content.json";
 import amazonEcommerceModule from "../problems/lld/amazon-ecommerce/content.json";
@@ -349,8 +350,10 @@ import cachingStrategiesModule from "../courses/system-design-interviews/caching
 import capacityEstimationModule from "../courses/system-design-interviews/capacity-estimation/content.json";
 import chatSystemHldModule from "../problems/hld/chat-system-hld/content.json";
 import ciCdSafeDeliveryModule from "../courses/devops/ci-cd-safe-delivery/content.json";
+import claudeModule from "../courses/claude/content.json";
 import cleanCodeCsharpModule from "../courses/clean-code-csharp/content.json";
 import cloudIntegrationModule from "../courses/dotnet-nuget-packages/cloud-integration/content.json";
+import codexModule from "../courses/codex/content.json";
 import commonSystemDesignsModule from "../courses/system-design-interviews/common-system-designs/content.json";
 import concurrencyProductionDatabaseProblemsModule from "../courses/sql-server/concurrency-production-database-problems/content.json";
 import consistencyAvailabilityModule from "../courses/system-design-interviews/consistency-availability/content.json";
@@ -378,6 +381,7 @@ import distributedTransactionsModule from "../courses/microservices-architecture
 import dockerComposeModule from "../cheatsheet/docker-compose/content.json";
 import dotnetAiBackendModule from "../courses/dotnet-ai-backend/content.json";
 import dotnetNugetPackagesModule from "../courses/dotnet-nuget-packages/content.json";
+import dotnetReactAiLeadModule from "../courses/dotnet-react-ai-lead/content.json";
 import dropboxStorageModule from "../problems/hld/dropbox-storage/content.json";
 import ecommerceHldModule from "../problems/hld/ecommerce-hld/content.json";
 import efCoreModule from "../courses/ef-core/content.json";
@@ -457,6 +461,34 @@ import paymentGatewayHldModule from "../problems/hld/payment-gateway-hld/content
 import performanceObservabilityModule from "../courses/aspnet-core/performance-observability/content.json";
 import performanceOptimizationModule from "../courses/redis-caching-strategies/performance-optimization/content.json";
 import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
+import phase1FoundationsAiToolsOverviewModule from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/content.json";
+import phase1FoundationsIntroToAiCodingModule from "../courses/codex/phase-1-foundations-intro-to-ai-coding/content.json";
+import phase1FoundationsPromptEngineeringForCodeModule from "../courses/codex/phase-1-foundations-prompt-engineering-for-code/content.json";
+import phase1FoundationsPromptingBasicsModule from "../courses/ai-basics/phase-1-foundations-prompting-basics/content.json";
+import phase1FoundationsWhatIsAiModule from "../courses/ai-basics/phase-1-foundations-what-is-ai/content.json";
+import phase2KeyConceptsHallucinationsAndAccuracyModule from "../courses/ai-basics/phase-2-key-concepts-hallucinations-and-accuracy/content.json";
+import phase2KeyConceptsUnderstandingLlmsModule from "../courses/ai-basics/phase-2-key-concepts-understanding-llms/content.json";
+import phase2ToolsAiCodingToolsModule from "../courses/codex/phase-2-tools-ai-coding-tools/content.json";
+import phase3ToolsInDepthChatbotsInDepthModule from "../courses/ai-basics/phase-3-tools-in-depth-chatbots-in-depth/content.json";
+import phase3ToolsInDepthResearchAndSearchToolsModule from "../courses/ai-basics/phase-3-tools-in-depth-research-and-search-tools/content.json";
+import phase3ToolsInDepthWritingAndContentToolsModule from "../courses/ai-basics/phase-3-tools-in-depth-writing-and-content-tools/content.json";
+import phase3WorkflowsAgenticWorkflowsModule from "../courses/codex/phase-3-workflows-agentic-workflows/content.json";
+import phase3WorkflowsPracticalAiWorkflowsModule from "../courses/codex/phase-3-workflows-practical-ai-workflows/content.json";
+import phase4AdvancedPromptingAdvancedPromptingModule from "../courses/ai-basics/phase-4-advanced-prompting-advanced-prompting/content.json";
+import phase4AdvancedPromptingAiWorkflowsModule from "../courses/ai-basics/phase-4-advanced-prompting-ai-workflows/content.json";
+import phase4AdvancedTechniquesSecurityAndTestingModule from "../courses/codex/phase-4-advanced-techniques-security-and-testing/content.json";
+import phase5AutomationAgentsAgentsIntroductionModule from "../courses/ai-basics/phase-5-automation-agents-agents-introduction/content.json";
+import phase5AutomationAgentsAutomationBasicsModule from "../courses/ai-basics/phase-5-automation-agents-automation-basics/content.json";
+import phase5AutomationAgentsToolCallingBasicsModule from "../courses/ai-basics/phase-5-automation-agents-tool-calling-basics/content.json";
+import phase6SafetyPrivacyAndDataModule from "../courses/ai-basics/phase-6-safety-privacy-and-data/content.json";
+import phase6SafetySafetyAndLimitationsModule from "../courses/ai-basics/phase-6-safety-safety-and-limitations/content.json";
+import phase7IntermediateSystemsEmbeddingsAndVectorsModule from "../courses/ai-basics/phase-7-intermediate-systems-embeddings-and-vectors/content.json";
+import phase7IntermediateSystemsRagAndMemoryModule from "../courses/ai-basics/phase-7-intermediate-systems-rag-and-memory/content.json";
+import phase8AdvancedAiLocalVsCloudAiModule from "../courses/ai-basics/phase-8-advanced-ai-local-vs-cloud-ai/content.json";
+import phase8AdvancedAiMcpAndSkillsModule from "../courses/ai-basics/phase-8-advanced-ai-mcp-and-skills/content.json";
+import phase8AdvancedAiMultimodalAiModule from "../courses/ai-basics/phase-8-advanced-ai-multimodal-ai/content.json";
+import phase9CapstonePersonalAiStackModule from "../courses/ai-basics/phase-9-capstone-personal-ai-stack/content.json";
+import phase9CapstoneStayingCurrentModule from "../courses/ai-basics/phase-9-capstone-staying-current/content.json";
 import postgresqlModule from "../courses/postgresql/content.json";
 import prismaModule from "../courses/prisma/content.json";
 import productionApiDesignReliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
@@ -867,6 +899,7 @@ const rawModulesPart1 = [
 	advancedRebaseModule,
 	advancedTopicsModule,
 	advancedTypeModelingRuntimeSafetyModule,
+	aiBasicsModule,
 	airbnbBookingModule,
 	airbnbBookingHldModule,
 	amazonEcommerceModule,
@@ -915,8 +948,10 @@ const rawModulesPart1 = [
 	capacityEstimationModule,
 	chatSystemHldModule,
 	ciCdSafeDeliveryModule,
+	claudeModule,
 	cleanCodeCsharpModule,
 	cloudIntegrationModule,
+	codexModule,
 	commonSystemDesignsModule,
 	concurrencyProductionDatabaseProblemsModule,
 	consistencyAvailabilityModule,
@@ -944,6 +979,7 @@ const rawModulesPart1 = [
 	dockerComposeModule,
 	dotnetAiBackendModule,
 	dotnetNugetPackagesModule,
+	dotnetReactAiLeadModule,
 	dropboxStorageModule,
 	ecommerceHldModule,
 	efCoreModule,
@@ -1023,6 +1059,34 @@ const rawModulesPart1 = [
 	performanceObservabilityModule,
 	performanceOptimizationModule,
 	performanceTuningModule,
+	phase1FoundationsAiToolsOverviewModule,
+	phase1FoundationsIntroToAiCodingModule,
+	phase1FoundationsPromptEngineeringForCodeModule,
+	phase1FoundationsPromptingBasicsModule,
+	phase1FoundationsWhatIsAiModule,
+	phase2KeyConceptsHallucinationsAndAccuracyModule,
+	phase2KeyConceptsUnderstandingLlmsModule,
+	phase2ToolsAiCodingToolsModule,
+	phase3ToolsInDepthChatbotsInDepthModule,
+	phase3ToolsInDepthResearchAndSearchToolsModule,
+	phase3ToolsInDepthWritingAndContentToolsModule,
+	phase3WorkflowsAgenticWorkflowsModule,
+	phase3WorkflowsPracticalAiWorkflowsModule,
+	phase4AdvancedPromptingAdvancedPromptingModule,
+	phase4AdvancedPromptingAiWorkflowsModule,
+	phase4AdvancedTechniquesSecurityAndTestingModule,
+	phase5AutomationAgentsAgentsIntroductionModule,
+	phase5AutomationAgentsAutomationBasicsModule,
+	phase5AutomationAgentsToolCallingBasicsModule,
+	phase6SafetyPrivacyAndDataModule,
+	phase6SafetySafetyAndLimitationsModule,
+	phase7IntermediateSystemsEmbeddingsAndVectorsModule,
+	phase7IntermediateSystemsRagAndMemoryModule,
+	phase8AdvancedAiLocalVsCloudAiModule,
+	phase8AdvancedAiMcpAndSkillsModule,
+	phase8AdvancedAiMultimodalAiModule,
+	phase9CapstonePersonalAiStackModule,
+	phase9CapstoneStayingCurrentModule,
 	postgresqlModule,
 	prismaModule,
 	productionApiDesignReliabilityModule,
@@ -1034,6 +1098,9 @@ const rawModulesPart1 = [
 	productionReadinessModule,
 	programmingComputerFundamentalsModule,
 	programmingComputerWebFoundationsModule,
+];
+
+const rawModulesPart2 = [
 	project1EnterpriseExpensePlatformModule,
 	project2CollaborativeCommunicationPlatformModule,
 	project3ProductionIncidentSimulatorModule,
@@ -1066,9 +1133,6 @@ const rawModulesPart1 = [
 	reduxModule1,
 	requirementClarificationModule,
 	resiliencePatternsModule,
-];
-
-const rawModulesPart2 = [
 	restApiDesignScenariosModule,
 	rideSharingHldModule,
 	routingModule,

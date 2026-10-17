@@ -18,6 +18,9 @@ const NAV_LINKS = [
   { href: "/cheatsheet", label: "Cheat Sheets" },
   { href: "/problems", label: "Problems" },
   { href: "/interview-questions", label: "Interview Questions" },
+  { href: "/glossary", label: "Glossary" },
+  { href: "/prompts", label: "Prompt Templates" },
+  { href: "/roadmaps", label: "Roadmaps" },
 ];
 
 export function Navbar() {

@@ -1,0 +1,538 @@
+{
+  "id": "lesson-047",
+  "slug": "vector-databases-in-practice",
+  "moduleSlug": "phase-7-intermediate-systems-embeddings-and-vectors",
+  "courseSlug": "ai-basics",
+  "title": "Vector Databases in Practice",
+  "description": "Go from concept to implementation mindset: chunking, metadata, retrieval settings, and evaluation for real semantic search systems.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": [
+    "vector-database",
+    "rag",
+    "semantic-search",
+    "retrieval",
+    "embeddings"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Understanding vectors conceptually is useful, but practical quality depends on implementation details. Most poor RAG systems fail due to weak chunking, missing metadata, and no retrieval evaluation. This lesson gives you a practical blueprint."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A vector database stores high-dimensional numerical representations (embeddings) of your content alongside the original text. When a user asks a question, the question is also embedded and compared against all stored vectors to find the closest matches — the most semantically similar chunks. The key insight: similarity is measured in vector space, not by keyword overlap."
+      }
+    },
+    {
+      "type": "heading",
+      "id": "why-vector-dbs",
+      "data": {
+        "level": 2,
+        "text": "Why dedicated vector databases?",
+        "anchor": "why-vector-dbs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Traditional relational databases store structured rows and columns and support exact lookups or range queries. They cannot efficiently answer questions like 'find me text about contract cancellation policies' when the source documents never use those exact words. Vector databases solve this by indexing embeddings using data structures (like HNSW or IVF) optimized for approximate nearest-neighbor search across millions of high-dimensional vectors — at millisecond latency."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Feature",
+          "Traditional DB",
+          "Vector DB"
+        ],
+        "rows": [
+          [
+            "Query type",
+            "Exact / range match",
+            "Semantic similarity"
+          ],
+          [
+            "Data stored",
+            "Structured rows",
+            "Vectors + metadata + text"
+          ],
+          [
+            "Search speed at scale",
+            "Fast for indexed columns",
+            "Fast via ANN indexes (HNSW, IVF)"
+          ],
+          [
+            "Handles synonyms / paraphrases",
+            "No",
+            "Yes"
+          ],
+          [
+            "Filter support",
+            "Full SQL",
+            "Metadata pre/post-filters"
+          ],
+          [
+            "Example systems",
+            "PostgreSQL, MySQL",
+            "Pinecone, Weaviate, Qdrant, pgvector"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "practical-pipeline",
+      "data": {
+        "level": 2,
+        "text": "Practical semantic search pipeline",
+        "anchor": "practical-pipeline"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "vector-pipeline-practice",
+        "caption": "Production-style retrieval pipeline from raw docs to grounded answer.",
+        "definition": "flowchart LR\n  A[Source documents] --> B[Chunking strategy]\n  B --> C[Embed each chunk]\n  C --> D[Store vectors + metadata]\n  D --> E[User query embedding]\n  E --> F[Similarity search + filters]\n  F --> G[Top-k retrieved chunks]\n  G --> H[LLM grounded response]\n  H --> I[Evaluation + feedback loop]\n\n  style D fill:#ddf4ff,stroke:#0969da,color:#0550ae\n  style F fill:#fff8c5,stroke:#9a6700,color:#9a6700\n  style H fill:#d1f3d8,stroke:#1a7f37,color:#1a7f37\n  style I fill:#eddff8,stroke:#8250df,color:#6639ba"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "chunking-strategy",
+      "data": {
+        "level": 2,
+        "text": "Chunking: the most underestimated decision",
+        "anchor": "chunking-strategy"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Chunking is the process of splitting your source documents into smaller pieces before embedding. The goal: each chunk should contain one coherent idea or topic so that its embedding accurately represents that specific meaning. A chunk that covers three different topics produces a blended embedding that matches nothing well."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "There is no universally correct chunk size. Short chunks (100–200 tokens) are precise but may lack context. Long chunks (1000+ tokens) carry more context but dilute the embedding signal. A common starting point is 300–500 tokens with a 10–20% overlap between consecutive chunks, so that sentences that fall near a boundary appear in both adjacent chunks and are not lost."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "chunking-overlap-diagram",
+        "caption": "Overlapping chunks ensure boundary sentences appear in at least one high-quality chunk.",
+        "definition": "graph TD\n  Doc[Full Document]\n  Doc --> C1[Chunk 1: tokens 1–400]\n  Doc --> C2[Chunk 2: tokens 350–750]\n  Doc --> C3[Chunk 3: tokens 700–1100]\n  C1 -. overlap .-> C2\n  C2 -. overlap .-> C3\n\n  style C1 fill:#ddf4ff,stroke:#0969da,color:#0550ae\n  style C2 fill:#d1f3d8,stroke:#1a7f37,color:#1a7f37\n  style C3 fill:#fff8c5,stroke:#9a6700,color:#9a6700"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Beyond fixed-size splitting, document structure is a better guide when available. For markdown or HTML, split on headings. For PDFs with clear sections, use section boundaries. For code, split on function or class definitions. Respecting natural semantic boundaries almost always outperforms naive character-count splits."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Design choice",
+          "Common mistake",
+          "Recommended baseline"
+        ],
+        "rows": [
+          [
+            "Chunk size",
+            "Too large; loses precision",
+            "300-800 tokens, with overlap"
+          ],
+          [
+            "Metadata",
+            "No filters for source type/date",
+            "Store title, section, date, owner, sensitivity"
+          ],
+          [
+            "Top-k retrieval",
+            "Using fixed k everywhere",
+            "Start with k=5 and tune by task"
+          ],
+          [
+            "Re-ranking",
+            "Skipping relevance refinement",
+            "Use lightweight re-ranker for quality-critical tasks"
+          ],
+          [
+            "Evaluation",
+            "No benchmark queries",
+            "Maintain query set with expected evidence chunks"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "metadata",
+      "data": {
+        "level": 2,
+        "text": "Metadata: precision filtering on top of semantic search",
+        "anchor": "metadata"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Vector similarity alone cannot distinguish between a 2019 policy document and its 2024 replacement, or between content written for engineers versus for customers. Metadata fields stored alongside each vector enable pre-filtering (narrow the search space before similarity scoring) or post-filtering (remove irrelevant results after retrieval). Both approaches trade recall for precision — the right balance depends on your use case."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Useful metadata fields for most knowledge bases: source document title, section heading, creation or last-updated date, document owner or team, sensitivity level (public / internal / confidential), content type (FAQ, policy, tutorial, reference), and language. The more structured your metadata, the more controllable your retrieval becomes."
+      }
+    },
+    {
+      "type": "heading",
+      "id": "code-example-upsert",
+      "data": {
+        "level": 2,
+        "text": "Code: embedding and storing chunks",
+        "anchor": "code-example-upsert"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "python",
+        "caption": "Minimal example: embed text chunks and upsert them into a vector store (Pinecone-style API).",
+        "code": "from openai import OpenAI\nimport pinecone\n\nclient = OpenAI()\nindex = pinecone.Index(\"knowledge-base\")\n\ndef embed(text: str) -> list[float]:\n    response = client.embeddings.create(\n        model=\"text-embedding-3-small\",\n        input=text\n    )\n    return response.data[0].embedding\n\nchunks = [\n    {\"id\": \"doc1-chunk0\", \"text\": \"Refund requests must be submitted within 30 days.\",\n     \"metadata\": {\"source\": \"refund-policy.pdf\", \"section\": \"eligibility\", \"date\": \"2024-03\"}},\n    {\"id\": \"doc1-chunk1\", \"text\": \"Approved refunds are processed within 5 business days.\",\n     \"metadata\": {\"source\": \"refund-policy.pdf\", \"section\": \"processing\", \"date\": \"2024-03\"}},\n]\n\nvectors = [\n    {\n        \"id\": chunk[\"id\"],\n        \"values\": embed(chunk[\"text\"]),\n        \"metadata\": {**chunk[\"metadata\"], \"text\": chunk[\"text\"]}\n    }\n    for chunk in chunks\n]\n\nindex.upsert(vectors=vectors)"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "code-example-query",
+      "data": {
+        "level": 2,
+        "text": "Code: querying with metadata filters",
+        "anchor": "code-example-query"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "python",
+        "caption": "Query the vector index with both semantic similarity and a metadata filter on date.",
+        "code": "def retrieve(query: str, k: int = 5, date_from: str = None):\n    query_vector = embed(query)\n    \n    filter_expr = {}\n    if date_from:\n        filter_expr = {\"date\": {\"$gte\": date_from}}\n    \n    results = index.query(\n        vector=query_vector,\n        top_k=k,\n        filter=filter_expr,\n        include_metadata=True\n    )\n    \n    return [\n        {\"text\": match.metadata[\"text\"], \"score\": match.score, \"source\": match.metadata[\"source\"]}\n        for match in results.matches\n    ]\n\nchunks = retrieve(\"how long do I have to request a refund?\", k=3, date_from=\"2024-01\")\nfor c in chunks:\n    print(f\"[{c['score']:.3f}] {c['source']}: {c['text']}\")"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "similarity-metrics",
+      "data": {
+        "level": 2,
+        "text": "Similarity metrics: cosine, dot product, Euclidean",
+        "anchor": "similarity-metrics"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Vector databases compute a distance or similarity score between the query vector and every stored vector. The three most common metrics are cosine similarity, dot product, and Euclidean distance. Cosine similarity measures the angle between two vectors and ignores magnitude — this is the default choice for most text embeddings because embedding magnitude is not meaningful. Dot product is faster to compute and equivalent to cosine similarity when vectors are normalized to unit length. Euclidean distance measures straight-line distance and is sensitive to magnitude, making it a poor default for text unless your embedding model is explicitly designed for it."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Metric",
+          "What it measures",
+          "Best for"
+        ],
+        "rows": [
+          [
+            "Cosine similarity",
+            "Angle between vectors (direction)",
+            "Text embeddings — most common choice"
+          ],
+          [
+            "Dot product",
+            "Magnitude × alignment",
+            "Normalized vectors; fastest computation"
+          ],
+          [
+            "Euclidean (L2)",
+            "Straight-line distance",
+            "Image embeddings, dense retrieval models"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "reranking",
+      "data": {
+        "level": 2,
+        "text": "Re-ranking: a second pass for precision",
+        "anchor": "reranking"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The top-k results from a vector search are ordered by approximate nearest-neighbor score, which is fast but not always the best relevance signal. Re-ranking adds a second, slower model pass that scores each retrieved chunk against the original query using a cross-encoder — a model that reads query and chunk together rather than comparing pre-computed vectors independently. Cross-encoders are more accurate but too slow to run over the full index, so the pattern is: retrieve a broader candidate set (k=20) with vector search, then re-rank to the final top-5 with a cross-encoder."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "reranking-flow",
+        "caption": "Two-stage retrieval: fast ANN search narrows candidates, cross-encoder re-ranks for precision.",
+        "definition": "flowchart TD\n  Q[User query] --> ANN[ANN vector search — top-20 candidates]\n  ANN --> RR[Cross-encoder re-ranker]\n  RR --> Top5[Final top-5 chunks]\n  Top5 --> LLM[LLM answer generation]\n\n  style ANN fill:#ddf4ff,stroke:#0969da,color:#0550ae\n  style RR fill:#fff8c5,stroke:#9a6700,color:#9a6700\n  style Top5 fill:#d1f3d8,stroke:#1a7f37,color:#1a7f37"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "evaluation",
+      "data": {
+        "level": 2,
+        "text": "Evaluation: the feedback loop that keeps quality honest",
+        "anchor": "evaluation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without a benchmark, every change to your retrieval pipeline is a guess. Build a small evaluation set of 20–50 representative queries paired with the expected source chunk or document. For each configuration change (chunk size, top-k, metadata filters, re-ranking on/off), measure two metrics: recall@k — the fraction of queries where the correct chunk appears in the top-k results — and mean reciprocal rank (MRR) — which rewards finding the right chunk earlier in the ranked list."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Metric",
+          "What it tells you",
+          "How to compute it"
+        ],
+        "rows": [
+          [
+            "Recall@k",
+            "Does the right chunk appear in top-k?",
+            "Count queries where correct chunk is in top-k / total queries"
+          ],
+          [
+            "Mean Reciprocal Rank (MRR)",
+            "How high does the correct chunk rank?",
+            "Average of 1/rank of first correct chunk across queries"
+          ],
+          [
+            "Faithfulness",
+            "Does the LLM answer stick to retrieved context?",
+            "Human or LLM judge: is each claim grounded in retrieved text?"
+          ],
+          [
+            "Answer relevance",
+            "Does the answer address the question?",
+            "Human or LLM judge: does the answer satisfy the user's intent?"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Retrieval evaluation is separate from answer evaluation. A system can retrieve the right chunks but generate an unfaithful answer. Both layers need separate measurement. Tools like RAGAS (open-source) automate scoring of faithfulness and answer relevance using an LLM judge, making continuous evaluation tractable without a large human annotation budget."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Start simple, then tune",
+        "text": "Ship a baseline first, then improve one parameter at a time: chunk size, overlap, top-k, metadata filters, reranking. Measure each change against the same benchmark queries."
+      }
+    },
+    {
+      "type": "heading",
+      "id": "popular-vector-dbs",
+      "data": {
+        "level": 2,
+        "text": "Choosing a vector database",
+        "anchor": "popular-vector-dbs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Several mature options exist. Pinecone is a fully managed, cloud-native vector database designed for production scale with minimal operational overhead. Weaviate and Qdrant are open-source databases that can be self-hosted or used as a managed service; both support rich metadata filtering and hybrid (keyword + vector) search. Chroma is a lightweight open-source option popular for prototyping and local development. For teams already running PostgreSQL, the pgvector extension adds vector indexing to an existing relational database without introducing a new system."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Database",
+          "Hosting",
+          "Best for",
+          "Hybrid search"
+        ],
+        "rows": [
+          [
+            "Pinecone",
+            "Managed cloud",
+            "Production at scale, minimal ops",
+            "Yes (sparse + dense)"
+          ],
+          [
+            "Weaviate",
+            "Self-hosted / managed",
+            "Rich filtering, multi-modal",
+            "Yes"
+          ],
+          [
+            "Qdrant",
+            "Self-hosted / managed",
+            "High-performance filtering, Rust-based",
+            "Yes"
+          ],
+          [
+            "Chroma",
+            "Local / self-hosted",
+            "Prototyping, local dev, LangChain",
+            "Limited"
+          ],
+          [
+            "pgvector",
+            "Self-hosted (Postgres)",
+            "Existing Postgres shops, SQL familiarity",
+            "Via full-text search"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "id": "hybrid-search",
+      "data": {
+        "level": 2,
+        "text": "Hybrid search: combining keyword and semantic retrieval",
+        "anchor": "hybrid-search"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Pure semantic search occasionally misses exact matches — product codes, names, legal citations, or rare technical terms that embeddings may not represent precisely. Pure keyword search (BM25) misses semantic intent. Hybrid search combines both: run a BM25 keyword retrieval and a vector similarity retrieval in parallel, then merge the ranked results using a fusion algorithm like Reciprocal Rank Fusion (RRF). The merged list typically outperforms either method alone, especially on mixed corpora with structured identifiers alongside natural-language content."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hybrid-search-diagram",
+        "caption": "Hybrid retrieval merges keyword and vector results for more robust coverage.",
+        "definition": "flowchart TD\n  Q[User query]\n  Q --> KW[BM25 keyword search]\n  Q --> VS[Vector similarity search]\n  KW --> RRF[Reciprocal Rank Fusion]\n  VS --> RRF\n  RRF --> Final[Merged top-k results]\n  Final --> LLM[LLM answer]\n\n  style KW fill:#fff8c5,stroke:#9a6700,color:#9a6700\n  style VS fill:#ddf4ff,stroke:#0969da,color:#0550ae\n  style RRF fill:#eddff8,stroke:#8250df,color:#6639ba\n  style Final fill:#d1f3d8,stroke:#1a7f37,color:#1a7f37"
+      }
+    },
+    {
+      "type": "heading",
+      "id": "common-pitfalls",
+      "data": {
+        "level": 2,
+        "text": "Common pitfalls in production vector search",
+        "anchor": "common-pitfalls"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Embedding model mismatch: your query and your stored chunks must be embedded with the same model. Switching embedding models after indexing requires re-embedding and re-indexing the entire corpus — a costly operation. Pin your embedding model version in production."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Stale index: when source documents are updated, the old chunks remain in the index unless explicitly deleted and replaced. Set up a pipeline to detect document changes (via hash or modification date) and re-embed affected chunks. Stale content silently degrades answer quality."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Retrieval hallucination: the LLM receives retrieved chunks as context and is instructed to answer only from them. If none of the retrieved chunks actually contain the answer, a poorly prompted LLM may fill the gap from its parametric memory — producing a confident but unsupported answer. Always instruct the LLM to say it does not know when the context is insufficient."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Too many retrieved chunks: large k values dilute the context window with marginal chunks. The LLM may focus on less-relevant passages (lost-in-the-middle effect) and produce worse answers than with a smaller, higher-quality set of chunks. Tune k down and use re-ranking rather than passing 20 raw chunks to the LLM."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Vector DB implementation essentials",
+        "points": [
+          "Retrieval quality matters as much as model quality",
+          "Chunking and metadata are the two highest-impact levers",
+          "Use benchmark queries to tune settings objectively",
+          "Grounded responses need retrieved evidence, not just fluent text",
+          "Continuous evaluation prevents silent quality drift",
+          "Hybrid search (keyword + vector) outperforms pure vector search on mixed corpora",
+          "Re-ranking with a cross-encoder improves precision at the cost of latency",
+          "Pin embedding model versions — switching models requires full re-indexing",
+          "Stale index content silently degrades answer quality; automate update detection"
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "embeddings-simply",
+    "rag-explained"
+  ],
+  "furtherReading": [
+    {
+      "title": "Building and Evaluating Advanced RAG",
+      "url": "https://www.deeplearning.ai/short-courses/building-and-evaluating-advanced-rag/",
+      "type": "course",
+      "author": "DeepLearning.AI",
+      "description": "Practical course on real RAG pipelines and evaluation."
+    },
+    {
+      "title": "Pinecone Learn",
+      "url": "https://www.pinecone.io/learn/",
+      "type": "article",
+      "author": "Pinecone",
+      "description": "Practical guides on vector search, retrieval design, and production considerations."
+    },
+    {
+      "title": "Qdrant Documentation — Filtering",
+      "url": "https://qdrant.tech/documentation/concepts/filtering/",
+      "type": "documentation",
+      "author": "Qdrant",
+      "description": "Detailed reference on metadata pre-filtering and post-filtering in Qdrant."
+    },
+    {
+      "title": "RAGAS: Evaluation Framework for RAG Pipelines",
+      "url": "https://docs.ragas.io/en/latest/",
+      "type": "documentation",
+      "author": "RAGAS",
+      "description": "Open-source framework for automated evaluation of retrieval and answer quality in RAG systems."
+    },
+    {
+      "title": "Weaviate: Hybrid Search Explained",
+      "url": "https://weaviate.io/blog/hybrid-search-explained",
+      "type": "article",
+      "author": "Weaviate",
+      "description": "In-depth explanation of combining BM25 and vector search with Reciprocal Rank Fusion."
+    },
+    {
+      "title": "Lost in the Middle: How Language Models Use Long Contexts",
+      "url": "https://arxiv.org/abs/2307.03172",
+      "type": "paper",
+      "author": "Liu et al., 2023",
+      "description": "Research paper documenting how LLMs perform worse on information placed in the middle of long context windows — directly relevant to retrieved chunk ordering."
+    }
+  ]
+}
