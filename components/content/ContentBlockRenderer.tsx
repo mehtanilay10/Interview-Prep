@@ -377,6 +377,16 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
     case 'example':
       return renderExampleBlock(block as ContentBlock & { type: 'example' }, idx);
 
+    case 'code':
+      return (
+        <div key={idx} className="my-4">
+          {block.data.caption && (
+            <p className="mb-2 text-xs text-fg-muted">{block.data.caption}</p>
+          )}
+          <CustomCodeBlock code={block.data.code} language={block.data.language} />
+        </div>
+      );
+
     case 'solution':
       return renderSolutionBlock(block as ContentBlock & { type: 'solution' }, idx);
 
@@ -692,6 +702,16 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
           content: legacy.content as string,
           code: legacy.code as string | undefined,
           language: legacy.language as string | undefined,
+        },
+      };
+    case 'code':
+      return {
+        ...common,
+        type: 'code',
+        data: {
+          language: legacy.language as string,
+          caption: legacy.caption as string | undefined,
+          code: legacy.code as string,
         },
       };
     case 'solution':

@@ -24,17 +24,17 @@ export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
         {/* Badge */}
 <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-accent-muted bg-accent-subtle px-3 py-1 text-xs font-medium text-accent-fg">
            <span className="h-1.5 w-1.5 rounded-full bg-accent-fg animate-pulse" aria-hidden="true" />
-           Interview Preparation Course
+           Interview Prep & AI Learning Platform
          </span>
 
           <h1 className="mb-4 text-4xl font-bold tracking-tight text-fg-default sm:text-5xl lg:text-6xl text-balance">
-            Ace your interviews.{' '}
-            <span className="text-accent-fg">Prepare with confidence.</span>{' '}
-            Stand out.
+            Master interviews.{' '}
+            <span className="text-accent-fg">Learn AI tools.</span>{' '}
+            Build skills.
           </h1>
 
           <p className="mx-auto mb-8 max-w-2xl text-lg text-fg-muted leading-relaxed">
-            A complete, beginner-friendly course to help you prepare for interviews. No coding required.
+            A complete learning platform for interview preparation, AI literacy, and programming skills. From beginner to advanced.
           </p>
 
         {/* CTAs */}
@@ -44,20 +44,20 @@ export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
             className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" />
-            Start Preparing
+            Start Learning
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
           <Link
-            href="/cheatsheet"
+            href="/courses/ai-basics"
             className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
           >
-            Browse Cheat Sheets
+            Learn AI Basics
           </Link>
           <Link
             href="/interview-questions"
             className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
           >
-            Practice Interview Questions
+            Interview Questions
           </Link>
         </div>
 

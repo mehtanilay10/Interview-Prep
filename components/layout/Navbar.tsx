@@ -13,11 +13,19 @@ import { cn } from "@/lib/utils";
 import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
 
+const TECHS = [
+  { key: "frontend", label: "Frontend" },
+  { key: "backend", label: "Backend" },
+  { key: "ai", label: "AI" },
+  { key: "architecture", label: "Architect" },
+];
+
 const NAV_LINKS = [
-  { href: "/courses", label: "Courses" },
+  { href: "/courses", label: "All Courses" },
   { href: "/cheatsheet", label: "Cheat Sheets" },
   { href: "/problems", label: "Problems" },
-  { href: "/interview-questions", label: "Interview Questions" },
+  { href: "/interview-questions", label: "Interview Q&A" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 export function Navbar() {
@@ -27,6 +35,7 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [techOpen, setTechOpen] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -130,6 +139,30 @@ export function Navbar() {
           </div>
         ) : (
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setTechOpen((o) => !o)}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+                aria-expanded={techOpen}
+              >
+                Technologies
+              </button>
+              {techOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
+                  {TECHS.map((t) => (
+                    <Link
+                      key={t.key}
+                      href={`/courses?tech=${t.key}`}
+                      onClick={() => setTechOpen(false)}
+                      className="block px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                    >
+                      {t.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
             {NAV_LINKS.map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
