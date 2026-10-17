@@ -264,6 +264,9 @@ import advancedQ4Lesson from "../interview-qa/03-advanced-questions/advanced-q4.
 import advancedQ5Lesson from "../interview-qa/03-advanced-questions/advanced-q5.json";
 import agentArchitecturePatternsLesson from "../courses/dotnet-ai-backend/05-ai-agents-dotnet/agent-architecture-patterns.json";
 import agentGuardrailsAndApprovalsLesson from "../courses/ai-basics/phase-5-automation-agents-tool-calling-basics/agent-guardrails-and-approvals.json";
+import lesson1WhatIsAnAgentLesson from "../courses/agentic-ai/phase-1-foundations-what-is-an-agent/lesson-1-what-is-an-agent.json";
+import lesson2PlanningAndToolUseLesson from "../courses/agentic-ai/phase-2-plans-and-tools-agents-in-action/lesson-2-planning-and-tool-use.json";
+import lesson3SpecializationAndCoordinationLesson from "../courses/agentic-ai/phase-3-advanced-orchestration-multiagent-systems/lesson-3-specialization-and-coordination.json";
 import agentResearchTaskLesson from "../projects/agent-research-task.json";
 import agenticCodingIntroLesson from "../courses/codex/phase-3-workflows-agentic-workflows/agentic-coding-intro.json";
 import aggregateFunctionsLesson from "../courses/postgresql/grouping-aggregation-subqueries/aggregate-functions.json";
@@ -3180,6 +3183,9 @@ const rawLessonsPart1 = [
 	advancedQ5Lesson,
 	agentArchitecturePatternsLesson,
 	agentGuardrailsAndApprovalsLesson,
+lesson1WhatIsAnAgentLesson,
+lesson2PlanningAndToolUseLesson,
+lesson3SpecializationAndCoordinationLesson,
 	agentResearchTaskLesson,
 	agenticCodingIntroLesson,
 	aggregateFunctionsLesson,

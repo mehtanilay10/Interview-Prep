@@ -463,6 +463,9 @@ import performanceOptimizationModule from "../courses/redis-caching-strategies/p
 import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
 import phase1FoundationsAiToolsOverviewModule from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/content.json";
 import phase1FoundationsIntroToAiCodingModule from "../courses/codex/phase-1-foundations-intro-to-ai-coding/content.json";
+import phase1FoundationsWhatIsAnAgentModule from "../courses/agentic-ai/phase-1-foundations-what-is-an-agent/content.json";
+import phase2PlansAndToolsAgentsInActionModule from "../courses/agentic-ai/phase-2-plans-and-tools-agents-in-action/content.json";
+import phase3AdvancedOrchestrationMultiagentSystemsModule from "../courses/agentic-ai/phase-3-advanced-orchestration-multiagent-systems/content.json";
 import phase1FoundationsPromptEngineeringForCodeModule from "../courses/codex/phase-1-foundations-prompt-engineering-for-code/content.json";
 import phase1FoundationsPromptingBasicsModule from "../courses/ai-basics/phase-1-foundations-prompting-basics/content.json";
 import phase1FoundationsWhatIsAiModule from "../courses/ai-basics/phase-1-foundations-what-is-ai/content.json";
@@ -1061,6 +1064,9 @@ const rawModulesPart1 = [
 	performanceTuningModule,
 	phase1FoundationsAiToolsOverviewModule,
 	phase1FoundationsIntroToAiCodingModule,
+phase1FoundationsWhatIsAnAgentModule,
+phase2PlansAndToolsAgentsInActionModule,
+phase3AdvancedOrchestrationMultiagentSystemsModule,
 	phase1FoundationsPromptEngineeringForCodeModule,
 	phase1FoundationsPromptingBasicsModule,
 	phase1FoundationsWhatIsAiModule,
