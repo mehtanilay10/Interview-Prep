@@ -301,6 +301,8 @@ import advancedPatternsModule1 from "../courses/yarn-npm-packages/advanced-patte
 import advancedRebaseModule from "../courses/git-linux-developer-workflow/advanced-rebase/content.json";
 import advancedTopicsModule from "../courses/postgresql/advanced-topics/content.json";
 import advancedTypeModelingRuntimeSafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
+import agenticAiModule from "../courses/agentic-ai/content.json";
+import aiBasicsModule from "../courses/ai-basics/content.json";
 import airbnbBookingModule from "../problems/lld/airbnb-booking/content.json";
 import airbnbBookingHldModule from "../problems/hld/airbnb-booking-hld/content.json";
 import amazonEcommerceModule from "../problems/lld/amazon-ecommerce/content.json";
@@ -457,6 +459,13 @@ import paymentGatewayHldModule from "../problems/hld/payment-gateway-hld/content
 import performanceObservabilityModule from "../courses/aspnet-core/performance-observability/content.json";
 import performanceOptimizationModule from "../courses/redis-caching-strategies/performance-optimization/content.json";
 import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
+import phase1FoundationsAiToolsOverviewModule from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/content.json";
+import phase1FoundationsPromptingBasicsModule from "../courses/ai-basics/phase-1-foundations-prompting-basics/content.json";
+import phase1FoundationsWhatIsAiModule from "../courses/ai-basics/phase-1-foundations-what-is-ai/content.json";
+import phase1FoundationsWhatIsAnAgentModule from "../courses/agentic-ai/phase-1-foundations-what-is-an-agent/content.json";
+import phase2KeyConceptsHallucinationsAndAccuracyModule from "../courses/ai-basics/phase-2-key-concepts-hallucinations-and-accuracy/content.json";
+import phase2PlansAndToolsAgentsInActionModule from "../courses/agentic-ai/phase-2-plans-and-tools-agents-in-action/content.json";
+import phase3AdvancedOrchestrationMultiagentSystemsModule from "../courses/agentic-ai/phase-3-advanced-orchestration-multiagent-systems/content.json";
 import postgresqlModule from "../courses/postgresql/content.json";
 import prismaModule from "../courses/prisma/content.json";
 import productionApiDesignReliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
@@ -867,6 +876,8 @@ const rawModulesPart1 = [
 	advancedRebaseModule,
 	advancedTopicsModule,
 	advancedTypeModelingRuntimeSafetyModule,
+	agenticAiModule,
+	aiBasicsModule,
 	airbnbBookingModule,
 	airbnbBookingHldModule,
 	amazonEcommerceModule,
@@ -1023,6 +1034,13 @@ const rawModulesPart1 = [
 	performanceObservabilityModule,
 	performanceOptimizationModule,
 	performanceTuningModule,
+	phase1FoundationsAiToolsOverviewModule,
+	phase1FoundationsPromptingBasicsModule,
+	phase1FoundationsWhatIsAiModule,
+	phase1FoundationsWhatIsAnAgentModule,
+	phase2KeyConceptsHallucinationsAndAccuracyModule,
+	phase2PlansAndToolsAgentsInActionModule,
+	phase3AdvancedOrchestrationMultiagentSystemsModule,
 	postgresqlModule,
 	prismaModule,
 	productionApiDesignReliabilityModule,
@@ -1057,6 +1075,9 @@ const rawModulesPart1 = [
 	reactSystemDesignModule,
 	reactTestingModule,
 	reactTestingModule1,
+];
+
+const rawModulesPart2 = [
 	reactTypescriptReviewsModule,
 	realWorldCaseStudiesModule,
 	redisCachingStrategiesModule,
@@ -1066,9 +1087,6 @@ const rawModulesPart1 = [
 	reduxModule1,
 	requirementClarificationModule,
 	resiliencePatternsModule,
-];
-
-const rawModulesPart2 = [
 	restApiDesignScenariosModule,
 	rideSharingHldModule,
 	routingModule,

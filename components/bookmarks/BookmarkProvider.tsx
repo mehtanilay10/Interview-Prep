@@ -83,6 +83,8 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   const [prevLoggedIn, setPrevLoggedIn] = useState(isLoggedIn);
   const serverBookmarksRef = useRef(serverBookmarks);
   serverBookmarksRef.current = serverBookmarks;
+  // Guard against re-syncing the same snapshot repeatedly.
+  const lastSyncedRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -104,6 +106,7 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       if (data) {
         setServerBookmarks(data);
+        lastSyncedRef.current = JSON.stringify(data);
       }
       setIsInitialLoad(false);
     });
@@ -113,8 +116,13 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, serverBookmarks]);
 
   useEffect(() => {
-    if (!isLoggedIn || !serverBookmarksRef.current) return;
-    syncBookmarksToServerFn(serverBookmarksRef.current);
+    if (!isLoggedIn || !serverBookmarks || isInitialLoad) return;
+    // Only sync if the snapshot actually changed since the last sync.
+    const snapshot = JSON.stringify(serverBookmarks);
+    if (snapshot === lastSyncedRef.current) return;
+    lastSyncedRef.current = snapshot;
+    setSyncedToServer(false);
+    syncBookmarksToServerFn(serverBookmarks).then(() => setSyncedToServer(true));
   }, [isLoggedIn, serverBookmarks, isInitialLoad]);
 
   useEffect(() => {

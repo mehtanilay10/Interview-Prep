@@ -303,6 +303,7 @@ import amazonSagemakerLesson from "../courses/aws/14-ai-machine-learning/amazon-
 import amazonSnsEventbridgeLesson from "../courses/aws/07-load-balancing-application-integration/amazon-sns-eventbridge.json";
 import amazonSqsLesson from "../courses/aws/07-load-balancing-application-integration/amazon-sqs.json";
 import amazonVpcLesson from "../courses/aws/04-networking/amazon-vpc.json";
+import anatomyOfAGoodPromptLesson from "../courses/ai-basics/phase-1-foundations-prompting-basics/anatomy-of-a-good-prompt.json";
 import anatomyOfLambdaExpressionLesson from "../courses/linq/02-linq-fundamentals-syntax/anatomy-of-lambda-expression.json";
 import andOrOperatorsLesson from "../courses/postgresql/querying-data/and-or-operators.json";
 import angularEssentialsLesson from "../courses/yarn-npm-packages/frontend-frameworks/angular-essentials.json";
@@ -665,6 +666,7 @@ import changeTrackingLesson from "../courses/ef-core/06-change-tracking/change-t
 import channelsAndProducerConsumerPipelinesLesson from "../courses/csharp-fundamentals/advanced-async-concurrency-threading/channels-and-producer-consumer-pipelines.json";
 import chatSystemDesignLesson from "../courses/system-design-interviews/common-system-designs/chat-system-design.json";
 import chatSystemHldLesson from "../problems/hld/chat-system-hld/chat-system-hld.json";
+import chatbotLandscapeLesson from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/chatbot-landscape.json";
 import cheatsheetLesson from "../cheatsheet/apollo/cheatsheet.json";
 import cheatsheetLesson1 from "../cheatsheet/aspnet-core/cheatsheet.json";
 import cheatsheetLesson2 from "../cheatsheet/aws/cheatsheet.json";
@@ -699,6 +701,7 @@ import choosingAzureRegionAndAvailabilityZoneLesson from "../problems/azure/01-a
 import choosingBetweenVmAndAppServiceLesson from "../problems/azure/02-azure-compute-problems/choosing-between-vm-and-app-service.json";
 import choosingStateOwnershipBoundariesLesson from "../courses/react-advanced-patterns/modern-state-application-architecture/choosing-state-ownership-boundaries.json";
 import choosingTheRightStructureLesson from "../courses/programming-computer-web-foundations/data-structures-deep-dive/choosing-the-right-structure.json";
+import choosingTheRightToolLesson from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/choosing-the-right-tool.json";
 import choreographyVsOrchestrationLesson from "../courses/microservices-architecture/distributed-transactions/choreography-vs-orchestration.json";
 import chunkingAndEmbeddingDocumentsLesson from "../courses/dotnet-ai-backend/02-rag-implementation/chunking-and-embedding-documents.json";
 import ciCdForAppServiceLesson from "../courses/azure/11-application-deployment-and-devops/ci-cd-for-app-service.json";
@@ -1555,6 +1558,9 @@ import leadershipQuestionsLesson from "../interview-qa/behavioral-interview-ques
 import learnLinqStepByStepLesson from "../courses/linq/01-getting-started-linq/learn-linq-step-by-step.json";
 import leftRightJoinsLesson from "../courses/postgresql/joins/left-right-joins.json";
 import legacyModernizationStrategiesLesson from "../courses/clean-code-csharp/senior-engineering-judgment-architecture-decisions/legacy-modernization-strategies.json";
+import lesson1WhatIsAnAgentLesson from "../courses/agentic-ai/phase-1-foundations-what-is-an-agent/lesson-1-what-is-an-agent.json";
+import lesson2PlanningAndToolUseLesson from "../courses/agentic-ai/phase-2-plans-and-tools-agents-in-action/lesson-2-planning-and-tool-use.json";
+import lesson3SpecializationAndCoordinationLesson from "../courses/agentic-ai/phase-3-advanced-orchestration-multiagent-systems/lesson-3-specialization-and-coordination.json";
 import libraryManagementLesson from "../problems/lld/library-management/library-management.json";
 import librarySystemSchemaLesson from "../problems/database-design/schema-design-scenarios/library-system-schema.json";
 import limitOffsetFetchLesson from "../courses/postgresql/querying-data/limit-offset-fetch.json";
@@ -3121,6 +3127,7 @@ const rawLessonsPart1 = [
 	amazonSnsEventbridgeLesson,
 	amazonSqsLesson,
 	amazonVpcLesson,
+	anatomyOfAGoodPromptLesson,
 	anatomyOfLambdaExpressionLesson,
 	andOrOperatorsLesson,
 	angularEssentialsLesson,
@@ -3317,10 +3324,10 @@ const rawLessonsPart1 = [
 	azureSqlDatabaseLesson,
 	azureSqlDatabaseConnectivityLesson,
 	azureSqlDatabaseOverviewLesson,
-	azureSqlIntroLesson,
 ];
 
 const rawLessonsPart2 = [
+	azureSqlIntroLesson,
 	azureSqlManagedInstanceLesson,
 	azureSqlQueryPerformanceAndScalingLesson,
 	azureSqlVsCosmosDbLesson,
@@ -3486,6 +3493,7 @@ const rawLessonsPart2 = [
 	channelsAndProducerConsumerPipelinesLesson,
 	chatSystemDesignLesson,
 	chatSystemHldLesson,
+	chatbotLandscapeLesson,
 	cheatsheetLesson,
 	cheatsheetLesson1,
 	cheatsheetLesson2,
@@ -3520,6 +3528,7 @@ const rawLessonsPart2 = [
 	choosingBetweenVmAndAppServiceLesson,
 	choosingStateOwnershipBoundariesLesson,
 	choosingTheRightStructureLesson,
+	choosingTheRightToolLesson,
 	choreographyVsOrchestrationLesson,
 	chunkingAndEmbeddingDocumentsLesson,
 	ciCdForAppServiceLesson,
@@ -3818,12 +3827,12 @@ const rawLessonsPart2 = [
 	deployAspnetCoreBeanstalkLesson,
 	deployingContainerizedAppsOnAksLesson,
 	deploymentAndScalingPatternsLesson,
-	deploymentArchitectureForNextjsLesson,
-	deploymentOptionsLesson,
-	deploymentPipelinesLesson,
 ];
 
 const rawLessonsPart3 = [
+	deploymentArchitectureForNextjsLesson,
+	deploymentOptionsLesson,
+	deploymentPipelinesLesson,
 	deploymentSecretsAndEnvironmentConfigurationLesson,
 	deploymentSetupLesson,
 	deploymentSlotsAndSlotSwappingLesson,
@@ -4321,12 +4330,12 @@ const rawLessonsPart3 = [
 	jsI02Lesson,
 	jsI03Lesson,
 	jsI04Lesson,
-	jsI05Lesson,
-	jsonbAdvancedLesson,
-	jsonbArraysLesson,
 ];
 
 const rawLessonsPart4 = [
+	jsI05Lesson,
+	jsonbAdvancedLesson,
+	jsonbArraysLesson,
 	jsonpatchLesson,
 	jsxBasicsLesson,
 	jsxBasicsLesson1,
@@ -4382,6 +4391,9 @@ const rawLessonsPart4 = [
 	learnLinqStepByStepLesson,
 	leftRightJoinsLesson,
 	legacyModernizationStrategiesLesson,
+	lesson1WhatIsAnAgentLesson,
+	lesson2PlanningAndToolUseLesson,
+	lesson3SpecializationAndCoordinationLesson,
 	libraryManagementLesson,
 	librarySystemSchemaLesson,
 	limitOffsetFetchLesson,
@@ -4821,15 +4833,15 @@ const rawLessonsPart4 = [
 	promptCompositionAndGenerationLesson,
 	promptsTokensAndContextWindowsLesson,
 	propertiesLesson,
+];
+
+const rawLessonsPart5 = [
 	propsAdvancedLesson,
 	propsBasicsLesson,
 	prosAndConsOfMicroservicesLesson,
 	protobufLesson,
 	prototypePatternLesson,
 	prototypePatternLesson1,
-];
-
-const rawLessonsPart5 = [
 	providerLesson,
 	proxyPatternLesson,
 	psTopSsLsofAndCurlForDiagnosisLesson,
@@ -5324,15 +5336,15 @@ const rawLessonsPart5 = [
 	switchStatementsLesson,
 	swrLesson,
 	symmetricTreeLesson,
+];
+
+const rawLessonsPart6 = [
 	synchronousVsAsynchronousCommunicationLesson,
 	synchronousVsAsynchronousWorkLesson,
 	synchronousVsAsynchronousWorkflowsLesson,
 	systemIoPipelinesLesson,
 	systemQ1Lesson,
 	systemQ11Lesson,
-];
-
-const rawLessonsPart6 = [
 	systemQ12Lesson,
 	systemQ13Lesson,
 	systemQ14Lesson,
