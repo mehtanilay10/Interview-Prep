@@ -1,5 +1,6 @@
 import type { Course } from "@/types";
 
+import aiBasicsCourse from "./ai-basics/content.json";
 import apiDesignCourse from "../problems/api-design/content.json";
 import apolloCourse from "./apollo/content.json";
 import architectureDecisionLabProblemsCourse from "../problems/architecture-decision-lab-problems/content.json";
@@ -57,6 +58,7 @@ import unitTestingDotnetCourse from "./unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./yarn-npm-packages/content.json";
 
 const rawCoursesPart1 = [
+	aiBasicsCourse,
 	apiDesignCourse,
 	apolloCourse,
 	architectureDecisionLabProblemsCourse,

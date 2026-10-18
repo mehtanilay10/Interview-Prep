@@ -301,6 +301,7 @@ import advancedPatternsModule1 from "../courses/yarn-npm-packages/advanced-patte
 import advancedRebaseModule from "../courses/git-linux-developer-workflow/advanced-rebase/content.json";
 import advancedTopicsModule from "../courses/postgresql/advanced-topics/content.json";
 import advancedTypeModelingRuntimeSafetyModule from "../courses/typescript-for-react/advanced-type-modeling-runtime-safety/content.json";
+import aiBasicsModule from "../courses/ai-basics/content.json";
 import airbnbBookingModule from "../problems/lld/airbnb-booking/content.json";
 import airbnbBookingHldModule from "../problems/hld/airbnb-booking-hld/content.json";
 import amazonEcommerceModule from "../problems/lld/amazon-ecommerce/content.json";
@@ -457,6 +458,10 @@ import paymentGatewayHldModule from "../problems/hld/payment-gateway-hld/content
 import performanceObservabilityModule from "../courses/aspnet-core/performance-observability/content.json";
 import performanceOptimizationModule from "../courses/redis-caching-strategies/performance-optimization/content.json";
 import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
+import phase1FoundationsAiToolsOverviewModule from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/content.json";
+import phase1FoundationsPromptingBasicsModule from "../courses/ai-basics/phase-1-foundations-prompting-basics/content.json";
+import phase6BuildingProductionAgentsModule from "../courses/agentic-ai/phase-6-building-production-agents/content.json";
+import phase7SpecialAgentArchitecturesModule from "../courses/agentic-ai/phase-7-special-agent-architectures/content.json";
 import postgresqlModule from "../courses/postgresql/content.json";
 import prismaModule from "../courses/prisma/content.json";
 import productionApiDesignReliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
@@ -867,6 +872,7 @@ const rawModulesPart1 = [
 	advancedRebaseModule,
 	advancedTopicsModule,
 	advancedTypeModelingRuntimeSafetyModule,
+	aiBasicsModule,
 	airbnbBookingModule,
 	airbnbBookingHldModule,
 	amazonEcommerceModule,
@@ -1023,6 +1029,10 @@ const rawModulesPart1 = [
 	performanceObservabilityModule,
 	performanceOptimizationModule,
 	performanceTuningModule,
+	phase1FoundationsAiToolsOverviewModule,
+	phase1FoundationsPromptingBasicsModule,
+	phase6BuildingProductionAgentsModule,
+	phase7SpecialAgentArchitecturesModule,
 	postgresqlModule,
 	prismaModule,
 	productionApiDesignReliabilityModule,
@@ -1061,14 +1071,14 @@ const rawModulesPart1 = [
 	realWorldCaseStudiesModule,
 	redisCachingStrategiesModule,
 	redisFundamentalsModule,
+];
+
+const rawModulesPart2 = [
 	redisUseCasesModule,
 	reduxModule,
 	reduxModule1,
 	requirementClarificationModule,
 	resiliencePatternsModule,
-];
-
-const rawModulesPart2 = [
 	restApiDesignScenariosModule,
 	rideSharingHldModule,
 	routingModule,
