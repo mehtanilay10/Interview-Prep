@@ -60,6 +60,7 @@ export default async function CourseDetailPage({ params }: Params) {
               key={mod.id}
               module={mod}
               courseSlug={courseSlug}
+              basePrefix={`${category}/courses`}
               lessonCount={mod.lessonSlugs?.length ?? 0}
             />
           ))}

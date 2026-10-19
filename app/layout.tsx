@@ -5,7 +5,7 @@ import { PWARegistration } from '@/components/ui/PWARegistration';
 import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { getNavigationCategories } from '@/lib/content';
+import { getNavigationCategories, getPopularCourses } from '@/lib/content';
 import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { AuthProvider } from '@/components/auth/AuthProvider';
@@ -51,6 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const categories = getNavigationCategories();
+  const popularCourses = getPopularCourses();
 
   return (
     <html lang="en" suppressHydrationWarning className={inter.className}>
@@ -71,7 +72,7 @@ export default function RootLayout({
                     {children}
                   </ErrorBoundaryWrapper>
                 </main>
-                <Footer categories={categories} />
+                <Footer categories={categories} popularCourses={popularCourses} />
                 <OfflineIndicator />
               </ThemeProvider>
             </BookmarkProvider>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { StickyNote } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { getLessonBySlug } from '@/lib/content';
+import { getLessonBySlug, getContentItemHref } from '@/lib/content';
 
 interface LessonNote {
   courseSlug: string;
@@ -37,21 +37,11 @@ interface ResolvedNote extends LessonNote {
 function resolveLesson(note: LessonNote): { title: string; href: string } {
   const lesson = getLessonBySlug(note.lessonSlug, note.courseSlug);
   if (lesson) {
-    if (note.courseSlug === 'interview-qa') {
-      return { title: lesson.title, href: `/interview-questions/${note.moduleSlug}/${note.lessonSlug}` };
-    }
-    if (note.courseSlug.startsWith('problem')) {
-      return { title: lesson.title, href: `/problems/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
-    }
-    return { title: lesson.title, href: `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}` };
+    return { title: lesson.title, href: getContentItemHref(note.courseSlug, note.moduleSlug, note.lessonSlug) };
   }
   return {
     title: note.lessonSlug.replace(/-/g, ' '),
-    href: note.courseSlug === 'interview-qa'
-      ? `/interview-questions/${note.moduleSlug}/${note.lessonSlug}`
-      : note.courseSlug.startsWith('problem')
-        ? `/problems/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}`
-        : `/courses/${note.courseSlug}/${note.moduleSlug}/${note.lessonSlug}`,
+    href: getContentItemHref(note.courseSlug, note.moduleSlug, note.lessonSlug),
   };
 }
 

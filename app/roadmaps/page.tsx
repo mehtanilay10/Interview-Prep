@@ -2,7 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { roadmaps, getRoadmapForCourse } from '@/content/roadmaps';
-import { getAllCourses } from '@/lib/content';
+import { getAllCourses, getCourseCategory } from '@/lib/content';
+
+/** Resolve a roadmap href (stored category-less, e.g. `/courses/ai-basics/...`) to its category-prefixed route. */
+function resolveRoadmapHref(href: string, courseSlug: string): string {
+  if (href.startsWith('/courses/') || href.startsWith('/problems/') || href.startsWith('/cheatsheets/')) {
+    return `/${getCourseCategory(courseSlug)}${href}`;
+  }
+  return href;
+}
 import { BookOpen, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +49,7 @@ function RoadmapNodeComponent({ node, courseSlug, depth = 0 }: { node: import('@
               <span className="text-sm">{depth === 0 ? '📘' : '📖'}</span>
               {node.href ? (
                 <Link
-                  href={node.href}
+                  href={resolveRoadmapHref(node.href, courseSlug)}
                   className="text-sm font-medium text-fg-default hover:text-accent-fg transition-colors truncate"
                 >
                   {node.title}

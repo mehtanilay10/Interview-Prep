@@ -48,7 +48,7 @@ export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
           <Link
-            href="/courses/ai-basics"
+            href="/ai/courses/ai-basics"
             className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
           >
             Learn AI Basics

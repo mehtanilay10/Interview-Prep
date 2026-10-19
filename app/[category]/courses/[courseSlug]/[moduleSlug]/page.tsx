@@ -150,6 +150,7 @@ export default async function CourseModuleDetailPage({ params }: Params) {
                   lesson={toLessonNavItem(lesson)}
                   moduleSlug={moduleSlug}
                   courseSlug={courseSlug}
+                  basePrefix={`${category}/courses`}
                   variant="list"
                 />
               ))}

@@ -85,19 +85,20 @@ export interface CategoryMeta {
 
 /** Display metadata for known categories. Unknown categories fall back to a generic label. */
 export const CATEGORY_META: Record<string, CategoryMeta> = {
-  dotnet: { label: '.NET', icon: '💜' },
+  backend: { label: 'Backend', icon: '⚙️' },
   frontend: { label: 'Frontend', icon: '⚛️' },
   database: { label: 'Database', icon: '🗄️' },
-  cloud: { label: 'Cloud', icon: '☁️' },
   ai: { label: 'AI', icon: '🤖' },
-  architecture: { label: 'Architecture', icon: '🏗️' },
   devops: { label: 'DevOps', icon: '🚀' },
-  backend: { label: 'Backend', icon: '⚙️' },
+  architecture: { label: 'Architecture', icon: '🏗️' },
   fundamentals: { label: 'Fundamentals', icon: '🌱' },
 };
 
 /** Preferred display order; any other categories found in content are appended alphabetically. */
-const CATEGORY_ORDER = ['dotnet', 'frontend', 'database', 'cloud', 'ai', 'architecture', 'devops', 'backend', 'fundamentals'];
+const CATEGORY_ORDER = ['backend', 'frontend', 'database', 'ai', 'devops', 'architecture'];
+
+/** Categories that exist in content but are intentionally omitted from the navigation bar. */
+const HIDDEN_CATEGORIES = new Set(['fundamentals']);
 
 export function getCategoryMeta(category: string): CategoryMeta {
   return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), icon: '📚' };
@@ -165,7 +166,7 @@ function computeNavigationCategories(): NavCategory[] {
   const ordered = [
     ...CATEGORY_ORDER.filter((key) => present.has(key)),
     ...[...present].filter((key) => !CATEGORY_ORDER.includes(key)).sort(),
-  ];
+  ].filter((key) => !HIDDEN_CATEGORIES.has(key));
 
   return ordered.map((key) => {
     const meta = getCategoryMeta(key);
@@ -463,18 +464,18 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
   // AI
   'ai-basics': 'ai',
   'dotnet-ai-backend': 'ai',
-  // Dotnet
-  'csharp-fundamentals': 'dotnet',
-  'linq': 'dotnet',
-  'ef-core': 'dotnet',
-  'aspnet-core': 'dotnet',
-  'aspnet-core-web-api': 'dotnet',
-  'dotnet-nuget-packages': 'dotnet',
-  'unit-testing-dotnet': 'dotnet',
-  'authentication-authorization': 'dotnet',
-  'graphql-dotnet': 'dotnet',
-  'aws-for-aspnet': 'dotnet',
-  'azure-for-aspnet': 'dotnet',
+  // Backend (.NET)
+  'csharp-fundamentals': 'backend',
+  'linq': 'backend',
+  'ef-core': 'backend',
+  'aspnet-core': 'backend',
+  'aspnet-core-web-api': 'backend',
+  'dotnet-nuget-packages': 'backend',
+  'unit-testing-dotnet': 'backend',
+  'authentication-authorization': 'backend',
+  'graphql-dotnet': 'backend',
+  'aws-for-aspnet': 'backend',
+  'azure-for-aspnet': 'backend',
   // Frontend
   'react-fundamentals': 'frontend',
   'typescript-for-react': 'frontend',
@@ -489,9 +490,9 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
   // Database
   'postgresql': 'database',
   'sql-server': 'database',
-  // Cloud
-  'aws': 'cloud',
-  'azure': 'cloud',
+  // Cloud → DevOps
+  'aws': 'devops',
+  'azure': 'devops',
   // DevOps
   'devops': 'devops',
   'git-linux-developer-workflow': 'devops',
@@ -505,16 +506,16 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
   'system-design-interviews': 'architecture',
   'frontend-performance-engineering': 'architecture',
   // Cheatsheets (module slugs)
-  'csharp': 'dotnet',
+  'csharp': 'backend',
   'javascript': 'frontend',
   'react': 'frontend',
   'react-router': 'frontend',
   'typescript': 'frontend',
-  'graphql': 'dotnet',
+  'graphql': 'backend',
   'docker-compose': 'devops',
   // Problems (course slugs)
   'api-design': 'backend',
-  'asp': 'dotnet',
+  'asp': 'backend',
   'database-design': 'database',
   'sql': 'database',
   'architecture-decisions': 'architecture',
@@ -556,6 +557,78 @@ const problemCourseSlugs: Set<string> = new Set(
 
 export function isProblemCourseSlug(slug: string | undefined): boolean {
   return slug !== undefined && problemCourseSlugs.has(slug);
+}
+
+/**
+ * Builds the canonical, category-prefixed href for a stored
+ * (courseSlug, moduleSlug, lessonSlug) triple — e.g. from bookmarks,
+ * notes, or progress records. All course/problem routes live under
+ * `/[category]/...`, so links must include the resolved category.
+ */
+export function getContentItemHref(
+  courseSlug: string,
+  moduleSlug?: string | null,
+  lessonSlug?: string | null
+): string {
+  if (courseSlug === 'interview-qa') {
+    return moduleSlug && lessonSlug
+      ? `/interview-questions/${moduleSlug}/${lessonSlug}`
+      : '/interview-questions';
+  }
+
+  // Cheatsheets: one lesson per technology module; the category is derived
+  // from the technology (module) slug, not a course.
+  if (courseSlug === 'cheatsheet') {
+    if (moduleSlug) {
+      return `/${getCourseCategory(moduleSlug)}/cheatsheets/${moduleSlug}`;
+    }
+    return '/cheatsheet';
+  }
+
+  const category = getCourseCategory(courseSlug);
+  const prefix = isProblemCourseSlug(courseSlug) ? 'problems' : 'courses';
+
+  if (moduleSlug && lessonSlug) {
+    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}/${lessonSlug}`;
+  }
+  if (moduleSlug) {
+    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}`;
+  }
+  return `/${category}/${prefix}/${courseSlug}`;
+}
+
+/**
+ * A curated set of headline courses for the footer's "Popular Courses"
+ * column. Falls back to the largest courses by lesson count if a listed
+ * slug is ever removed from content.
+ */
+const POPULAR_COURSE_SLUGS = [
+  'aspnet-core',
+  'csharp-fundamentals',
+  'react-fundamentals',
+  'postgresql',
+  'system-design-interviews',
+  'ai-basics',
+];
+
+export interface PopularCourse {
+  title: string;
+  href: string;
+  icon: string;
+}
+
+export function getPopularCourses(): PopularCourse[] {
+  const picked: PopularCourse[] = [];
+  for (const slug of POPULAR_COURSE_SLUGS) {
+    const course = getCourseBySlug(slug);
+    if (!course || course.category === 'problems' || course.isInterview) continue;
+    picked.push({
+      title: course.title,
+      icon: course.icon,
+      href: `/${getCourseCategory(course.slug)}/courses/${course.slug}`,
+    });
+  }
+  return picked;
 }
 
 export function getSearchResultHref(result: SearchResult): string {

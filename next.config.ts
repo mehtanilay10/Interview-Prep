@@ -2,6 +2,14 @@ import type { NextConfig } from 'next';
 import withPWA from '@ducanh2912/next-pwa';
 
 const nextConfig: NextConfig = {
+  // Legacy category URLs: .NET content moved from /dotnet → /backend and
+  // Cloud content from /cloud → /devops. Keep old links working.
+  async redirects() {
+    return [
+      { source: '/dotnet/:path*', destination: '/backend/:path*', permanent: true },
+      { source: '/cloud/:path*', destination: '/devops/:path*', permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       {

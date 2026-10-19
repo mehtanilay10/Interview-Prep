@@ -61,6 +61,23 @@ export function Navbar({ categories }: NavbarProps) {
   }, []);
 
   useEffect(() => {
+    if (!mobileOpen) return;
+    // Lock body scroll while the mobile menu is open so background content
+    // doesn't scroll behind the menu, and give the menu its own scroll area.
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
     if (!searchMode) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSearchMode(false);
@@ -307,7 +324,7 @@ export function Navbar({ categories }: NavbarProps) {
       {mobileOpen && (
         <div
           id="mobile-nav"
-          className="xl:hidden animate-slide-up border-t border-border bg-canvas-subtle"
+          className="xl:hidden animate-slide-up border-t border-border bg-canvas-subtle max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain"
         >
           <nav className="flex flex-col gap-1 px-4 py-3" aria-label="Mobile navigation">
             <PWAInstallButton className="mb-2" />

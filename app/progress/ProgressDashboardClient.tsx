@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, isProblemCourseSlug } from '@/lib/content';
+import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, isProblemCourseSlug, getContentItemHref } from '@/lib/content';
 import type { Lesson, Course } from '@/types';
 
 interface LessonProgress {
@@ -388,13 +388,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                 return (
                   <Link
                     key={course.courseSlug}
-                    href={
-                      course.courseSlug === 'interview-qa'
-                        ? '/interview-questions'
-                        : isProblemCourseSlug(course.courseSlug)
-                          ? `/problems/${course.courseSlug}`
-                          : `/courses/${course.courseSlug}`
-                    }
+                    href={getContentItemHref(course.courseSlug)}
                     className="group block rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3">

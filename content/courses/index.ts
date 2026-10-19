@@ -3,33 +3,35 @@ import type { Course } from "@/types";
 import aiBasicsCourse from "./ai/ai-basics/content.json";
 import apiDesignCourse from "../problems/backend/api-design/content.json";
 import apolloCourse from "./frontend/apollo/content.json";
-import aspnetCoreCourse from "./dotnet/aspnet-core/content.json";
-import aspnetCoreCourse1 from "../problems/dotnet/aspnet-core/content.json";
-import aspnetCoreWebApiCourse from "./dotnet/aspnet-core-web-api/content.json";
-import authenticationAuthorizationCourse from "./dotnet/authentication-authorization/content.json";
-import awsCourse from "./cloud/aws/content.json";
-import awsForAspnetCourse from "./dotnet/aws-for-aspnet/content.json";
-import azureCourse from "./cloud/azure/content.json";
-import azureCourse1 from "../problems/cloud/azure/content.json";
-import azureForAspnetCourse from "./dotnet/azure-for-aspnet/content.json";
+import aspnetCoreCourse from "./backend/aspnet-core/content.json";
+import aspnetCoreCourse1 from "../problems/backend/aspnet-core/content.json";
+import aspnetCoreWebApiCourse from "./backend/aspnet-core-web-api/content.json";
+import authenticationAuthorizationCourse from "./backend/authentication-authorization/content.json";
+import awsCourse from "./devops/aws/content.json";
+import awsForAspnetCourse from "./backend/aws-for-aspnet/content.json";
+import azureCourse from "./devops/azure/content.json";
+import azureCourse1 from "../problems/devops/azure/content.json";
+import azureForAspnetCourse from "./backend/azure-for-aspnet/content.json";
 import cheatsheetCourse from "../cheatsheet/content.json";
+import claudeCourse from "./ai/claude/content.json";
 import cleanCodeCsharpCourse from "./architecture/clean-code-csharp/content.json";
-import csharpCourse from "../problems/dotnet/csharp/content.json";
-import csharpFundamentalsCourse from "./dotnet/csharp-fundamentals/content.json";
+import codexCourse from "./ai/codex/content.json";
+import csharpCourse from "../problems/backend/csharp/content.json";
+import csharpFundamentalsCourse from "./backend/csharp-fundamentals/content.json";
 import databaseDesignCourse from "../problems/database/database-design/content.json";
 import designPatternsCourse from "./architecture/design-patterns/content.json";
 import devopsCourse from "./devops/devops/content.json";
 import dotnetAiBackendCourse from "./ai/dotnet-ai-backend/content.json";
-import dotnetNugetPackagesCourse from "./dotnet/dotnet-nuget-packages/content.json";
-import efCoreCourse from "./dotnet/ef-core/content.json";
+import dotnetNugetPackagesCourse from "./backend/dotnet-nuget-packages/content.json";
+import efCoreCourse from "./backend/ef-core/content.json";
 import frontendPerformanceEngineeringCourse from "./architecture/frontend-performance-engineering/content.json";
 import fullStackSeniorProjectsCourse from "../problems/architecture/full-stack-senior-projects/content.json";
 import fullstackSecurityCourse from "./architecture/fullstack-security/content.json";
 import gitLinuxDeveloperWorkflowCourse from "./devops/git-linux-developer-workflow/content.json";
-import graphqlDotnetCourse from "./dotnet/graphql-dotnet/content.json";
+import graphqlDotnetCourse from "./backend/graphql-dotnet/content.json";
 import hldCourse from "../problems/architecture/hld/content.json";
 import interviewQaCourse from "../interview-qa/content.json";
-import linqCourse from "./dotnet/linq/content.json";
+import linqCourse from "./backend/linq/content.json";
 import lldCourse from "../problems/architecture/lld/content.json";
 import messageQueuesEventStreamingCourse from "./architecture/message-queues-event-streaming/content.json";
 import microservicesArchitectureCourse from "./architecture/microservices-architecture/content.json";
@@ -50,40 +52,42 @@ import sqlServerCourse from "./database/sql-server/content.json";
 import systemDesignCourse from "../problems/architecture/system-design/content.json";
 import systemDesignInterviewsCourse from "./architecture/system-design-interviews/content.json";
 import typescriptForReactCourse from "./frontend/typescript-for-react/content.json";
-import unitTestingDotnetCourse from "./dotnet/unit-testing-dotnet/content.json";
+import unitTestingDotnetCourse from "./backend/unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./frontend/yarn-npm-packages/content.json";
 
 const rawCoursesPart1 = [
 	{ ...aiBasicsCourse, urlCategory: "ai" },
 	{ ...apiDesignCourse, urlCategory: "backend" },
 	{ ...apolloCourse, urlCategory: "frontend" },
-	{ ...aspnetCoreCourse, urlCategory: "dotnet" },
-	{ ...aspnetCoreCourse1, urlCategory: "dotnet" },
-	{ ...aspnetCoreWebApiCourse, urlCategory: "dotnet" },
-	{ ...authenticationAuthorizationCourse, urlCategory: "dotnet" },
-	{ ...awsCourse, urlCategory: "cloud" },
-	{ ...awsForAspnetCourse, urlCategory: "dotnet" },
-	{ ...azureCourse, urlCategory: "cloud" },
-	{ ...azureCourse1, urlCategory: "cloud" },
-	{ ...azureForAspnetCourse, urlCategory: "dotnet" },
+	{ ...aspnetCoreCourse, urlCategory: "backend" },
+	{ ...aspnetCoreCourse1, urlCategory: "backend" },
+	{ ...aspnetCoreWebApiCourse, urlCategory: "backend" },
+	{ ...authenticationAuthorizationCourse, urlCategory: "backend" },
+	{ ...awsCourse, urlCategory: "devops" },
+	{ ...awsForAspnetCourse, urlCategory: "backend" },
+	{ ...azureCourse, urlCategory: "devops" },
+	{ ...azureCourse1, urlCategory: "devops" },
+	{ ...azureForAspnetCourse, urlCategory: "backend" },
 	{ ...cheatsheetCourse, urlCategory: "cheatsheet" },
+	{ ...claudeCourse, urlCategory: "ai" },
 	{ ...cleanCodeCsharpCourse, urlCategory: "architecture" },
-	{ ...csharpCourse, urlCategory: "dotnet" },
-	{ ...csharpFundamentalsCourse, urlCategory: "dotnet" },
+	{ ...codexCourse, urlCategory: "ai" },
+	{ ...csharpCourse, urlCategory: "backend" },
+	{ ...csharpFundamentalsCourse, urlCategory: "backend" },
 	{ ...databaseDesignCourse, urlCategory: "database" },
 	{ ...designPatternsCourse, urlCategory: "architecture" },
 	{ ...devopsCourse, urlCategory: "devops" },
 	{ ...dotnetAiBackendCourse, urlCategory: "ai" },
-	{ ...dotnetNugetPackagesCourse, urlCategory: "dotnet" },
-	{ ...efCoreCourse, urlCategory: "dotnet" },
+	{ ...dotnetNugetPackagesCourse, urlCategory: "backend" },
+	{ ...efCoreCourse, urlCategory: "backend" },
 	{ ...frontendPerformanceEngineeringCourse, urlCategory: "architecture" },
 	{ ...fullStackSeniorProjectsCourse, urlCategory: "architecture" },
 	{ ...fullstackSecurityCourse, urlCategory: "architecture" },
 	{ ...gitLinuxDeveloperWorkflowCourse, urlCategory: "devops" },
-	{ ...graphqlDotnetCourse, urlCategory: "dotnet" },
+	{ ...graphqlDotnetCourse, urlCategory: "backend" },
 	{ ...hldCourse, urlCategory: "architecture" },
 	{ ...interviewQaCourse, urlCategory: "interview-qa" },
-	{ ...linqCourse, urlCategory: "dotnet" },
+	{ ...linqCourse, urlCategory: "backend" },
 	{ ...lldCourse, urlCategory: "architecture" },
 	{ ...messageQueuesEventStreamingCourse, urlCategory: "architecture" },
 	{ ...microservicesArchitectureCourse, urlCategory: "architecture" },
@@ -104,7 +108,7 @@ const rawCoursesPart1 = [
 	{ ...systemDesignCourse, urlCategory: "architecture" },
 	{ ...systemDesignInterviewsCourse, urlCategory: "architecture" },
 	{ ...typescriptForReactCourse, urlCategory: "frontend" },
-	{ ...unitTestingDotnetCourse, urlCategory: "dotnet" },
+	{ ...unitTestingDotnetCourse, urlCategory: "backend" },
 	{ ...yarnNpmPackagesCourse, urlCategory: "frontend" },
 ];
 

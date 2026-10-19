@@ -120,6 +120,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               currentModuleSlug={moduleSlug}
               currentLessonSlug={lessonSlug}
               courseSlug={courseSlug}
+              basePrefix={`${category}/courses`}
               modules={courseModules}
               lessonsByModule={lessonsByModule}
             />
@@ -171,6 +172,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               lessonSlug={lessonSlug}
               moduleSlug={moduleSlug}
               courseSlug={courseSlug}
+              basePrefix={`${category}/courses`}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
               modules={courseModules}
               lessonsByModule={lessonsByModule}
@@ -224,6 +226,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
                     lesson={toLessonNavItem(rel)}
                     moduleSlug={rel.moduleSlug}
                     courseSlug={courseSlug}
+                    basePrefix={`${category}/courses`}
                   />
                 ))}
               </div>

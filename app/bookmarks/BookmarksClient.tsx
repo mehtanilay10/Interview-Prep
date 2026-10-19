@@ -5,6 +5,7 @@ import { Bookmark } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { getContentItemHref } from '@/lib/content';
 
 interface BookmarkItem {
   id: string;
@@ -29,10 +30,7 @@ function bookmarkHref(item: BookmarkItem): string {
   if (item.type === 'interview') {
     return `/interview-questions/${item.moduleSlug}/${item.slug}`;
   }
-  if (item.type === 'problem') {
-    return `/problems/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
-  }
-  return `/courses/${item.courseSlug}/${item.moduleSlug}/${item.slug}`;
+  return getContentItemHref(item.courseSlug, item.moduleSlug, item.slug);
 }
 
 export function BookmarksClient({ user }: BookmarksClientProps) {

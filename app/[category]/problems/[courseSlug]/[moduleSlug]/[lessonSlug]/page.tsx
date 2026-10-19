@@ -221,6 +221,7 @@ export default async function ProblemDetailPage({ params }: Params) {
                     lesson={toLessonNavItem(rel)}
                     moduleSlug={rel.moduleSlug}
                     courseSlug={courseSlug}
+                    basePrefix={`${category}/problems`}
                   />
                 ))}
               </div>
