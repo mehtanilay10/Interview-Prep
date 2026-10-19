@@ -62,7 +62,12 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
 
 export default async function CheatsheetPage({ params }: { params: Promise<{ category: string; technology: string }> }) {
   const resolvedParams = await params;
-  const { technology, category } = resolvedParams;
+  const category = resolvedParams?.category;
+  const technology = resolvedParams?.technology;
+  
+  if (!category || !technology) {
+    notFound();
+  }
   const mod = getModuleBySlug(technology);
   if (!mod || mod.courseSlug !== 'cheatsheet') notFound();
 

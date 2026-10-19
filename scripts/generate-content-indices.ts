@@ -84,7 +84,8 @@ function scanCourses(): CourseInfo[] {
 
     // For courses, problems, projects: each subdirectory with content.json is a course
     // Now with category subdirectories, we need to look one level deeper
-    if (area === 'interview-qa') continue;
+    // Cheatsheet subdirectories are modules of the cheatsheet course, not courses.
+    if (area === 'interview-qa' || area === 'cheatsheet') continue;
 
     const entries = fs.readdirSync(areaPath);
     for (const entry of entries) {

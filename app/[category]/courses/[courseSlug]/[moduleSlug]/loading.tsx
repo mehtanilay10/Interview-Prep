@@ -1,24 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getModuleBySlug, getCourseCategory } from '@/lib/content';
-
-interface Params {
-  params: Promise<{ category: string; courseSlug: string; moduleSlug: string }>;
-}
-
-export async function generateMetadata({ params }: Params): Promise<{ title: string }> {
-  const resolvedParams = await params;
-  const { moduleSlug } = resolvedParams;
-  const mod = getModuleBySlug(moduleSlug);
-  return { title: mod?.title ?? 'Loading...' };
-}
-
-export default async function CourseModuleLoading({ params }: Params) {
-  const resolvedParams = await params;
-  const { category, courseSlug, moduleSlug } = resolvedParams;
-  
-  const expectedCategory = getCourseCategory(courseSlug);
-  if (category !== expectedCategory) notFound();
-  
+export default function CourseModuleLoading() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="animate-pulse space-y-4">
