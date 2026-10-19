@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { roadmaps, getRoadmapForCourse } from '@/content/roadmaps';
+import { roadmaps, getRoadmapForCourse } from '@/content/ai/roadmaps';
 import { getAllCourses, getCourseCategory } from '@/lib/content';
 
 /** Resolve a roadmap href (stored category-less, e.g. `/courses/ai-basics/...`) to its category-prefixed route. */

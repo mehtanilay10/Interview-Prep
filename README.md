@@ -196,13 +196,18 @@ interview-prep/
 │       └── ErrorBoundaryWrapper.tsx        # Error boundary wrapper for page content
 │
 ├── content/                                # All course content (JSON/TypeScript files)
-│   ├── courses/                            # Structured courses
-│   ├── problems/                           # Coding problems (C#, SQL)
+│   ├── [category]/                         # ai | architecture | backend | database | devops | frontend | fundamentals
+│   │   ├── courses/                        # Structured courses
+│   │   ├── problems/                       # Coding problems (C#, SQL)
+│   │   └── cheatsheet/                     # Cheat sheets by technology
 │   ├── interview-qa/                       # Interview Q&A by technology
-│   ├── cheatsheet/                         # Cheat sheets by technology
-│   ├── modules/index.ts                    # Auto-generated module definitions
-│   ├── lessons/index.ts                    # Auto-generated lesson definitions + content blocks
-│   └── courses/index.ts                    # Auto-generated course exports
+│   ├── ai/glossary/                        # AI glossary terms
+│   ├── ai/prompts/                         # AI prompt templates
+│   ├── ai/roadmaps/                        # Roadmap definitions
+│   ├── cheatsheet.json                     # Cheatsheet section metadata
+│   ├── courses.ts                          # Auto-generated course exports
+│   ├── modules.ts                          # Auto-generated module definitions
+│   └── lessons.ts                          # Auto-generated lesson definitions + content blocks
 │
 ├── hooks/
 │   ├── useProgress.ts                      # Hybrid progress tracking (localStorage + Neon DB)
@@ -258,10 +263,10 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 
 | Area | Path | Purpose |
 |---|---|---|
-| Courses | `content/courses/` | Structured learning modules |
-| Problems | `content/problems/` | Coding problems with multiple solutions |
+| Courses | `content/[category]/courses/` | Structured learning modules |
+| Problems | `content/[category]/problems/` | Coding problems with multiple solutions |
 | Interview Q&A | `content/interview-qa/` | Technology-grouped interview questions |
-| Cheat sheets | `content/cheatsheet/` | Quick-reference code examples |
+| Cheat sheets | `content/[category]/cheatsheet/` | Quick-reference code examples |
 
 ### Adding a new lesson
 
@@ -271,14 +276,14 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 
 ### Adding a new module
 
-1. Create `content/[area]/[courseSlug]/[moduleSlug]/content.json`
+1. Create `content/[category]/courses/[courseSlug]/[moduleSlug]/content.json`
 2. Create lesson JSON files in the module folder
 3. Add the module slug to the course's `moduleSlugs` array
 4. Run `yarn generate:content` to regenerate index files
 
 ### Adding a new course
 
-1. Create `content/[area]/[courseSlug]/content.json`
+1. Create `content/[category]/courses/[courseSlug]/content.json`
 2. Add module folders with `content.json` and lesson JSON files
 3. Update `app/sitemap.ts` if needed
 4. Run `yarn generate:content` to regenerate index files (or just run `yarn dev` / `yarn build`, which trigger it automatically via `predev`/`prebuild`)

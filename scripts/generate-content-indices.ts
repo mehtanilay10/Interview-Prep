@@ -2,10 +2,17 @@
 
 /**
  * Auto-generates content index files for courses, modules, and lessons.
- * Scans content directories and regenerates:
- *   - content/courses/index.ts
- *   - content/modules/index.ts
- *   - content/lessons/index.ts
+ * Scans the category-first content tree and regenerates:
+ *   - content/courses.ts
+ *   - content/modules.ts
+ *   - content/lessons.ts
+ *
+ * Layout:
+ *   content/<category>/courses/<courseSlug>/...
+ *   content/<category>/problems/<courseSlug>/...
+ *   content/<category>/cheatsheet/<technology>/...
+ *   content/interview-qa/...            (technology-based, not category-based)
+ *   content/cheatsheet.json             (cheatsheet section metadata)
  *
  * Run automatically before dev/build so new JSON files are picked up without manual edits.
  */
@@ -16,9 +23,12 @@ import path from 'path';
 const ROOT = path.resolve(process.cwd());
 const CONTENT_DIR = path.join(ROOT, 'content');
 
-const COURSES_INDEX = path.join(CONTENT_DIR, 'courses', 'index.ts');
-const MODULES_INDEX = path.join(CONTENT_DIR, 'modules', 'index.ts');
-const LESSONS_INDEX = path.join(CONTENT_DIR, 'lessons', 'index.ts');
+const COURSES_INDEX = path.join(CONTENT_DIR, 'courses.ts');
+const MODULES_INDEX = path.join(CONTENT_DIR, 'modules.ts');
+const LESSONS_INDEX = path.join(CONTENT_DIR, 'lessons.ts');
+
+/** Section directories that make a top-level directory a content category. */
+const SECTION_DIRS = ['courses', 'problems', 'cheatsheet'] as const;
 
 interface CourseInfo {
   importPath: string;
@@ -47,117 +57,79 @@ function toVariableName(slug: string, prefix: string): string {
   const cleaned = slug
     .replace(/[^a-z0-9]+(.)?/g, (_, chr) => (chr ? chr.toUpperCase() : ''))
     .replace(/^[0-9]/, (m) => `${prefix}${m}`);
-  const result = `${prefix}${cleaned}`;
-  return result;
+  return `${prefix}${cleaned}`;
+}
+
+function isDirectory(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function listDirs(p: string): string[] {
+  try {
+    return fs
+      .readdirSync(p)
+      .filter((entry) => isDirectory(path.join(p, entry)));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Categories are the top-level directories that contain at least one of the
+ * known section directories (courses / problems / cheatsheet). This keeps the
+ * category list in sync with whatever content actually exists on disk.
+ */
+function findCategories(): string[] {
+  return fs
+    .readdirSync(CONTENT_DIR)
+    .filter((entry) => isDirectory(path.join(CONTENT_DIR, entry)))
+    .filter((entry) => SECTION_DIRS.some((section) => isDirectory(path.join(CONTENT_DIR, entry, section))))
+    .sort();
+}
+
+function uniqueVariableName(base: string, prefix: string, usedNames: Set<string>): string {
+  let variableName = base;
+  if (!/^[a-zA-Z]/.test(variableName)) {
+    variableName = `${prefix}${variableName}`;
+  }
+  if (usedNames.has(variableName)) {
+    let counter = 1;
+    while (usedNames.has(`${variableName}${counter}`)) counter++;
+    variableName = `${variableName}${counter}`;
+  }
+  usedNames.add(variableName);
+  return variableName;
 }
 
 function scanCourses(): CourseInfo[] {
   const courses: CourseInfo[] = [];
   const usedNames = new Set<string>();
 
-  for (const area of ['courses', 'problems', 'cheatsheet', 'interview-qa', 'projects']) {
-    const areaPath = path.join(CONTENT_DIR, area);
-    if (!fs.existsSync(areaPath)) continue;
+  const addCourse = (slug: string, category: string, importPath: string) => {
+    const variableName = uniqueVariableName(`${toVariableName(slug, '')}Course`, 'course', usedNames);
+    courses.push({ importPath, variableName, slug, category });
+  };
 
-    // For interview-qa and cheatsheet, the top-level content.json IS the course.
-    // Modules are in subdirectories and should not be imported here.
-    const topLevelContent = path.join(areaPath, 'content.json');
-    if (fs.existsSync(topLevelContent)) {
-      const importPath = area === 'courses' ? './content.json' :
-                        area === 'problems' ? `../problems/content.json` :
-                        area === 'cheatsheet' ? `../cheatsheet/content.json` :
-                        area === 'interview-qa' ? `../interview-qa/content.json` :
-                        `../projects/content.json`;
-      const slug = area === 'courses' ? 'courses' : area;
-      let variableName = toVariableName(slug, '');
-      variableName = `${variableName}Course`;
-      if (!/^[a-zA-Z]/.test(variableName)) {
-        variableName = `course${variableName}`;
-      }
-      if (usedNames.has(variableName)) {
-        let counter = 1;
-        while (usedNames.has(`${variableName}${counter}`)) counter++;
-        variableName = `${variableName}${counter}`;
-      }
-      usedNames.add(variableName);
-      courses.push({ importPath, variableName, slug, category: area });
-    }
-
-    // For courses, problems, projects: each subdirectory with content.json is a course
-    // Now with category subdirectories, we need to look one level deeper
-    // Cheatsheet subdirectories are modules of the cheatsheet course, not courses.
-    if (area === 'interview-qa' || area === 'cheatsheet') continue;
-
-    const entries = fs.readdirSync(areaPath);
-    for (const entry of entries) {
-      const fullPath = path.join(areaPath, entry);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        // Check if this is a category directory (contains subdirectories with content.json)
-        // or a direct course directory (has content.json)
-        const contentJsonPath = path.join(fullPath, 'content.json');
-        if (fs.existsSync(contentJsonPath)) {
-          // Direct course directory (old structure or non-category)
-          const importPath = area === 'courses' ? `./${entry}/content.json` :
-                            area === 'problems' ? `../problems/${entry}/content.json` :
-                            `../projects/${entry}/content.json`;
-          const slug = entry;
-          let variableName = toVariableName(slug, '');
-          variableName = `${variableName}Course`;
-          if (!/^[a-zA-Z]/.test(variableName)) {
-            variableName = `course${variableName}`;
-          }
-          if (usedNames.has(variableName)) {
-            let counter = 1;
-            while (usedNames.has(`${variableName}${counter}`)) counter++;
-            variableName = `${variableName}${counter}`;
-          }
-          usedNames.add(variableName);
-          
-          let category = area;
-          if (area === 'courses') {
-            const parentDir = path.basename(path.dirname(fullPath));
-            if (parentDir !== 'courses') {
-              category = parentDir;
-            }
-          }
-          
-          courses.push({ importPath, variableName, slug, category });
-        } else {
-          // This might be a category directory - scan its subdirectories
-          const subEntries = fs.readdirSync(fullPath);
-          for (const subEntry of subEntries) {
-            const subFullPath = path.join(fullPath, subEntry);
-            const subStat = fs.statSync(subFullPath);
-            if (subStat.isDirectory()) {
-              const subContentJsonPath = path.join(subFullPath, 'content.json');
-              if (fs.existsSync(subContentJsonPath)) {
-                const importPath = area === 'courses' ? `./${entry}/${subEntry}/content.json` :
-                                  area === 'problems' ? `../problems/${entry}/${subEntry}/content.json` :
-                                  area === 'cheatsheet' ? `../cheatsheet/${entry}/${subEntry}/content.json` :
-                                  `../projects/${entry}/${subEntry}/content.json`;
-                const slug = subEntry;
-                let variableName = toVariableName(slug, '');
-                variableName = `${variableName}Course`;
-                if (!/^[a-zA-Z]/.test(variableName)) {
-                  variableName = `course${variableName}`;
-                }
-                if (usedNames.has(variableName)) {
-                  let counter = 1;
-                  while (usedNames.has(`${variableName}${counter}`)) counter++;
-                  variableName = `${variableName}${counter}`;
-                }
-                usedNames.add(variableName);
-                
-                let category = entry; // The category is the parent directory name
-                
-                courses.push({ importPath, variableName, slug, category });
-              }
-            }
-          }
-        }
+  for (const category of findCategories()) {
+    for (const section of ['courses', 'problems'] as const) {
+      const sectionDir = path.join(CONTENT_DIR, category, section);
+      for (const entry of listDirs(sectionDir)) {
+        if (!fs.existsSync(path.join(sectionDir, entry, 'content.json'))) continue;
+        addCourse(entry, category, `./${category}/${section}/${entry}/content.json`);
       }
     }
+  }
+
+  // Section-level pseudo-courses (not part of a single category).
+  if (fs.existsSync(path.join(CONTENT_DIR, 'cheatsheet.json'))) {
+    addCourse('cheatsheet', 'cheatsheet', './cheatsheet.json');
+  }
+  if (fs.existsSync(path.join(CONTENT_DIR, 'interview-qa', 'content.json'))) {
+    addCourse('interview-qa', 'interview-qa', './interview-qa/content.json');
   }
 
   return courses.sort((a, b) => a.slug.localeCompare(b.slug));
@@ -166,59 +138,43 @@ function scanCourses(): CourseInfo[] {
 function scanModules(): ModuleInfo[] {
   const modules: ModuleInfo[] = [];
   const usedNames = new Set<string>();
-  const areas = ['courses', 'problems', 'interview-qa', 'cheatsheet', 'projects'];
 
-  for (const area of areas) {
-    const areaPath = path.join(CONTENT_DIR, area);
-    if (!fs.existsSync(areaPath)) continue;
+  const walk = (dir: string, category: string) => {
+    for (const entry of fs.readdirSync(dir)) {
+      const fullPath = path.join(dir, entry);
+      if (!isDirectory(fullPath)) continue;
 
-    const walk = (dir: string) => {
-      const entries = fs.readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          const contentJsonPath = path.join(fullPath, 'content.json');
-          if (fs.existsSync(contentJsonPath)) {
-            const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
-            const importPath = `../${relativePath}/content.json`;
-            const slug = entry;
-            // URL category comes from the directory structure:
-            // courses/<category>/..., problems/<category>/..., cheatsheet/<category>/...
-            const relSegments = relativePath.split('/');
-            const category =
-              area === 'courses' || area === 'problems' || area === 'cheatsheet'
-                ? relSegments[1] ?? ''
-                : '';
-            let variableName = toVariableName(slug, '');
-            variableName = `${variableName}Module`;
-            if (!/^[a-zA-Z]/.test(variableName)) {
-              variableName = `mod${variableName}`;
-            }
-            if (usedNames.has(variableName)) {
-              let counter = 1;
-              while (usedNames.has(`${variableName}${counter}`)) counter++;
-              variableName = `${variableName}${counter}`;
-            }
-            usedNames.add(variableName);
+      const contentJsonPath = path.join(fullPath, 'content.json');
+      if (fs.existsSync(contentJsonPath)) {
+        const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
+        const importPath = `./${relativePath}/content.json`;
+        const slug = entry;
+        const variableName = uniqueVariableName(`${toVariableName(slug, '')}Module`, 'mod', usedNames);
 
-            let courseSlug = '';
-            try {
-              const data = JSON.parse(fs.readFileSync(contentJsonPath, 'utf8'));
-              courseSlug = data.courseSlug || '';
-            } catch (e) {
-              // ignore
-            }
-
-            modules.push({ importPath, variableName, slug, courseSlug, category });
-          }
-          walk(fullPath);
+        let courseSlug = '';
+        try {
+          const data = JSON.parse(fs.readFileSync(contentJsonPath, 'utf8'));
+          courseSlug = data.courseSlug || '';
+        } catch {
+          // ignore malformed JSON — typecheck/tests will surface it
         }
-      }
-    };
 
-    walk(areaPath);
+        modules.push({ importPath, variableName, slug, courseSlug, category });
+      }
+
+      walk(fullPath, category);
+    }
+  };
+
+  for (const category of findCategories()) {
+    for (const section of SECTION_DIRS) {
+      const sectionDir = path.join(CONTENT_DIR, category, section);
+      if (isDirectory(sectionDir)) walk(sectionDir, category);
+    }
   }
+
+  const interviewDir = path.join(CONTENT_DIR, 'interview-qa');
+  if (isDirectory(interviewDir)) walk(interviewDir, '');
 
   return modules.sort((a, b) => a.slug.localeCompare(b.slug));
 }
@@ -226,52 +182,42 @@ function scanModules(): ModuleInfo[] {
 function scanLessons(): LessonInfo[] {
   const lessons: LessonInfo[] = [];
   const usedNames = new Set<string>();
-  const areas = ['courses', 'problems', 'interview-qa', 'cheatsheet', 'projects'];
 
-  for (const area of areas) {
-    const areaPath = path.join(CONTENT_DIR, area);
-    if (!fs.existsSync(areaPath)) continue;
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir)) {
+      const fullPath = path.join(dir, entry);
+      if (isDirectory(fullPath)) {
+        walk(fullPath);
+      } else if (entry.endsWith('.json') && entry !== 'content.json') {
+        const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
+        const importPath = `./${relativePath}`;
+        const slug = entry.replace('.json', '');
+        const variableName = uniqueVariableName(`${toVariableName(slug, '')}Lesson`, 'lesson', usedNames);
 
-    const walk = (dir: string) => {
-      const entries = fs.readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          walk(fullPath);
-        } else if (entry.endsWith('.json') && entry !== 'content.json') {
-const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
-            const importPath = `../${relativePath}`;
-          const slug = entry.replace('.json', '');
-          let variableName = toVariableName(slug, '');
-          variableName = `${variableName}Lesson`;
-          if (!/^[a-zA-Z]/.test(variableName)) {
-            variableName = `lesson${variableName}`;
-          }
-          if (usedNames.has(variableName)) {
-            let counter = 1;
-            while (usedNames.has(`${variableName}${counter}`)) counter++;
-            variableName = `${variableName}${counter}`;
-          }
-          usedNames.add(variableName);
-
-          let courseSlug = '';
-          let moduleSlug = '';
-          try {
-            const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
-            courseSlug = data.courseSlug || '';
-            moduleSlug = data.moduleSlug || '';
-          } catch (e) {
-            // ignore
-          }
-
-          lessons.push({ importPath, variableName, slug, courseSlug, moduleSlug });
+        let courseSlug = '';
+        let moduleSlug = '';
+        try {
+          const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          courseSlug = data.courseSlug || '';
+          moduleSlug = data.moduleSlug || '';
+        } catch {
+          // ignore malformed JSON
         }
-      }
-    };
 
-    walk(areaPath);
+        lessons.push({ importPath, variableName, slug, courseSlug, moduleSlug });
+      }
+    }
+  };
+
+  for (const category of findCategories()) {
+    for (const section of SECTION_DIRS) {
+      const sectionDir = path.join(CONTENT_DIR, category, section);
+      if (isDirectory(sectionDir)) walk(sectionDir);
+    }
   }
+
+  const interviewDir = path.join(CONTENT_DIR, 'interview-qa');
+  if (isDirectory(interviewDir)) walk(interviewDir);
 
   return lessons.sort((a, b) => a.slug.localeCompare(b.slug));
 }
@@ -285,28 +231,26 @@ function generateCoursesIndex(courses: CourseInfo[]): string {
 
   const imports = courses.map((c) => `import ${c.variableName} from "${c.importPath}";`).join('\n');
 
-  let partsDecl = '';
-  let combineDecl = '';
-  if (chunks.length === 1) {
-    const exports = chunks[0].map((c) => `\t{ ...${c.variableName}, urlCategory: "${c.category}" },`).join('\n');
-    partsDecl = `const rawCoursesPart1 = [\n${exports}\n];\n`;
-    combineDecl = `const rawCourses: any[] = [...rawCoursesPart1];`;
-  } else {
-    const partDecls = chunks.map((chunk, idx) => {
-      const exports = chunk.map((c) => `\t{ ...${c.variableName}, urlCategory: "${c.category}" },`).join('\n');
-      return `const rawCoursesPart${idx + 1} = [\n${exports}\n];`;
-    }).join('\n\n');
+  const buildParts = (kind: 'Courses') => {
+    const partDecls = chunks
+      .map((chunk, idx) => {
+        const exports = chunk
+          .map((c) => `\t{ ...${c.variableName}, urlCategory: "${c.category}" },`)
+          .join('\n');
+        return `const raw${kind}Part${idx + 1} = [\n${exports}\n];`;
+      })
+      .join('\n\n');
+    const partRefs = chunks.map((_, idx) => `raw${kind}Part${idx + 1}`).join(', ');
+    return { partDecls, combineDecl: `const raw${kind}: any[] = [${partRefs}];` };
+  };
 
-    const partRefs = chunks.map((_, idx) => `rawCoursesPart${idx + 1}`).join(', ');
-    partsDecl = partDecls;
-    combineDecl = `const rawCourses: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
-  }
+  const { partDecls, combineDecl } = buildParts('Courses');
 
   return `import type { Course } from "@/types";
 
 ${imports}
 
-${partsDecl}
+${partDecls}
 
 ${combineDecl}
 
@@ -327,28 +271,22 @@ function generateModulesIndex(modules: ModuleInfo[]): string {
 
   const imports = modules.map((m) => `import ${m.variableName} from "${m.importPath}";`).join('\n');
 
-  let partsDecl = '';
-  let combineDecl = '';
-  if (chunks.length === 1) {
-    const exports = chunks[0].map((m) => `\t{ ...${m.variableName}, urlCategory: "${m.category}" },`).join('\n');
-    partsDecl = `const rawModulesPart1 = [\n${exports}\n];\n`;
-    combineDecl = `const rawModules: any[] = [...rawModulesPart1];`;
-  } else {
-    const partDecls = chunks.map((chunk, idx) => {
-      const exports = chunk.map((m) => `\t{ ...${m.variableName}, urlCategory: "${m.category}" },`).join('\n');
+  const partDecls = chunks
+    .map((chunk, idx) => {
+      const exports = chunk
+        .map((m) => `\t{ ...${m.variableName}, urlCategory: "${m.category}" },`)
+        .join('\n');
       return `const rawModulesPart${idx + 1} = [\n${exports}\n];`;
-    }).join('\n\n');
-
-    const partRefs = chunks.map((_, idx) => `rawModulesPart${idx + 1}`).join(', ');
-    partsDecl = partDecls;
-    combineDecl = `const rawModules: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
-  }
+    })
+    .join('\n\n');
+  const partRefs = chunks.map((_, idx) => `rawModulesPart${idx + 1}`).join(', ');
+  const combineDecl = `const rawModules: any[] = [${partRefs}];`;
 
   return `import type { Module } from "@/types";
 
 ${imports}
 
-${partsDecl}
+${partDecls}
 
 ${combineDecl}
 
@@ -373,28 +311,20 @@ function generateLessonsIndex(lessons: LessonInfo[]): string {
 
   const imports = lessons.map((l) => `import ${l.variableName} from "${l.importPath}";`).join('\n');
 
-  let partsDecl = '';
-  let combineDecl = '';
-  if (chunks.length === 1) {
-    const exports = chunks[0].map((l) => `\t${l.variableName},`).join('\n');
-    partsDecl = `const rawLessonsPart1 = [\n${exports}\n];\n`;
-    combineDecl = `const rawLessons: any[] = [...rawLessonsPart1];`;
-  } else {
-    const partDecls = chunks.map((chunk, idx) => {
+  const partDecls = chunks
+    .map((chunk, idx) => {
       const exports = chunk.map((l) => `\t${l.variableName},`).join('\n');
       return `const rawLessonsPart${idx + 1} = [\n${exports}\n];`;
-    }).join('\n\n');
-
-    const partRefs = chunks.map((_, idx) => `rawLessonsPart${idx + 1}`).join(', ');
-    partsDecl = partDecls;
-    combineDecl = `const rawLessons: any[] = [${partRefs.split(', ').map(p => `...${p}`).join(', ')}];`;
-  }
+    })
+    .join('\n\n');
+  const partRefs = chunks.map((_, idx) => `rawLessonsPart${idx + 1}`).join(', ');
+  const combineDecl = `const rawLessons: any[] = [${partRefs}];`;
 
   return `import type { Lesson } from '@/types';
 
 ${imports}
 
-${partsDecl}
+${partDecls}
 
 ${combineDecl}
 
@@ -405,23 +335,14 @@ export function getLessonBySlug(slug: string): Lesson | undefined {
 }
 
 export function getLessonsByModule(moduleSlug: string, courseSlug?: string): Lesson[] {
-\treturn lessons.filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug)).sort((a, b) => a.order - b.order);
-}
-
-export function getAdjacentLessons(lesson: Lesson, allLessons: Lesson[]): { prev: Lesson | null; next: Lesson | null } {
-\tconst moduleLessons = allLessons.filter((l) => l.moduleSlug === lesson.moduleSlug).sort((a, b) => a.order - b.order);
-\tconst idx = moduleLessons.findIndex((l) => l.slug === lesson.slug);
-\treturn {
-\t\tprev: idx > 0 ? moduleLessons[idx - 1] : null,
-\t\tnext: idx < moduleLessons.length - 1 ? moduleLessons[idx + 1] : null,
-\t};
+\treturn lessons.filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug));
 }
 `;
 }
 
 /**
- * Writes content only when it differs from what is on disk.
- * Avoids touching mtimes (and busting the webpack cache) when nothing changed.
+ * Writes content only when it changes, so we don't touch mtimes (and bust the
+ * webpack cache) when nothing changed.
  */
 function writeIfChanged(filePath: string, content: string): boolean {
   try {
@@ -444,21 +365,11 @@ function main() {
 
   console.log(`Found ${courses.length} courses, ${modules.length} modules, ${lessons.length} lessons`);
 
-  const coursesIndex = generateCoursesIndex(courses);
-  const modulesIndex = generateModulesIndex(modules);
-  const lessonsIndex = generateLessonsIndex(lessons);
+  writeIfChanged(COURSES_INDEX, generateCoursesIndex(courses));
+  writeIfChanged(MODULES_INDEX, generateModulesIndex(modules));
+  writeIfChanged(LESSONS_INDEX, generateLessonsIndex(lessons));
 
-  const changed = [
-    writeIfChanged(COURSES_INDEX, coursesIndex),
-    writeIfChanged(MODULES_INDEX, modulesIndex),
-    writeIfChanged(LESSONS_INDEX, lessonsIndex),
-  ].some(Boolean);
-
-  console.log(
-    changed
-      ? 'Updated content/courses/index.ts, content/modules/index.ts, content/lessons/index.ts'
-      : 'Content indices unchanged — skipped writes'
-  );
+  console.log('Updated content/courses.ts, content/modules.ts, content/lessons.ts');
 }
 
 main();

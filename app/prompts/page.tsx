@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { PromptCard } from '@/components/content/PromptCard';
 import { CalloutBox } from '@/components/ui/CalloutBox';
-import { promptTemplates } from '@/content/prompts';
+import { promptTemplates } from '@/content/ai/prompts';
 
 export const metadata: Metadata = {
   title: 'Prompt Library',

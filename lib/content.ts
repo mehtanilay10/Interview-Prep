@@ -7,10 +7,10 @@
 import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
-import cheatsheetContent from '@/content/cheatsheet/content.json';
-import { glossaryTerms } from '@/content/glossary';
-import { roadmaps } from '@/content/roadmaps';
-import { promptTemplates } from '@/content/prompts';
+import cheatsheetContent from '@/content/cheatsheet.json';
+import { glossaryTerms } from '@/content/ai/glossary';
+import { roadmaps } from '@/content/ai/roadmaps';
+import { promptTemplates } from '@/content/ai/prompts';
 import type {
   Module,
   Lesson,
