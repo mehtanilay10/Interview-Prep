@@ -8,6 +8,9 @@ import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
 import cheatsheetContent from '@/content/cheatsheet/content.json';
+import { glossaryTerms } from '@/content/glossary';
+import { roadmaps } from '@/content/roadmaps';
+import { promptTemplates } from '@/content/prompts';
 import type {
   Module,
   Lesson,
@@ -16,6 +19,9 @@ import type {
   ContentBlock,
   SearchResult,
   Difficulty,
+  GlossaryTerm,
+  RoadmapNode,
+  PromptTemplate,
 } from '@/types';
 
 // ── Re-exports for convenience ────────────────────────────────────────────────
@@ -348,4 +354,42 @@ export function getInterviewQuestions(technology: string, moduleSlug?: string): 
 
 export function getInterviewQuestionCount(technology: string): number {
   return lessons.filter((l) => (l as Lesson & { technology?: string }).technology === technology).length;
+}
+
+// ── Glossary helpers ───────────────────────────────────────────────────────────
+
+export function getAllGlossaryTerms(): GlossaryTerm[] {
+  return [...glossaryTerms].sort((a, b) => a.term.localeCompare(b.term));
+}
+
+export function getGlossaryTermBySlug(slug: string): GlossaryTerm | undefined {
+  return glossaryTerms.find((t) => t.slug === slug);
+}
+
+export function getGlossaryTermsByCategory(category: string): GlossaryTerm[] {
+  return glossaryTerms.filter((t) => t.category === category);
+}
+
+// ── Roadmap helpers ───────────────────────────────────────────────────────────
+
+export function getAllRoadmaps(): RoadmapNode[] {
+  return [...roadmaps];
+}
+
+export function getRoadmapForCourse(courseSlug: string): RoadmapNode | undefined {
+  return roadmaps.find((r) => r.id.includes(courseSlug));
+}
+
+// ── Prompt helpers ────────────────────────────────────────────────────────────
+
+export function getAllPromptTemplates(): PromptTemplate[] {
+  return [...promptTemplates].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export function getPromptTemplateBySlug(slug: string): PromptTemplate | undefined {
+  return promptTemplates.find((p) => p.slug === slug);
+}
+
+export function getPromptsByCategory(category: string): PromptTemplate[] {
+  return promptTemplates.filter((p) => p.category === category);
 }

@@ -460,8 +460,6 @@ import performanceOptimizationModule from "../courses/redis-caching-strategies/p
 import performanceTuningModule from "../courses/postgresql/performance-tuning/content.json";
 import phase1FoundationsAiToolsOverviewModule from "../courses/ai-basics/phase-1-foundations-ai-tools-overview/content.json";
 import phase1FoundationsPromptingBasicsModule from "../courses/ai-basics/phase-1-foundations-prompting-basics/content.json";
-import phase6BuildingProductionAgentsModule from "../courses/agentic-ai/phase-6-building-production-agents/content.json";
-import phase7SpecialAgentArchitecturesModule from "../courses/agentic-ai/phase-7-special-agent-architectures/content.json";
 import postgresqlModule from "../courses/postgresql/content.json";
 import prismaModule from "../courses/prisma/content.json";
 import productionApiDesignReliabilityModule from "../courses/aspnet-core-web-api/production-api-design-reliability/content.json";
@@ -1031,8 +1029,6 @@ const rawModulesPart1 = [
 	performanceTuningModule,
 	phase1FoundationsAiToolsOverviewModule,
 	phase1FoundationsPromptingBasicsModule,
-	phase6BuildingProductionAgentsModule,
-	phase7SpecialAgentArchitecturesModule,
 	postgresqlModule,
 	prismaModule,
 	productionApiDesignReliabilityModule,
@@ -1071,11 +1067,11 @@ const rawModulesPart1 = [
 	realWorldCaseStudiesModule,
 	redisCachingStrategiesModule,
 	redisFundamentalsModule,
+	redisUseCasesModule,
+	reduxModule,
 ];
 
 const rawModulesPart2 = [
-	redisUseCasesModule,
-	reduxModule,
 	reduxModule1,
 	requirementClarificationModule,
 	resiliencePatternsModule,

@@ -100,6 +100,11 @@ export type ContentBlock =
       data: { title?: string; content: string; code?: string; language?: string };
     }
   | {
+      type: 'code';
+      id?: string;
+      data: { language: string; caption?: string; code: string };
+    }
+  | {
       type: 'solution';
       id?: string;
       data: { title?: string; content: string; code: string; language?: string };
@@ -366,4 +371,114 @@ export interface RoadmapNode {
   children?: RoadmapNode[];
   isOptional?: boolean;
   difficulty?: Difficulty;
+}
+
+// ── Glossary ─────────────────────────────────────────────────────────────────
+
+export type GlossaryCategory =
+  | 'core-concepts'
+  | 'models-and-training'
+  | 'prompting'
+  | 'tools-and-apis'
+  | 'agents-and-automation'
+  | 'safety-and-ethics'
+  | 'architecture'
+  | 'multimodal'
+  | 'evaluation';
+
+export interface GlossaryTerm {
+  id: string;
+  slug: string;
+  term: string;
+  phonetic?: string;
+  shortDefinition: string;
+  fullDefinition: string;
+  category: GlossaryCategory;
+  difficulty: Difficulty;
+  relatedTerms?: string[]; // slugs
+  learnMoreSlug?: string; // lesson slug
+  examples?: string[];
+  alsoKnownAs?: string[];
+}
+
+// ── Prompt Templates ─────────────────────────────────────────────────────────
+
+export type PromptCategory =
+  | 'writing'
+  | 'thinking'
+  | 'research'
+  | 'coding'
+  | 'creativity'
+  | 'productivity'
+  | 'learning'
+  | 'analysis'
+  | 'summarization';
+
+export interface PromptTemplate {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: PromptCategory;
+  difficulty: Difficulty;
+  template: string; // use [BRACKETS] for placeholders
+  example?: string;
+  tags: string[];
+  tips?: string[];
+  isStarter?: boolean;
+}
+
+// ── Tool Comparison ──────────────────────────────────────────────────────────
+
+export type ToolCategory =
+  | 'chatbot'
+  | 'image-generation'
+  | 'coding'
+  | 'writing'
+  | 'automation'
+  | 'search'
+  | 'voice'
+  | 'video'
+  | 'productivity'
+  | 'local-ai';
+
+export interface ToolFeature {
+  name: string;
+  supported: boolean | 'partial' | 'unknown';
+  note?: string;
+}
+
+export interface ToolEntry {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category: ToolCategory;
+  url?: string;
+  pricing: 'free' | 'freemium' | 'paid' | 'open-source';
+  difficulty: Difficulty;
+  bestFor: string[];
+  limitations?: string[];
+  features?: ToolFeature[];
+  logoEmoji?: string;
+  isPopular?: boolean;
+  isBeginnnerPick?: boolean;
+}
+
+// ── Mini Projects ────────────────────────────────────────────────────────────
+
+export interface MiniProject {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  difficulty: Difficulty;
+  estimatedHours: number;
+  tags: string[];
+  skills: string[];
+  tools: string[];
+  steps: string[];
+  expectedOutput: string;
+  bonusChallenges?: string[];
+  relatedLessons?: string[]; // lesson slugs
 }
