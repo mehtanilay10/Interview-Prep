@@ -97,11 +97,14 @@ content/
   courses.ts                  # Auto-generated exports all courses
   modules.ts                  # Auto-generated exports all modules (courses + problems + cheatsheet + interview-qa)
   lessons.ts                  # Auto-generated exports all lessons (courses + problems + cheatsheet + interview-qa)
+  categories.ts               # Auto-generated slug -> URL category maps (lightweight, client-safe)
 ```
 
 > The generated aggregator files (`content/courses.ts`, `content/modules.ts`,
 > `content/lessons.ts`) are flat files at the root of `content/`, so the import
 > specifiers `@/content/courses`, `@/content/modules`, and `@/content/lessons` are unchanged.
+> `content/categories.ts` only contains small string maps (`COURSE_URL_CATEGORY`,
+> `PROBLEM_COURSE_SLUGS`), so it is safe to import from client components.
 
 ### Adding a course
 1. Create `content/[category]/courses/[courseSlug]/content.json`
@@ -139,6 +142,9 @@ They are served at `/[category]/cheatsheets` and `/[category]/cheatsheets/[techn
 section that is *not* organized by category). Their lesson JSON carries a
 `technology` string (e.g. `"C#"`, `"JavaScript"`) used by `getInterviewTechnologies()` /
 `getInterviewQuestions()` to group questions. They are served at `/interview-questions`.
+Technology URL slugs come from `getInterviewTechSlug()` in `lib/content-hrefs.ts`
+(e.g. `C#` → `csharp`, `CI/CD Pipelines` → `cicd-pipelines`) — use that helper instead of
+lowercasing/replacing spaces inline.
 
 ### Lesson JSON structure
 ```json
@@ -156,6 +162,7 @@ section that is *not* organized by category). Their lesson JSON carries a
   "blocks": [],
   "technology": "C#",              // optional; on interview-qa lessons to group by topic
   "relatedLessons": [],             // optional; lesson slugs for "next steps" links
+  "relatedGlossaryTerms": [],       // optional; glossary term slugs shown as related links
   "furtherReading": []              // optional; FurtherReadingItem[] (article/video/course/tool)
 }
 ```
@@ -164,11 +171,11 @@ section that is *not* organized by category). Their lesson JSON carries a
 See `types/index.ts` for the full list. Current types:
 - `paragraph`, `heading`, `bullet-list`, `numbered-list`
 - `callout`, `quote`, `key-terms`, `table`
-- `example`, `solution`, `exercise`, `checklist`
+- `example`, `code`, `solution`, `exercise`, `checklist`
 - `mermaid`, `comparison-cards`, `summary-box`, `faq-block`
 - `divider`, `image`
 
-`faq-block` data should use `items: { question: string; answer: string }[]`. Legacy content may use `faqs`; the renderer and article-compare validator normalize this automatically.
+`faq-block` data should use `items: { question: string; answer: string }[]`. Legacy content may use `faqs`; `ContentBlockRenderer` normalizes this automatically.
 
 ---
 
@@ -191,7 +198,6 @@ See `types/index.ts` for the full list. Current types:
 - `/roadmaps` — Learning roadmaps
 - `/ai/glossary` — AI glossary
 - `/ai/prompts` — Prompt templates
-- `/ai/internal/article-compare` — Internal side-by-side article comparison tool (noindex)
 - `/search` — Search page
 - `/user/login` — Google sign-in page
 - `/user/progress` — Progress dashboard (requires login)
@@ -204,10 +210,34 @@ live under each category (`/[category]/…`).
 
 ## Navigation and indexing
 
+The top navigation bar and the footer's "Browse by Category" column are computed
+server-side from content — there are no hardcoded category lists:
+
+- `getNavigationCategories()` in `lib/content.ts` builds the nav-bar category
+  dropdowns (desktop + mobile accordion) from the content directory structure.
+  Each category lists the sections that actually exist (`Courses` / `Problems` /
+  `Cheat Sheets`). The `AI` category additionally carries two static sections —
+  `Glossary` (`/ai/glossary`) and `Prompt Templates` (`/ai/prompts`) — appended
+  inside `computeNavigationCategories()`.
+- New categories are picked up automatically; add display metadata to
+  `CATEGORY_META` / `CATEGORY_ORDER` in `lib/content.ts`. Categories listed in
+  `HIDDEN_CATEGORIES` (currently `fundamentals`) are intentionally omitted from
+  the nav bar but remain browsable by URL.
+- The footer's static columns are the `LEARN_LINKS`, `ACCOUNT_LINKS`, and
+  `ABOUT_LINKS` arrays in `components/layout/Footer.tsx`; "Popular Courses"
+  comes from `getPopularCourses()`.
+- `app/sitemap.ts` lists the static top-level routes and then walks all content.
+  It de-duplicates URLs, so a page may appear in both places safely.
+  Do **not** add login-gated `/user/*` pages to the sitemap.
+- `app/robots.ts` allows everything except `/api/` and `/user/` and points crawlers
+  at the sitemap.
+
 Whenever you add a new top-level page:
-1. Add it to `NAV_LINKS` in `components/layout/Navbar.tsx`
-2. Add it to `FOOTER_LINKS` in `components/layout/Footer.tsx`
-3. Add it to `app/sitemap.ts` in the static routes array
+1. Add it to the appropriate link array in `components/layout/Footer.tsx`
+   (or to a nav category section in `lib/content.ts` if it belongs under a category)
+2. Add it to `app/sitemap.ts` in the static routes array (unless it requires login)
+3. If the page should be crawl-restricted, add it to `app/robots.ts`
+4. Add it to the Routes list above
 
 ## Module ordering
 
@@ -233,6 +263,7 @@ Module order within a course is determined by the `order` field in each module's
   - `app/api/user/theme/route.ts` — GET/POST user theme preference
   - `app/api/user/offline-queue/route.ts` — GET/POST offline action queue
   - `app/api/user/notes/route.ts` — GET/POST/DELETE lesson notes
+  - `app/api/user/preferences/route.ts` — GET/POST personalization preferences (font size, density, motion, landing page)
   - `app/api/search/route.ts` — GET search
 - The progress dashboard at `/user/progress` is a protected route that redirects unauthenticated users to `/user/login`.
 
@@ -244,8 +275,11 @@ Module order within a course is determined by the `order` field in each module's
 - Use the existing types from `types/index.ts` — extend them don't bypass them
 - Run `yarn typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
+- Content-free href/slug helpers (`getContentItemHref`, `getSearchResultHref`, `getCourseCategory`, `isProblemCourseSlug`, `getInterviewTechSlug`, `getInterviewTechName`) live in `lib/content-hrefs.ts` (re-exported from `lib/content.ts`) so client components can build links without bundling lesson JSON
+- **`'use client'` components must never import `@/lib/content` directly.** That module pulls in every lesson JSON file (~19 MB), which bloats the client bundle for every page. Pass content data down as props from a server component, enrich it in an API route, or import the lightweight `@/lib/content-hrefs` / `@/content/categories` helpers instead
 - SEO metadata helpers (`buildMetadata`, `buildLessonMetadata`, `buildModuleMetadata`) live in `lib/seo.ts`
 - Auth helpers live in `lib/auth.ts`
+- API-route helpers live in `lib/authMiddleware.ts` (authenticated handler wrapper), `lib/errorHandler.ts`, `lib/logger.ts`, `lib/rateLimit.ts`, `lib/csrf.ts`, `lib/validators.ts`, and `lib/cache.ts`; client-side fetching goes through `lib/apiFetch.ts`
 
 ---
 
@@ -321,7 +355,7 @@ Utility scripts in `scripts/` help keep content consistent:
 - `yarn db:studio` — opens Prisma Studio
 - `yarn db:migrate` — creates/applies Prisma migrations during development
 - `yarn vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
-- `yarn generate:content` — regenerates `content/courses.ts`, `content/modules.ts`, and `content/lessons.ts`
+- `yarn generate:content` — regenerates `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, and `content/categories.ts`
 - `yarn test:content` — runs content validation tests
 - `node scripts/vercel-build.js` — Vercel build entrypoint
 
@@ -334,7 +368,7 @@ Utility scripts in `scripts/` help keep content consistent:
 - **`next/link` vs `<a>`**: Use `next/link` for internal links; `<a target="_blank" rel="noopener noreferrer">` for external
 - **Image optimization**: Content `image` blocks render with a plain `<img>` element (with an `@next/next/no-img-element` eslint-disable comment) because the `src` comes from lesson content and is opened in a modal; follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
 - **Generate static params**: When adding a new dynamic route, implement `generateStaticParams()` for build-time generation
-- **Content indexing**: When adding lessons/modules, always run `yarn generate:content` to update the generated aggregator files (`content/courses.ts`, `content/modules.ts`, `content/lessons.ts`). The build will not automatically discover new content files without running the generator.
+- **Content indexing**: When adding lessons/modules, always run `yarn generate:content` to update the generated aggregator files (`content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, `content/categories.ts`). The build will not automatically discover new content files without running the generator.
 - **Auth-aware hooks**: `useProgress` and `useBookmarks` are context-based hooks provided by `ProgressProvider` and `BookmarkProvider`. When logged in, they fetch from and write to `/api/progress` and `/api/bookmarks`. When logged out, they read/write `localStorage` only. Do not bypass these hooks with direct DB calls in client components.
 - **Sign-in gating**: Do not redirect unauthenticated users away from the app. Show the inline `SignInPrompt` component when they try to use bookmark/progress features.
 - **Error boundaries**: Wrap risky client-side rendering in `ErrorBoundaryWrapper` (`components/app/ErrorBoundaryWrapper.tsx`) to show a friendly fallback instead of crashing the whole page.
@@ -345,7 +379,7 @@ Utility scripts in `scripts/` help keep content consistent:
 ## Important notes
 
 - This project uses **Yarn 1.22+**. Use `yarn <script>` for project commands and `yarn prisma ...` for Prisma CLI commands.
-- The `content/courses.ts`, `content/modules.ts`, and `content/lessons.ts` files are fully auto-generated by `scripts/generate-content-indices.ts`. They are regenerated automatically before `dev`/`build` via `predev`/`prebuild` scripts, or manually with `yarn generate:content`. Do not edit these files by hand.
+- The `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, and `content/categories.ts` files are fully auto-generated by `scripts/generate-content-indices.ts`. They are regenerated automatically before `dev`/`build` via `predev`/`prebuild` scripts, or manually with `yarn generate:content`. Do not edit these files by hand.
 - The cheatsheet and interview-qa "courses" (`content/cheatsheet.json`, `content/interview-qa/content.json`) are imported directly; their modules/lessons are registered in `content/modules.ts` and `content/lessons.ts`.
 - Interview questions use a `technology` field on lessons to group them. See `lib/content.ts` helpers like `getInterviewTechnologies()` and `getInterviewQuestions()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, X, ArrowRight } from 'lucide-react';
-import { getSearchResultHref } from '@/lib/content';
+import { getSearchResultHref } from '@/lib/content-hrefs';
 import type { SearchResult } from '@/types';
 import { cn } from '@/lib/utils';
 

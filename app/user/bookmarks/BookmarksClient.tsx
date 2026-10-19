@@ -5,7 +5,7 @@ import { Bookmark } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { getContentItemHref } from '@/lib/content';
+import { getContentItemHref } from '@/lib/content-hrefs';
 
 interface BookmarkItem {
   id: string;

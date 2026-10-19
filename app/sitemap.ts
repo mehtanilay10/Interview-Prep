@@ -1,22 +1,8 @@
 import { MetadataRoute } from 'next';
 import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories } from '@/lib/content';
-import { getCourseCategory } from '@/lib/content';
+import { getCourseCategory, getInterviewTechSlug } from '@/lib/content-hrefs';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
-
-const TECH_SLUG_MAP: Record<string, string> = {
-  'c#': 'csharp',
-  'asp.net core': 'aspnet-core',
-  'oop': 'oop',
-  'javascript': 'javascript',
-  'general': 'general',
-  'system design': 'system-design',
-  'behavioral': 'behavioral',
-  'sql server': 'sql-server',
-  'full-stack scenarios': 'fullstack-scenarios',
-  'performance optimization': 'performance-optimization',
-  'ci/cd pipelines': 'cicd-pipelines',
-};
 
 function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRoute.Sitemap[0]['changeFrequency'] = 'monthly', lastModified?: Date): MetadataRoute.Sitemap[0] {
   return {
@@ -35,11 +21,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/ai/glossary`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/ai/prompts`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/user/progress`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/user/bookmarks`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/user/notes`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/user/personalization`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/user/login`, 0.5, 'monthly'),
   ];
 
   const courses = getAllCourses().filter((c) => !c.isInterview);
@@ -69,7 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const technologies = getInterviewTechnologies();
   for (const tech of technologies) {
-    const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
+    const techSlug = getInterviewTechSlug(tech);
     entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${techSlug}`));
 
     const questions = getInterviewQuestions(tech);
@@ -79,15 +60,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   const cheatsheetModules = getModulesForCourse('cheatsheet');
-  const cheatsheetLessons = getLessonsForCourse('cheatsheet');
   for (const mod of cheatsheetModules) {
     const category = getCourseCategory(mod.slug);
     entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}`));
-
-    const lessons = cheatsheetLessons.filter((l) => l.moduleSlug === mod.slug);
-    for (const lesson of lessons) {
-      entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}/${lesson.slug}`));
-    }
   }
 
   const problemCourses = getProblemCourses();
@@ -108,5 +83,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  return entries;
+  // The navigation-category loop can re-produce URLs already present in the
+  // static list (e.g. /ai/glossary and /ai/prompts are now AI nav sections).
+  // Keep the first occurrence so priorities stay stable and no URL repeats.
+  const seen = new Set<string>();
+  const unique: MetadataRoute.Sitemap = [];
+  for (const entry of entries) {
+    if (seen.has(entry.url)) continue;
+    seen.add(entry.url);
+    unique.push(entry);
+  }
+  return unique;
 }

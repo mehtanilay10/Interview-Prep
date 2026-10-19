@@ -13,6 +13,7 @@ interface MobileProgressAndContentsProps {
   courseSlug: string;
   basePrefix?: string;
   allModuleLessonSlugs: string[];
+  allCourseLessonSlugs?: string[];
   modules: Module[];
   lessonsByModule: Record<string, LessonNavItem[]>;
   category?: 'lessons' | 'problems' | 'interviewQuestions';
@@ -25,6 +26,7 @@ export function MobileProgressAndContents({
   courseSlug,
   basePrefix = 'courses',
   allModuleLessonSlugs,
+  allCourseLessonSlugs,
   modules,
   lessonsByModule,
   category = 'lessons',
@@ -39,8 +41,8 @@ export function MobileProgressAndContents({
           lessonSlug={lessonSlug}
           moduleSlug={moduleSlug}
           allModuleLessonSlugs={allModuleLessonSlugs}
+          allCourseLessonSlugs={allCourseLessonSlugs}
           category={category}
-          courseSlug={courseSlug}
           className="border-0 bg-transparent rounded-none"
         />
 

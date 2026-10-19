@@ -10,6 +10,12 @@ import { courses } from '@/content/courses';
 import { glossaryTerms } from '@/content/ai/glossary';
 import { roadmaps } from '@/content/ai/roadmaps';
 import { promptTemplates } from '@/content/ai/prompts';
+import {
+  getCourseCategory,
+  isProblemCourseSlug,
+  getContentItemHref,
+  getSearchResultHref,
+} from '@/lib/content-hrefs';
 import type {
   Module,
   Lesson,
@@ -26,6 +32,11 @@ import type {
 
 // ── Re-exports for convenience ────────────────────────────────────────────────
 export { modules, lessons, courses };
+
+// Href builders live in `lib/content-hrefs.ts` (content-free, safe to import
+// from client components) and are re-exported here so server code only ever
+// needs a single import.
+export { getCourseCategory, isProblemCourseSlug, getContentItemHref, getSearchResultHref };
 
 // ── Shared caches for derived content lookups ────────────────────────────────
 // Content is bundled statically (JSON imports), so it never changes during the
@@ -174,6 +185,16 @@ function computeNavigationCategories(): NavCategory[] {
       { label: 'Problems', href: `/${key}/problems`, count: problemList.filter((c) => getCourseCategory(c.slug) === key).length },
       { label: 'Cheat Sheets', href: `/${key}/cheatsheets`, count: cheatsheetList.filter((m) => getCourseCategory(m.slug) === key).length },
     ].filter((s) => s.count > 0);
+
+    // Site-wide AI resources hang off the AI category so they show up in the
+    // nav bar dropdown, the mobile accordion, and the footer category list.
+    if (key === 'ai') {
+      sections.push(
+        { label: 'Glossary', href: '/ai/glossary', count: glossaryTerms.length },
+        { label: 'Prompt Templates', href: '/ai/prompts', count: promptTemplates.length }
+      );
+    }
+
     return { key, label: meta.label, icon: meta.icon, sections };
   });
 }
@@ -440,148 +461,8 @@ export function searchAll(query: string): SearchResult[] {
   return scored.slice(0, 10).map((s) => s.result);
 }
 
-// Course slug to category mapping for URL generation (legacy fallback — the
-// primary source of truth is the `urlCategory` stamped from directory structure).
-const COURSE_CATEGORY_MAP: Record<string, string> = {
-  // Fundamentals
-  'programming-computer-web-foundations': 'fundamentals',
-  'oops-concepts': 'fundamentals',
-  'senior-software-engineering': 'fundamentals',
-  // AI
-  'ai-basics': 'ai',
-  'dotnet-ai-backend': 'ai',
-  // Backend (.NET)
-  'csharp-fundamentals': 'backend',
-  'linq': 'backend',
-  'ef-core': 'backend',
-  'aspnet-core': 'backend',
-  'aspnet-core-web-api': 'backend',
-  'dotnet-nuget-packages': 'backend',
-  'unit-testing-dotnet': 'backend',
-  'authentication-authorization': 'backend',
-  'graphql-dotnet': 'backend',
-  'aws-for-aspnet': 'backend',
-  'azure-for-aspnet': 'backend',
-  // Frontend
-  'react-fundamentals': 'frontend',
-  'typescript-for-react': 'frontend',
-  'redux': 'frontend',
-  'react-query': 'frontend',
-  'react-testing': 'frontend',
-  'apollo': 'frontend',
-  'react-advanced-patterns': 'frontend',
-  'next-js-full-stack-react': 'frontend',
-  'prisma': 'frontend',
-  'yarn-npm-packages': 'frontend',
-  // Database
-  'postgresql': 'database',
-  'sql-server': 'database',
-  // Cloud → DevOps
-  'aws': 'devops',
-  'azure': 'devops',
-  // DevOps
-  'devops': 'devops',
-  'git-linux-developer-workflow': 'devops',
-  // Architecture
-  'design-patterns': 'architecture',
-  'clean-code-csharp': 'architecture',
-  'redis-caching-strategies': 'architecture',
-  'fullstack-security': 'architecture',
-  'message-queues-event-streaming': 'architecture',
-  'microservices-architecture': 'architecture',
-  'system-design-interviews': 'architecture',
-  'frontend-performance-engineering': 'architecture',
-  // Cheatsheets (module slugs)
-  'csharp': 'backend',
-  'javascript': 'frontend',
-  'react': 'frontend',
-  'react-router': 'frontend',
-  'typescript': 'frontend',
-  'graphql': 'backend',
-  'docker-compose': 'devops',
-  // Problems (course slugs)
-  'api-design': 'backend',
-  'asp': 'backend',
-  'database-design': 'database',
-  'sql': 'database',
-  'architecture-decisions': 'architecture',
-  'code-review': 'architecture',
-  'hld': 'architecture',
-  'lld': 'architecture',
-  'distributed-systems': 'architecture',
-  'full-stack-senior-projects': 'architecture',
-  'low-level-design': 'architecture',
-  'production-incidents': 'architecture',
-  'system-design': 'architecture',
-};
-
-// Built once from the (static) courses + cheatsheet modules so that every
-// per-page / per-param category lookup is O(1) instead of two linear scans.
-const courseCategoryIndex: Map<string, string> = (() => {
-  const index = new Map<string, string>();
-  for (const c of courses) {
-    if (c.urlCategory) index.set(c.slug, c.urlCategory);
-  }
-  for (const m of modules) {
-    if (m.courseSlug === 'cheatsheet' && m.urlCategory && !index.has(m.slug)) {
-      index.set(m.slug, m.urlCategory);
-    }
-  }
-  return index;
-})();
-
-export function getCourseCategory(slug: string): string {
-  // Prefer the directory-derived category stamped by the content generator.
-  const indexed = courseCategoryIndex.get(slug);
-  if (indexed) return indexed;
-  return COURSE_CATEGORY_MAP[slug] ?? 'courses';
-}
-
-const problemCourseSlugs: Set<string> = new Set(
-  courses.filter((c) => c.category === 'problems').map((c) => c.slug)
-);
-
-export function isProblemCourseSlug(slug: string | undefined): boolean {
-  return slug !== undefined && problemCourseSlugs.has(slug);
-}
-
-/**
- * Builds the canonical, category-prefixed href for a stored
- * (courseSlug, moduleSlug, lessonSlug) triple — e.g. from bookmarks,
- * notes, or progress records. All course/problem routes live under
- * `/[category]/...`, so links must include the resolved category.
- */
-export function getContentItemHref(
-  courseSlug: string,
-  moduleSlug?: string | null,
-  lessonSlug?: string | null
-): string {
-  if (courseSlug === 'interview-qa') {
-    return moduleSlug && lessonSlug
-      ? `/interview-questions/${moduleSlug}/${lessonSlug}`
-      : '/interview-questions';
-  }
-
-  // Cheatsheets: one lesson per technology module; the category is derived
-  // from the technology (module) slug, not a course.
-  if (courseSlug === 'cheatsheet') {
-    if (moduleSlug) {
-      return `/${getCourseCategory(moduleSlug)}/cheatsheets/${moduleSlug}`;
-    }
-    return '/';
-  }
-
-  const category = getCourseCategory(courseSlug);
-  const prefix = isProblemCourseSlug(courseSlug) ? 'problems' : 'courses';
-
-  if (moduleSlug && lessonSlug) {
-    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}/${lessonSlug}`;
-  }
-  if (moduleSlug) {
-    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}`;
-  }
-  return `/${category}/${prefix}/${courseSlug}`;
-}
+// Course category / problem-slug lookups now live in `lib/content-hrefs.ts`
+// (see the re-exports at the top of this file).
 
 /**
  * A curated set of headline courses for the footer's "Popular Courses"
@@ -615,51 +496,6 @@ export function getPopularCourses(): PopularCourse[] {
     });
   }
   return picked;
-}
-
-export function getSearchResultHref(result: SearchResult): string {
-  if (result.type === 'lesson') {
-    const category = getCourseCategory(result.courseSlug ?? '');
-    if (isProblemCourseSlug(result.courseSlug)) {
-      return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
-    }
-    if (result.courseSlug === 'interview-qa' && result.technology) {
-      const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
-      return `/interview-questions/${techSlug}/${result.slug}`;
-    }
-    if (result.courseSlug === 'cheatsheet') {
-      return `/${category}/cheatsheets/${result.slug}`;
-    }
-    return `/${category}/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
-  }
-
-  if (result.type === 'module') {
-    const category = getCourseCategory(result.courseSlug ?? '');
-    if (result.courseSlug === 'cheatsheet') {
-      return `/${category}/cheatsheets/${result.slug}`;
-    }
-    if (isProblemCourseSlug(result.courseSlug)) {
-      return `/${category}/problems/${result.courseSlug}/${result.slug}`;
-    }
-    return `/${category}/courses/${result.courseSlug}/${result.slug}`;
-  }
-
-  if (result.type === 'course') {
-    if (result.slug === 'interview-qa') {
-      return '/interview-questions';
-    }
-    const category = getCourseCategory(result.slug);
-    if (isProblemCourseSlug(result.slug)) {
-      return `/${category}/problems/${result.slug}`;
-    }
-    return `/${category}/courses/${result.slug}`;
-  }
-
-  if (result.type === 'cheatsheet') {
-    return '/';
-  }
-
-  return '/';
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────

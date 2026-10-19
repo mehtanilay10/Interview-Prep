@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getSearchResultHref } from '@/lib/content';
+import { getSearchResultHref } from '@/lib/content-hrefs';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { SearchErrorBoundary } from '@/components/ui/SearchErrorBoundary';
 import type { SearchResult } from '@/types';

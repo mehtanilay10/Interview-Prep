@@ -230,6 +230,7 @@ export interface Lesson {
   skipLabel?: string;
   blocks: ContentBlock[];
   relatedLessons?: string[]; // lesson slugs
+  relatedGlossaryTerms?: string[]; // glossary term slugs
   furtherReading?: FurtherReadingItem[];
 }
 

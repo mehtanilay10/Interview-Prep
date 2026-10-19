@@ -4,6 +4,8 @@ import { ValidationError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { rateLimit } from '@/lib/rateLimit';
 import { NotePayloadSchema } from '@/lib/validators';
+import { getLessonBySlug } from '@/lib/content';
+import { getContentItemHref } from '@/lib/content-hrefs';
 
 export const GET = createApiAuthHandler(async (databaseUser) => {
   const { prisma } = await import('@/lib/prisma');
@@ -20,13 +22,20 @@ export const GET = createApiAuthHandler(async (databaseUser) => {
     },
   });
 
-  const notes = rows.map((row: { courseSlug: string; moduleSlug: string; lessonSlug: string; content: string; updatedAt: Date }) => ({
-    courseSlug: row.courseSlug,
-    moduleSlug: row.moduleSlug,
-    lessonSlug: row.lessonSlug,
-    content: row.content,
-    updatedAt: row.updatedAt.toISOString(),
-  }));
+  // Resolve lesson titles + canonical hrefs on the server so the notes page
+  // does not need to import content data into the client bundle.
+  const notes = rows.map((row: { courseSlug: string; moduleSlug: string; lessonSlug: string; content: string; updatedAt: Date }) => {
+    const lesson = getLessonBySlug(row.lessonSlug, row.courseSlug);
+    return {
+      courseSlug: row.courseSlug,
+      moduleSlug: row.moduleSlug,
+      lessonSlug: row.lessonSlug,
+      content: row.content,
+      updatedAt: row.updatedAt.toISOString(),
+      title: lesson?.title ?? row.lessonSlug.replace(/-/g, ' '),
+      href: getContentItemHref(row.courseSlug, row.moduleSlug, row.lessonSlug),
+    };
+  });
 
   return NextResponse.json({ notes });
 });

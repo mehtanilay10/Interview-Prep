@@ -175,6 +175,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               courseSlug={courseSlug}
               basePrefix={`${category}/courses`}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
+              allCourseLessonSlugs={courseLessons.map((l) => l.slug)}
               modules={courseModules}
               lessonsByModule={lessonsByModule}
               category="lessons"
@@ -245,8 +246,8 @@ export default async function CourseLessonDetailPage({ params }: Params) {
               lessonSlug={lessonSlug}
               moduleSlug={moduleSlug}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
+              allCourseLessonSlugs={courseLessons.map((l) => l.slug)}
               category="lessons"
-              courseSlug={courseSlug}
             />
             <TableOfContents entries={toc} />
           </div>

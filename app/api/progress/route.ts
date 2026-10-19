@@ -6,35 +6,51 @@ import { rateLimit } from '@/lib/rateLimit';
 import { ProgressPayloadSchema } from '@/lib/validators';
 import { getCached, setCache } from '@/lib/cache';
 import { lessons } from '@/content/lessons';
+import { getModuleBySlug } from '@/content/modules';
+import { getContentItemHref } from '@/lib/content-hrefs';
 import type { ProgressCategory } from '@prisma/client';
+
+interface ProgressItem {
+  lessonSlug: string;
+  moduleSlug: string;
+  completedAt: string;
+  title: string;
+  href: string;
+  estimatedMinutes: number;
+}
 
 function isProgressCategory(value: unknown): value is ProgressCategory {
   return value === 'lessons' || value === 'problems' || value === 'interviewQuestions';
 }
 
+/**
+ * Resolves the canonical, category-prefixed href for a stored progress row.
+ * Uses the lesson's `courseSlug` (and the module's course as a fallback) so
+ * links include both the category and the course segment.
+ */
 function buildLessonHref(category: ProgressCategory, moduleSlug: string, lessonSlug: string): string {
   const lesson = lessons.find((l) => l.moduleSlug === moduleSlug && l.slug === lessonSlug);
-  if (!lesson) {
-    if (category === 'interviewQuestions') {
-      return `/interview-questions/${moduleSlug}/${lessonSlug}`;
-    }
-    const prefix = category === 'problems' ? 'problems' : 'courses';
-    return `/${prefix}/${moduleSlug}/${lessonSlug}`;
+  if (lesson) {
+    return getContentItemHref(lesson.courseSlug, lesson.moduleSlug, lesson.slug);
   }
 
   if (category === 'interviewQuestions') {
-    return `/interview-questions/${lesson.moduleSlug}/${lesson.slug}`;
+    return `/interview-questions/${moduleSlug}/${lessonSlug}`;
   }
 
-  const prefix = category === 'problems' ? 'problems' : 'courses';
-  return `/${prefix}/${lesson.courseSlug}/${lesson.moduleSlug}/${lesson.slug}`;
+  const courseSlug = getModuleBySlug(moduleSlug)?.courseSlug;
+  if (courseSlug) {
+    return getContentItemHref(courseSlug, moduleSlug, lessonSlug);
+  }
+
+  return '/';
 }
 
 export const GET = createApiAuthHandler(async (databaseUser) => {
   const { prisma } = await import('@/lib/prisma');
 
   const cacheKey = `progress:${databaseUser.id}`;
-  const cached = getCached<Record<string, Array<{ lessonSlug: string; moduleSlug: string; completedAt: string; title: string; href: string }>>>(cacheKey);
+  const cached = getCached<Record<string, ProgressItem[]>>(cacheKey);
   if (cached) {
     return NextResponse.json({ progress: cached });
   }
@@ -50,7 +66,7 @@ export const GET = createApiAuthHandler(async (databaseUser) => {
     },
   });
 
-  const progress: Record<string, Array<{ lessonSlug: string; moduleSlug: string; completedAt: string; title: string; href: string }>> = {};
+  const progress: Record<string, ProgressItem[]> = {};
   for (const row of rows) {
     if (!progress[row.category]) {
       progress[row.category] = [];
@@ -65,6 +81,7 @@ export const GET = createApiAuthHandler(async (databaseUser) => {
       completedAt: row.completedAt.toISOString(),
       title,
       href: buildLessonHref(row.category, row.moduleSlug, row.lessonSlug),
+      estimatedMinutes: lesson?.estimatedMinutes ?? 0,
     });
   }
 

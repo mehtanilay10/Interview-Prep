@@ -7,6 +7,7 @@ import {
   getInterviewQuestions,
   getInterviewTechnologies,
 } from '@/lib/content';
+import { getInterviewTechName, getInterviewTechSlug } from '@/lib/content-hrefs';
 import { buildLessonMetadata } from '@/lib/seo';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
@@ -16,43 +17,6 @@ import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
-
-const TECH_NAME_MAP: Record<string, string> = {
-  'csharp': 'C#',
-  'aspnet-core': 'ASP.NET Core',
-  'oop': 'OOP',
-  'javascript': 'JavaScript',
-  'general': 'General',
-  'system-design': 'System Design',
-  'behavioral': 'Behavioral',
-  'sql-server': 'SQL Server',
-  'fullstack-scenarios': 'Full-Stack Scenarios',
-  'performance-optimization': 'Performance Optimization',
-  'cicd-pipelines': 'CI/CD Pipelines',
-};
-
-const TECH_SLUG_MAP: Record<string, string> = {
-  'c#': 'csharp',
-  'asp.net core': 'aspnet-core',
-  'oop': 'oop',
-  'javascript': 'javascript',
-  'general': 'general',
-  'system design': 'system-design',
-  'behavioral': 'behavioral',
-  'sql server': 'sql-server',
-  'full-stack scenarios': 'fullstack-scenarios',
-  'performance optimization': 'performance-optimization',
-  'ci/cd pipelines': 'cicd-pipelines',
-};
-
-/**
- * Maintenance rule:
- * When adding a new interview question technology, update BOTH:
- * - The lesson JSON `technology` field
- * - TECH_NAME_MAP and TECH_SLUG_MAP in both interview question pages
- *   (`app/interview-questions/[technology]/page.tsx` and
- *    `app/interview-questions/[technology]/[slug]/page.tsx`)
- */
 
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
@@ -64,8 +28,7 @@ export async function generateStaticParams() {
       const key = `${q.slug}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const techSlug = TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase();
-      params.push({ technology: techSlug, slug: q.slug });
+      params.push({ technology: getInterviewTechSlug(tech), slug: q.slug });
     }
   }
   return params;
@@ -86,7 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
 
 export default async function InterviewLessonDetailPage({ params }: { params: Promise<{ technology: string; slug: string }> }) {
   const { technology, slug } = await params;
-  const tech = TECH_NAME_MAP[technology] ?? technology;
+  const tech = getInterviewTechName(technology);
 
   const lesson = getLessonBySlug(slug, 'interview-qa');
   if (!lesson) notFound();

@@ -5,14 +5,18 @@ import { CheckCircle2, RotateCcw } from 'lucide-react';
 import { cn, safePercent } from '@/lib/utils';
 import { useProgress } from '@/hooks/useProgress';
 import { SignInPrompt } from '@/components/auth/SignInPrompt';
-import { getLessonsForCourse } from '@/lib/content';
 
 interface ProgressTrackerProps {
   lessonSlug: string;
   moduleSlug: string;
   allModuleLessonSlugs: string[];
+  /**
+   * Slugs of every lesson in the course. Passed in from the server component so
+   * this client component does not need to import content data (which would
+   * pull every lesson JSON into the browser bundle).
+   */
+  allCourseLessonSlugs?: string[];
   category?: 'lessons' | 'problems' | 'interviewQuestions';
-  courseSlug?: string;
   className?: string;
 }
 
@@ -20,8 +24,8 @@ export const ProgressTracker = memo(function ProgressTracker({
   lessonSlug,
   moduleSlug,
   allModuleLessonSlugs,
+  allCourseLessonSlugs = [],
   category = 'lessons',
-  courseSlug,
   className,
 }: ProgressTrackerProps) {
   const { toggleComplete, isCompleted, isLoggedOut } = useProgress();
@@ -32,17 +36,12 @@ export const ProgressTracker = memo(function ProgressTracker({
   const total = allModuleLessonSlugs.length;
   const modulePercent = safePercent(completed, total);
 
-  const courseLessons = useMemo(() => {
-    if (!courseSlug) return [];
-    return getLessonsForCourse(courseSlug);
-  }, [courseSlug]);
+  const courseCompleted = useMemo(
+    () => allCourseLessonSlugs.filter((s) => isCompleted(s, category)).length,
+    [allCourseLessonSlugs, isCompleted, category]
+  );
 
-  const courseCompleted = useMemo(() => {
-    if (!courseSlug) return 0;
-    return courseLessons.filter((l) => isCompleted(l.slug, category)).length;
-  }, [courseSlug, courseLessons, isCompleted, category]);
-
-  const courseTotal = courseLessons.length;
+  const courseTotal = allCourseLessonSlugs.length;
   const coursePercent = safePercent(courseCompleted, courseTotal);
 
   const handleToggle = () => {
@@ -75,7 +74,7 @@ export const ProgressTracker = memo(function ProgressTracker({
         </div>
       )}
 
-      {courseSlug && courseTotal > 0 && (
+      {courseTotal > 0 && (
         <div className="px-4 pb-2">
           <div className="mb-1.5 flex items-center justify-between text-xs text-fg-muted">
             <span>Course progress</span>

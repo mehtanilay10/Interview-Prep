@@ -38,11 +38,11 @@ interface FooterProps {
   popularCourses?: FooterPopularCourse[];
 }
 
+// Glossary and Prompt Templates live under the AI group in
+// "Browse by Category" (see getNavigationCategories) to avoid duplicates.
 const LEARN_LINKS: FooterLink[] = [
   { href: '/interview-questions', label: 'Interview Questions' },
   { href: '/roadmaps', label: 'Roadmaps' },
-  { href: '/ai/glossary', label: 'Glossary' },
-  { href: '/ai/prompts', label: 'Prompt Templates' },
 ];
 
 const ACCOUNT_LINKS: FooterLink[] = [

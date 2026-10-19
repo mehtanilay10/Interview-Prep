@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getInterviewTechnologies, getInterviewQuestionCount } from '@/lib/content';
+import { getInterviewTechSlug } from '@/lib/content-hrefs';
 import { formatHours } from '@/lib/utils';
 import { buildMetadata } from '@/lib/seo';
 
@@ -34,17 +35,6 @@ const TECH_DESCRIPTIONS: Record<string, string> = {
   'SQL Server': 'SQL Server database concepts, queries, indexing, and performance optimization.',
 };
 
-const TECH_SLUG_MAP: Record<string, string> = {
-  'c#': 'csharp',
-  'asp.net core': 'aspnet-core',
-  'oop': 'oop',
-  'javascript': 'javascript',
-  'general': 'general',
-  'system design': 'system-design',
-  'behavioral': 'behavioral',
-  'sql server': 'sql-server',
-};
-
 export default function InterviewQuestionsPage() {
   const technologies = getInterviewTechnologies();
 
@@ -63,7 +53,7 @@ export default function InterviewQuestionsPage() {
           return (
             <Link
               key={tech}
-              href={`/interview-questions/${TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase()}`}
+              href={`/interview-questions/${getInterviewTechSlug(tech)}`}
               className="group flex flex-col rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
             >
               <div className="mb-3 flex items-center gap-3">

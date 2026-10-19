@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StickyNote } from 'lucide-react';
-import { cn, formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { getLessonBySlug, getContentItemHref } from '@/lib/content';
 
 interface LessonNote {
   courseSlug: string;
@@ -13,9 +12,7 @@ interface LessonNote {
   lessonSlug: string;
   content: string;
   updatedAt: string;
-}
-
-interface ResolvedNote extends LessonNote {
+  /** Resolved by `GET /api/user/notes` — avoids importing content data client-side. */
   title: string;
   href: string;
 }
@@ -26,22 +23,6 @@ interface NotesClientProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-  };
-}
-
-interface ResolvedNote extends LessonNote {
-  title: string;
-  href: string;
-}
-
-function resolveLesson(note: LessonNote): { title: string; href: string } {
-  const lesson = getLessonBySlug(note.lessonSlug, note.courseSlug);
-  if (lesson) {
-    return { title: lesson.title, href: getContentItemHref(note.courseSlug, note.moduleSlug, note.lessonSlug) };
-  }
-  return {
-    title: note.lessonSlug.replace(/-/g, ' '),
-    href: getContentItemHref(note.courseSlug, note.moduleSlug, note.lessonSlug),
   };
 }
 
@@ -67,10 +48,7 @@ export function NotesClient({ user }: NotesClientProps) {
     fetchData();
   }, []);
 
-  const resolvedNotes = notes.slice(0, 50).map((note) => ({
-    ...note,
-    ...resolveLesson(note),
-  })) as ResolvedNote[];
+  const resolvedNotes = notes.slice(0, 50);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">

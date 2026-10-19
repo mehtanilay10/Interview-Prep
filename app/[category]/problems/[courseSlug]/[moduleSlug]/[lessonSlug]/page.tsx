@@ -169,6 +169,7 @@ export default async function ProblemDetailPage({ params }: Params) {
               courseSlug={courseSlug}
               basePrefix={`${category}/problems`}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
+              allCourseLessonSlugs={courseLessons.map((l) => l.slug)}
               modules={courseModules}
               lessonsByModule={lessonsByModule}
               category="problems"
@@ -239,8 +240,8 @@ export default async function ProblemDetailPage({ params }: Params) {
               lessonSlug={lessonSlug}
               moduleSlug={moduleSlug}
               allModuleLessonSlugs={moduleLessons.map((l) => l.slug)}
+              allCourseLessonSlugs={courseLessons.map((l) => l.slug)}
               category="problems"
-              courseSlug={courseSlug}
             />
             <TableOfContents entries={toc} />
           </div>

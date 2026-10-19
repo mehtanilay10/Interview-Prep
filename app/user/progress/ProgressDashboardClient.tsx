@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   CheckCircle2,
@@ -13,8 +12,6 @@ import {
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { getLessonBySlug, getModuleBySlug, getLessonsForCourse, courses, lessons, isProblemCourseSlug, getContentItemHref } from '@/lib/content';
-import type { Lesson, Course } from '@/types';
 
 interface LessonProgress {
   lessonSlug: string;
@@ -22,6 +19,33 @@ interface LessonProgress {
   completedAt: string;
   title: string;
   href: string;
+  estimatedMinutes?: number;
+}
+
+/** Compact, server-computed course metadata (no lesson content). */
+export interface ProgressCourseEntry {
+  slug: string;
+  title: string;
+  href: string;
+  lessonCount: number;
+  totalMinutes: number;
+}
+
+/** Maps a module slug to the course it belongs to. */
+export interface ProgressModuleCourse {
+  courseSlug: string;
+  courseTitle: string;
+}
+
+/**
+ * Server-computed catalog used by the dashboard. Passing this in as props
+ * keeps `lib/content.ts` (and therefore every lesson JSON) out of the client
+ * bundle for this route.
+ */
+export interface ProgressCatalog {
+  courses: ProgressCourseEntry[];
+  moduleCourse: Record<string, ProgressModuleCourse>;
+  counts: { lessons: number; problems: number; interview: number };
 }
 
 interface CategoryProgress {
@@ -33,6 +57,7 @@ interface CategoryProgress {
 interface CourseProgressInfo {
   courseSlug: string;
   courseTitle: string;
+  href: string;
   completedCount: number;
   totalCount: number;
   percent: number;
@@ -47,17 +72,6 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'courses', label: 'Course Progress', icon: Target },
 ];
 
-function getCourseForModule(moduleSlug: string): { courseSlug: string; courseTitle: string } | null {
-  const mod = getModuleBySlug(moduleSlug);
-  if (!mod) return null;
-  if (mod.courseSlug === 'interview-qa') {
-    return { courseSlug: 'interview-qa', courseTitle: 'Technical Interview Questions' };
-  }
-  const course = courses.find((c) => c.slug === mod.courseSlug);
-  if (!course) return null;
-  return { courseSlug: course.slug, courseTitle: course.title };
-}
-
 function getProgressColor(percent: number) {
   if (percent === 0) return { bar: 'bg-canvas-inset', text: 'text-fg-muted', badge: 'bg-canvas-inset text-fg-muted', label: 'Not started' };
   if (percent < 25) return { bar: 'bg-severe-emphasis', text: 'text-severe-fg', badge: 'bg-severe-muted text-severe-fg', label: 'Just started' };
@@ -67,8 +81,10 @@ function getProgressColor(percent: number) {
   return { bar: 'bg-success-emphasis', text: 'text-success-fg', badge: 'bg-success-muted text-success-fg', label: 'Completed' };
 }
 
-export function ProgressDashboardClient({ user }: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } }) {
-  const router = useRouter();
+export function ProgressDashboardClient({ user, catalog }: {
+  user: { id: string; name?: string | null; email?: string | null; image?: string | null };
+  catalog: ProgressCatalog;
+}) {
   const [progress, setProgress] = useState<Record<string, CategoryProgress>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -91,6 +107,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                 completedAt: item.completedAt,
                 title: item.title,
                 href: item.href,
+                estimatedMinutes: item.estimatedMinutes ?? 0,
               })),
               lastVisitedLesson: undefined,
               startedAt: (items as LessonProgress[])[0]?.completedAt,
@@ -117,17 +134,9 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
   const problemsCompleted = progress.problems?.completedLessons.length || 0;
   const interviewCompleted = progress.interviewQuestions?.completedLessons.length || 0;
 
-  const totalLessonsCount = useMemo(() => {
-    return lessons.filter((l) => l.courseSlug !== 'interview-qa').length;
-  }, []);
-
-  const totalProblemsCount = useMemo(() => {
-    return lessons.filter((l) => isProblemCourseSlug(l.courseSlug)).length;
-  }, []);
-
-  const totalInterviewCount = useMemo(() => {
-    return lessons.filter((l) => l.courseSlug === 'interview-qa').length;
-  }, []);
+  const totalLessonsCount = catalog.counts.lessons;
+  const totalProblemsCount = catalog.counts.problems;
+  const totalInterviewCount = catalog.counts.interview;
 
   const completionRate = useMemo(() => {
     const total = totalLessonsCount + totalProblemsCount + totalInterviewCount;
@@ -136,67 +145,43 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
   }, [lessonsCompleted, problemsCompleted, interviewCompleted, totalLessonsCount, totalProblemsCount, totalInterviewCount]);
 
   const courseProgressList = useMemo<CourseProgressInfo[]>(() => {
-    const courseMap = new Map<string, { title: string; completed: Set<string>; total: number; totalMinutes: number; completedMinutes: number }>();
+    const catalogBySlug = new Map(catalog.courses.map((course) => [course.slug, course]));
+    const courseMap = new Map<string, { title: string; href: string; completed: Set<string>; total: number; totalMinutes: number; completedMinutes: number }>();
 
-    for (const [cat, catProgress] of Object.entries(progress)) {
+    for (const catProgress of Object.values(progress)) {
       for (const item of catProgress.completedLessons) {
-        const courseInfo = getCourseForModule(item.moduleSlug);
+        const courseInfo = catalog.moduleCourse[item.moduleSlug];
         if (!courseInfo) continue;
+        const key = `${item.moduleSlug}:${item.lessonSlug}`;
         const existing = courseMap.get(courseInfo.courseSlug);
         if (existing) {
-          existing.completed.add(`${item.moduleSlug}:${item.lessonSlug}`);
-          const lesson = lessons.find((l) => l.slug === item.lessonSlug && l.moduleSlug === item.moduleSlug);
-          if (lesson) existing.completedMinutes += lesson.estimatedMinutes;
+          existing.completed.add(key);
+          existing.completedMinutes += item.estimatedMinutes ?? 0;
         } else {
-          const lesson = lessons.find((l) => l.slug === item.lessonSlug && l.moduleSlug === item.moduleSlug);
           courseMap.set(courseInfo.courseSlug, {
             title: courseInfo.courseTitle,
-            completed: new Set([`${item.moduleSlug}:${item.lessonSlug}`]),
+            href: catalogBySlug.get(courseInfo.courseSlug)?.href ?? '/',
+            completed: new Set([key]),
             total: 0,
             totalMinutes: 0,
-            completedMinutes: lesson ? lesson.estimatedMinutes : 0,
+            completedMinutes: item.estimatedMinutes ?? 0,
           });
         }
       }
     }
 
-    for (const course of courses) {
-      const courseLessons = getLessonsForCourse(course.slug);
+    for (const course of catalog.courses) {
       const existing = courseMap.get(course.slug);
-      const totalMinutes = courseLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
       if (existing) {
-        existing.total = courseLessons.length;
-        existing.totalMinutes = totalMinutes;
-        existing.completedMinutes = courseLessons
-          .filter((l) => existing.completed.has(`${l.moduleSlug}:${l.slug}`))
-          .reduce((sum, l) => sum + l.estimatedMinutes, 0);
+        existing.total = course.lessonCount;
+        existing.totalMinutes = course.totalMinutes;
       } else {
         courseMap.set(course.slug, {
           title: course.title,
+          href: course.href,
           completed: new Set(),
-          total: courseLessons.length,
-          totalMinutes,
-          completedMinutes: 0,
-        });
-      }
-    }
-
-    const interviewLessons = lessons.filter((l) => l.courseSlug === 'interview-qa');
-    const interviewTotalMinutes = interviewLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
-    if (interviewLessons.length > 0) {
-      const existing = courseMap.get('interview-qa');
-      if (existing) {
-        existing.total = interviewLessons.length;
-        existing.totalMinutes = interviewTotalMinutes;
-        existing.completedMinutes = interviewLessons
-          .filter((l) => existing.completed.has(`${l.moduleSlug}:${l.slug}`))
-          .reduce((sum, l) => sum + l.estimatedMinutes, 0);
-      } else {
-        courseMap.set('interview-qa', {
-          title: 'Technical Interview Questions',
-          completed: new Set(),
-          total: interviewLessons.length,
-          totalMinutes: interviewTotalMinutes,
+          total: course.lessonCount,
+          totalMinutes: course.totalMinutes,
           completedMinutes: 0,
         });
       }
@@ -206,6 +191,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
       .map(([courseSlug, data]) => ({
         courseSlug,
         courseTitle: data.title,
+        href: data.href,
         completedCount: data.completed.size,
         totalCount: data.total,
         percent: data.total > 0 ? Math.round((data.completed.size / data.total) * 100) : 0,
@@ -213,7 +199,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
       }))
       .filter((c) => c.totalCount > 0)
       .sort((a, b) => b.percent - a.percent);
-  }, [progress]);
+  }, [progress, catalog]);
 
   const recentCompletions = useMemo(() => {
     if (totalCompleted === 0) return [];
@@ -388,7 +374,7 @@ export function ProgressDashboardClient({ user }: { user: { id: string; name?: s
                 return (
                   <Link
                     key={course.courseSlug}
-                    href={getContentItemHref(course.courseSlug)}
+                    href={course.href}
                     className="group block rounded-xl border border-border bg-canvas p-5 transition-all hover:border-accent-fg hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3">

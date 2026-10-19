@@ -1,0 +1,258 @@
+/**
+ * Href builders for content routes, plus interview-technology slug helpers.
+ *
+ * This module is deliberately *content-free*: it only reads the tiny generated
+ * `content/categories.ts` lookup and static maps declared below. Client
+ * components (search suggestions, search results, bookmarks, …) import href
+ * helpers from here — importing `lib/content.ts` instead would pull every
+ * lesson JSON into the browser bundle, which bloats the client chunks and
+ * slows down every build.
+ *
+ * `lib/content.ts` re-exports everything in this file, so server code can keep
+ * importing these helpers from `@/lib/content`.
+ */
+
+import { COURSE_URL_CATEGORY, PROBLEM_COURSE_SLUGS } from '@/content/categories';
+import type { SearchResult } from '@/types';
+
+// ── Course category / problem lookups ────────────────────────────────────────
+
+// Legacy hand-maintained fallback for slugs the generator doesn't see (the
+// generated `COURSE_URL_CATEGORY` above is the primary source of truth).
+const COURSE_CATEGORY_MAP: Record<string, string> = {
+  // Fundamentals
+  'programming-computer-web-foundations': 'fundamentals',
+  'oops-concepts': 'fundamentals',
+  'senior-software-engineering': 'fundamentals',
+  // AI
+  'ai-basics': 'ai',
+  'dotnet-ai-backend': 'ai',
+  // Backend (.NET)
+  'csharp-fundamentals': 'backend',
+  'linq': 'backend',
+  'ef-core': 'backend',
+  'aspnet-core': 'backend',
+  'aspnet-core-web-api': 'backend',
+  'dotnet-nuget-packages': 'backend',
+  'unit-testing-dotnet': 'backend',
+  'authentication-authorization': 'backend',
+  'graphql-dotnet': 'backend',
+  'aws-for-aspnet': 'backend',
+  'azure-for-aspnet': 'backend',
+  // Frontend
+  'react-fundamentals': 'frontend',
+  'typescript-for-react': 'frontend',
+  'redux': 'frontend',
+  'react-query': 'frontend',
+  'react-testing': 'frontend',
+  'apollo': 'frontend',
+  'react-advanced-patterns': 'frontend',
+  'next-js-full-stack-react': 'frontend',
+  'prisma': 'frontend',
+  'yarn-npm-packages': 'frontend',
+  // Database
+  'postgresql': 'database',
+  'sql-server': 'database',
+  // Cloud → DevOps
+  'aws': 'devops',
+  'azure': 'devops',
+  // DevOps
+  'devops': 'devops',
+  'git-linux-developer-workflow': 'devops',
+  // Architecture
+  'design-patterns': 'architecture',
+  'clean-code-csharp': 'architecture',
+  'redis-caching-strategies': 'architecture',
+  'fullstack-security': 'architecture',
+  'message-queues-event-streaming': 'architecture',
+  'microservices-architecture': 'architecture',
+  'system-design-interviews': 'architecture',
+  'frontend-performance-engineering': 'architecture',
+  // Cheatsheets (module slugs)
+  'csharp': 'backend',
+  'javascript': 'frontend',
+  'react': 'frontend',
+  'react-router': 'frontend',
+  'typescript': 'frontend',
+  'graphql': 'backend',
+  'docker-compose': 'devops',
+  // Problems (course slugs)
+  'api-design': 'backend',
+  'asp': 'backend',
+  'database-design': 'database',
+  'sql': 'database',
+  'architecture-decisions': 'architecture',
+  'code-review': 'architecture',
+  'hld': 'architecture',
+  'lld': 'architecture',
+  'distributed-systems': 'architecture',
+  'full-stack-senior-projects': 'architecture',
+  'low-level-design': 'architecture',
+  'production-incidents': 'architecture',
+  'system-design': 'architecture',
+};
+
+const problemCourseSlugs = new Set<string>(PROBLEM_COURSE_SLUGS);
+
+export function getCourseCategory(slug: string): string {
+  // Prefer the directory-derived category stamped by the content generator.
+  const indexed = COURSE_URL_CATEGORY[slug];
+  if (indexed) return indexed;
+  return COURSE_CATEGORY_MAP[slug] ?? 'courses';
+}
+
+export function isProblemCourseSlug(slug: string | undefined): boolean {
+  return slug !== undefined && problemCourseSlugs.has(slug);
+}
+
+/**
+ * Builds the canonical, category-prefixed href for a stored
+ * (courseSlug, moduleSlug, lessonSlug) triple — e.g. from bookmarks,
+ * notes, or progress records. All course/problem routes live under
+ * `/[category]/...`, so links must include the resolved category.
+ */
+export function getContentItemHref(
+  courseSlug: string,
+  moduleSlug?: string | null,
+  lessonSlug?: string | null
+): string {
+  if (courseSlug === 'interview-qa') {
+    return moduleSlug && lessonSlug
+      ? `/interview-questions/${moduleSlug}/${lessonSlug}`
+      : '/interview-questions';
+  }
+
+  // Cheatsheets: one lesson per technology module; the category is derived
+  // from the technology (module) slug, not a course.
+  if (courseSlug === 'cheatsheet') {
+    if (moduleSlug) {
+      return `/${getCourseCategory(moduleSlug)}/cheatsheets/${moduleSlug}`;
+    }
+    return '/';
+  }
+
+  const category = getCourseCategory(courseSlug);
+  const prefix = isProblemCourseSlug(courseSlug) ? 'problems' : 'courses';
+
+  if (moduleSlug && lessonSlug) {
+    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}/${lessonSlug}`;
+  }
+  if (moduleSlug) {
+    return `/${category}/${prefix}/${courseSlug}/${moduleSlug}`;
+  }
+  return `/${category}/${prefix}/${courseSlug}`;
+}
+
+// ── Interview technology slugs ───────────────────────────────────────────────
+
+/**
+ * Display name → URL slug for every interview technology.
+ *
+ * Maintenance rule: when adding a new interview question technology, update
+ * this map (and `TECH_NAME_MAP` below) alongside the lesson JSON `technology`
+ * field. Slugs that need no special casing may be omitted — they fall back to
+ * a generic slugify — but entries here keep historical URLs stable.
+ */
+const TECH_SLUG_MAP: Record<string, string> = {
+  'c#': 'csharp',
+  'asp.net core': 'aspnet-core',
+  'oop': 'oop',
+  'javascript': 'javascript',
+  'general': 'general',
+  'system design': 'system-design',
+  'behavioral': 'behavioral',
+  'sql server': 'sql-server',
+  'full-stack scenarios': 'fullstack-scenarios',
+  'performance optimization': 'performance-optimization',
+  'ci/cd pipelines': 'cicd-pipelines',
+  'entity framework core': 'entity-framework-core',
+  'backend & database': 'backend-database',
+  'react': 'react',
+  'architecture': 'architecture',
+  'security': 'security',
+};
+
+/** URL slug → display name (the inverse of {@link TECH_SLUG_MAP}). */
+const TECH_NAME_MAP: Record<string, string> = {
+  csharp: 'C#',
+  'aspnet-core': 'ASP.NET Core',
+  oop: 'OOP',
+  javascript: 'JavaScript',
+  general: 'General',
+  'system-design': 'System Design',
+  behavioral: 'Behavioral',
+  'sql-server': 'SQL Server',
+  'fullstack-scenarios': 'Full-Stack Scenarios',
+  'performance-optimization': 'Performance Optimization',
+  'cicd-pipelines': 'CI/CD Pipelines',
+  'entity-framework-core': 'Entity Framework Core',
+  'backend-database': 'Backend & Database',
+  react: 'React',
+  architecture: 'architecture',
+  security: 'security',
+};
+
+/** URL-safe fallback for technologies without an explicit map entry. */
+function fallbackTechSlug(technology: string): string {
+  return technology
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Converts a lesson `technology` value (e.g. "C#", "CI/CD Pipelines") to its URL slug. */
+export function getInterviewTechSlug(technology: string): string {
+  const key = technology.trim().toLowerCase();
+  return TECH_SLUG_MAP[key] ?? fallbackTechSlug(key);
+}
+
+/** Converts an interview technology URL slug (e.g. "csharp") back to its display name. */
+export function getInterviewTechName(slug: string): string {
+  return TECH_NAME_MAP[slug] ?? slug;
+}
+
+// ── Search result hrefs ──────────────────────────────────────────────────────
+
+export function getSearchResultHref(result: SearchResult): string {
+  if (result.type === 'lesson') {
+    const category = getCourseCategory(result.courseSlug ?? '');
+    if (isProblemCourseSlug(result.courseSlug)) {
+      return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+    }
+    if (result.courseSlug === 'interview-qa' && result.technology) {
+      return `/interview-questions/${getInterviewTechSlug(result.technology)}/${result.slug}`;
+    }
+    if (result.courseSlug === 'cheatsheet') {
+      return `/${category}/cheatsheets/${result.slug}`;
+    }
+    return `/${category}/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+  }
+
+  if (result.type === 'module') {
+    const category = getCourseCategory(result.courseSlug ?? '');
+    if (result.courseSlug === 'cheatsheet') {
+      return `/${category}/cheatsheets/${result.slug}`;
+    }
+    if (isProblemCourseSlug(result.courseSlug)) {
+      return `/${category}/problems/${result.courseSlug}/${result.slug}`;
+    }
+    return `/${category}/courses/${result.courseSlug}/${result.slug}`;
+  }
+
+  if (result.type === 'course') {
+    if (result.slug === 'interview-qa') {
+      return '/interview-questions';
+    }
+    const category = getCourseCategory(result.slug);
+    if (isProblemCourseSlug(result.slug)) {
+      return `/${category}/problems/${result.slug}`;
+    }
+    return `/${category}/courses/${result.slug}`;
+  }
+
+  if (result.type === 'cheatsheet') {
+    return '/';
+  }
+
+  return '/';
+}

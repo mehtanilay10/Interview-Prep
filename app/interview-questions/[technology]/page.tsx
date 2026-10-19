@@ -5,55 +5,25 @@ import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { getInterviewTechnologies, getInterviewQuestions, getInterviewLevelsForTechnology, getInterviewQuestionCount } from '@/lib/content';
+import { getInterviewTechName, getInterviewTechSlug } from '@/lib/content-hrefs';
 import { formatHours } from '@/lib/utils';
-
-const TECH_NAME_MAP: Record<string, string> = {
-  'csharp': 'C#',
-  'aspnet-core': 'ASP.NET Core',
-  'oop': 'OOP',
-  'javascript': 'JavaScript',
-  'general': 'General',
-  'system-design': 'System Design',
-  'behavioral': 'Behavioral',
-  'sql-server': 'SQL Server',
-  'fullstack-scenarios': 'Full-Stack Scenarios',
-  'performance-optimization': 'Performance Optimization',
-  'cicd-pipelines': 'CI/CD Pipelines',
-};
-
-const TECH_SLUG_MAP: Record<string, string> = {
-  'c#': 'csharp',
-  'asp.net core': 'aspnet-core',
-  'oop': 'oop',
-  'javascript': 'javascript',
-  'general': 'general',
-  'system design': 'system-design',
-  'behavioral': 'behavioral',
-  'sql server': 'sql-server',
-  'full-stack scenarios': 'fullstack-scenarios',
-  'performance optimization': 'performance-optimization',
-  'ci/cd pipelines': 'cicd-pipelines',
-};
 
 /**
  * Maintenance rule:
- * When adding a new interview question technology, update BOTH:
- * - The lesson JSON `technology` field
- * - TECH_NAME_MAP and TECH_SLUG_MAP in both interview question pages
- *   (`app/interview-questions/[technology]/page.tsx` and
- *    `app/interview-questions/[technology]/[slug]/page.tsx`)
+ * When adding a new interview question technology, update the lesson JSON
+ * `technology` field and the slug/name maps in `lib/content-hrefs.ts`.
  */
 
 export async function generateStaticParams() {
   const technologies = getInterviewTechnologies();
   return technologies.map((tech) => ({
-    technology: TECH_SLUG_MAP[tech.toLowerCase()] ?? tech.toLowerCase(),
+    technology: getInterviewTechSlug(tech),
   }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ technology: string }> }): Promise<Metadata> {
   const { technology } = await params;
-  const tech = TECH_NAME_MAP[technology] ?? technology;
+  const tech = getInterviewTechName(technology);
   const count = getInterviewQuestionCount(tech);
   return {
     title: `${tech} Interview Questions`,
@@ -63,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
 
 export default async function InterviewTechnologyPage({ params }: { params: Promise<{ technology: string }> }) {
   const { technology } = await params;
-  const tech = TECH_NAME_MAP[technology] ?? technology;
+  const tech = getInterviewTechName(technology);
   const levels = getInterviewLevelsForTechnology(tech);
 
   if (levels.length === 0) {
