@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions } from '@/lib/content';
+import { getCourseCategory } from '@/lib/content';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
@@ -47,15 +48,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const courses = getAllCourses().filter((c) => !c.isInterview);
 
   for (const course of courses) {
-    entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}`));
+    const category = getCourseCategory(course.slug);
+    entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}`));
 
     const modules = getModulesForCourse(course.slug);
     for (const mod of modules) {
-      entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}/${mod.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}/${mod.slug}`));
 
       const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
       for (const lesson of lessons) {
-        entries.push(toSitemapEntry(`${BASE_URL}/courses/${course.slug}/${mod.slug}/${lesson.slug}`));
+        entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}/${mod.slug}/${lesson.slug}`));
       }
     }
   }
@@ -73,26 +75,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const cheatsheetModules = getModulesForCourse('cheatsheet');
   for (const mod of cheatsheetModules) {
-    entries.push(toSitemapEntry(`${BASE_URL}/cheatsheet/${mod.slug}`));
+    const category = getCourseCategory(mod.slug);
+    entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}`));
 
     const lessons = getLessonsForCourse('cheatsheet').filter((l) => l.moduleSlug === mod.slug);
     for (const lesson of lessons) {
-      entries.push(toSitemapEntry(`${BASE_URL}/cheatsheet/${mod.slug}/${lesson.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}/${lesson.slug}`));
     }
   }
 
   const problemCourses = getProblemCourses();
 
   for (const course of problemCourses) {
-    entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}`, 0.8, 'weekly'));
+    const category = getCourseCategory(course.slug);
+    entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}`, 0.8, 'weekly'));
 
     const modules = getModulesForCourse(course.slug);
     for (const mod of modules) {
-      entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}/${mod.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}/${mod.slug}`));
 
       const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
       for (const lesson of lessons) {
-        entries.push(toSitemapEntry(`${BASE_URL}/problems/${course.slug}/${mod.slug}/${lesson.slug}`));
+        entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}/${mod.slug}/${lesson.slug}`));
       }
     }
   }

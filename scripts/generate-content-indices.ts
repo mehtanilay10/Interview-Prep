@@ -24,6 +24,7 @@ interface CourseInfo {
   importPath: string;
   variableName: string;
   slug: string;
+  category: string;
 }
 
 interface ModuleInfo {
@@ -78,19 +79,23 @@ function scanCourses(): CourseInfo[] {
         variableName = `${variableName}${counter}`;
       }
       usedNames.add(variableName);
-      courses.push({ importPath, variableName, slug });
+      courses.push({ importPath, variableName, slug, category: area });
     }
 
     // For courses, problems, projects: each subdirectory with content.json is a course
-    if (area === 'interview-qa' || area === 'cheatsheet') continue;
+    // Now with category subdirectories, we need to look one level deeper
+    if (area === 'interview-qa') continue;
 
     const entries = fs.readdirSync(areaPath);
     for (const entry of entries) {
       const fullPath = path.join(areaPath, entry);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
+        // Check if this is a category directory (contains subdirectories with content.json)
+        // or a direct course directory (has content.json)
         const contentJsonPath = path.join(fullPath, 'content.json');
         if (fs.existsSync(contentJsonPath)) {
+          // Direct course directory (old structure or non-category)
           const importPath = area === 'courses' ? `./${entry}/content.json` :
                             area === 'problems' ? `../problems/${entry}/content.json` :
                             `../projects/${entry}/content.json`;
@@ -106,7 +111,48 @@ function scanCourses(): CourseInfo[] {
             variableName = `${variableName}${counter}`;
           }
           usedNames.add(variableName);
-          courses.push({ importPath, variableName, slug });
+          
+          let category = area;
+          if (area === 'courses') {
+            const parentDir = path.basename(path.dirname(fullPath));
+            if (parentDir !== 'courses') {
+              category = parentDir;
+            }
+          }
+          
+          courses.push({ importPath, variableName, slug, category });
+        } else {
+          // This might be a category directory - scan its subdirectories
+          const subEntries = fs.readdirSync(fullPath);
+          for (const subEntry of subEntries) {
+            const subFullPath = path.join(fullPath, subEntry);
+            const subStat = fs.statSync(subFullPath);
+            if (subStat.isDirectory()) {
+              const subContentJsonPath = path.join(subFullPath, 'content.json');
+              if (fs.existsSync(subContentJsonPath)) {
+                const importPath = area === 'courses' ? `./${entry}/${subEntry}/content.json` :
+                                  area === 'problems' ? `../problems/${entry}/${subEntry}/content.json` :
+                                  area === 'cheatsheet' ? `../cheatsheet/${entry}/${subEntry}/content.json` :
+                                  `../projects/${entry}/${subEntry}/content.json`;
+                const slug = subEntry;
+                let variableName = toVariableName(slug, '');
+                variableName = `${variableName}Course`;
+                if (!/^[a-zA-Z]/.test(variableName)) {
+                  variableName = `course${variableName}`;
+                }
+                if (usedNames.has(variableName)) {
+                  let counter = 1;
+                  while (usedNames.has(`${variableName}${counter}`)) counter++;
+                  variableName = `${variableName}${counter}`;
+                }
+                usedNames.add(variableName);
+                
+                let category = entry; // The category is the parent directory name
+                
+                courses.push({ importPath, variableName, slug, category });
+              }
+            }
+          }
         }
       }
     }

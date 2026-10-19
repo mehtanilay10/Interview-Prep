@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3 } from "lucide-react";
+import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3, ChevronRight } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
@@ -13,11 +13,103 @@ import { cn } from "@/lib/utils";
 import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
 
-const TECHS = [
-  { key: "frontend", label: "Frontend" },
-  { key: "backend", label: "Backend" },
-  { key: "ai", label: "AI" },
-  { key: "architecture", label: "Architect" },
+const CATEGORIES = [
+  {
+    key: "fundamentals",
+    label: "Fundamentals",
+    icon: "🌱",
+    courses: [
+      { slug: "programming-computer-web-foundations", title: "Programming, Computer & Web Foundations" },
+      { slug: "oops-concepts", title: "OOP Concepts" },
+      { slug: "senior-software-engineering", title: "Senior Software Engineering" },
+    ],
+  },
+  {
+    key: "ai",
+    label: "AI",
+    icon: "🤖",
+    courses: [
+      { slug: "ai-basics", title: "AI Basics" },
+      { slug: "dotnet-ai-backend", title: ".NET AI Backend" },
+    ],
+  },
+  {
+    key: "dotnet",
+    label: ".NET",
+    icon: "💜",
+    courses: [
+      { slug: "csharp-fundamentals", title: "C# Fundamentals" },
+      { slug: "linq", title: "LINQ" },
+      { slug: "ef-core", title: "EF Core" },
+      { slug: "aspnet-core", title: "ASP.NET Core" },
+      { slug: "aspnet-core-web-api", title: "ASP.NET Core Web API" },
+      { slug: "dotnet-nuget-packages", title: ".NET NuGet Packages" },
+      { slug: "unit-testing-dotnet", title: "Unit Testing .NET" },
+      { slug: "authentication-authorization", title: "Authentication & Authorization" },
+      { slug: "graphql-dotnet", title: "GraphQL .NET" },
+      { slug: "aws-for-aspnet", title: "AWS for ASP.NET" },
+      { slug: "azure-for-aspnet", title: "Azure for ASP.NET" },
+    ],
+  },
+  {
+    key: "frontend",
+    label: "Frontend",
+    icon: "⚛️",
+    courses: [
+      { slug: "react-fundamentals", title: "React Fundamentals" },
+      { slug: "typescript-for-react", title: "TypeScript for React" },
+      { slug: "redux", title: "Redux" },
+      { slug: "react-query", title: "React Query" },
+      { slug: "react-testing", title: "React Testing" },
+      { slug: "apollo", title: "Apollo Client" },
+      { slug: "react-advanced-patterns", title: "React Advanced Patterns" },
+      { slug: "next-js-full-stack-react", title: "Next.js Full-Stack React" },
+      { slug: "prisma", title: "Prisma" },
+      { slug: "yarn-npm-packages", title: "Yarn & npm Packages" },
+    ],
+  },
+  {
+    key: "database",
+    label: "Database",
+    icon: "🗄️",
+    courses: [
+      { slug: "postgresql", title: "PostgreSQL" },
+      { slug: "sql-server", title: "SQL Server" },
+    ],
+  },
+  {
+    key: "cloud",
+    label: "Cloud",
+    icon: "☁️",
+    courses: [
+      { slug: "aws", title: "AWS" },
+      { slug: "azure", title: "Azure" },
+    ],
+  },
+  {
+    key: "devops",
+    label: "DevOps",
+    icon: "🚀",
+    courses: [
+      { slug: "devops", title: "DevOps" },
+      { slug: "git-linux-developer-workflow", title: "Git & Linux Developer Workflow" },
+    ],
+  },
+  {
+    key: "architecture",
+    label: "Architecture",
+    icon: "🏗️",
+    courses: [
+      { slug: "design-patterns", title: "Design Patterns" },
+      { slug: "clean-code-csharp", title: "Clean Code C#" },
+      { slug: "redis-caching-strategies", title: "Redis Caching Strategies" },
+      { slug: "fullstack-security", title: "Full-Stack Security" },
+      { slug: "message-queues-event-streaming", title: "Message Queues & Event Streaming" },
+      { slug: "microservices-architecture", title: "Microservices Architecture" },
+      { slug: "system-design-interviews", title: "System Design Interviews" },
+      { slug: "frontend-performance-engineering", title: "Frontend Performance Engineering" },
+    ],
+  },
 ];
 
 const NAV_LINKS = [
@@ -35,10 +127,11 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [techOpen, setTechOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
   const { data: session, status } = useSession();
   const isLoggedIn = status === 'authenticated';
 
@@ -84,15 +177,15 @@ export function Navbar() {
   }, [userMenuOpen]);
 
   useEffect(() => {
-    if (!userMenuOpen) return;
+    if (!categoriesOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
+        setCategoriesOpen(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userMenuOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [categoriesOpen]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
@@ -138,31 +231,60 @@ export function Navbar() {
             </button>
           </div>
         ) : (
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation" ref={categoryMenuRef}>
+            {/* Categories Mega Menu */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setTechOpen((o) => !o)}
+                onClick={() => setCategoriesOpen(categoriesOpen ? null : "all")}
                 className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
-                aria-expanded={techOpen}
+                aria-expanded={!!categoriesOpen}
+                aria-haspopup="true"
               >
-                Technologies
+                Categories
               </button>
-              {techOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
-                  {TECHS.map((t) => (
+              {categoriesOpen && (
+                <div className="absolute left-0 mt-2 w-full min-w-[800px] max-w-[1000px] rounded-lg border border-border bg-canvas shadow-lg py-4 z-50">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 p-4">
+                    {CATEGORIES.map((cat) => (
+                      <div key={cat.key} className="col-span-1 md:col-span-2 lg:col-span-1">
+                        <Link
+                          href={`/${cat.key}/courses`}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg font-semibold text-fg-default hover:bg-canvas-subtle transition-colors"
+                          onClick={() => setCategoriesOpen(null)}
+                        >
+                          <span className="text-lg" aria-hidden="true">{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </Link>
+                        <ul className="mt-1 space-y-1 ml-6">
+                          {cat.courses.map((course) => (
+                            <li key={course.slug}>
+                              <Link
+                                href={`/${cat.key}/courses/${course.slug}`}
+                                className="block px-3 py-1.5 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default rounded-md transition-colors"
+                                onClick={() => setCategoriesOpen(null)}
+                              >
+                                {course.title}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-border mt-2 pt-2 px-4">
                     <Link
-                      key={t.key}
-                      href={`/courses?tech=${t.key}`}
-                      onClick={() => setTechOpen(false)}
-                      className="block px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                      href="/courses"
+                      className="text-sm font-medium text-accent-fg hover:underline"
+                      onClick={() => setCategoriesOpen(null)}
                     >
-                      {t.label}
+                      View all courses →
                     </Link>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>
+
             {NAV_LINKS.map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
@@ -284,14 +406,45 @@ export function Navbar() {
                 size="sm"
               />
             </SearchErrorBoundary>
-            {NAV_LINKS.map((link) => {
-              const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-              return (
-                <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className={cn("rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas hover:text-fg-default")}>
-                  {link.label}
-                </Link>
-              );
-            })}
+            {/* Mobile Categories */}
+            <div className="space-y-2">
+              {CATEGORIES.map((cat) => (
+                <div key={cat.key} className="border border-border rounded-lg overflow-hidden">
+                  <Link
+                    href={`/${cat.key}/courses`}
+                    className="flex items-center gap-2 px-3 py-2 font-semibold text-fg-default hover:bg-canvas"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className="text-lg" aria-hidden="true">{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    <ChevronRight className="h-4 w-4 ml-auto text-fg-muted" aria-hidden="true" />
+                  </Link>
+                  <ul className="border-t border-border bg-canvas">
+                    {cat.courses.map((course) => (
+                      <li key={course.slug}>
+                        <Link
+                          href={`/${cat.key}/courses/${course.slug}`}
+                          className="block px-6 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          {course.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="pt-2 border-t border-border">
+              {NAV_LINKS.map((link) => {
+                const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+                return (
+                  <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className={cn("rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas hover:text-fg-default")}>
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
         </div>
       )}

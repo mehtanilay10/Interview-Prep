@@ -252,37 +252,124 @@ export function searchAll(query: string): SearchResult[] {
 
 const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems', 'hld-problems']);
 
+// Course slug to category mapping for URL generation
+const COURSE_CATEGORY_MAP: Record<string, string> = {
+  // Fundamentals
+  'programming-computer-web-foundations': 'fundamentals',
+  'oops-concepts': 'fundamentals',
+  'senior-software-engineering': 'fundamentals',
+  // AI
+  'ai-basics': 'ai',
+  'dotnet-ai-backend': 'ai',
+  // Dotnet
+  'csharp-fundamentals': 'dotnet',
+  'linq': 'dotnet',
+  'ef-core': 'dotnet',
+  'aspnet-core': 'dotnet',
+  'aspnet-core-web-api': 'dotnet',
+  'dotnet-nuget-packages': 'dotnet',
+  'unit-testing-dotnet': 'dotnet',
+  'authentication-authorization': 'dotnet',
+  'graphql-dotnet': 'dotnet',
+  'aws-for-aspnet': 'dotnet',
+  'azure-for-aspnet': 'dotnet',
+  // Frontend
+  'react-fundamentals': 'frontend',
+  'typescript-for-react': 'frontend',
+  'redux': 'frontend',
+  'react-query': 'frontend',
+  'react-testing': 'frontend',
+  'apollo': 'frontend',
+  'react-advanced-patterns': 'frontend',
+  'next-js-full-stack-react': 'frontend',
+  'prisma': 'frontend',
+  'yarn-npm-packages': 'frontend',
+  // Database
+  'postgresql': 'database',
+  'sql-server': 'database',
+  // Cloud
+  'aws': 'cloud',
+  'azure': 'cloud',
+  // DevOps
+  'devops': 'devops',
+  'git-linux-developer-workflow': 'devops',
+  // Architecture
+  'design-patterns': 'architecture',
+  'clean-code-csharp': 'architecture',
+  'redis-caching-strategies': 'architecture',
+  'fullstack-security': 'architecture',
+  'message-queues-event-streaming': 'architecture',
+  'microservices-architecture': 'architecture',
+  'system-design-interviews': 'architecture',
+  'frontend-performance-engineering': 'architecture',
+  // Cheatsheets (module slugs)
+  'csharp': 'dotnet',
+  'javascript': 'frontend',
+  'react': 'frontend',
+  'react-router': 'frontend',
+  'typescript': 'frontend',
+  'graphql': 'dotnet',
+  'docker-compose': 'devops',
+  // Problems (course slugs)
+  'api-design': 'backend',
+  'asp': 'dotnet',
+  'database-design': 'database',
+  'sql': 'database',
+  'architecture-decisions': 'architecture',
+  'code-review': 'architecture',
+  'hld': 'architecture',
+  'lld': 'architecture',
+  'distributed-systems': 'architecture',
+  'full-stack-senior-projects': 'architecture',
+  'low-level-design': 'architecture',
+  'production-incidents': 'architecture',
+  'system-design': 'architecture',
+};
+
+export function getCourseCategory(slug: string): string {
+  return COURSE_CATEGORY_MAP[slug] ?? 'courses';
+}
+
 export function isProblemCourseSlug(slug: string | undefined): boolean {
   return slug !== undefined && PROBLEM_COURSE_SLUGS.has(slug);
 }
 
 export function getSearchResultHref(result: SearchResult): string {
   if (result.type === 'lesson') {
+    const category = getCourseCategory(result.courseSlug ?? '');
     if (isProblemCourseSlug(result.courseSlug)) {
-      return `/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+      return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
     }
     if (result.courseSlug === 'interview-qa' && result.technology) {
       const techSlug = result.technology.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '').replace(/\//g, '-');
       return `/interview-questions/${techSlug}/${result.slug}`;
     }
-    return `/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
+    if (result.courseSlug === 'cheatsheet') {
+      return `/${category}/cheatsheets/${result.slug}`;
+    }
+    return `/${category}/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
   }
 
   if (result.type === 'module') {
+    const category = getCourseCategory(result.courseSlug ?? '');
     if (result.courseSlug === 'cheatsheet') {
-      return `/cheatsheet/${result.slug}`;
+      return `/${category}/cheatsheets/${result.slug}`;
     }
     if (isProblemCourseSlug(result.courseSlug)) {
-      return `/problems/${result.courseSlug}/${result.slug}`;
+      return `/${category}/problems/${result.courseSlug}/${result.slug}`;
     }
-    return `/courses/${result.courseSlug}/${result.slug}`;
+    return `/${category}/courses/${result.courseSlug}/${result.slug}`;
   }
 
   if (result.type === 'course') {
+    const category = getCourseCategory(result.slug);
     if (isProblemCourseSlug(result.slug)) {
-      return `/problems/${result.slug}`;
+      return `/${category}/problems/${result.slug}`;
     }
-    return `/courses/${result.slug}`;
+    if (result.slug === 'cheatsheet') {
+      return '/cheatsheet';
+    }
+    return `/${category}/courses/${result.slug}`;
   }
 
   if (result.type === 'cheatsheet') {

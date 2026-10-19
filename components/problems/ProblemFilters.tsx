@@ -8,10 +8,12 @@ export function ProblemFilters({
   modules,
   lessons,
   courseSlug,
+  basePrefix = "problems",
 }: {
   modules: Module[];
   lessons: Lesson[];
   courseSlug: string;
+  basePrefix?: string;
 }) {
   const [difficulty, setDifficulty] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,8 +77,8 @@ export function ProblemFilters({
               key={mod.id}
               module={mod}
               courseSlug={courseSlug}
-              basePrefix="problems"
-               lessonCount={mod.lessonSlugs?.length ?? 0}
+              basePrefix={basePrefix}
+              lessonCount={mod.lessonSlugs?.length ?? 0}
             />
           ))}
         </div>
