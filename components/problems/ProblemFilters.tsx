@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ModuleCard } from '@/components/course/ModuleCard';
-import type { Module, Lesson } from '@/types';
+import type { Module, LessonNavItem } from '@/types';
 
 export function ProblemFilters({
   modules,
@@ -11,7 +11,7 @@ export function ProblemFilters({
   basePrefix = "problems",
 }: {
   modules: Module[];
-  lessons: Lesson[];
+  lessons: LessonNavItem[];
   courseSlug: string;
   basePrefix?: string;
 }) {

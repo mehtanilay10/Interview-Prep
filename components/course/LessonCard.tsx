@@ -3,10 +3,10 @@ import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
 import { cn } from '@/lib/utils';
-import type { Lesson } from '@/types';
+import type { LessonNavItem } from '@/types';
 
 interface LessonCardProps {
-  lesson: Lesson;
+  lesson: LessonNavItem;
   moduleSlug: string;
   courseSlug?: string;
   basePrefix?: string;

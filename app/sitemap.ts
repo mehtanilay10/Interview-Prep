@@ -59,10 +59,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}`));
 
     const modules = getModulesForCourse(course.slug);
+    const courseLessons = getLessonsForCourse(course.slug);
     for (const mod of modules) {
       entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}/${mod.slug}`));
 
-      const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
+      const lessons = courseLessons.filter((l) => l.moduleSlug === mod.slug);
       for (const lesson of lessons) {
         entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}/${mod.slug}/${lesson.slug}`));
       }
@@ -81,11 +82,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   const cheatsheetModules = getModulesForCourse('cheatsheet');
+  const cheatsheetLessons = getLessonsForCourse('cheatsheet');
   for (const mod of cheatsheetModules) {
     const category = getCourseCategory(mod.slug);
     entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}`));
 
-    const lessons = getLessonsForCourse('cheatsheet').filter((l) => l.moduleSlug === mod.slug);
+    const lessons = cheatsheetLessons.filter((l) => l.moduleSlug === mod.slug);
     for (const lesson of lessons) {
       entries.push(toSitemapEntry(`${BASE_URL}/${category}/cheatsheets/${mod.slug}/${lesson.slug}`));
     }
@@ -98,10 +100,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}`, 0.8, 'weekly'));
 
     const modules = getModulesForCourse(course.slug);
+    const courseLessons = getLessonsForCourse(course.slug);
     for (const mod of modules) {
       entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}/${mod.slug}`));
 
-      const lessons = getLessonsForCourse(course.slug).filter((l) => l.moduleSlug === mod.slug);
+      const lessons = courseLessons.filter((l) => l.moduleSlug === mod.slug);
       for (const lesson of lessons) {
         entries.push(toSitemapEntry(`${BASE_URL}/${category}/problems/${course.slug}/${mod.slug}/${lesson.slug}`));
       }

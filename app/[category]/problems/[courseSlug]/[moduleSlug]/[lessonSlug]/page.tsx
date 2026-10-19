@@ -12,7 +12,10 @@ import {
   getProblemCourses,
   extractTOC,
   getCourseCategory,
+  toLessonNavItem,
+  toLessonNavItems,
 } from '@/lib/content';
+import type { LessonNavItem } from '@/types';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { FurtherReading } from '@/components/content/FurtherReading';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
@@ -86,10 +89,12 @@ export default async function ProblemDetailPage({ params }: Params) {
   const prev = currentIdx > 0 ? courseLessons[currentIdx - 1] : null;
   const next = currentIdx < courseLessons.length - 1 ? courseLessons[currentIdx + 1] : null;
 
-  // Build lessonsByModule map (course-scoped only)
-  const lessonsByModule: Record<string, typeof moduleLessons> = {};
+  // Build lessonsByModule map (course-scoped only).
+  // Stripped of `blocks`: these are only rendered by client components, and
+  // embedding every lesson's content here would bloat each page's payload.
+  const lessonsByModule: Record<string, LessonNavItem[]> = {};
   for (const m of courseModules) {
-    lessonsByModule[m.slug] = getLessonsForModule(m.slug, courseSlug);
+    lessonsByModule[m.slug] = toLessonNavItems(getLessonsForModule(m.slug, courseSlug));
   }
 
   // Related lessons
@@ -133,7 +138,7 @@ export default async function ProblemDetailPage({ params }: Params) {
 
           {/* Lesson header */}
           <header className="mb-8">
-            <LessonActions lesson={lesson} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems">
+            <LessonActions lesson={toLessonNavItem(lesson)} courseSlug={courseSlug} moduleSlug={moduleSlug} category="problems">
               <LessonNotesButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} />
               <OfflineSaveButton courseSlug={courseSlug} moduleSlug={moduleSlug} lessonSlug={lessonSlug} title={lesson.title} />
             </LessonActions>
@@ -213,7 +218,7 @@ export default async function ProblemDetailPage({ params }: Params) {
                 {relatedLessons.map((rel) => (
                   <LessonCard
                     key={rel.slug}
-                    lesson={rel}
+                    lesson={toLessonNavItem(rel)}
                     moduleSlug={rel.moduleSlug}
                     courseSlug={courseSlug}
                   />

@@ -419,6 +419,22 @@ export function getAdjacentLessons(lesson: Lesson, allLessons: Lesson[]): { prev
 `;
 }
 
+/**
+ * Writes content only when it differs from what is on disk.
+ * Avoids touching mtimes (and busting the webpack cache) when nothing changed.
+ */
+function writeIfChanged(filePath: string, content: string): boolean {
+  try {
+    if (fs.readFileSync(filePath, 'utf8') === content) {
+      return false;
+    }
+  } catch {
+    // File does not exist yet — fall through and write it.
+  }
+  fs.writeFileSync(filePath, content);
+  return true;
+}
+
 function main() {
   console.log('Scanning content directories...');
 
@@ -432,11 +448,17 @@ function main() {
   const modulesIndex = generateModulesIndex(modules);
   const lessonsIndex = generateLessonsIndex(lessons);
 
-  fs.writeFileSync(COURSES_INDEX, coursesIndex);
-  fs.writeFileSync(MODULES_INDEX, modulesIndex);
-  fs.writeFileSync(LESSONS_INDEX, lessonsIndex);
+  const changed = [
+    writeIfChanged(COURSES_INDEX, coursesIndex),
+    writeIfChanged(MODULES_INDEX, modulesIndex),
+    writeIfChanged(LESSONS_INDEX, lessonsIndex),
+  ].some(Boolean);
 
-  console.log('Updated content/courses/index.ts, content/modules/index.ts, content/lessons/index.ts');
+  console.log(
+    changed
+      ? 'Updated content/courses/index.ts, content/modules/index.ts, content/lessons/index.ts'
+      : 'Content indices unchanged — skipped writes'
+  );
 }
 
 main();

@@ -9,6 +9,7 @@ import {
   getLessonsForModule,
   getProblemCourses,
   getCourseCategory,
+  toLessonNavItem,
 } from '@/lib/content';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
@@ -146,7 +147,7 @@ export default async function ProblemsModuleDetailPage({ params }: Params) {
             {lessons.map((lesson) => (
               <LessonCard
                 key={lesson.id}
-                lesson={lesson}
+                lesson={toLessonNavItem(lesson)}
                 moduleSlug={moduleSlug}
                 courseSlug={courseSlug}
                 basePrefix={`${category}/problems`}

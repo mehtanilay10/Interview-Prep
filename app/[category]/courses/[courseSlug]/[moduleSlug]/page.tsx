@@ -9,6 +9,7 @@ import {
   getModuleBySlug,
   getLessonsForModule,
   getCourseCategory,
+  toLessonNavItem,
 } from '@/lib/content';
 import { buildModuleMetadata } from '@/lib/seo';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
@@ -146,7 +147,7 @@ export default async function CourseModuleDetailPage({ params }: Params) {
               {lessons.map((lesson) => (
                 <LessonCard
                   key={lesson.id}
-                  lesson={lesson}
+                  lesson={toLessonNavItem(lesson)}
                   moduleSlug={moduleSlug}
                   courseSlug={courseSlug}
                   variant="list"

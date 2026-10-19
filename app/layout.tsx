@@ -50,6 +50,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const categories = getNavigationCategories();
+
   return (
     <html lang="en" suppressHydrationWarning className={inter.className}>
       <head>
@@ -63,13 +65,13 @@ export default function RootLayout({
               <PWARegistration />
               <ContinuePrompt />
               <ThemeProvider>
-                <Navbar categories={getNavigationCategories()} />
+                <Navbar categories={categories} />
                 <main id="main-content" className="flex-1">
                   <ErrorBoundaryWrapper>
                     {children}
                   </ErrorBoundaryWrapper>
                 </main>
-                <Footer categories={getNavigationCategories()} />
+                <Footer categories={categories} />
                 <OfflineIndicator />
               </ThemeProvider>
             </BookmarkProvider>

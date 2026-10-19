@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useProgress } from '@/hooks/useProgress';
-import type { Module, Lesson } from '@/types';
+import type { Module, LessonNavItem } from '@/types';
 
 interface LessonSidebarProps {
   currentModuleSlug: string;
@@ -13,7 +13,7 @@ interface LessonSidebarProps {
   courseSlug?: string;
   basePrefix?: string;
   modules: Module[];
-  lessonsByModule: Record<string, Lesson[]>;
+  lessonsByModule: Record<string, LessonNavItem[]>;
 }
 
 export function LessonSidebar({

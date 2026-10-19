@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ProblemFilters } from '@/components/problems/ProblemFilters';
-import { getCourseBySlug, getModulesForCourse, getLessonsForCourse, getProblemCourses, getCourseCategory } from '@/lib/content';
+import { getCourseBySlug, getModulesForCourse, getLessonsForCourse, getProblemCourses, getCourseCategory, toLessonNavItems } from '@/lib/content';
 
 interface Params {
   params: Promise<{ category: string; courseSlug: string }>;
@@ -53,7 +53,7 @@ export default async function ProblemsCoursePage({ params }: Params) {
         titleAs="h1"
       />
 
-      <ProblemFilters modules={allModules} lessons={allLessons} courseSlug={courseSlug} basePrefix={`${category}/problems`} />
+      <ProblemFilters modules={allModules} lessons={toLessonNavItems(allLessons)} courseSlug={courseSlug} basePrefix={`${category}/problems`} />
     </div>
   );
 }

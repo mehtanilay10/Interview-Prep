@@ -233,6 +233,17 @@ export interface Lesson {
   furtherReading?: FurtherReadingItem[];
 }
 
+/**
+ * Lesson metadata without the heavy `blocks` content.
+ *
+ * Use this for lessons handed to client components (sidebar, lesson cards,
+ * filters, action buttons) — they only render metadata, but because every prop
+ * of a client component is serialized into each page's RSC payload, including
+ * `blocks` would embed the full content of *every* lesson of a course into
+ * *every* page of that course at build time.
+ */
+export type LessonNavItem = Omit<Lesson, 'blocks'>;
+
 // ── Tool Comparison ──────────────────────────────────────────────────────────
 
 // ── Weekly / 90-Day Plan ─────────────────────────────────────────────────────

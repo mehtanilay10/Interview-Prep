@@ -22,27 +22,55 @@ import type {
   GlossaryTerm,
   RoadmapNode,
   PromptTemplate,
+  LessonNavItem,
 } from '@/types';
 
 // ── Re-exports for convenience ────────────────────────────────────────────────
 export { modules, lessons, courses };
 
+// ── Shared caches for derived content lookups ────────────────────────────────
+// Content is bundled statically (JSON imports), so it never changes during the
+// lifetime of a process. During `next build` each helper below runs for every
+// one of the ~4,100 generated pages (plus every generateStaticParams call), so
+// uncached linear scans over all ~2,800 lessons / ~560 modules are repeated
+// thousands of times. Derived lists and lookup indexes are computed on first
+// use and reused afterwards. Arrays returned from these helpers are shared —
+// treat them as read-only (callers only ever read/filter/map them).
+
+function memoizeNoArg<R>(compute: () => R): () => R {
+  let result: R | undefined;
+  let initialized = false;
+  return () => {
+    if (!initialized) {
+      result = compute();
+      initialized = true;
+    }
+    return result as R;
+  };
+}
+
 // ── Course helpers ────────────────────────────────────────────────────────────
 
-export function getAllCourses(): Course[] {
-  return [...courses]
+const allCoursesCache = memoizeNoArg(() =>
+  [...courses]
     .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet')
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => a.order - b.order)
+);
+
+export function getAllCourses(): Course[] {
+  return allCoursesCache();
 }
 
 export function getCourseBySlug(slug: string): Course | undefined {
   return courses.find((c) => c.slug === slug);
 }
 
+const problemCoursesCache = memoizeNoArg(() =>
+  courses.filter((c) => c.category === 'problems').sort((a, b) => a.order - b.order)
+);
+
 export function getProblemCourses(): Course[] {
-  return courses
-    .filter((c) => c.category === 'problems')
-    .sort((a, b) => a.order - b.order);
+  return problemCoursesCache();
 }
 
 // ── Category / navigation helpers ────────────────────────────────────────────
@@ -75,8 +103,10 @@ export function getCategoryMeta(category: string): CategoryMeta {
   return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), icon: '📚' };
 }
 
+const nonInterviewCoursesCache = memoizeNoArg(() => getAllCourses().filter((c) => !c.isInterview));
+
 export function getNonInterviewCourses(): Course[] {
-  return getAllCourses().filter((c) => !c.isInterview);
+  return nonInterviewCoursesCache();
 }
 
 export function getCoursesByCategory(category: string): Course[] {
@@ -87,10 +117,12 @@ export function getProblemCoursesByCategory(category: string): Course[] {
   return getProblemCourses().filter((c) => getCourseCategory(c.slug) === category);
 }
 
+const cheatsheetModulesCache = memoizeNoArg(() =>
+  modules.filter((m) => m.courseSlug === 'cheatsheet').sort((a, b) => a.order - b.order)
+);
+
 export function getCheatsheetModules(): Module[] {
-  return modules
-    .filter((m) => m.courseSlug === 'cheatsheet')
-    .sort((a, b) => a.order - b.order);
+  return cheatsheetModulesCache();
 }
 
 /** Collision-safe lookup: cheatsheet technology slugs can collide with course module slugs. */
@@ -120,7 +152,7 @@ export interface NavCategory {
  * (Courses / Problems / Cheat Sheets) that actually exist for it.
  * This drives the navigation bar on desktop and mobile.
  */
-export function getNavigationCategories(): NavCategory[] {
+function computeNavigationCategories(): NavCategory[] {
   const courseList = getNonInterviewCourses();
   const problemList = getProblemCourses();
   const cheatsheetList = getCheatsheetModules();
@@ -146,15 +178,33 @@ export function getNavigationCategories(): NavCategory[] {
   });
 }
 
-export function getModulesForCourse(courseSlug: string): Module[] {
-  return getModulesByCourse(courseSlug);
+// Computed twice per page render (Navbar + Footer) — cache for the process.
+const navigationCategoriesCache = memoizeNoArg(computeNavigationCategories);
+
+export function getNavigationCategories(): NavCategory[] {
+  return navigationCategoriesCache();
 }
 
+const modulesForCourseCache = new Map<string, Module[]>();
+
+export function getModulesForCourse(courseSlug: string): Module[] {
+  const cached = modulesForCourseCache.get(courseSlug);
+  if (cached) return cached;
+  const result = getModulesByCourse(courseSlug);
+  modulesForCourseCache.set(courseSlug, result);
+  return result;
+}
+
+const lessonsForCourseCache = new Map<string, Lesson[]>();
+
 export function getLessonsForCourse(courseSlug: string): Lesson[] {
+  const cached = lessonsForCourseCache.get(courseSlug);
+  if (cached) return cached;
+
   const courseModules = getModulesByCourse(courseSlug);
   const moduleSlugs = new Set(courseModules.map((m) => m.slug));
   const moduleOrder = new Map(courseModules.map((m) => [m.slug, m.order]));
-  return lessons
+  const result = lessons
     .filter((l) => moduleSlugs.has(l.moduleSlug) && l.courseSlug === courseSlug)
     .sort((a, b) => {
       const modOrderA = moduleOrder.get(a.moduleSlug) ?? 0;
@@ -162,6 +212,9 @@ export function getLessonsForCourse(courseSlug: string): Lesson[] {
       if (modOrderA !== modOrderB) return modOrderA - modOrderB;
       return a.order - b.order;
     });
+
+  lessonsForCourseCache.set(courseSlug, result);
+  return result;
 }
 
 // ── Module helpers ────────────────────────────────────────────────────────────
@@ -190,13 +243,39 @@ export function getAllLessons(): Lesson[] {
   return [...lessons].sort((a, b) => a.order - b.order);
 }
 
+// Lookup indexes: getLessonBySlug runs for every page render (metadata + page
+// body + related-lesson links) and each call used to scan every lesson twice.
+const lessonBySlugIndex = new Map<string, Lesson | undefined>();
+const lessonsByCourseAndSlugIndex = new Map<string, Map<string, Lesson>>();
+
 export function getLessonBySlug(slug: string, courseSlug?: string): Lesson | undefined {
-  const candidates = courseSlug ? lessons.filter((l) => l.courseSlug === courseSlug) : lessons;
-  return candidates.find((l) => l.slug === slug);
+  if (courseSlug) {
+    let courseIndex = lessonsByCourseAndSlugIndex.get(courseSlug);
+    if (!courseIndex) {
+      courseIndex = new Map<string, Lesson>();
+      for (const l of lessons) {
+        if (l.courseSlug === courseSlug && !courseIndex.has(l.slug)) courseIndex.set(l.slug, l);
+      }
+      lessonsByCourseAndSlugIndex.set(courseSlug, courseIndex);
+    }
+    return courseIndex.get(slug);
+  }
+
+  if (lessonBySlugIndex.has(slug)) return lessonBySlugIndex.get(slug);
+  const found = lessons.find((l) => l.slug === slug);
+  lessonBySlugIndex.set(slug, found);
+  return found;
 }
 
+const lessonsForModuleCache = new Map<string, Lesson[]>();
+
 export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Lesson[] {
-  return getLessonsByModule(moduleSlug, courseSlug);
+  const key = `${courseSlug ?? ''} ${moduleSlug}`;
+  const cached = lessonsForModuleCache.get(key);
+  if (cached) return cached;
+  const result = getLessonsByModule(moduleSlug, courseSlug);
+  lessonsForModuleCache.set(key, result);
+  return result;
 }
 
 export function getAdjacentLessons(
@@ -228,6 +307,29 @@ export function getLessonBreadcrumb(lesson: Lesson): {
   const mod = getModuleBySlug(lesson.moduleSlug);
   const course = mod ? getCourseBySlug(mod.courseSlug) : undefined;
   return { course, module: mod, lesson };
+}
+
+// ── Lesson payloads for client components ─────────────────────────────────────
+
+/**
+ * Returns a copy of a lesson without its `blocks` content.
+ *
+ * Client components (lesson sidebar, lesson cards, filters, action buttons)
+ * only render lesson metadata, but every prop passed to a client component is
+ * serialized into that page's RSC payload. Handing them full lessons means each
+ * page of a course embeds the content of *every* lesson of that course — which
+ * dominates build output size and render time. Use this helper at those call
+ * sites; keep full `Lesson` objects only where `blocks` are actually rendered.
+ */
+export function toLessonNavItem(lesson: Lesson): LessonNavItem {
+  const copy = { ...lesson };
+  delete (copy as Partial<Lesson>).blocks;
+  return copy as LessonNavItem;
+}
+
+/** Same as {@link toLessonNavItem}, for lists handed to client components. */
+export function toLessonNavItems(list: Lesson[]): LessonNavItem[] {
+  return list.map(toLessonNavItem);
 }
 
 // ── Table of Contents extraction ─────────────────────────────────────────────
@@ -426,18 +528,34 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
   'system-design': 'architecture',
 };
 
+// Built once from the (static) courses + cheatsheet modules so that every
+// per-page / per-param category lookup is O(1) instead of two linear scans.
+const courseCategoryIndex: Map<string, string> = (() => {
+  const index = new Map<string, string>();
+  for (const c of courses) {
+    if (c.urlCategory) index.set(c.slug, c.urlCategory);
+  }
+  for (const m of modules) {
+    if (m.courseSlug === 'cheatsheet' && m.urlCategory && !index.has(m.slug)) {
+      index.set(m.slug, m.urlCategory);
+    }
+  }
+  return index;
+})();
+
 export function getCourseCategory(slug: string): string {
   // Prefer the directory-derived category stamped by the content generator.
-  const course = courses.find((c) => c.slug === slug);
-  if (course?.urlCategory) return course.urlCategory;
-  // Cheatsheet technologies are modules, not courses — look them up too.
-  const mod = modules.find((m) => m.slug === slug && m.courseSlug === 'cheatsheet');
-  if (mod?.urlCategory) return mod.urlCategory;
+  const indexed = courseCategoryIndex.get(slug);
+  if (indexed) return indexed;
   return COURSE_CATEGORY_MAP[slug] ?? 'courses';
 }
 
+const problemCourseSlugs: Set<string> = new Set(
+  courses.filter((c) => c.category === 'problems').map((c) => c.slug)
+);
+
 export function isProblemCourseSlug(slug: string | undefined): boolean {
-  return slug !== undefined && courses.some((c) => c.slug === slug && c.category === 'problems');
+  return slug !== undefined && problemCourseSlugs.has(slug);
 }
 
 export function getSearchResultHref(result: SearchResult): string {
@@ -502,7 +620,7 @@ export function getCourseStats() {
 
 // ── Interview question helpers ────────────────────────────────────────────────
 
-export function getInterviewTechnologies(): string[] {
+const interviewTechnologiesCache = memoizeNoArg(() => {
   const techs = new Set<string>();
   for (const l of lessons) {
     const tech = (l as Lesson & { technology?: string }).technology;
@@ -511,9 +629,18 @@ export function getInterviewTechnologies(): string[] {
     }
   }
   return Array.from(techs).sort();
+});
+
+export function getInterviewTechnologies(): string[] {
+  return interviewTechnologiesCache();
 }
 
+const interviewLevelsCache = new Map<string, { slug: string; title: string; icon: string; estimatedHours: number; order: number }[]>();
+
 export function getInterviewLevelsForTechnology(technology: string): { slug: string; title: string; icon: string; estimatedHours: number; order: number }[] {
+  const cached = interviewLevelsCache.get(technology);
+  if (cached) return cached;
+
   const levelMap = new Map<string, { slug: string; title: string; icon: string; estimatedHours: number; order: number }>();
   for (const l of lessons) {
     const tech = (l as Lesson & { technology?: string }).technology;
@@ -531,11 +658,19 @@ export function getInterviewLevelsForTechnology(technology: string): { slug: str
       }
     }
   }
-  return Array.from(levelMap.values()).sort((a, b) => a.order - b.order);
+  const result = Array.from(levelMap.values()).sort((a, b) => a.order - b.order);
+  interviewLevelsCache.set(technology, result);
+  return result;
 }
 
+const interviewQuestionsCache = new Map<string, Lesson[]>();
+
 export function getInterviewQuestions(technology: string, moduleSlug?: string): Lesson[] {
-  return lessons
+  const key = `${technology} ${moduleSlug ?? ''}`;
+  const cached = interviewQuestionsCache.get(key);
+  if (cached) return cached;
+
+  const result = lessons
     .filter((l) => {
       const tech = (l as Lesson & { technology?: string }).technology;
       if (tech !== technology) return false;
@@ -543,10 +678,13 @@ export function getInterviewQuestions(technology: string, moduleSlug?: string): 
       return true;
     })
     .sort((a, b) => a.order - b.order);
+
+  interviewQuestionsCache.set(key, result);
+  return result;
 }
 
 export function getInterviewQuestionCount(technology: string): number {
-  return lessons.filter((l) => (l as Lesson & { technology?: string }).technology === technology).length;
+  return getInterviewQuestions(technology).length;
 }
 
 // ── Glossary helpers ───────────────────────────────────────────────────────────
