@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getCourseStats, getAllCourses } from '@/lib/content';
+import { getCourseStats, getAllCourses, getCourseCategory } from '@/lib/content';
 import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
@@ -139,7 +139,7 @@ export default function HomePage() {
             {courses.slice(0, 6).map((course: Course) => (
               <Link
                 key={course.id}
-                href={`/courses/${course.slug}`}
+              href={`/${getCourseCategory(course.slug)}/courses/${course.slug}`}
                 className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
               >
                 <span className="text-3xl" aria-hidden="true">{course.icon}</span>
@@ -181,7 +181,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                href={firstCourse ? `/courses/${firstCourse.slug}` : '/courses'}
+                href={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/courses'}
                 className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
               >
                 Start Learning

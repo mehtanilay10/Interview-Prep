@@ -45,6 +45,107 @@ export function getProblemCourses(): Course[] {
     .sort((a, b) => a.order - b.order);
 }
 
+// ── Category / navigation helpers ────────────────────────────────────────────
+// Categories are derived from the content directory structure (stamped as
+// `urlCategory` by the content generator) so the navigation always matches
+// the content that actually exists.
+
+export interface CategoryMeta {
+  label: string;
+  icon: string;
+}
+
+/** Display metadata for known categories. Unknown categories fall back to a generic label. */
+export const CATEGORY_META: Record<string, CategoryMeta> = {
+  dotnet: { label: '.NET', icon: '💜' },
+  frontend: { label: 'Frontend', icon: '⚛️' },
+  database: { label: 'Database', icon: '🗄️' },
+  cloud: { label: 'Cloud', icon: '☁️' },
+  ai: { label: 'AI', icon: '🤖' },
+  architecture: { label: 'Architecture', icon: '🏗️' },
+  devops: { label: 'DevOps', icon: '🚀' },
+  backend: { label: 'Backend', icon: '⚙️' },
+  fundamentals: { label: 'Fundamentals', icon: '🌱' },
+};
+
+/** Preferred display order; any other categories found in content are appended alphabetically. */
+const CATEGORY_ORDER = ['dotnet', 'frontend', 'database', 'cloud', 'ai', 'architecture', 'devops', 'backend', 'fundamentals'];
+
+export function getCategoryMeta(category: string): CategoryMeta {
+  return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), icon: '📚' };
+}
+
+export function getNonInterviewCourses(): Course[] {
+  return getAllCourses().filter((c) => !c.isInterview);
+}
+
+export function getCoursesByCategory(category: string): Course[] {
+  return getNonInterviewCourses().filter((c) => getCourseCategory(c.slug) === category);
+}
+
+export function getProblemCoursesByCategory(category: string): Course[] {
+  return getProblemCourses().filter((c) => getCourseCategory(c.slug) === category);
+}
+
+export function getCheatsheetModules(): Module[] {
+  return modules
+    .filter((m) => m.courseSlug === 'cheatsheet')
+    .sort((a, b) => a.order - b.order);
+}
+
+/** Collision-safe lookup: cheatsheet technology slugs can collide with course module slugs. */
+export function getCheatsheetModuleBySlug(slug: string): Module | undefined {
+  return modules.find((m) => m.slug === slug && m.courseSlug === 'cheatsheet');
+}
+
+export function getCheatsheetModulesByCategory(category: string): Module[] {
+  return getCheatsheetModules().filter((m) => getCourseCategory(m.slug) === category);
+}
+
+export interface NavSection {
+  label: string;
+  href: string;
+  count: number;
+}
+
+export interface NavCategory {
+  key: string;
+  label: string;
+  icon: string;
+  sections: NavSection[];
+}
+
+/**
+ * Returns every category that has content, each with the sections
+ * (Courses / Problems / Cheat Sheets) that actually exist for it.
+ * This drives the navigation bar on desktop and mobile.
+ */
+export function getNavigationCategories(): NavCategory[] {
+  const courseList = getNonInterviewCourses();
+  const problemList = getProblemCourses();
+  const cheatsheetList = getCheatsheetModules();
+
+  const present = new Set<string>();
+  for (const c of courseList) present.add(getCourseCategory(c.slug));
+  for (const c of problemList) present.add(getCourseCategory(c.slug));
+  for (const m of cheatsheetList) present.add(getCourseCategory(m.slug));
+
+  const ordered = [
+    ...CATEGORY_ORDER.filter((key) => present.has(key)),
+    ...[...present].filter((key) => !CATEGORY_ORDER.includes(key)).sort(),
+  ];
+
+  return ordered.map((key) => {
+    const meta = getCategoryMeta(key);
+    const sections: NavSection[] = [
+      { label: 'Courses', href: `/${key}/courses`, count: courseList.filter((c) => getCourseCategory(c.slug) === key).length },
+      { label: 'Problems', href: `/${key}/problems`, count: problemList.filter((c) => getCourseCategory(c.slug) === key).length },
+      { label: 'Cheat Sheets', href: `/${key}/cheatsheets`, count: cheatsheetList.filter((m) => getCourseCategory(m.slug) === key).length },
+    ].filter((s) => s.count > 0);
+    return { key, label: meta.label, icon: meta.icon, sections };
+  });
+}
+
 export function getModulesForCourse(courseSlug: string): Module[] {
   return getModulesByCourse(courseSlug);
 }
@@ -250,9 +351,8 @@ export function searchAll(query: string): SearchResult[] {
   return scored.slice(0, 10).map((s) => s.result);
 }
 
-const PROBLEM_COURSE_SLUGS = new Set(['csharp-problems', 'sql-problems', 'system-design', 'azure-problems', 'lld-problems', 'hld-problems']);
-
-// Course slug to category mapping for URL generation
+// Course slug to category mapping for URL generation (legacy fallback — the
+// primary source of truth is the `urlCategory` stamped from directory structure).
 const COURSE_CATEGORY_MAP: Record<string, string> = {
   // Fundamentals
   'programming-computer-web-foundations': 'fundamentals',
@@ -327,11 +427,17 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
 };
 
 export function getCourseCategory(slug: string): string {
+  // Prefer the directory-derived category stamped by the content generator.
+  const course = courses.find((c) => c.slug === slug);
+  if (course?.urlCategory) return course.urlCategory;
+  // Cheatsheet technologies are modules, not courses — look them up too.
+  const mod = modules.find((m) => m.slug === slug && m.courseSlug === 'cheatsheet');
+  if (mod?.urlCategory) return mod.urlCategory;
   return COURSE_CATEGORY_MAP[slug] ?? 'courses';
 }
 
 export function isProblemCourseSlug(slug: string | undefined): boolean {
-  return slug !== undefined && PROBLEM_COURSE_SLUGS.has(slug);
+  return slug !== undefined && courses.some((c) => c.slug === slug && c.category === 'problems');
 }
 
 export function getSearchResultHref(result: SearchResult): string {

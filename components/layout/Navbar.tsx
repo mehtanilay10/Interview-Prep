@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3, ChevronRight } from "lucide-react";
+import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3, ChevronDown } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
@@ -13,121 +13,33 @@ import { cn } from "@/lib/utils";
 import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
 
-const CATEGORIES = [
-  {
-    key: "fundamentals",
-    label: "Fundamentals",
-    icon: "🌱",
-    courses: [
-      { slug: "programming-computer-web-foundations", title: "Programming, Computer & Web Foundations" },
-      { slug: "oops-concepts", title: "OOP Concepts" },
-      { slug: "senior-software-engineering", title: "Senior Software Engineering" },
-    ],
-  },
-  {
-    key: "ai",
-    label: "AI",
-    icon: "🤖",
-    courses: [
-      { slug: "ai-basics", title: "AI Basics" },
-      { slug: "dotnet-ai-backend", title: ".NET AI Backend" },
-    ],
-  },
-  {
-    key: "dotnet",
-    label: ".NET",
-    icon: "💜",
-    courses: [
-      { slug: "csharp-fundamentals", title: "C# Fundamentals" },
-      { slug: "linq", title: "LINQ" },
-      { slug: "ef-core", title: "EF Core" },
-      { slug: "aspnet-core", title: "ASP.NET Core" },
-      { slug: "aspnet-core-web-api", title: "ASP.NET Core Web API" },
-      { slug: "dotnet-nuget-packages", title: ".NET NuGet Packages" },
-      { slug: "unit-testing-dotnet", title: "Unit Testing .NET" },
-      { slug: "authentication-authorization", title: "Authentication & Authorization" },
-      { slug: "graphql-dotnet", title: "GraphQL .NET" },
-      { slug: "aws-for-aspnet", title: "AWS for ASP.NET" },
-      { slug: "azure-for-aspnet", title: "Azure for ASP.NET" },
-    ],
-  },
-  {
-    key: "frontend",
-    label: "Frontend",
-    icon: "⚛️",
-    courses: [
-      { slug: "react-fundamentals", title: "React Fundamentals" },
-      { slug: "typescript-for-react", title: "TypeScript for React" },
-      { slug: "redux", title: "Redux" },
-      { slug: "react-query", title: "React Query" },
-      { slug: "react-testing", title: "React Testing" },
-      { slug: "apollo", title: "Apollo Client" },
-      { slug: "react-advanced-patterns", title: "React Advanced Patterns" },
-      { slug: "next-js-full-stack-react", title: "Next.js Full-Stack React" },
-      { slug: "prisma", title: "Prisma" },
-      { slug: "yarn-npm-packages", title: "Yarn & npm Packages" },
-    ],
-  },
-  {
-    key: "database",
-    label: "Database",
-    icon: "🗄️",
-    courses: [
-      { slug: "postgresql", title: "PostgreSQL" },
-      { slug: "sql-server", title: "SQL Server" },
-    ],
-  },
-  {
-    key: "cloud",
-    label: "Cloud",
-    icon: "☁️",
-    courses: [
-      { slug: "aws", title: "AWS" },
-      { slug: "azure", title: "Azure" },
-    ],
-  },
-  {
-    key: "devops",
-    label: "DevOps",
-    icon: "🚀",
-    courses: [
-      { slug: "devops", title: "DevOps" },
-      { slug: "git-linux-developer-workflow", title: "Git & Linux Developer Workflow" },
-    ],
-  },
-  {
-    key: "architecture",
-    label: "Architecture",
-    icon: "🏗️",
-    courses: [
-      { slug: "design-patterns", title: "Design Patterns" },
-      { slug: "clean-code-csharp", title: "Clean Code C#" },
-      { slug: "redis-caching-strategies", title: "Redis Caching Strategies" },
-      { slug: "fullstack-security", title: "Full-Stack Security" },
-      { slug: "message-queues-event-streaming", title: "Message Queues & Event Streaming" },
-      { slug: "microservices-architecture", title: "Microservices Architecture" },
-      { slug: "system-design-interviews", title: "System Design Interviews" },
-      { slug: "frontend-performance-engineering", title: "Frontend Performance Engineering" },
-    ],
-  },
-];
+export interface NavbarSection {
+  label: string;
+  href: string;
+  count: number;
+}
 
-const NAV_LINKS = [
-  { href: "/courses", label: "All Courses" },
-  { href: "/cheatsheet", label: "Cheat Sheets" },
-  { href: "/problems", label: "Problems" },
-  { href: "/interview-questions", label: "Interview Q&A" },
-  { href: "/glossary", label: "Glossary" },
-];
+export interface NavbarCategory {
+  key: string;
+  label: string;
+  icon: string;
+  sections: NavbarSection[];
+}
 
-export function Navbar() {
+interface NavbarProps {
+  /** Categories (with their Courses / Problems / Cheat Sheets sections), computed server-side from content. */
+  categories: NavbarCategory[];
+}
+
+export function Navbar({ categories }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState<string | null>(null);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [mobileCategoryOpen, setMobileCategoryOpen] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -177,19 +89,103 @@ export function Navbar() {
   }, [userMenuOpen]);
 
   useEffect(() => {
-    if (!categoriesOpen) return;
+    if (!openCategory) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
-        setCategoriesOpen(null);
+        setOpenCategory(null);
       }
     };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenCategory(null);
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [categoriesOpen]);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [openCategory]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
   };
+
+  const isCategoryActive = (key: string) => pathname.startsWith(`/${key}/`);
+
+  const userProfile = (
+    <>
+      {isLoggedIn && session?.user ? (
+        <div className="relative" ref={userMenuRef}>
+          <button
+            onClick={() => setUserMenuOpen((o) => !o)}
+            className="flex items-center gap-2 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+            aria-label="User menu"
+            aria-expanded={userMenuOpen}
+          >
+            {session.user.image ? (
+              <Image src={session.user.image} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" unoptimized />
+            ) : (
+              <User className="h-5 w-5" aria-hidden="true" />
+            )}
+            <span className="hidden text-sm font-medium sm:block">{session.user.name}</span>
+          </button>
+          {userMenuOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
+              <Link
+                href="/progress"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                Progress Dashboard
+              </Link>
+              <Link
+                href="/bookmarks"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <Bookmark className="h-4 w-4" aria-hidden="true" />
+                Bookmarks
+              </Link>
+              <Link
+                href="/notes"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <StickyNote className="h-4 w-4" aria-hidden="true" />
+                Notes
+              </Link>
+              <Link
+                href="/personalization"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <Settings2 className="h-4 w-4" aria-hidden="true" />
+                Personalization
+              </Link>
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  handleSignOut();
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Link
+          href="/login"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+        >
+          Sign in
+        </Link>
+      )}
+    </>
+  );
 
   return (
     <header
@@ -207,7 +203,7 @@ export function Navbar() {
         </Link>
 
         {searchMode ? (
-          <div className="hidden flex-1 items-center justify-center md:flex">
+          <div className="hidden flex-1 items-center justify-center xl:flex">
             <div className="relative w-full max-w-2xl transition-all duration-300 ease-in-out">
               <SearchErrorBoundary>
                 <SearchSuggestions
@@ -231,68 +227,56 @@ export function Navbar() {
             </button>
           </div>
         ) : (
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation" ref={categoryMenuRef}>
-            {/* Categories Mega Menu */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setCategoriesOpen(categoriesOpen ? null : "all")}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
-                aria-expanded={!!categoriesOpen}
-                aria-haspopup="true"
-              >
-                Categories
-              </button>
-              {categoriesOpen && (
-                <div className="absolute left-0 mt-2 w-full min-w-[800px] max-w-[1000px] rounded-lg border border-border bg-canvas shadow-lg py-4 z-50">
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 p-4">
-                    {CATEGORIES.map((cat) => (
-                      <div key={cat.key} className="col-span-1 md:col-span-2 lg:col-span-1">
-                        <Link
-                          href={`/${cat.key}/courses`}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg font-semibold text-fg-default hover:bg-canvas-subtle transition-colors"
-                          onClick={() => setCategoriesOpen(null)}
-                        >
-                          <span className="text-lg" aria-hidden="true">{cat.icon}</span>
-                          <span>{cat.label}</span>
-                        </Link>
-                        <ul className="mt-1 space-y-1 ml-6">
-                          {cat.courses.map((course) => (
-                            <li key={course.slug}>
-                              <Link
-                                href={`/${cat.key}/courses/${course.slug}`}
-                                className="block px-3 py-1.5 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default rounded-md transition-colors"
-                                onClick={() => setCategoriesOpen(null)}
-                              >
-                                {course.title}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-border mt-2 pt-2 px-4">
-                    <Link
-                      href="/courses"
-                      className="text-sm font-medium text-accent-fg hover:underline"
-                      onClick={() => setCategoriesOpen(null)}
-                    >
-                      View all courses →
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {NAV_LINKS.map((link) => {
-              const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+          <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main navigation" ref={categoryMenuRef}>
+            {/* Category dropdowns */}
+            {categories.map((cat) => {
+              const isOpen = openCategory === cat.key;
+              const isActive = isCategoryActive(cat.key);
               return (
-                <Link key={link.href} href={link.href} className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas-subtle hover:text-fg-default")} aria-current={isActive ? "page" : undefined}>
-                  {link.label}
-                </Link>
+                <div key={cat.key} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenCategory(isOpen ? null : cat.key)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
+                      isActive || isOpen
+                        ? "bg-accent-subtle text-accent-fg"
+                        : "text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+                    )}
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                  >
+                    <span aria-hidden="true">{cat.icon}</span>
+                    <span className="whitespace-nowrap">{cat.label}</span>
+                    <ChevronDown
+                      className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-60 rounded-lg border border-border bg-canvas shadow-lg py-1 z-50">
+                      {cat.sections.map((section) => (
+                        <Link
+                          key={section.href}
+                          href={section.href}
+                          className={cn(
+                            "flex items-center justify-between px-4 py-2 text-sm transition-colors",
+                            pathname.startsWith(section.href)
+                              ? "bg-accent-subtle text-accent-fg"
+                              : "text-fg-default hover:bg-canvas-subtle hover:text-fg-default"
+                          )}
+                          onClick={() => setOpenCategory(null)}
+                        >
+                          <span className="font-medium">{section.label}</span>
+                          <span className="text-xs text-fg-subtle">{section.count}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
+
             <button
               type="button"
               onClick={() => setSearchMode(true)}
@@ -306,80 +290,11 @@ export function Navbar() {
         )}
 
         <div className="flex items-center gap-1">
-          {isLoggedIn && session?.user ? (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setUserMenuOpen((o) => !o)}
-                className="flex items-center gap-2 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
-                aria-label="User menu"
-                aria-expanded={userMenuOpen}
-              >
-                {session.user.image ? (
-                  <Image src={session.user.image} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" unoptimized />
-                ) : (
-                  <User className="h-5 w-5" aria-hidden="true" />
-                )}
-                <span className="hidden text-sm font-medium sm:block">{session.user.name}</span>
-              </button>
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
-                  <Link
-                    href="/progress"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                    Progress Dashboard
-                  </Link>
-                  <Link
-                    href="/bookmarks"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <Bookmark className="h-4 w-4" aria-hidden="true" />
-                    Bookmarks
-                  </Link>
-                  <Link
-                    href="/notes"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <StickyNote className="h-4 w-4" aria-hidden="true" />
-                    Notes
-                  </Link>
-                  <Link
-                    href="/personalization"
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <Settings2 className="h-4 w-4" aria-hidden="true" />
-                    Personalization
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      handleSignOut();
-                    }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
-                  >
-                    <LogOut className="h-4 w-4" aria-hidden="true" />
-                    Sign out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
-            >
-              Sign in
-            </Link>
-          )}
+          {userProfile}
           <button
             type="button"
             onClick={() => setMobileOpen((o) => !o)}
-            className="rounded-md p-2 text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default md:hidden"
+            className="rounded-md p-2 text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default xl:hidden"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav"
@@ -392,7 +307,7 @@ export function Navbar() {
       {mobileOpen && (
         <div
           id="mobile-nav"
-          className="md:hidden animate-slide-up border-t border-border bg-canvas-subtle"
+          className="xl:hidden animate-slide-up border-t border-border bg-canvas-subtle"
         >
           <nav className="flex flex-col gap-1 px-4 py-3" aria-label="Mobile navigation">
             <PWAInstallButton className="mb-2" />
@@ -406,42 +321,45 @@ export function Navbar() {
                 size="sm"
               />
             </SearchErrorBoundary>
-            {/* Mobile Categories */}
+            {/* Mobile category accordion */}
             <div className="space-y-2">
-              {CATEGORIES.map((cat) => (
-                <div key={cat.key} className="border border-border rounded-lg overflow-hidden">
-                  <Link
-                    href={`/${cat.key}/courses`}
-                    className="flex items-center gap-2 px-3 py-2 font-semibold text-fg-default hover:bg-canvas"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <span className="text-lg" aria-hidden="true">{cat.icon}</span>
-                    <span>{cat.label}</span>
-                    <ChevronRight className="h-4 w-4 ml-auto text-fg-muted" aria-hidden="true" />
-                  </Link>
-                  <ul className="border-t border-border bg-canvas">
-                    {cat.courses.map((course) => (
-                      <li key={course.slug}>
-                        <Link
-                          href={`/${cat.key}/courses/${course.slug}`}
-                          className="block px-6 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
-                          onClick={() => setMobileOpen(false)}
-                        >
-                          {course.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-border">
-              {NAV_LINKS.map((link) => {
-                const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+              {categories.map((cat) => {
+                const isExpanded = mobileCategoryOpen === cat.key;
                 return (
-                  <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className={cn("rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-accent-subtle text-accent-fg" : "text-fg-muted hover:bg-canvas hover:text-fg-default")}>
-                    {link.label}
-                  </Link>
+                  <div key={cat.key} className="border border-border rounded-lg overflow-hidden bg-canvas">
+                    <button
+                      type="button"
+                      onClick={() => setMobileCategoryOpen(isExpanded ? null : cat.key)}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-2 font-semibold transition-colors",
+                        isCategoryActive(cat.key) ? "text-accent-fg" : "text-fg-default hover:bg-canvas-subtle"
+                      )}
+                      aria-expanded={isExpanded}
+                    >
+                      <span className="text-lg" aria-hidden="true">{cat.icon}</span>
+                      <span>{cat.label}</span>
+                      <ChevronDown
+                        className={cn("h-4 w-4 ml-auto text-fg-muted transition-transform", isExpanded && "rotate-180")}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {isExpanded && (
+                      <ul className="border-t border-border">
+                        {cat.sections.map((section) => (
+                          <li key={section.href}>
+                            <Link
+                              href={section.href}
+                              className="flex items-center justify-between px-6 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+                              onClick={() => setMobileOpen(false)}
+                            >
+                              <span>{section.label}</span>
+                              <span className="text-xs text-fg-subtle">{section.count}</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 );
               })}
             </div>

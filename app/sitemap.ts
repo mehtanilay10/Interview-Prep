@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions } from '@/lib/content';
+import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories } from '@/lib/content';
 import { getCourseCategory } from '@/lib/content';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
@@ -46,6 +46,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   const courses = getAllCourses().filter((c) => !c.isInterview);
+
+  // Category listing pages (/[category]/courses, /problems, /cheatsheets)
+  for (const cat of getNavigationCategories()) {
+    for (const section of cat.sections) {
+      entries.push(toSitemapEntry(`${BASE_URL}${section.href}`, 0.8, 'weekly'));
+    }
+  }
 
   for (const course of courses) {
     const category = getCourseCategory(course.slug);

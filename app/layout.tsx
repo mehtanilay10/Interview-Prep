@@ -5,6 +5,7 @@ import { PWARegistration } from '@/components/ui/PWARegistration';
 import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { getNavigationCategories } from '@/lib/content';
 import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { AuthProvider } from '@/components/auth/AuthProvider';
@@ -62,13 +63,13 @@ export default function RootLayout({
               <PWARegistration />
               <ContinuePrompt />
               <ThemeProvider>
-                <Navbar />
+                <Navbar categories={getNavigationCategories()} />
                 <main id="main-content" className="flex-1">
                   <ErrorBoundaryWrapper>
                     {children}
                   </ErrorBoundaryWrapper>
                 </main>
-                <Footer />
+                <Footer categories={getNavigationCategories()} />
                 <OfflineIndicator />
               </ThemeProvider>
             </BookmarkProvider>

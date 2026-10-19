@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { getModuleBySlug, getLessonsForModule, getCourseCategory } from '@/lib/content';
+import { getCheatsheetModuleBySlug, getCheatsheetModules, getLessonsForModule, getCourseCategory, getCategoryMeta } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
@@ -39,24 +39,23 @@ const TECH_NAMES: Record<string, string> = {
 };
 
 export async function generateStaticParams() {
-  const modules = getModuleBySlug('csharp') ? ['csharp', 'sql-server', 'react', 'redux', 'apollo', 'graphql', 'docker-compose', 'javascript', 'typescript', 'react-router'] : [];
-  return modules.map((tech) => ({ 
-    technology: tech,
-    category: getCourseCategory(tech)
+  return getCheatsheetModules().map((mod) => ({
+    technology: mod.slug,
+    category: getCourseCategory(mod.slug)
   }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ technology: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const { technology } = resolvedParams;
-  const mod = getModuleBySlug(technology);
+  const mod = getCheatsheetModuleBySlug(technology);
   if (!mod) return {};
   return buildLessonMetadata({
     title: mod.title,
     description: mod.description,
     moduleSlug: mod.slug,
     lessonSlug: 'cheatsheet',
-    basePath: '/cheatsheet',
+    basePath: `/${getCourseCategory(technology)}/cheatsheets`,
   });
 }
 
@@ -68,8 +67,8 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
   if (!category || !technology) {
     notFound();
   }
-  const mod = getModuleBySlug(technology);
-  if (!mod || mod.courseSlug !== 'cheatsheet') notFound();
+  const mod = getCheatsheetModuleBySlug(technology);
+  if (!mod) notFound();
 
   // Validate category matches
   const expectedCategory = getCourseCategory(technology);
@@ -81,6 +80,7 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
 
   const icon = TECH_ICONS[technology] ?? '📝';
   const techName = TECH_NAMES[technology] ?? technology;
+  const categoryMeta = getCategoryMeta(category);
 
   return (
     <NotesModalProvider courseSlug="cheatsheet" moduleSlug={technology} lessonSlug={lesson.slug}>
@@ -88,6 +88,7 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
         <Breadcrumbs
         items={[
           { label: 'Cheat Sheets', href: '/cheatsheet' },
+          { label: categoryMeta.label, href: `/${category}/cheatsheets` },
           { label: techName },
         ]}
         className="mb-4"
@@ -95,11 +96,11 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
 
       <div className="mb-8">
         <Link
-          href="/cheatsheet"
+          href={`/${category}/cheatsheets`}
           className="inline-flex items-center gap-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to all cheat sheets
+          Back to {categoryMeta.label} cheat sheets
         </Link>
       </div>
 

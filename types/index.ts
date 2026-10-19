@@ -170,6 +170,8 @@ export interface Course {
   color: string;
   order: number;
   category?: string;
+  /** URL category derived from the content directory structure (e.g. "dotnet"). Stamped by the content generator. */
+  urlCategory?: string;
   isInterview?: boolean;
   moduleSlugs: string[]; // ordered list of module slugs belonging to this course
 }
@@ -187,6 +189,8 @@ export interface Module {
   difficulty: Difficulty;
   estimatedHours: number;
   icon: string;
+  /** URL category derived from the content directory structure (e.g. "dotnet"). Stamped by the content generator. */
+  urlCategory?: string;
   tags?: string[];
   lessonSlugs?: string[]; // ordered list of lesson slugs
   isOptional?: boolean;

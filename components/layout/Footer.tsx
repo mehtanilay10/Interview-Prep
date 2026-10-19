@@ -17,27 +17,35 @@ interface FooterColumn {
   links: FooterLink[];
 }
 
-const FOOTER_LINKS: FooterColumn[] = [
-  {
-    heading: 'Learn',
-    links: [
-      { href: '/courses', label: 'All Courses' },
-      { href: '/cheatsheet', label: 'Cheat Sheets' },
-      { href: '/problems', label: 'Problems' },
-      { href: '/interview-questions', label: 'Interview Questions' },
-    ],
-  },
-  {
-    heading: 'About',
-    links: [
-      { href: 'https://github.com/mehtanilay10/Interview-Prep/', label: 'GitHub', external: true },
-      { href: 'https://mnilay.com/', label: 'Author', external: true },
-      { href: 'https://www.youtube.com/c/TutorialsTeam', label: 'YouTube', external: true },
-    ],
-  },
+export interface FooterCategory {
+  key: string;
+  label: string;
+  icon: string;
+  sections: { label: string; href: string; count: number }[];
+}
+
+interface FooterProps {
+  /** Categories (with their Courses / Problems / Cheat Sheets sections), computed server-side from content. */
+  categories: FooterCategory[];
+}
+
+const LEARN_LINKS: FooterLink[] = [
+  { href: '/courses', label: 'All Courses' },
+  { href: '/problems', label: 'Problems' },
+  { href: '/cheatsheet', label: 'Cheat Sheets' },
+  { href: '/interview-questions', label: 'Interview Questions' },
+  { href: '/glossary', label: 'Glossary' },
+  { href: '/roadmaps', label: 'Roadmaps' },
+  { href: '/prompts', label: 'Prompt Templates' },
 ];
 
-function FooterLinkGroup({ col }: { col: typeof FOOTER_LINKS[0] }) {
+const ABOUT_LINKS: FooterLink[] = [
+  { href: 'https://github.com/mehtanilay10/Interview-Prep/', label: 'GitHub', external: true },
+  { href: 'https://mnilay.com/', label: 'Author', external: true },
+  { href: 'https://www.youtube.com/c/TutorialsTeam', label: 'YouTube', external: true },
+];
+
+function FooterColumnGroup({ heading, children }: { heading: string; children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -48,40 +56,74 @@ function FooterLinkGroup({ col }: { col: typeof FOOTER_LINKS[0] }) {
         aria-expanded={isOpen}
       >
         <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-          {col.heading}
+          {heading}
         </h3>
         <ChevronDown
           className={cn("h-4 w-4 text-fg-muted transition-transform sm:hidden", isOpen && "rotate-180")}
         />
       </button>
-      <ul className={cn("mt-3 space-y-2 overflow-hidden sm:mt-3 sm:block", isOpen ? "block animate-slide-up" : "hidden")}>
-        {col.links.map((link) => (
-          <li key={link.href}>
-            {link.external ? (
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block py-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
-              >
-                {link.label}
-              </a>
-            ) : (
-              <Link
-                href={link.href}
-                className="block py-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
-              >
-                {link.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
+      <div className={cn("mt-3 overflow-hidden sm:mt-3", isOpen ? "block animate-slide-up" : "hidden")}>
+        {children}
+      </div>
     </div>
   );
 }
 
-export function Footer() {
+function FooterLinkList({ links }: { links: FooterLink[] }) {
+  return (
+    <ul className="space-y-2">
+      {links.map((link) => (
+        <li key={link.href}>
+          {link.external ? (
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block py-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
+            >
+              {link.label}
+            </a>
+          ) : (
+            <Link
+              href={link.href}
+              className="block py-1 text-sm text-fg-muted transition-colors hover:text-accent-fg"
+            >
+              {link.label}
+            </Link>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FooterCategoryList({ categories }: { categories: FooterCategory[] }) {
+  return (
+    <ul className="space-y-3">
+      {categories.map((cat) => (
+        <li key={cat.key}>
+          <p className="flex items-center gap-2 text-sm font-medium text-fg-default">
+            <span aria-hidden="true">{cat.icon}</span>
+            {cat.label}
+          </p>
+          <div className="ml-6 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+            {cat.sections.map((section) => (
+              <Link
+                key={section.href}
+                href={section.href}
+                className="py-0.5 text-sm text-fg-muted transition-colors hover:text-accent-fg"
+              >
+                {section.label}
+              </Link>
+            ))}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function Footer({ categories }: FooterProps) {
   const [year, setYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -91,9 +133,9 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-canvas-subtle transition-theme">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
-          <div className="sm:col-span-2 lg:col-span-1">
+          <div>
             <Link
               href="/"
               className="flex items-center gap-2 font-semibold text-fg-default transition-colors hover:text-accent-fg"
@@ -106,14 +148,20 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Link columns */}
-          <div className="sm:col-span-2 lg:col-span-2">
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12 lg:grid-cols-2">
-              {FOOTER_LINKS.map((col) => (
-                <FooterLinkGroup key={col.heading} col={col} />
-              ))}
-            </div>
-          </div>
+          {/* Learn */}
+          <FooterColumnGroup heading="Learn">
+            <FooterLinkList links={LEARN_LINKS} />
+          </FooterColumnGroup>
+
+          {/* Browse by category */}
+          <FooterColumnGroup heading="Browse by Category">
+            <FooterCategoryList categories={categories} />
+          </FooterColumnGroup>
+
+          {/* About */}
+          <FooterColumnGroup heading="About">
+            <FooterLinkList links={ABOUT_LINKS} />
+          </FooterColumnGroup>
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-fg-subtle sm:flex-row">

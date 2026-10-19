@@ -32,6 +32,7 @@ interface ModuleInfo {
   variableName: string;
   slug: string;
   courseSlug: string;
+  category: string;
 }
 
 interface LessonInfo {
@@ -182,6 +183,13 @@ function scanModules(): ModuleInfo[] {
             const relativePath = path.relative(CONTENT_DIR, fullPath).replace(/\\/g, '/');
             const importPath = `../${relativePath}/content.json`;
             const slug = entry;
+            // URL category comes from the directory structure:
+            // courses/<category>/..., problems/<category>/..., cheatsheet/<category>/...
+            const relSegments = relativePath.split('/');
+            const category =
+              area === 'courses' || area === 'problems' || area === 'cheatsheet'
+                ? relSegments[1] ?? ''
+                : '';
             let variableName = toVariableName(slug, '');
             variableName = `${variableName}Module`;
             if (!/^[a-zA-Z]/.test(variableName)) {
@@ -202,7 +210,7 @@ function scanModules(): ModuleInfo[] {
               // ignore
             }
 
-            modules.push({ importPath, variableName, slug, courseSlug });
+            modules.push({ importPath, variableName, slug, courseSlug, category });
           }
           walk(fullPath);
         }
@@ -280,12 +288,12 @@ function generateCoursesIndex(courses: CourseInfo[]): string {
   let partsDecl = '';
   let combineDecl = '';
   if (chunks.length === 1) {
-    const exports = chunks[0].map((c) => `\t${c.variableName},`).join('\n');
+    const exports = chunks[0].map((c) => `\t{ ...${c.variableName}, urlCategory: "${c.category}" },`).join('\n');
     partsDecl = `const rawCoursesPart1 = [\n${exports}\n];\n`;
     combineDecl = `const rawCourses: any[] = [...rawCoursesPart1];`;
   } else {
     const partDecls = chunks.map((chunk, idx) => {
-      const exports = chunk.map((c) => `\t${c.variableName},`).join('\n');
+      const exports = chunk.map((c) => `\t{ ...${c.variableName}, urlCategory: "${c.category}" },`).join('\n');
       return `const rawCoursesPart${idx + 1} = [\n${exports}\n];`;
     }).join('\n\n');
 
@@ -322,12 +330,12 @@ function generateModulesIndex(modules: ModuleInfo[]): string {
   let partsDecl = '';
   let combineDecl = '';
   if (chunks.length === 1) {
-    const exports = chunks[0].map((m) => `\t${m.variableName},`).join('\n');
+    const exports = chunks[0].map((m) => `\t{ ...${m.variableName}, urlCategory: "${m.category}" },`).join('\n');
     partsDecl = `const rawModulesPart1 = [\n${exports}\n];\n`;
     combineDecl = `const rawModules: any[] = [...rawModulesPart1];`;
   } else {
     const partDecls = chunks.map((chunk, idx) => {
-      const exports = chunk.map((m) => `\t${m.variableName},`).join('\n');
+      const exports = chunk.map((m) => `\t{ ...${m.variableName}, urlCategory: "${m.category}" },`).join('\n');
       return `const rawModulesPart${idx + 1} = [\n${exports}\n];`;
     }).join('\n\n');
 
