@@ -4,9 +4,11 @@ import { ArrowRight, BookOpen, Clock, CheckCircle } from 'lucide-react';
 interface HeroSectionProps {
   totalLessons: number;
   totalHours: number;
+  /** Destination for the primary "Start Learning" call to action. */
+  startHref?: string;
 }
 
-export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
+export function HeroSection({ totalLessons, totalHours, startHref = '/' }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-canvas py-16 sm:py-24">
       {/* Subtle grid background */}
@@ -40,7 +42,7 @@ export function HeroSection({ totalLessons, totalHours }: HeroSectionProps) {
         {/* CTAs */}
         <div className="mb-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href="/courses"
+            href={startHref}
             className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" />

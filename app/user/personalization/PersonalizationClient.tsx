@@ -21,7 +21,7 @@ interface PersonalizationClientProps {
 type FontSize = 'sm' | 'md' | 'lg' | 'xl';
 type CodeFontSize = 'sm' | 'md' | 'lg';
 type Density = 'comfortable' | 'compact';
-type LandingPage = '/courses' | '/problems' | '/interview-questions';
+type LandingPage = '/' | '/roadmaps' | '/interview-questions';
 
 const FONT_SIZES: { value: FontSize; label: string }[] = [
   { value: 'sm', label: 'Small' },
@@ -42,8 +42,8 @@ const DENSITIES: { value: Density; label: string }[] = [
 ];
 
 const LANDING_PAGES: { value: LandingPage; label: string }[] = [
-  { value: '/courses', label: 'Courses' },
-  { value: '/problems', label: 'Problems' },
+  { value: '/', label: 'Home' },
+  { value: '/roadmaps', label: 'Roadmaps' },
   { value: '/interview-questions', label: 'Interview Questions' },
 ];
 
@@ -295,7 +295,7 @@ export function PersonalizationClient({ user }: PersonalizationClientProps) {
             <div className="relative">
               <select
                 id="landing-page"
-                value={preferences.defaultLanding || '/courses'}
+                value={LANDING_PAGES.find((p) => p.value === preferences.defaultLanding)?.value ?? '/'}
                 onChange={(e) => updatePreference('defaultLanding', e.target.value)}
                 className="w-full appearance-none rounded-lg border border-border bg-canvas px-3 py-2 pr-8 text-sm text-fg-default transition-colors hover:border-fg-muted focus:border-accent-fg focus:outline-none"
               >

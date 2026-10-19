@@ -175,23 +175,32 @@ See `types/index.ts` for the full list. Current types:
 ## Routes
 
 - `/` — Home page
-- `/login` — Google sign-in page
-- `/courses` — Course listing
-- `/courses/[courseSlug]` — Course overview
-- `/courses/[courseSlug]/[moduleSlug]` — Module overview
-- `/courses/[courseSlug]/[moduleSlug]/[lessonSlug]` — Lesson page
-- `/problems` — Problems listing
-- `/problems/[courseSlug]` — Problem course overview
-- `/problems/[courseSlug]/[moduleSlug]` — Problem module overview
-- `/problems/[courseSlug]/[moduleSlug]/[lessonSlug]` — Problem lesson page
-- `/cheatsheet` — Cheat sheet listing
-- `/cheatsheet/[technology]` — Individual cheat sheet
+- `/[category]/courses` — Category course listing
+- `/[category]/courses/[courseSlug]` — Course overview
+- `/[category]/courses/[courseSlug]/[moduleSlug]` — Module overview
+- `/[category]/courses/[courseSlug]/[moduleSlug]/[lessonSlug]` — Lesson page
+- `/[category]/problems` — Category problem listing
+- `/[category]/problems/[courseSlug]` — Problem course overview
+- `/[category]/problems/[courseSlug]/[moduleSlug]` — Problem module overview
+- `/[category]/problems/[courseSlug]/[moduleSlug]/[lessonSlug]` — Problem lesson page
+- `/[category]/cheatsheets` — Category cheat sheet listing
+- `/[category]/cheatsheets/[technology]` — Individual cheat sheet
 - `/interview-questions` — Interview question listing
 - `/interview-questions/[technology]` — Technology-specific questions
 - `/interview-questions/[technology]/[slug]` — Individual question
-- `/progress` — Progress dashboard (requires login)
+- `/roadmaps` — Learning roadmaps
+- `/ai/glossary` — AI glossary
+- `/ai/prompts` — Prompt templates
+- `/ai/internal/article-compare` — Internal side-by-side article comparison tool (noindex)
 - `/search` — Search page
-- `/internal/article-compare` — Internal side-by-side article comparison tool (noindex)
+- `/user/login` — Google sign-in page
+- `/user/progress` — Progress dashboard (requires login)
+- `/user/bookmarks` — Bookmarks (requires login)
+- `/user/notes` — Lesson notes (requires login)
+- `/user/personalization` — Preferences (requires login)
+
+There are no longer top-level `/courses`, `/problems`, or `/cheatsheet` pages — those listings
+live under each category (`/[category]/…`).
 
 ## Navigation and indexing
 
@@ -225,7 +234,7 @@ Module order within a course is determined by the `order` field in each module's
   - `app/api/user/offline-queue/route.ts` — GET/POST offline action queue
   - `app/api/user/notes/route.ts` — GET/POST/DELETE lesson notes
   - `app/api/search/route.ts` — GET search
-- The progress dashboard at `/progress` is a protected route that redirects unauthenticated users to `/login`.
+- The progress dashboard at `/user/progress` is a protected route that redirects unauthenticated users to `/user/login`.
 
 ---
 

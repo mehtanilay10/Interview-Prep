@@ -63,6 +63,7 @@ export default function HomePage() {
       <HeroSection
         totalLessons={stats.totalLessons}
         totalHours={stats.totalHours}
+        startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
       />
 
       {/* Who is this for */}
@@ -156,16 +157,6 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
-
-          <div className="mt-8 text-center">
-            <Link
-              href="/courses"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default transition-colors hover:bg-canvas-subtle hover:text-accent-fg"
-            >
-              View all courses
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -181,7 +172,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                href={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/courses'}
+                href={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
                 className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
               >
                 Start Learning

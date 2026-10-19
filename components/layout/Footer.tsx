@@ -39,21 +39,18 @@ interface FooterProps {
 }
 
 const LEARN_LINKS: FooterLink[] = [
-  { href: '/courses', label: 'All Courses' },
-  { href: '/problems', label: 'Problems' },
-  { href: '/cheatsheet', label: 'Cheat Sheets' },
   { href: '/interview-questions', label: 'Interview Questions' },
-  { href: '/glossary', label: 'Glossary' },
   { href: '/roadmaps', label: 'Roadmaps' },
-  { href: '/prompts', label: 'Prompt Templates' },
+  { href: '/ai/glossary', label: 'Glossary' },
+  { href: '/ai/prompts', label: 'Prompt Templates' },
 ];
 
 const ACCOUNT_LINKS: FooterLink[] = [
   { href: '/search', label: 'Search', icon: <Search className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { href: '/progress', label: 'Progress Dashboard', icon: <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { href: '/bookmarks', label: 'Bookmarks', icon: <Bookmark className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { href: '/notes', label: 'Notes', icon: <StickyNote className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { href: '/login', label: 'Sign in', icon: <LogIn className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { href: '/user/progress', label: 'Progress Dashboard', icon: <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { href: '/user/bookmarks', label: 'Bookmarks', icon: <Bookmark className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { href: '/user/notes', label: 'Notes', icon: <StickyNote className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { href: '/user/login', label: 'Sign in', icon: <LogIn className="h-3.5 w-3.5" aria-hidden="true" /> },
 ];
 
 const ABOUT_LINKS: FooterLink[] = [

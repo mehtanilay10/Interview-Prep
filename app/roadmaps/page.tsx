@@ -114,7 +114,7 @@ export default function RoadmapPage() {
           return (
             <Link
               key={course.slug}
-              href={`/roadmap#${course.slug}`}
+              href={`/roadmaps#${course.slug}`}
               className={cn(
                 'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
                 course.slug === activeSlug

@@ -76,7 +76,7 @@ export class BookmarkErrorBoundary extends Component<BookmarkErrorBoundaryProps,
               <button
                 onClick={() => {
                   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                  window.location.href = '/bookmarks';
+                  window.location.href = '/user/bookmarks';
                 }}
                 className="rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default hover:bg-canvas-subtle"
               >

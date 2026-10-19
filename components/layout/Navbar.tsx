@@ -149,7 +149,7 @@ export function Navbar({ categories }: NavbarProps) {
           {userMenuOpen && (
             <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
               <Link
-                href="/progress"
+                href="/user/progress"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                 onClick={() => setUserMenuOpen(false)}
               >
@@ -157,7 +157,7 @@ export function Navbar({ categories }: NavbarProps) {
                 Progress Dashboard
               </Link>
               <Link
-                href="/bookmarks"
+                href="/user/bookmarks"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                 onClick={() => setUserMenuOpen(false)}
               >
@@ -165,7 +165,7 @@ export function Navbar({ categories }: NavbarProps) {
                 Bookmarks
               </Link>
               <Link
-                href="/notes"
+                href="/user/notes"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                 onClick={() => setUserMenuOpen(false)}
               >
@@ -173,7 +173,7 @@ export function Navbar({ categories }: NavbarProps) {
                 Notes
               </Link>
               <Link
-                href="/personalization"
+                href="/user/personalization"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                 onClick={() => setUserMenuOpen(false)}
               >
@@ -195,7 +195,7 @@ export function Navbar({ categories }: NavbarProps) {
         </div>
       ) : (
         <Link
-          href="/login"
+          href="/user/login"
           className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
         >
           Sign in

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function PersonalizationPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect('/login');
+    redirect('/user/login');
   }
 
   return (

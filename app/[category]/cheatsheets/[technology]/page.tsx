@@ -87,7 +87,6 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <Breadcrumbs
         items={[
-          { label: 'Cheat Sheets', href: '/cheatsheet' },
           { label: categoryMeta.label, href: `/${category}/cheatsheets` },
           { label: techName },
         ]}

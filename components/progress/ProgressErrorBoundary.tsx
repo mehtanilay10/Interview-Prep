@@ -76,7 +76,7 @@ export class ProgressErrorBoundary extends Component<ProgressErrorBoundaryProps,
               <button
                 onClick={() => {
                   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                  window.location.href = '/progress';
+                  window.location.href = '/user/progress';
                 }}
                 className="rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default hover:bg-canvas-subtle"
               >

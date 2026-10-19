@@ -70,7 +70,7 @@ export default async function ProblemsModuleDetailPage({ params }: Params) {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <Breadcrumbs
         items={[
-          { label: 'Problems', href: '/problems' },
+          { label: 'Problems', href: `/${category}/problems` },
           { label: course.title, href: `/${category}/problems/${courseSlug}` },
           { label: mod.title },
         ]}

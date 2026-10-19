@@ -36,10 +36,15 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
-  const { moduleSlug } = resolvedParams;
+  const { category, courseSlug, moduleSlug } = resolvedParams;
   const mod = getModuleBySlug(moduleSlug);
   if (!mod) return {};
-  return buildModuleMetadata({ title: mod.title, description: mod.description, moduleSlug });
+  return buildModuleMetadata({
+    title: mod.title,
+    description: mod.description,
+    moduleSlug,
+    basePath: `/${category}/courses/${courseSlug}`,
+  });
 }
 
 export default async function CourseModuleDetailPage({ params }: Params) {
@@ -70,7 +75,7 @@ export default async function CourseModuleDetailPage({ params }: Params) {
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <Breadcrumbs
           items={[
-            { label: 'Courses', href: '/courses' },
+            { label: 'Courses', href: `/${category}/courses` },
             { label: course.title, href: `/${category}/courses/${courseSlug}` },
             { label: mod.title },
           ]}

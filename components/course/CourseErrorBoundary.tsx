@@ -76,7 +76,7 @@ export class CourseErrorBoundary extends Component<CourseErrorBoundaryProps, Cou
               <button
                 onClick={() => {
                   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                  window.location.href = '/courses';
+                  window.location.href = '/';
                 }}
                 className="rounded-lg border border-border bg-canvas px-4 py-2 text-sm font-medium text-fg-default hover:bg-canvas-subtle"
               >

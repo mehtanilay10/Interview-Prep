@@ -1193,7 +1193,7 @@ const rawModulesPart2 = [
 	{ ...zoomConferencingHldModule, urlCategory: "architecture" },
 ];
 
-const rawModules: any[] = [rawModulesPart1, rawModulesPart2];
+const rawModules: any[] = [...rawModulesPart1, ...rawModulesPart2];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 

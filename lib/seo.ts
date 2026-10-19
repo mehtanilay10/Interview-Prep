@@ -48,9 +48,10 @@ export function buildLessonMetadata(opts: {
   description: string;
   moduleSlug: string;
   lessonSlug: string;
-  basePath?: string;
+  /** Category-prefixed base path, e.g. `/backend/courses/aspnet-core`. */
+  basePath: string;
 }): Metadata {
-  const basePath = opts.basePath ?? '/courses';
+  const { basePath } = opts;
   return buildMetadata({
     title: opts.title,
     description: opts.description,
@@ -62,9 +63,10 @@ export function buildModuleMetadata(opts: {
   title: string;
   description: string;
   moduleSlug: string;
-  basePath?: string;
+  /** Category-prefixed base path, e.g. `/backend/courses/aspnet-core`. */
+  basePath: string;
 }): Metadata {
-  const basePath = opts.basePath ?? '/courses';
+  const { basePath } = opts;
   return buildMetadata({
     title: opts.title,
     description: opts.description,

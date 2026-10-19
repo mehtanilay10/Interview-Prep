@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function NotesPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect('/login');
+    redirect('/user/login');
   }
 
   return <NotesClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />;

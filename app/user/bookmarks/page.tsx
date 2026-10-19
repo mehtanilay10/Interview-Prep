@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default async function BookmarksPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect('/login');
+    redirect('/user/login');
   }
 
   return (

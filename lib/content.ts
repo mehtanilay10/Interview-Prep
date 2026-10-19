@@ -7,7 +7,6 @@
 import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
-import cheatsheetContent from '@/content/cheatsheet.json';
 import { glossaryTerms } from '@/content/ai/glossary';
 import { roadmaps } from '@/content/ai/roadmaps';
 import { promptTemplates } from '@/content/ai/prompts';
@@ -418,6 +417,9 @@ export function searchAll(query: string): SearchResult[] {
 
   // Search courses
   for (const course of courses) {
+    // The cheatsheet "course" has no cross-category landing page; its
+    // individual cheat sheets are surfaced as module results instead.
+    if (course.slug === 'cheatsheet') continue;
     const titleScore = scoreText(course.title, q) * 3;
     const descScore = scoreText(course.description, q);
 
@@ -432,22 +434,6 @@ export function searchAll(query: string): SearchResult[] {
         score: titleScore + descScore,
       });
     }
-  }
-
-  // Search cheatsheet section
-  const csTitleScore = scoreText(cheatsheetContent.title, q) * 3;
-  const csDescScore = scoreText(cheatsheetContent.description, q);
-
-  if (csTitleScore > 0 || csDescScore > 0) {
-    scored.push({
-      result: {
-        type: 'cheatsheet',
-        slug: cheatsheetContent.slug,
-        title: cheatsheetContent.title,
-        description: cheatsheetContent.description,
-      },
-      score: csTitleScore + csDescScore,
-    });
   }
 
   scored.sort((a, b) => b.score - a.score);
@@ -582,7 +568,7 @@ export function getContentItemHref(
     if (moduleSlug) {
       return `/${getCourseCategory(moduleSlug)}/cheatsheets/${moduleSlug}`;
     }
-    return '/cheatsheet';
+    return '/';
   }
 
   const category = getCourseCategory(courseSlug);
@@ -659,18 +645,18 @@ export function getSearchResultHref(result: SearchResult): string {
   }
 
   if (result.type === 'course') {
+    if (result.slug === 'interview-qa') {
+      return '/interview-questions';
+    }
     const category = getCourseCategory(result.slug);
     if (isProblemCourseSlug(result.slug)) {
       return `/${category}/problems/${result.slug}`;
-    }
-    if (result.slug === 'cheatsheet') {
-      return '/cheatsheet';
     }
     return `/${category}/courses/${result.slug}`;
   }
 
   if (result.type === 'cheatsheet') {
-    return '/cheatsheet';
+    return '/';
   }
 
   return '/';

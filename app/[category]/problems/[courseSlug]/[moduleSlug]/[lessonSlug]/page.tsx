@@ -128,7 +128,7 @@ export default async function ProblemDetailPage({ params }: Params) {
           {/* Breadcrumbs */}
           <Breadcrumbs
             items={[
-              { label: 'Problems', href: '/problems' },
+              { label: 'Problems', href: `/${category}/problems` },
               { label: course.title, href: `/${category}/problems/${courseSlug}` },
               { label: mod.title, href: `/${category}/problems/${courseSlug}/${moduleSlug}` },
               { label: lesson.title },

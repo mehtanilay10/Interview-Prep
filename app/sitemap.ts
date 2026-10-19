@@ -30,19 +30,16 @@ function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRo
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [
     toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/courses`, 0.9, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/cheatsheet`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/problems`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/glossary`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/prompts`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/roadmaps`, 0.8, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/progress`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/bookmarks`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/notes`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/personalization`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/login`, 0.5, 'monthly'),
+    toSitemapEntry(`${BASE_URL}/ai/glossary`, 0.8, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/ai/prompts`, 0.8, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/user/progress`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/user/bookmarks`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/user/notes`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/user/personalization`, 0.7, 'weekly'),
+    toSitemapEntry(`${BASE_URL}/user/login`, 0.5, 'monthly'),
   ];
 
   const courses = getAllCourses().filter((c) => !c.isInterview);

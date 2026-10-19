@@ -112,7 +112,7 @@ const rawCoursesPart1 = [
 	{ ...yarnNpmPackagesCourse, urlCategory: "frontend" },
 ];
 
-const rawCourses: any[] = [rawCoursesPart1];
+const rawCourses: any[] = [...rawCoursesPart1];
 
 export const courses: Course[] = rawCourses as unknown as Course[];
 

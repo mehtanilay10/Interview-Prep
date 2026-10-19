@@ -52,7 +52,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
-  const { moduleSlug, lessonSlug, courseSlug } = resolvedParams;
+  const { category, moduleSlug, lessonSlug, courseSlug } = resolvedParams;
   const lesson = getLessonBySlug(lessonSlug, courseSlug);
   if (!lesson) return {};
   return buildLessonMetadata({
@@ -60,6 +60,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     description: lesson.description,
     moduleSlug,
     lessonSlug,
+    basePath: `/${category}/courses/${courseSlug}`,
   });
 }
 
@@ -133,7 +134,7 @@ export default async function CourseLessonDetailPage({ params }: Params) {
           {/* Breadcrumbs */}
           <Breadcrumbs
             items={[
-              { label: 'Courses', href: '/courses' },
+              { label: 'Courses', href: `/${category}/courses` },
               { label: course.title, href: `/${category}/courses/${courseSlug}` },
               { label: mod.title, href: `/${category}/courses/${courseSlug}/${moduleSlug}` },
               { label: lesson.title },
