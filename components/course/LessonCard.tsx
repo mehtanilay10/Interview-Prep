@@ -1,7 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
+import { usePreferencesContext } from '@/components/user/PreferencesProvider';
 import { cn } from '@/lib/utils';
 import type { LessonNavItem } from '@/types';
 
@@ -26,6 +29,13 @@ export function LessonCard({
   className,
   variant = 'list',
 }: LessonCardProps) {
+  const { preferences, mounted } = usePreferencesContext();
+
+  // "Show completed lessons" (Personalization) hides finished lessons from
+  // lists. The currently open lesson is always shown so navigation stays sane.
+  const hideCompleted = mounted && !preferences.showCompleted && isCompleted && !isCurrent;
+  if (hideCompleted) return null;
+
   const lessonHref = courseSlug
     ? `/${basePrefix}/${courseSlug}/${moduleSlug}/${lesson.slug}`
     : `/${basePrefix}/${moduleSlug}/${lesson.slug}`;

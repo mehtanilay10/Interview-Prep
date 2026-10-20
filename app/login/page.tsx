@@ -26,7 +26,7 @@ export default function LoginPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-subtle">
               <BarChart3 className="h-6 w-6 text-accent-fg" aria-hidden="true" />
             </div>
-            <h1 className="text-2xl font-bold text-fg-default">Welcome to Interview Prep</h1>
+            <h1 className="text-2xl font-bold text-fg-default">Welcome to Quotient</h1>
             <p className="mt-2 text-sm text-fg-muted">
               Sign in to sync your progress and bookmarks across devices.
             </p>

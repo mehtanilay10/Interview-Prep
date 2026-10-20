@@ -6,6 +6,7 @@ import { useLessonNotes } from '@/hooks/useLessonNotes';
 import { SignInPrompt } from '@/components/auth/SignInPrompt';
 import { cn } from '@/lib/utils';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface NotesModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export function NotesModal({ isOpen, onClose, courseSlug, moduleSlug, lessonSlug
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap(dialogRef, isOpen);
+  useBodyScrollLock(isOpen);
 
   const getNoteRef = useRef(getNote);
   getNoteRef.current = getNote;
@@ -63,10 +65,8 @@ export function NotesModal({ isOpen, onClose, courseSlug, moduleSlug, lessonSlug
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKey);
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 

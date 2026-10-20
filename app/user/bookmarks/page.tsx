@@ -1,23 +1,16 @@
 import { Metadata } from 'next';
-import { getCurrentUser, requireAuth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { BookmarksClient } from './BookmarksClient';
 import { BookmarkErrorBoundary } from '@/components/bookmarks/BookmarkErrorBoundary';
 
 export const metadata: Metadata = {
-  title: 'Bookmarks | Interview Prep',
+  title: 'Bookmarks | Quotient',
   description: 'View and manage your saved bookmarks.',
 };
 
-export default async function BookmarksPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect('/user/login');
-  }
-
+export default function BookmarksPage() {
   return (
     <BookmarkErrorBoundary>
-      <BookmarksClient user={{ id: user.id || '', name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} />
+      <BookmarksClient />
     </BookmarkErrorBoundary>
   );
 }

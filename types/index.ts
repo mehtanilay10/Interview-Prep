@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Core domain types for Interview Prep course website
+// Core domain types for Quotient course website
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Shared primitives ────────────────────────────────────────────────────────
@@ -375,18 +375,6 @@ export interface SearchResult {
   difficulty?: Difficulty;
   tags?: string[];
   technology?: string;
-}
-
-// ── Roadmap node ─────────────────────────────────────────────────────────────
-
-export interface RoadmapNode {
-  id: string;
-  title: string;
-  type: 'phase' | 'module' | 'milestone';
-  href?: string;
-  children?: RoadmapNode[];
-  isOptional?: boolean;
-  difficulty?: Difficulty;
 }
 
 // ── Glossary ─────────────────────────────────────────────────────────────────

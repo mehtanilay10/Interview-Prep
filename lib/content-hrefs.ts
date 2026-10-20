@@ -194,6 +194,36 @@ export function getInterviewTechSlug(technology: string): string {
   return TECH_SLUG_MAP[key] ?? fallbackTechSlug(key);
 }
 
+// Reverse of TECH_SLUG_MAP for turning a slug back into a display name
+// (e.g. `csharp` -> "C#"). Built once from the canonical map above.
+const TECH_NAME_BY_SLUG: Record<string, string> = Object.fromEntries(
+  Object.entries(TECH_SLUG_MAP).map(([name, slug]) => [slug, name])
+);
+
+/**
+ * Converts a URL slug back into a human-readable technology name, e.g.
+ * `csharp` -> "C#", `aspnet-core` -> "ASP.NET Core". Falls back to a
+ * title-cased version of the slug when the slug is not in the known map.
+ */
+export function getInterviewTechName(slug: string): string {
+  const known = TECH_NAME_BY_SLUG[slug];
+  if (known) {
+    // Restore conventional capitalisation for names stored lowercase.
+    return known
+      .split(' ')
+      .map((word) => (word.length <= 3 ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+      .join(' ')
+      .replace(/\bC#\b/i, 'C#')
+      .replace(/\bOop\b/i, 'OOP')
+      .replace(/\bSql\b/i, 'SQL')
+      .replace(/\bCi\/cd\b/i, 'CI/CD');
+  }
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 /** The content category an interview technology lives in (e.g. "backend"). */
 export function getInterviewTechCategory(technologySlug: string): string | undefined {
   return INTERVIEW_TECH_CATEGORY[technologySlug];
@@ -234,7 +264,12 @@ export function getSearchResultHref(result: SearchResult): string {
       return '/';
     }
     if (result.courseSlug === 'cheatsheet') {
-      return `/${category}/cheatsheets/${result.slug}`;
+      // Every cheat-sheet lesson has slug `cheatsheet`; the URL segment is the
+      // module (technology) slug, not the lesson slug.
+      return result.moduleSlug ? `/${category}/cheatsheets/${result.moduleSlug}` : '/';
+    }
+    if (isProblemCourseSlug(result.courseSlug)) {
+      return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
     }
     return `/${category}/courses/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
   }

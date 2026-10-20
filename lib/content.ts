@@ -8,14 +8,15 @@ import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
 import { glossaryTerms } from '@/content/ai/glossary';
-import { roadmaps } from '@/content/ai/roadmaps';
 import { promptTemplates } from '@/content/ai/prompts';
+import { computeHeadingAnchors } from '@/lib/utils';
 import {
   getCourseCategory,
   isProblemCourseSlug,
   getContentItemHref,
   getSearchResultHref,
   getInterviewTechCategory,
+  getInterviewTechName,
 } from '@/lib/content-hrefs';
 import type {
   Module,
@@ -26,7 +27,6 @@ import type {
   SearchResult,
   Difficulty,
   GlossaryTerm,
-  RoadmapNode,
   PromptTemplate,
   LessonNavItem,
 } from '@/types';
@@ -37,7 +37,7 @@ export { modules, lessons, courses };
 // Href builders live in `lib/content-hrefs.ts` (content-free, safe to import
 // from client components) and are re-exported here so server code only ever
 // needs a single import.
-export { getCourseCategory, isProblemCourseSlug, getContentItemHref, getSearchResultHref, getInterviewTechCategory };
+export { getCourseCategory, isProblemCourseSlug, getContentItemHref, getSearchResultHref, getInterviewTechCategory, getInterviewTechName };
 
 /** Difficulty levels in the order they are presented to learners. */
 const DIFFICULTY_ORDER: Difficulty[] = ['beginner', 'intermediate', 'advanced'];
@@ -67,7 +67,10 @@ function memoizeNoArg<R>(compute: () => R): () => R {
 
 const allCoursesCache = memoizeNoArg(() =>
   [...courses]
-    .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet')
+    // `problems`, `cheatsheet`, and `interview-qa` are pseudo-courses that
+    // reuse the course model but have their own dedicated route trees.
+    // Including them here would generate duplicate `/courses/...` pages.
+    .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet' && c.category !== 'interview-qa')
     .sort((a, b) => a.order - b.order)
 );
 
@@ -77,6 +80,25 @@ export function getAllCourses(): Course[] {
 
 export function getCourseBySlug(slug: string): Course | undefined {
   return courses.find((c) => c.slug === slug);
+}
+
+/**
+ * Whether a course is served by the generic `/[category]/courses/[courseSlug]`
+ * route tree.
+ *
+ * Problem sets, cheat sheets, and interview Q&A all reuse the course model but
+ * own dedicated route trees of their own, so they must not resolve on the
+ * course routes. Note that a course's `category` field is **not** the URL
+ * category — content JSON stamps values like `"category": "basics"` or
+ * `"category": "backend"` — so this compares against the pseudo-course values
+ * only (`'problems' | 'cheatsheet' | 'interview-qa'`), never the URL segment.
+ */
+export function isRegularCourse(course: Course): boolean {
+  return (
+    course.category !== 'problems' &&
+    course.category !== 'cheatsheet' &&
+    course.category !== 'interview-qa'
+  );
 }
 
 const problemCoursesCache = memoizeNoArg(() =>
@@ -251,12 +273,18 @@ export function getAllModules(): Module[] {
   return [...modules].sort((a, b) => a.order - b.order);
 }
 
-export function getModuleBySlug(slug: string): Module | undefined {
+export function getModuleBySlug(slug: string, courseSlug?: string): Module | undefined {
+  // Module slugs are only unique within a course (e.g. `csharp` exists as both
+  // a cheat-sheet module and an interview-qa module), so an optional
+  // `courseSlug` disambiguates. Without it, the first match is returned.
+  if (courseSlug) {
+    return modules.find((m) => m.slug === slug && m.courseSlug === courseSlug);
+  }
   return modules.find((m) => m.slug === slug);
 }
 
-export function getCourseForModule(moduleSlug: string): Course | undefined {
-  const mod = getModuleBySlug(moduleSlug);
+export function getCourseForModule(moduleSlug: string, courseSlug?: string): Course | undefined {
+  const mod = getModuleBySlug(moduleSlug, courseSlug);
   if (!mod) return undefined;
   return courses.find((c) => c.slug === mod.courseSlug);
 }
@@ -271,30 +299,6 @@ export function getAllLessons(): Lesson[] {
   return [...lessons].sort((a, b) => a.order - b.order);
 }
 
-// Lookup indexes: getLessonBySlug runs for every page render (metadata + page
-// body + related-lesson links) and each call used to scan every lesson twice.
-const lessonBySlugIndex = new Map<string, Lesson | undefined>();
-const lessonsByCourseAndSlugIndex = new Map<string, Map<string, Lesson>>();
-
-export function getLessonBySlug(slug: string, courseSlug?: string): Lesson | undefined {
-  if (courseSlug) {
-    let courseIndex = lessonsByCourseAndSlugIndex.get(courseSlug);
-    if (!courseIndex) {
-      courseIndex = new Map<string, Lesson>();
-      for (const l of lessons) {
-        if (l.courseSlug === courseSlug && !courseIndex.has(l.slug)) courseIndex.set(l.slug, l);
-      }
-      lessonsByCourseAndSlugIndex.set(courseSlug, courseIndex);
-    }
-    return courseIndex.get(slug);
-  }
-
-  if (lessonBySlugIndex.has(slug)) return lessonBySlugIndex.get(slug);
-  const found = lessons.find((l) => l.slug === slug);
-  lessonBySlugIndex.set(slug, found);
-  return found;
-}
-
 const lessonsForModuleCache = new Map<string, Lesson[]>();
 
 export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Lesson[] {
@@ -304,6 +308,48 @@ export function getLessonsForModule(moduleSlug: string, courseSlug?: string): Le
   const result = getLessonsByModule(moduleSlug, courseSlug);
   lessonsForModuleCache.set(key, result);
   return result;
+}
+
+// Lookup indexes: getLessonBySlug runs for every page render (metadata + page
+// body + related-lesson links) and each call used to scan every lesson twice.
+const lessonBySlugIndex = new Map<string, Lesson | undefined>();
+// A lesson slug is unique within a module but NOT within a course (e.g.
+// `maximum-subarray` exists in both the array and dynamic-programming problem
+// modules), so the index is keyed by `courseSlug|moduleSlug|slug`.
+const lessonByModuleAndSlugIndex = new Map<string, Lesson>();
+
+function lessonKey(courseSlug: string, moduleSlug: string, slug: string): string {
+  return `${courseSlug}|${moduleSlug}|${slug}`;
+}
+
+export function getLessonBySlug(slug: string, courseSlug?: string, moduleSlug?: string): Lesson | undefined {
+  if (courseSlug && moduleSlug) {
+    const key = lessonKey(courseSlug, moduleSlug, slug);
+    const cached = lessonByModuleAndSlugIndex.get(key);
+    if (cached) return cached;
+    for (const l of lessons) {
+      if (l.courseSlug === courseSlug && l.moduleSlug === moduleSlug && l.slug === slug) {
+        lessonByModuleAndSlugIndex.set(key, l);
+        return l;
+      }
+    }
+    return undefined;
+  }
+
+  if (courseSlug) {
+    // Without a module, prefer the first lesson in course/module order so the
+    // result is stable, then cache it under the module-qualified key too.
+    const found =
+      getLessonsForCourse(courseSlug).find((l) => l.slug === slug) ??
+      lessons.find((l) => l.courseSlug === courseSlug && l.slug === slug);
+    if (found) lessonByModuleAndSlugIndex.set(lessonKey(found.courseSlug, found.moduleSlug, found.slug), found);
+    return found;
+  }
+
+  if (lessonBySlugIndex.has(slug)) return lessonBySlugIndex.get(slug);
+  const found = lessons.find((l) => l.slug === slug);
+  lessonBySlugIndex.set(slug, found);
+  return found;
 }
 
 export function getAdjacentLessons(
@@ -332,7 +378,9 @@ export function getLessonBreadcrumb(lesson: Lesson): {
   module: Module | undefined;
   lesson: Lesson;
 } {
-  const mod = getModuleBySlug(lesson.moduleSlug);
+  // Scope by the lesson's own course: a module slug can collide across courses
+  // (e.g. `csharp`), so the bare slug would resolve to the wrong module.
+  const mod = getModuleBySlug(lesson.moduleSlug, lesson.courseSlug);
   const course = mod ? getCourseBySlug(mod.courseSlug) : undefined;
   return { course, module: mod, lesson };
 }
@@ -363,45 +411,57 @@ export function toLessonNavItems(list: Lesson[]): LessonNavItem[] {
 // ── Table of Contents extraction ─────────────────────────────────────────────
 
 export function extractTOC(blocks: ContentBlock[]): TocEntry[] {
-  const entries: TocEntry[] = [];
-  for (const block of blocks) {
-    if (block.type === 'heading') {
-      const data = (block as { data?: { level: 2 | 3 | 4; text: string; anchor?: string } }).data;
-      const level = data?.level ?? (block as { level?: 2 | 3 | 4 }).level;
-      const text = data?.text ?? (block as { text?: string }).text;
-      const anchor = data?.anchor;
-      if (level && text) {
-        entries.push({
-          anchor: anchor || text.toLowerCase().replace(/\s+/g, '-'),
-          text,
-          level,
-        });
-      }
+  // Collect headings with their block index so the anchor computation matches
+  // the heading renderer exactly (see `computeHeadingAnchors`).
+  const headings: { index: number; block: { text?: string; anchor?: string } }[] = [];
+  const levels: (2 | 3 | 4)[] = [];
+  blocks.forEach((block, index) => {
+    if (block.type !== 'heading') return;
+    const data = (block as { data?: { level: 2 | 3 | 4; text: string; anchor?: string } }).data;
+    const level = data?.level ?? (block as { level?: 2 | 3 | 4 }).level;
+    const text = data?.text ?? (block as { text?: string }).text;
+    if (level && text) {
+      headings.push({ index, block: { text, anchor: data?.anchor } });
+      levels.push(level);
     }
-  }
+  });
+
+  const anchors = computeHeadingAnchors(headings);
+  const entries: TocEntry[] = [];
+  headings.forEach(({ index, block }, i) => {
+    const anchor = anchors.get(index);
+    if (!anchor || !block.text) return;
+    entries.push({ anchor, text: block.text, level: levels[i] });
+  });
   return entries;
 }
 
 // ── Full-text search ──────────────────────────────────────────────────────────
 
-function scoreText(text: string, q: string): number {
+function scoreText(text: string, tokens: string[]): number {
   const lower = text.toLowerCase();
-  if (!lower.includes(q)) return 0;
-  if (lower === q) return 10;
-  if (lower.startsWith(q)) return 5;
-  return 1;
+  let score = 0;
+  for (const token of tokens) {
+    if (!lower.includes(token)) continue;
+    if (lower === token) score += 10;
+    else if (lower.startsWith(token)) score += 5;
+    else score += 1;
+  }
+  return score;
 }
 
 export function searchAll(query: string): SearchResult[] {
-  if (!query.trim()) return [];
-  const q = query.toLowerCase();
+  // Tokenize so multi-word queries like "react hooks" match content tagged
+  // `["react", "hooks"]` instead of requiring the literal substring.
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
   const scored: { result: SearchResult; score: number }[] = [];
 
   // Search lessons
   for (const lesson of lessons) {
-    const titleScore = scoreText(lesson.title, q) * 3;
-    const descScore = scoreText(lesson.description, q);
-    const tagScore = (lesson.tags ?? []).reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+    const titleScore = scoreText(lesson.title, tokens) * 3;
+    const descScore = scoreText(lesson.description, tokens);
+    const tagScore = (lesson.tags ?? []).reduce((sum, t) => sum + scoreText(t, tokens) * 2, 0);
 
     if (titleScore > 0 || descScore > 0 || tagScore > 0) {
       scored.push({
@@ -423,9 +483,9 @@ export function searchAll(query: string): SearchResult[] {
 
   // Search modules
   for (const mod of modules) {
-    const titleScore = scoreText(mod.title, q) * 3;
-    const descScore = scoreText(mod.description, q);
-    const tagScore = (mod.tags ?? []).reduce((sum, t) => sum + scoreText(t, q) * 2, 0);
+    const titleScore = scoreText(mod.title, tokens) * 3;
+    const descScore = scoreText(mod.description, tokens);
+    const tagScore = (mod.tags ?? []).reduce((sum, t) => sum + scoreText(t, tokens) * 2, 0);
 
     if (titleScore > 0 || descScore > 0 || tagScore > 0) {
       scored.push({
@@ -449,8 +509,8 @@ export function searchAll(query: string): SearchResult[] {
     // page; their individual cheat sheets and question topics are surfaced as
     // module results instead.
     if (course.slug === 'cheatsheet' || course.slug === 'interview-qa') continue;
-    const titleScore = scoreText(course.title, q) * 3;
-    const descScore = scoreText(course.description, q);
+    const titleScore = scoreText(course.title, tokens) * 3;
+    const descScore = scoreText(course.description, tokens);
 
     if (titleScore > 0 || descScore > 0) {
       scored.push({
@@ -471,40 +531,6 @@ export function searchAll(query: string): SearchResult[] {
 
 // Course category / problem-slug lookups now live in `lib/content-hrefs.ts`
 // (see the re-exports at the top of this file).
-
-/**
- * A curated set of headline courses for the footer's "Popular Courses"
- * column. Falls back to the largest courses by lesson count if a listed
- * slug is ever removed from content.
- */
-const POPULAR_COURSE_SLUGS = [
-  'aspnet-core',
-  'csharp-fundamentals',
-  'react-fundamentals',
-  'postgresql',
-  'system-design-interviews',
-  'ai-basics',
-];
-
-export interface PopularCourse {
-  title: string;
-  href: string;
-  icon: string;
-}
-
-export function getPopularCourses(): PopularCourse[] {
-  const picked: PopularCourse[] = [];
-  for (const slug of POPULAR_COURSE_SLUGS) {
-    const course = getCourseBySlug(slug);
-    if (!course || course.category === 'problems' || course.isInterview) continue;
-    picked.push({
-      title: course.title,
-      icon: course.icon,
-      href: `/${getCourseCategory(course.slug)}/courses/${course.slug}`,
-    });
-  }
-  return picked;
-}
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
@@ -634,16 +660,6 @@ export function getGlossaryTermBySlug(slug: string): GlossaryTerm | undefined {
 
 export function getGlossaryTermsByCategory(category: string): GlossaryTerm[] {
   return glossaryTerms.filter((t) => t.category === category);
-}
-
-// ── Roadmap helpers ───────────────────────────────────────────────────────────
-
-export function getAllRoadmaps(): RoadmapNode[] {
-  return [...roadmaps];
-}
-
-export function getRoadmapForCourse(courseSlug: string): RoadmapNode | undefined {
-  return roadmaps.find((r) => r.id.includes(courseSlug));
 }
 
 // ── Prompt helpers ────────────────────────────────────────────────────────────

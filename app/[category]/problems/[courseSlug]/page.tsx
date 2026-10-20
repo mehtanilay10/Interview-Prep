@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ProblemFilters } from '@/components/problems/ProblemFilters';
 import { getCourseBySlug, getModulesForCourse, getLessonsForCourse, getProblemCourses, getCourseCategory, toLessonNavItems } from '@/lib/content';
+import { buildMetadata } from '@/lib/seo';
 
 interface Params {
   params: Promise<{ category: string; courseSlug: string }>;
@@ -17,13 +18,15 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
-  const { courseSlug } = resolvedParams;
+  const { category, courseSlug } = resolvedParams;
   const course = getCourseBySlug(courseSlug);
-  if (!course) return {};
-  return {
+  if (!course || course.category !== 'problems') return {};
+  if (category !== getCourseCategory(courseSlug)) return {};
+  return buildMetadata({
     title: course.title,
     description: course.description,
-  };
+    path: `/${category}/problems/${courseSlug}`,
+  });
 }
 
 export default async function ProblemsCoursePage({ params }: Params) {

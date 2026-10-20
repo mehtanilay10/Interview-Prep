@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface MermaidModalProps {
   svgHtml: string;
@@ -70,6 +71,7 @@ export function MermaidModal({ svgHtml, caption, onClose }: MermaidModalProps) {
   const [systemDark, setSystemDark] = useState(false);
 
   useFocusTrap(dialogRef, true);
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -78,13 +80,6 @@ export function MermaidModal({ svgHtml, caption, onClose }: MermaidModalProps) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
 
   useEffect(() => {
     dialogRef.current?.focus();

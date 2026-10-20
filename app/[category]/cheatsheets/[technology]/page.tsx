@@ -5,38 +5,12 @@ import { ArrowLeft } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { getCheatsheetModuleBySlug, getCheatsheetModules, getLessonsForModule, getCourseCategory, getCategoryMeta } from '@/lib/content';
-import { buildLessonMetadata } from '@/lib/seo';
+import { getCheatsheetModuleBySlug, getCheatsheetModules, getLessonsForModule, getCourseCategory, getCategoryMeta, getInterviewTechName } from '@/lib/content';
+import { buildModuleMetadata } from '@/lib/seo';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
 import { NotesModalProvider } from '@/components/lesson/NotesModalContext';
 import { OfflineSaveButton } from '@/components/lesson/OfflineSaveButton';
-
-const TECH_ICONS: Record<string, string> = {
-  'csharp': '💻',
-  'sql-server': '🗄️',
-  'react': '⚛️',
-  'redux': '🔄',
-  'apollo': '🚀',
-  'graphql': '◼️',
-  'docker-compose': '🐳',
-  'javascript': '⚡',
-  'typescript': '📘',
-  'react-router': '🧭',
-};
-
-const TECH_NAMES: Record<string, string> = {
-  'csharp': 'C#',
-  'sql-server': 'SQL Server',
-  'react': 'React',
-  'redux': 'Redux',
-  'apollo': 'Apollo Client',
-  'graphql': 'GraphQL',
-  'docker-compose': 'Docker Compose',
-  'javascript': 'JavaScript',
-  'typescript': 'TypeScript',
-  'react-router': 'React Router',
-};
 
 export async function generateStaticParams() {
   return getCheatsheetModules().map((mod) => ({
@@ -50,11 +24,12 @@ export async function generateMetadata({ params }: { params: Promise<{ technolog
   const { technology } = resolvedParams;
   const mod = getCheatsheetModuleBySlug(technology);
   if (!mod) return {};
-  return buildLessonMetadata({
+  // The cheat sheet URL is `/[category]/cheatsheets/[technology]` — there is no
+  // lesson segment, so the canonical must not include `/cheatsheet`.
+  return buildModuleMetadata({
     title: mod.title,
     description: mod.description,
     moduleSlug: mod.slug,
-    lessonSlug: 'cheatsheet',
     basePath: `/${getCourseCategory(technology)}/cheatsheets`,
   });
 }
@@ -78,8 +53,8 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
   const lesson = lessons[0];
   if (!lesson) notFound();
 
-  const icon = TECH_ICONS[technology] ?? '📝';
-  const techName = TECH_NAMES[technology] ?? technology;
+  const icon = mod.icon ?? '📝';
+  const techName = getInterviewTechName(technology);
   const categoryMeta = getCategoryMeta(category);
 
   return (

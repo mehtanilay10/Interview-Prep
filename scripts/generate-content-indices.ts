@@ -75,7 +75,10 @@ function listDirs(p: string): string[] {
   try {
     return fs
       .readdirSync(p)
-      .filter((entry) => isDirectory(path.join(p, entry)));
+      .filter((entry) => isDirectory(path.join(p, entry)))
+      // Sort for deterministic output: `readdirSync` order is filesystem-
+      // dependent, which previously made the generated index files churn.
+      .sort();
   } catch {
     return [];
   }
@@ -143,7 +146,7 @@ function scanModules(): ModuleInfo[] {
   const usedNames = new Set<string>();
 
   const walk = (dir: string, category: string) => {
-    for (const entry of fs.readdirSync(dir)) {
+    for (const entry of fs.readdirSync(dir).sort()) {
       const fullPath = path.join(dir, entry);
       if (!isDirectory(fullPath)) continue;
 
@@ -184,7 +187,7 @@ function scanLessons(): LessonInfo[] {
   const usedNames = new Set<string>();
 
   const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir)) {
+    for (const entry of fs.readdirSync(dir).sort()) {
       const fullPath = path.join(dir, entry);
       if (isDirectory(fullPath)) {
         walk(fullPath);
@@ -289,7 +292,8 @@ ${combineDecl}
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
-export function getModuleBySlug(slug: string): Module | undefined {
+export function getModuleBySlug(slug: string, courseSlug?: string): Module | undefined {
+\tif (courseSlug) return modules.find((m) => m.slug === slug && m.courseSlug === courseSlug);
 \treturn modules.find((m) => m.slug === slug);
 }
 

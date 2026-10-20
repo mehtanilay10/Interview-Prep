@@ -11,6 +11,7 @@ import {
   getCourseCategory,
   toLessonNavItem,
 } from '@/lib/content';
+import { buildModuleMetadata } from '@/lib/seo';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { LessonCard } from '@/components/course/LessonCard';
@@ -34,13 +35,20 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
-  const { moduleSlug } = resolvedParams;
-  const mod = getModuleBySlug(moduleSlug);
+  const { category, courseSlug, moduleSlug } = resolvedParams;
+  const course = getCourseBySlug(courseSlug);
+  if (!course || course.category !== 'problems') return {};
+  if (category !== getCourseCategory(courseSlug)) return {};
+  // Scope the lookup to the course so a module slug belonging to another
+  // course cannot produce metadata for a page that will 404.
+  const mod = getModuleBySlug(moduleSlug, courseSlug);
   if (!mod) return {};
-  return {
+  return buildModuleMetadata({
     title: `${mod.title} — Problems`,
     description: mod.description,
-  };
+    moduleSlug,
+    basePath: `/${category}/problems/${courseSlug}`,
+  });
 }
 
 export default async function ProblemsModuleDetailPage({ params }: Params) {

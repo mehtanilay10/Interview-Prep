@@ -4,6 +4,10 @@ export const CSRF_COOKIE = 'interview_prep_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
 export function generateCsrfToken(): string {
+  // Prefer the platform CSPRNG; Math.random() is only a defensive fallback.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 

@@ -140,7 +140,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [prevLoggedIn, setPrevLoggedIn] = useState(isLoggedIn);
+  const [prevLoggedIn, setPrevLoggedIn] = useState(false);
+  // Start at `false` (not `isLoggedIn`) so that when the session resolves to
+  // authenticated — including on remounts where it is already authenticated —
+  // the login transition always fires and local data is synced to the server.
   const serverProgressRef = useRef(serverProgress);
   serverProgressRef.current = serverProgress;
 
@@ -312,7 +315,17 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const resetProgress = useCallback(() => {
     if (!isLoggedIn) return;
     setServerProgress(DEFAULT_PROGRESS);
-    syncProgressToServerFn(DEFAULT_PROGRESS);
+    // The POST endpoint is insert-only (it can never delete rows), so a reset
+    // must go through the DELETE endpoint or the progress would reappear on
+    // the next fetch.
+    retryWithBackoff(async () => {
+      const res = await apiFetch('/api/progress', { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error(`Failed to reset progress: ${res.status}`);
+      }
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true }).catch((err) => {
+      logger.warn('ProgressProvider', 'Failed to reset progress on server', err);
+    });
   }, [isLoggedIn]);
 
   const value = useMemo(

@@ -9,9 +9,15 @@ import {
   Target,
   BarChart3,
   ClipboardList,
+  Flame,
+  CalendarDays,
+  Clock,
+  Download,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { StatCard } from '@/components/user/StatCard';
 
 interface LessonProgress {
   lessonSlug: string;
@@ -81,19 +87,66 @@ function getProgressColor(percent: number) {
   return { bar: 'bg-success-emphasis', text: 'text-success-fg', badge: 'bg-success-muted text-success-fg', label: 'Completed' };
 }
 
-export function ProgressDashboardClient({ user, catalog }: {
-  user: { id: string; name?: string | null; email?: string | null; image?: string | null };
-  catalog: ProgressCatalog;
-}) {
+/** Local calendar day key (`YYYY-MM-DD`) for a timestamp. */
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Current streak in days. Walks backwards from today (or yesterday, so a
+ * streak survives until the end of the following day) counting consecutive
+ * days that have at least one completion.
+ */
+function computeStreak(completedAt: string[]): { current: number; longest: number } {
+  if (completedAt.length === 0) return { current: 0, longest: 0 };
+
+  const days = new Set(completedAt.map(dayKey));
+  const sorted = [...days].sort();
+
+  // Longest run of consecutive days anywhere in the history.
+  let longest = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(`${sorted[i - 1]}T00:00:00`);
+    const curr = new Date(`${sorted[i]}T00:00:00`);
+    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86_400_000);
+    run = diffDays === 1 ? run + 1 : 1;
+    if (run > longest) longest = run;
+  }
+
+  // Current run, anchored on today or yesterday.
+  const today = new Date();
+  let cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (!days.has(dayKey(cursor.toISOString()))) {
+    cursor = new Date(cursor.getTime() - 86_400_000);
+    if (!days.has(dayKey(cursor.toISOString()))) {
+      return { current: 0, longest };
+    }
+  }
+
+  let current = 0;
+  while (days.has(dayKey(cursor.toISOString()))) {
+    current += 1;
+    cursor = new Date(cursor.getTime() - 86_400_000);
+  }
+
+  return { current, longest };
+}
+
+export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog }) {
   const [progress, setProgress] = useState<Record<string, CategoryProgress>>({});
+  const [lastPath, setLastPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [progressRes] = await Promise.all([
+        const [progressRes, lastPathRes] = await Promise.all([
           fetch('/api/progress'),
+          fetch('/api/last-path'),
         ]);
 
         if (progressRes.ok) {
@@ -115,6 +168,11 @@ export function ProgressDashboardClient({ user, catalog }: {
           }
           setProgress(mapped);
         }
+
+        if (lastPathRes.ok) {
+          const pathData = await lastPathRes.json();
+          setLastPath(pathData.path ?? null);
+        }
       } catch (err) {
         logger.error('ProgressDashboardClient', 'Failed to fetch dashboard data:', err);
       } finally {
@@ -124,6 +182,11 @@ export function ProgressDashboardClient({ user, catalog }: {
 
     fetchData();
   }, []);
+
+  const allCompletions = useMemo(
+    () => Object.values(progress).flatMap((cat) => cat.completedLessons.map((l) => l.completedAt)),
+    [progress]
+  );
 
   const totalCompleted = useMemo(() => Object.values(progress).reduce(
     (sum, cat) => sum + cat.completedLessons.length,
@@ -143,6 +206,24 @@ export function ProgressDashboardClient({ user, catalog }: {
     if (total === 0) return 0;
     return Math.round(((lessonsCompleted + problemsCompleted + interviewCompleted) / total) * 100);
   }, [lessonsCompleted, problemsCompleted, interviewCompleted, totalLessonsCount, totalProblemsCount, totalInterviewCount]);
+
+  const { current: currentStreak, longest: longestStreak } = useMemo(
+    () => computeStreak(allCompletions),
+    [allCompletions]
+  );
+
+  const activeDays = useMemo(
+    () => new Set(allCompletions.map(dayKey)).size,
+    [allCompletions]
+  );
+
+  const minutesInvested = useMemo(
+    () =>
+      Object.values(progress)
+        .flatMap((cat) => cat.completedLessons)
+        .reduce((sum, lesson) => sum + (lesson.estimatedMinutes ?? 0), 0),
+    [progress]
+  );
 
   const courseProgressList = useMemo<CourseProgressInfo[]>(() => {
     const catalogBySlug = new Map(catalog.courses.map((course) => [course.slug, course]));
@@ -214,82 +295,127 @@ export function ProgressDashboardClient({ user, catalog }: {
       .slice(0, 10);
   }, [progress, totalCompleted]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const [progressRes, bookmarksRes, notesRes] = await Promise.all([
+        fetch('/api/progress'),
+        fetch('/api/bookmarks'),
+        fetch('/api/user/notes'),
+      ]);
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        progress: progressRes.ok ? (await progressRes.json()).progress : {},
+        bookmarks: bookmarksRes.ok ? (await bookmarksRes.json()).items : [],
+        notes: notesRes.ok ? (await notesRes.json()).notes : [],
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `interview-prep-data-${dayKey(new Date().toISOString())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      logger.error('ProgressDashboardClient', 'Failed to export data:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent-fg" />
+      <div className="space-y-6" aria-busy="true" aria-label="Loading progress">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-canvas-inset" />
+          ))}
+        </div>
+        <div className="h-64 animate-pulse rounded-xl bg-canvas-inset" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-fg-default">Progress Dashboard</h1>
-        <p className="mt-2 text-fg-muted">
-          Track your learning journey across all content types.
-        </p>
-      </div>
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-canvas p-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                activeTab === tab.id
+                  ? 'bg-accent-emphasis text-accent-fg'
+                  : 'text-fg-muted hover:text-fg-default'
+              )}
+              aria-selected={activeTab === tab.id}
+              role="tab"
+            >
+              <tab.icon className="h-4 w-4" aria-hidden="true" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-border bg-canvas p-1">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
-              activeTab === tab.id
-                ? 'bg-accent-emphasis text-accent-fg'
-                : 'text-fg-muted hover:text-fg-default'
-            )}
-            aria-selected={activeTab === tab.id}
-            role="tab"
-          >
-            <tab.icon className="h-4 w-4" aria-hidden="true" />
-            {tab.label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:border-accent-fg hover:text-fg-default disabled:opacity-50"
+        >
+          <Download className="h-4 w-4" aria-hidden="true" />
+          {exporting ? 'Exporting…' : 'Export my data'}
+        </button>
       </div>
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {lastPath && (
+            <Link
+              href={lastPath}
+              className="group flex items-center justify-between gap-4 rounded-xl border border-accent-fg/40 bg-accent-subtle p-5 transition-colors hover:border-accent-fg"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent-fg">
+                  Continue where you left off
+                </p>
+                <p className="mt-1 truncate text-sm font-medium text-fg-default">
+                  {lastPath}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-lg bg-accent-emphasis px-3 py-1.5 text-sm font-medium text-accent-fg">
+                Resume
+              </span>
+            </Link>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Lessons Completed</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{lessonsCompleted}</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-success-fg" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Problems Solved</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{problemsCompleted}</p>
-                </div>
-                <Target className="h-8 w-8 text-accent-fg" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Interviews Done</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{interviewCompleted}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-warning-fg" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-canvas p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-fg-muted">Completion Rate</p>
-                  <p className="mt-1 text-3xl font-bold text-fg-default">{completionRate}%</p>
-                </div>
-                <Award className="h-8 w-8 text-accent-fg" aria-hidden="true" />
-              </div>
-            </div>
+            <StatCard label="Lessons Completed" value={lessonsCompleted} icon={CheckCircle2} tone="success" />
+            <StatCard label="Problems Solved" value={problemsCompleted} icon={Target} tone="accent" />
+            <StatCard label="Interviews Done" value={interviewCompleted} icon={TrendingUp} tone="attention" />
+            <StatCard label="Completion Rate" value={`${completionRate}%`} icon={Award} tone="accent" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Current Streak"
+              value={`${currentStreak} ${currentStreak === 1 ? 'day' : 'days'}`}
+              icon={Flame}
+              tone="attention"
+              hint={longestStreak > currentStreak ? `Longest: ${longestStreak} days` : undefined}
+            />
+            <StatCard label="Active Days" value={activeDays} icon={CalendarDays} tone="accent" />
+            <StatCard
+              label="Time Invested"
+              value={minutesInvested >= 60 ? `${Math.round(minutesInvested / 60)}h` : `${minutesInvested}m`}
+              icon={Clock}
+              tone="done"
+              hint="Based on lesson estimates"
+            />
           </div>
 
           <div className="rounded-xl border border-border bg-canvas p-6">
@@ -298,7 +424,19 @@ export function ProgressDashboardClient({ user, catalog }: {
               <h2 className="text-lg font-semibold text-fg-default">Recent Completions</h2>
             </div>
             {recentCompletions.length === 0 ? (
-              <p className="text-sm text-fg-muted">No completions yet. Start learning!</p>
+              <EmptyState
+                icon={<CheckCircle2 className="h-10 w-10" aria-hidden="true" />}
+                title="No completions yet"
+                description="Mark a lesson as complete and it will show up here."
+                action={
+                  <Link
+                    href="/"
+                    className="rounded-lg bg-accent-emphasis px-4 py-2 text-sm font-medium text-accent-fg"
+                  >
+                    Browse courses
+                  </Link>
+                }
+              />
             ) : (
               <ul className="space-y-2">
                 {recentCompletions.map((lesson) => (
@@ -326,7 +464,11 @@ export function ProgressDashboardClient({ user, catalog }: {
             <h2 className="text-lg font-semibold text-fg-default">All Completed Lessons</h2>
           </div>
           {totalCompleted === 0 ? (
-            <p className="text-sm text-fg-muted">No completions yet. Start learning!</p>
+            <EmptyState
+              icon={<ClipboardList className="h-10 w-10" aria-hidden="true" />}
+              title="Nothing completed yet"
+              description="Your completed lessons, problems, and interview questions will be listed here."
+            />
           ) : (
             <div className="space-y-6">
               {(['lessons', 'problems', 'interviewQuestions'] as const).map((cat) => {
@@ -366,7 +508,11 @@ export function ProgressDashboardClient({ user, catalog }: {
             <h2 className="text-lg font-semibold text-fg-default">Course Level Progress</h2>
           </div>
           {courseProgressList.length === 0 ? (
-            <p className="text-sm text-fg-muted">No course progress yet. Start learning!</p>
+            <EmptyState
+              icon={<Target className="h-10 w-10" aria-hidden="true" />}
+              title="No course progress yet"
+              description="Enrol in a course and complete a lesson to see per-course progress."
+            />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {courseProgressList.map((course) => {

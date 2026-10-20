@@ -39,7 +39,10 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { category, technology, slug } = await params;
-  const lesson = getLessonBySlug(slug, 'interview-qa');
+  const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
+  if (!tech) return {};
+  // Scope by module (technology): a question slug could repeat across topics.
+  const lesson = getLessonBySlug(slug, 'interview-qa', technology);
   if (!lesson) return {};
   return buildLessonMetadata({
     title: lesson.title,
@@ -56,8 +59,8 @@ export default async function InterviewQuestionPage({ params }: Params) {
   const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
   if (!tech) notFound();
 
-  const lesson = getLessonBySlug(slug, 'interview-qa');
-  if (!lesson || lesson.moduleSlug !== technology) notFound();
+  const lesson = getLessonBySlug(slug, 'interview-qa', technology);
+  if (!lesson) notFound();
 
   const allQuestions = getInterviewQuestions(technology, category);
   const currentIdx = allQuestions.findIndex((q) => q.slug === slug);

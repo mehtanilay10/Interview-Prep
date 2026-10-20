@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useId } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, X, ArrowRight } from 'lucide-react';
@@ -50,6 +50,22 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
     const listRef = useRef<HTMLUListElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    // Two instances of this component render at once (desktop search mode +
+    // mobile menu); a hard-coded listbox id produced duplicate DOM ids and made
+    // `aria-controls` ambiguous. `useId` keeps each instance's ids unique.
+    const listId = useId();
+    // Timer that closes the suggestion list shortly after blur, so a click on a
+    // suggestion registers first. Cleared on unmount to avoid a late setState.
+    const blurTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+      return () => {
+        if (blurTimerRef.current !== null) {
+          window.clearTimeout(blurTimerRef.current);
+          blurTimerRef.current = null;
+        }
+      };
+    }, []);
 
     useImperativeHandle(ref, () => ({
       focus: () => inputRef.current?.focus(),
@@ -136,17 +152,24 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
           return;
         }
 
+        // The list has one extra selectable row beyond the suggestions: the
+        // "View all results" action, which lives at index `suggestions.length`.
+        const lastIndex = value.trim() && !loading ? suggestions.length : suggestions.length - 1;
+
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+          setSelectedIndex((prev) => (prev < lastIndex ? prev + 1 : 0));
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : lastIndex));
         } else if (e.key === 'Enter') {
           e.preventDefault();
           if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
             navigateToResult(suggestions[selectedIndex]);
           } else if (value.trim() && onSearch) {
+            onChange('');
+            setIsOpen(false);
+            setSelectedIndex(-1);
             onSearch(value.trim());
           }
         } else if (e.key === 'Escape') {
@@ -155,7 +178,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
           inputRef.current?.blur();
         }
       },
-      [isOpen, suggestions, selectedIndex, value, onSearch, navigateToResult]
+      [isOpen, suggestions, selectedIndex, value, onSearch, navigateToResult, loading, onChange]
     );
 
     const handleClear = useCallback(() => {
@@ -184,14 +207,15 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
               if (suggestions.length > 0) setIsOpen(true);
             }}
             onBlur={() => {
-              setTimeout(() => setIsOpen(false), 150);
+              if (blurTimerRef.current !== null) window.clearTimeout(blurTimerRef.current);
+              blurTimerRef.current = window.setTimeout(() => setIsOpen(false), 150);
             }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             autoFocus={autoFocus}
             role="combobox"
             aria-expanded={isOpen}
-            aria-controls="search-suggestions-list"
+            aria-controls={listId}
             aria-autocomplete="list"
             className={cn(
               'w-full rounded-lg border border-border bg-canvas text-fg-default placeholder:text-fg-subtle',
@@ -218,7 +242,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
         {isOpen && suggestions.length > 0 && (
           <ul
             ref={listRef}
-            id="search-suggestions-list"
+            id={listId}
             role="listbox"
             className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-border bg-canvas shadow-lg"
           >

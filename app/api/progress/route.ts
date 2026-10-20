@@ -3,12 +3,13 @@ import { createApiAuthHandler } from '@/lib/authMiddleware';
 import { ValidationError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { rateLimit } from '@/lib/rateLimit';
-import { ProgressPayloadSchema } from '@/lib/validators';
-import { getCached, setCache } from '@/lib/cache';
+import { ProgressEntrySchema, ProgressPayloadSchema } from '@/lib/validators';
+import { clearCache, getCached, setCache } from '@/lib/cache';
 import { lessons } from '@/content/lessons';
 import { getModuleBySlug } from '@/content/modules';
 import { getContentItemHref } from '@/lib/content-hrefs';
 import type { ProgressCategory } from '@prisma/client';
+import type { z } from 'zod';
 
 interface ProgressItem {
   lessonSlug: string;
@@ -19,8 +20,10 @@ interface ProgressItem {
   estimatedMinutes: number;
 }
 
-function isProgressCategory(value: unknown): value is ProgressCategory {
-  return value === 'lessons' || value === 'problems' || value === 'interviewQuestions';
+type ProgressEntryInput = z.infer<typeof ProgressEntrySchema>;
+
+function progressCacheKey(userId: string): string {
+  return `progress:${userId}`;
 }
 
 /**
@@ -119,40 +122,40 @@ export const POST = createApiAuthHandler(async (databaseUser, request) => {
   }
 
   const payload = parseResult.data;
-  const entries = payload.entries ?? [rawBody] as Array<{ category: ProgressCategory; lessonSlug: string; moduleSlug: string }>;
 
-  const validEntries: Array<{ category: ProgressCategory; lessonSlug: string; moduleSlug: string }> = [];
-
-  for (const entry of entries) {
-    if (
-      isProgressCategory(entry.category) &&
-      typeof entry.lessonSlug === 'string' &&
-      typeof entry.moduleSlug === 'string'
-    ) {
-      validEntries.push({
-        category: entry.category,
-        lessonSlug: entry.lessonSlug,
-        moduleSlug: entry.moduleSlug,
-      });
+  // Accept both `{ entries: [...] }` and a single entry object. The fallback
+  // is validated with the same entry schema so empty or oversized values are
+  // rejected here instead of being silently persisted.
+  let entries: ProgressEntryInput[];
+  if (payload.entries) {
+    entries = payload.entries;
+  } else {
+    const singleEntry = ProgressEntrySchema.safeParse(rawBody);
+    if (!singleEntry.success) {
+      const error = new ValidationError('Invalid progress payload');
+      logError('progress:POST', { ...error, details: singleEntry.error.issues });
+      return NextResponse.json(
+        { code: error.code, message: error.message, details: singleEntry.error.issues },
+        { status: error.statusCode }
+      );
     }
-  }
-
-  if (validEntries.length === 0 && entries.length !== 0) {
-    const error = new ValidationError('Invalid progress payload');
-    logError('progress:POST', error);
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
+    entries = [singleEntry.data];
   }
 
   try {
-    await prisma.userProgress.createMany({
-      data: validEntries.map((entry) => ({
-        userId: databaseUser.id,
-        category: entry.category,
-        lessonSlug: entry.lessonSlug,
-        moduleSlug: entry.moduleSlug,
-      })),
-      skipDuplicates: true,
-    });
+    if (entries.length > 0) {
+      await prisma.userProgress.createMany({
+        data: entries.map((entry) => ({
+          userId: databaseUser.id,
+          category: entry.category,
+          lessonSlug: entry.lessonSlug,
+          moduleSlug: entry.moduleSlug,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    // Invalidate the cached GET so the new rows are visible immediately.
+    clearCache(progressCacheKey(databaseUser.id));
   } catch (error) {
     const dbError = new DatabaseError('Failed to save progress', error);
     logError('progress:POST', dbError);
@@ -175,6 +178,8 @@ export const DELETE = createApiAuthHandler(async (databaseUser, request) => {
 
   try {
     await prisma.userProgress.deleteMany({ where: { userId: databaseUser.id } });
+    // Invalidate the cached GET so deleted rows do not reappear for 30s.
+    clearCache(progressCacheKey(databaseUser.id));
   } catch (error) {
     const dbError = new DatabaseError('Failed to delete progress', error);
     logError('progress:DELETE', dbError);

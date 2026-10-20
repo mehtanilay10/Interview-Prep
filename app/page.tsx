@@ -1,5 +1,21 @@
 import Link from 'next/link';
-import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  Compass,
+  Layers,
+  ShieldCheck,
+  Bug,
+  Terminal,
+  GitBranch,
+  Database,
+  BrainCircuit,
+  CheckCircle2,
+  Code2,
+  GraduationCap,
+  RefreshCw,
+  TrendingUp,
+} from 'lucide-react';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { getCourseStats, getAllCourses, getCourseCategory, getInterviewCategories } from '@/lib/content';
@@ -7,59 +23,94 @@ import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
 export const metadata = buildMetadata({
-  title: 'Interview Prep — Master Interview Skills & AI',
-  description: 'Comprehensive learning platform for interview preparation and AI literacy. Learn interview techniques, AI tools, programming, and more — all in one place.',
+  title: 'Quotient | Interview Prep & Career-Long Learning',
+  description:
+    'A structured learning workspace for interviews and career growth: courses, worked solutions, realistic questions, cheat sheets, and AI tooling. Build durable fundamentals and learn the why, not just the answer.',
   path: '/',
 });
+
+/** Icon per content category, so the "what's inside" band reads like a curriculum. */
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  backend: <Terminal className="h-4 w-4" aria-hidden="true" />,
+  frontend: <Code2 className="h-4 w-4" aria-hidden="true" />,
+  database: <Database className="h-4 w-4" aria-hidden="true" />,
+  devops: <GitBranch className="h-4 w-4" aria-hidden="true" />,
+  ai: <BrainCircuit className="h-4 w-4" aria-hidden="true" />,
+  architecture: <Layers className="h-4 w-4" aria-hidden="true" />,
+  fundamentals: <Compass className="h-4 w-4" aria-hidden="true" />,
+};
 
 export default function HomePage() {
   const stats = getCourseStats();
   const courses = getAllCourses().filter((c) => !c.isInterview);
   const firstCourse = courses[0];
 
-  // Interview questions are category-first, so the call to action points at the
-  // first category that hosts them.
   const [firstInterviewCategory] = getInterviewCategories();
 
-  const featureCards = [
+  // Distinct curriculum pillars — copy is specific to interview prep, not generic
+  // "we have courses" filler.
+  const pillars = [
     {
-      icon: <BookOpen className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
-      title: 'Learning Roadmaps',
-      description: 'Follow clear paths from fundamentals to advanced topics. Know exactly what to study next.',
+      icon: <Code2 className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
+      tag: 'Worked solutions',
+      title: 'Problems with multiple approaches',
+      description:
+        'Every coding problem ships with a naive solution, an optimal one, complexity analysis, and the trade-offs an interviewer actually probes.',
     },
     {
-      icon: <Zap className="h-5 w-5 text-success-fg" aria-hidden="true" />,
-      title: 'Practical Focus',
-      description: 'Every lesson connects to real-world scenarios. You\'ll apply what you learn the same day.',
+      icon: <Terminal className="h-5 w-5 text-done-fg" aria-hidden="true" />,
+      tag: 'Realistic questions',
+      title: 'Q&A by technology and depth',
+      description:
+        'Behavioural, system design, and language-specific questions grouped by difficulty — so you can drill the rounds you keep failing.',
     },
     {
-      icon: <MessageSquare className="h-5 w-5 text-done-fg" aria-hidden="true" />,
-      title: 'Interview Questions',
-      description: 'Practice with realistic interview questions and get prepared for technical interviews.',
-    },
-    {
-      icon: <Compass className="h-5 w-5 text-attention-fg" aria-hidden="true" />,
-      title: 'AI Tools Mastery',
-      description: 'Master modern AI tools like ChatGPT, Claude, and local AI for productivity.',
-    },
-    {
-      icon: <LayoutGrid className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
-      title: 'Visual Reference',
-      description: 'Diagrams, decision frameworks, and structured guides make complex topics click.',
+      icon: <Bug className="h-5 w-5 text-danger-fg" aria-hidden="true" />,
+      tag: 'The why',
+      title: 'Diagrams and decision frameworks',
+      description:
+        'Sequence diagrams, trade-off tables, and comparisons that make architecture and algorithms click instead of memorise.',
     },
     {
       icon: <ShieldCheck className="h-5 w-5 text-success-fg" aria-hidden="true" />,
-      title: 'Best Practices',
-      description: 'Learn professional standards and techniques that help you succeed in interviews and work.',
+      tag: 'Reference',
+      title: 'Cheat sheets you keep open',
+      description:
+        'Dense, correct, copy-ready snippets for C#, SQL, React, and more — the one tab you leave pinned during interviews.',
     },
   ];
 
-  const audience = [
-    { emoji: '👔', label: 'Professionals', desc: 'Enhance your interview skills and master AI tools for career growth.' },
-    { emoji: '🎓', label: 'Students', desc: 'Build a strong foundation in programming, interviews, and AI literacy.' },
-    { emoji: '🔄', label: 'Career Changers', desc: 'Learn interview techniques and modern tech skills to transition successfully.' },
-    { emoji: '🤖', label: 'AI Enthusiasts', desc: 'Master AI tools, prompting, and automation to boost productivity.' },
-    { emoji: '💻', label: 'Developers', desc: 'Sharpen technical skills, prepare for coding interviews, and learn AI-assisted development.' },
+  // Career-growth pillars — the long-run story: fundamentals, leveling up,
+  // learning by doing, and staying current/consistent.
+  const careerPillars = [
+    {
+      icon: <GraduationCap className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
+      tag: 'Fundamentals',
+      title: 'Foundations that compound',
+      description:
+        'Ordered modules across fundamentals, backend, frontend, databases, DevOps, AI, and architecture - explained in plain language first, then deepened with trade-offs.',
+    },
+    {
+      icon: <TrendingUp className="h-5 w-5 text-done-fg" aria-hidden="true" />,
+      tag: 'Growth',
+      title: 'From junior to senior',
+      description:
+        'Every topic starts simple and adds complexity gradually, so you can revisit the same ideas at a deeper level as your responsibilities grow.',
+    },
+    {
+      icon: <Code2 className="h-5 w-5 text-danger-fg" aria-hidden="true" />,
+      tag: 'Practice',
+      title: 'Learning by doing',
+      description:
+        'Try each problem before reading on, then compare your approach against worked solutions, diagrams, and cheat sheets you will reuse at work.',
+    },
+    {
+      icon: <RefreshCw className="h-5 w-5 text-success-fg" aria-hidden="true" />,
+      tag: 'Momentum',
+      title: 'Current skills, steady habits',
+      description:
+        'AI tooling and modern stacks sit alongside the classics, while progress, bookmarks, and notes make a little learning every week easy to keep up.',
+    },
   ];
 
   return (
@@ -67,38 +118,77 @@ export default function HomePage() {
       <HeroSection
         totalLessons={stats.totalLessons}
         totalHours={stats.totalHours}
+        totalCourses={courses.length}
         startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
         interviewHref={
-          firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/'
+          firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/search'
         }
       />
 
-      {/* Who is this for */}
+      {/* How it works — a small editorial 3-step strip */}
       <section className="border-b border-border bg-canvas-subtle py-12">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHeader
-            eyebrow="Who this is for"
-            title="Learning for everyone"
-            description="Whether you're preparing for interviews, learning AI tools, or mastering programming skills — this platform was built for you."
-            align="center"
+            eyebrow="How it works"
+            title="From blank stare to structured thinking"
+            description="No gamified streaks, no hollow progress bars. Just the loop that moves the needle - whether you are prepping for next week or growing for the next five years."
           />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {audience.map((item) => (
-              <article
-                key={item.label}
-                className="group flex items-start gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+          <ol className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                n: '01',
+                title: 'Pick a topic',
+                body: 'Start from a category like Backend or Database and follow a module end to end.',
+              },
+              {
+                n: '02',
+                title: 'Work the problem',
+                body: 'Read the prompt, try it yourself, then compare against the worked approaches.',
+              },
+              {
+                n: '03',
+                title: 'Track the gaps',
+                body: 'Bookmark, take notes, and mark lessons complete to see what still needs work.',
+              },
+            ].map((step) => (
+              <li
+                key={step.n}
+                className="relative rounded-xl border border-border bg-canvas p-5 transition-colors hover:border-accent-fg/50"
               >
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas-inset text-xl"
-                  aria-hidden="true"
-                >
-                  {item.emoji}
+                <span className="font-mono text-sm font-semibold text-accent-fg">{step.n}</span>
+                <h3 className="mt-2 font-semibold text-fg-default">{step.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* Curriculum — content-derived category band, not a fake feature grid */}
+      <section className="border-b border-border py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <SectionHeader
+            eyebrow="What's inside"
+            title="A curriculum, not a content dump"
+            description="Every category is organised into modules and ordered lessons — here's the shape of it."
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {pillars.map((pillar) => (
+              <article
+                key={pillar.title}
+                className="group flex gap-4 rounded-xl border border-border bg-canvas p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-canvas-inset">
+                  {pillar.icon}
                 </span>
                 <div>
-                  <p className="font-semibold text-fg-default text-sm group-hover:text-accent-fg transition-colors">
-                    {item.label}
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-fg">
+                    {pillar.tag}
                   </p>
-                  <p className="text-sm text-fg-muted mt-0.5">{item.desc}</p>
+                  <h3 className="mt-1 font-semibold text-fg-default">{pillar.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                    {pillar.description}
+                  </p>
                 </div>
               </article>
             ))}
@@ -106,29 +196,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="border-b border-border py-12">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      {/* Career growth — the long-run story beyond interview week */}
+      <section className="border-b border-border bg-canvas-subtle py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHeader
-            eyebrow="What's included"
-            title="Everything you need to learn and grow"
+            eyebrow="Beyond interview week"
+            title="Built for the career, not just the interview"
+            description="Interviews are a milestone, not the finish line. The same material that gets you through the loop is what keeps you growing as an engineer - and the progress tools keep you consistent between the big goals."
           />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {featureCards.map((card) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {careerPillars.map((pillar) => (
               <article
-                key={card.title}
-                className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                key={pillar.title}
+                className="group flex gap-4 rounded-xl border border-border bg-canvas p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas-inset"
-                  aria-hidden="true"
-                >
-                  {card.icon}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-canvas-inset">
+                  {pillar.icon}
                 </span>
-                <h3 className="text-sm font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
-                  {card.title}
-                </h3>
-                <p className="text-sm text-fg-muted">{card.description}</p>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-fg">
+                    {pillar.tag}
+                  </p>
+                  <h3 className="mt-1 font-semibold text-fg-default">{pillar.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                    {pillar.description}
+                  </p>
+                </div>
               </article>
             ))}
           </div>
@@ -137,60 +230,109 @@ export default function HomePage() {
 
       {/* Courses preview */}
       <section className="border-b border-border py-12">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <SectionHeader
-            eyebrow="Learning paths"
-            title="Browse courses"
-            description="Self-contained paths built for beginners and working professionals alike."
-          />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.slice(0, 6).map((course: Course) => (
-              <Link
-                key={course.id}
-              href={`/${getCourseCategory(course.slug)}/courses/${course.slug}`}
-                className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-              >
-                <span className="text-3xl" aria-hidden="true">{course.icon}</span>
-                <h3 className="text-sm font-semibold text-fg-default group-hover:text-accent-fg transition-colors">
-                  {course.title}
-                </h3>
-                <p className="line-clamp-2 text-sm text-fg-muted flex-1">
-                  {course.subtitle}
-                </p>
-                <span className="flex items-center gap-1 text-xs text-fg-subtle">
-                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                  {formatCourseHours(course)} read
-                </span>
-              </Link>
-            ))}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeader
+              eyebrow="Start here"
+              title="Popular courses"
+              description="Self-contained paths built for beginners and working professionals alike."
+              className="mb-0"
+            />
+            <Link
+              href={firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/search'}
+              className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-accent-fg hover:text-accent-emphasis"
+            >
+              Browse all questions
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.slice(0, 6).map((course: Course) => {
+              const category = getCourseCategory(course.slug);
+              const Icon = CATEGORY_ICONS[category] ?? <Layers className="h-4 w-4" aria-hidden="true" />;
+              return (
+                <Link
+                  key={course.id}
+                  href={`/${category}/courses/${course.slug}`}
+                  className="group flex flex-col gap-3 rounded-xl border border-border bg-canvas p-5 transition-all hover:-translate-y-0.5 hover:border-accent-fg/50 hover:shadow-md"
+                >
+                  <div className="flex items-center gap-2 text-xs font-medium text-fg-subtle">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-canvas-inset text-accent-fg">
+                      {Icon}
+                    </span>
+                    <span className="capitalize">{category}</span>
+                  </div>
+                  <h3 className="text-base font-semibold text-fg-default transition-colors group-hover:text-accent-fg">
+                    {course.title}
+                  </h3>
+                  <p className="line-clamp-2 flex-1 text-sm leading-relaxed text-fg-muted">
+                    {course.subtitle}
+                  </p>
+                  <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
+                    <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                    {course.moduleSlugs.length} modules &middot; {formatCourseHours(course)} read
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* CTA strip */}
+      {/* CTA */}
       <section className="py-16">
-        <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
-          <div className="mx-auto max-w-xl rounded-2xl border border-accent-subtle bg-accent-subtle/40 px-6 py-10">
-            <h2 className="mb-3 text-2xl font-bold text-fg-default">
-              Ready to start learning?
-            </h2>
-            <p className="mb-6 text-fg-muted">
-              Start with any course — no account needed, no cost. Master interviews, AI tools, and programming skills.
-            </p>
-            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
-                className="flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent-emphasis"
-              >
-                Start Learning
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <Link
-                href="/roadmaps"
-                className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
-              >
-                View Roadmaps
-              </Link>
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-canvas px-6 py-12 text-center">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.04]"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle at 1px 1px, var(--color-fg-default) 1px, transparent 0)',
+                backgroundSize: '24px 24px',
+              }}
+            />
+            <div className="relative">
+              <h2 className="text-balance text-2xl font-bold tracking-tight text-fg-default sm:text-3xl">
+                Walk in ready. Keep growing after.
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-fg-muted">
+                Free, open, and no account required. Master the reasoning behind interviews,
+                AI tooling, and programming — then track your progress when you&apos;re ready.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  href={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
+                  className="group inline-flex items-center gap-2 rounded-lg bg-accent-fg px-5 py-3 font-medium text-white transition-colors hover:bg-accent-emphasis"
+                >
+                  Start learning
+                  <ArrowRight
+                    className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                </Link>
+                <Link
+                  href="/search"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-3 font-medium text-fg-default transition-colors hover:bg-canvas-subtle"
+                >
+                  Search everything
+                </Link>
+              </div>
+              <p className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-fg-subtle">
+                <span className="inline-flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success-fg" aria-hidden="true" />
+                  No sign-up to read
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success-fg" aria-hidden="true" />
+                  Progress syncs when you log in
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success-fg" aria-hidden="true" />
+                  Open source
+                </span>
+              </p>
             </div>
           </div>
         </div>

@@ -161,7 +161,9 @@ export function MermaidRenderer({ definition, caption, className }: MermaidRende
           mermaid.initialize({
             startOnLoad: false,
             theme: mermaidTheme,
-            securityLevel: 'loose',
+            // `strict` sanitizes diagram content and disables raw HTML/click
+            // handlers, preventing XSS from lesson-authored mermaid blocks.
+            securityLevel: 'strict',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             fontSize: 16,
           });

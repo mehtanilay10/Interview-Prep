@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
-const SITE_NAME = 'Interview Prep';
+const SITE_NAME = 'Quotient';
 const DEFAULT_DESCRIPTION =
   'AI-powered interview preparation course. Master AI tools, prompting, automation, and modern workflows for technical interviews.';
 

@@ -5,6 +5,7 @@ import { type User } from '@prisma/client';
 import { AuthError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { ensureCsrfCookie, validateCsrf } from '@/lib/csrf';
+import { rateLimit } from '@/lib/rateLimit';
 
 export async function getAuthenticatedUser() {
   const session = await auth();
@@ -27,6 +28,17 @@ export function createApiAuthHandler(
 ) {
   const { requireCsrf = true } = options;
   return async (request: Request): Promise<NextResponse> => {
+    // Blanket throttle that runs before auth and CSRF validation so that
+    // probing credentials or tokens never bypasses rate limiting. Uses its
+    // own counter (`label`) so it does not consume the handler's quota.
+    const preAuthLimit = rateLimit(request, { limit: 60, windowMs: 60_000, label: 'api-auth' });
+    if (!preAuthLimit.allowed) {
+      return NextResponse.json(
+        { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((preAuthLimit.retryAfterMs ?? 1000) / 1000)) } }
+      );
+    }
+
     const user = await requireAuthenticatedUser();
     if (user instanceof NextResponse) {
       return user;

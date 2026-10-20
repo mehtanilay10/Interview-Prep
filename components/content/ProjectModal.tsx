@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { X, Clock, Wrench, Star } from 'lucide-react';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { formatHours } from '@/lib/utils';
 import type { MiniProject } from '@/types';
 
@@ -23,11 +24,8 @@ export function ProjectModal({ project, onClose }: ProjectModalProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  // Lock body scroll while open
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+  // Lock body scroll while open (restores the previous value on close)
+  useBodyScrollLock(true);
 
   // Focus trap — focus the dialog on open
   useEffect(() => {

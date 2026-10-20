@@ -7,8 +7,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      // API routes are internal; /user/* is login-gated account data.
-      disallow: ['/api/', '/user/'],
+      // API routes are internal; every account page under /user is login-gated.
+      disallow: ['/api/', '/login', '/user/'],
     },
     sitemap: `${BASE_URL}/sitemap.xml`,
   };

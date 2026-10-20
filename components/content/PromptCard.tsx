@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
@@ -14,11 +14,15 @@ interface PromptCardProps {
 export function PromptCard({ prompt, className }: PromptCardProps) {
   const [copied, setCopied] = useState(false);
   const [showExample, setShowExample] = useState(false);
+  // Clear the "Copied!" reset timer on unmount to avoid a late setState.
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(prompt.template);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const categoryColorMap: Record<string, string> = {

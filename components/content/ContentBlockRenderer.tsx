@@ -1,10 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { CalloutBox } from '@/components/ui/CalloutBox';
-import { cn } from '@/lib/utils';
+import { usePreferencesContext } from '@/components/user/PreferencesProvider';
+import { cn, computeHeadingAnchors } from '@/lib/utils';
 import type { ContentBlock } from '@/types';
 import { isContentBlock, isLesson, isModule } from '@/lib/typeGuards';
 import { ImageModal } from './ImageModal';
@@ -77,12 +78,23 @@ interface ContentBlockRendererProps {
 
 function CustomCodeBlock({ code, language }: { code: string; language?: string }) {
   const { resolvedTheme } = useTheme();
+  const { preferences, mounted } = usePreferencesContext();
   const [copied, setCopied] = useState(false);
+  // When the user turns off "auto-expand code blocks", long snippets start
+  // collapsed. Short ones are always shown to avoid pointless extra clicks.
+  const isLong = code.split('\n').length > 12;
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = mounted && !preferences.autoExpandCode && isLong && !expanded;
+  // "Copied!" auto-resets after a moment; clear the timer on unmount so it can't
+  // fire a state update on a component that is already gone.
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
@@ -93,27 +105,45 @@ function CustomCodeBlock({ code, language }: { code: string; language?: string }
         <span className="text-xs font-medium text-fg-muted uppercase tracking-wider">
           {language || 'code'}
         </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded-md px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-canvas hover:text-fg-default"
-          aria-label={copied ? 'Copied' : 'Copy code'}
-        >
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
+        <div className="flex items-center gap-1">
+          {isLong && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-md px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-canvas hover:text-fg-default"
+              aria-expanded={!collapsed}
+            >
+              {collapsed ? 'Show code' : 'Hide code'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-md px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-canvas hover:text-fg-default"
+            aria-label={copied ? 'Copied' : 'Copy code'}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
       </div>
-      <div className="overflow-x-auto bg-canvas text-sm">
-        <ShikiHighlighter
-          language={language || 'text'}
-          theme={shikiTheme}
-          showLineNumbers
-          startingLineNumber={1}
-          addDefaultStyles={false}
-          className="rs-code-block"
-        >
-          {code}
-        </ShikiHighlighter>
-      </div>
+      {collapsed ? (
+        <div className="bg-canvas-subtle px-4 py-3 text-xs text-fg-muted">
+          Code hidden — {code.split('\n').length} lines. Use “Show code” to view it.
+        </div>
+      ) : (
+        <div className="overflow-x-auto bg-canvas text-sm">
+          <ShikiHighlighter
+            language={language || 'text'}
+            theme={shikiTheme}
+            showLineNumbers
+            startingLineNumber={1}
+            addDefaultStyles={false}
+            className="rs-code-block"
+          >
+            {code}
+          </ShikiHighlighter>
+        </div>
+      )}
     </div>
   );
 }
@@ -229,7 +259,7 @@ function renderSolutionBlock(block: ContentBlock & { type: 'solution' }, idx: nu
   );
 }
 
-function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
+function renderBlock(block: ContentBlock, idx: number, headingAnchors?: Map<number, string>): React.ReactNode {
   switch (block.type) {
     case 'paragraph':
       return (
@@ -244,7 +274,7 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       }
       const level = block.data.level;
       const text = block.data.text;
-      const anchor = block.data.anchor;
+      const anchor = headingAnchors?.get(idx) ?? block.data.anchor;
       if (!level || !text) return null;
       const Tag = `h${level}` as 'h2' | 'h3' | 'h4';
       const sizeMap = { 2: 'text-xl', 3: 'text-lg', 4: 'text-base' };
@@ -419,32 +449,31 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       );
 
     case 'checklist':
-        return null;
-        //   return (
-        //     <div key={idx} className="my-4 rounded-xl border border-border bg-canvas-subtle p-4">
-        //       {block.data.title && (
-        //         <h4 className="mb-3 font-semibold text-fg-default">{block.data.title}</h4>
-        //       )}
-        //       <ul className="space-y-2">
-        //         {block.data.items.map((item, i) => (
-        //           <li key={i} className="flex items-start gap-2 text-sm">
-        //             <span
-        //               className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border bg-canvas text-fg-subtle"
-        //               aria-hidden="true"
-        //             >
-        //               ✓
-        //             </span>
-        //             <div>
-        //               <span className="text-fg-default">{renderInlineMarkdown(item.text)}</span>
-        //               {item.hint && (
-        //                 <span className="ml-1 text-xs text-fg-muted">— {renderInlineMarkdown(item.hint)}</span>
-        //               )}
-        //             </div>
-        //           </li>
-        //         ))}
-        //       </ul>
-        //     </div>
-        //   );
+      return (
+        <div key={idx} className="my-4 rounded-xl border border-border bg-canvas-subtle p-4">
+          {block.data.title && (
+            <h4 className="mb-3 font-semibold text-fg-default">{block.data.title}</h4>
+          )}
+          <ul className="space-y-2">
+            {block.data.items.map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm">
+                <span
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border bg-canvas text-fg-subtle"
+                  aria-hidden="true"
+                >
+                  ✓
+                </span>
+                <div>
+                  <span className="text-fg-default">{renderInlineMarkdown(item.text)}</span>
+                  {item.hint && (
+                    <span className="ml-1 text-xs text-fg-muted">— {renderInlineMarkdown(item.hint)}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
 
     case 'mermaid':
       return (
@@ -569,7 +598,15 @@ function renderBlock(block: ContentBlock, idx: number): React.ReactNode {
       return <ImageBlock key={idx} block={block} />;
 
     default:
-      throw new Error(`Unsupported content block type: ${(block as ContentBlock).type}`);
+      // Rendering an unsupported block type should never crash the whole
+      // lesson page; skip it instead of throwing (a new block type can appear
+      // in content before the renderer ships).
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `[ContentBlockRenderer] Unsupported content block type: ${(block as ContentBlock).type}`
+        );
+      }
+      return null;
   }
 }
 
@@ -797,9 +834,21 @@ function normalizeBlock(block: ContentBlock): ContentBlock {
 export function ContentBlockRenderer({ blocks, className }: ContentBlockRendererProps) {
   const normalizedBlocks = blocks.map(normalizeBlock);
 
+  // Compute the same anchors the table of contents derives, keyed by block
+  // index, so every heading gets an `id` even when the source block omits
+  // `anchor`. Without this, TOC links point at ids that were never rendered.
+  const headingAnchors = computeHeadingAnchors(
+    normalizedBlocks.flatMap((block, index) => {
+      if (block.type !== 'heading') return [];
+      const data = (block as { data?: { text?: string; anchor?: string } }).data;
+      const text = data?.text ?? (block as { text?: string }).text;
+      return [{ index, block: { text, anchor: data?.anchor } }];
+    })
+  );
+
   return (
     <div className={cn('lesson-prose', className)}>
-      {normalizedBlocks.map((block, idx) => renderBlock(block, idx))}
+      {normalizedBlocks.map((block, idx) => renderBlock(block, idx, headingAnchors))}
     </div>
   );
 }

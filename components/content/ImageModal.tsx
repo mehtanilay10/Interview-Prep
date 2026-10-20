@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import Image from 'next/image';
 
 interface ImageModalProps {
@@ -22,6 +23,7 @@ export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
   const [zoom, setZoom] = useState(1);
 
   useFocusTrap(dialogRef, true);
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -30,13 +32,6 @@ export function ImageModal({ src, alt, caption, onClose }: ImageModalProps) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
 
   useEffect(() => {
     dialogRef.current?.focus();

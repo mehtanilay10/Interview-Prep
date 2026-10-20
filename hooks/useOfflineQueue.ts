@@ -43,10 +43,6 @@ export function useOfflineQueue() {
 
   const [serverQueue, setServerQueue] = useState<OfflineQueueItem[] | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [syncedToServer, setSyncedToServer] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const serverQueueRef = useRef(serverQueue);
-  serverQueueRef.current = serverQueue;
   const hasLoadedQueueRef = useRef(false);
 
   useEffect(() => {
@@ -56,15 +52,12 @@ export function useOfflineQueue() {
   useEffect(() => {
     if (!isLoggedIn || hasLoadedQueueRef.current) return;
     hasLoadedQueueRef.current = true;
-    setIsInitialLoad(true);
-    setSyncedToServer(false);
     let cancelled = false;
     fetchQueueFromServer().then((data) => {
       if (cancelled) return;
       if (data) {
         setServerQueue(data);
       }
-      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -72,19 +65,8 @@ export function useOfflineQueue() {
   }, [isLoggedIn]); // intentionally ignore serverQueue to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverQueueRef.current || isInitialLoad) return;
-    const lastItem = serverQueueRef.current[serverQueueRef.current.length - 1];
-    if (lastItem) {
-      syncQueueToServer(lastItem);
-    }
-    setSyncedToServer(true);
-  }, [isLoggedIn, serverQueue, isInitialLoad]);
-
-  useEffect(() => {
     if (isLoggedOut) {
       setServerQueue(null);
-      setSyncedToServer(false);
-      setIsInitialLoad(true);
       hasLoadedQueueRef.current = false;
     }
   }, [isLoggedOut]);
@@ -113,9 +95,11 @@ export function useOfflineQueue() {
         const next = prev
           ? [...prev.filter((q) => !(q.courseSlug === courseSlug && q.moduleSlug === moduleSlug && q.lessonSlug === lessonSlug)), item]
           : [item];
-        syncQueueToServer(item);
         return next;
       });
+      // Sync outside the state updater: updaters must be pure (React may run
+      // them twice), so the network call happens after the state is committed.
+      syncQueueToServer(item);
     },
     [isLoggedIn]
   );

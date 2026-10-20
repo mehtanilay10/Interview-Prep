@@ -3,7 +3,7 @@ import { createApiAuthHandler } from '@/lib/authMiddleware';
 import { ValidationError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { rateLimit } from '@/lib/rateLimit';
-import { NotePayloadSchema } from '@/lib/validators';
+import { NoteDeleteSchema, NotePayloadSchema } from '@/lib/validators';
 import { getLessonBySlug } from '@/lib/content';
 import { getContentItemHref } from '@/lib/content-hrefs';
 
@@ -120,23 +120,17 @@ export const DELETE = createApiAuthHandler(async (databaseUser, request) => {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const payload = rawBody as Record<string, unknown>;
-  if (
-    !rawBody ||
-    typeof rawBody !== 'object' ||
-    typeof payload.courseSlug !== 'string' ||
-    typeof payload.moduleSlug !== 'string' ||
-    typeof payload.lessonSlug !== 'string'
-  ) {
+  const parseResult = NoteDeleteSchema.safeParse(rawBody);
+  if (!parseResult.success) {
     const error = new ValidationError('Invalid note delete payload');
-    logError('notes:DELETE', error);
+    logError('notes:DELETE', { ...error, details: parseResult.error.issues });
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const { courseSlug, moduleSlug, lessonSlug } = payload;
+  const { courseSlug, moduleSlug, lessonSlug } = parseResult.data;
 
   try {
-    await prisma.userLessonNote.deleteMany({
+    const result = await prisma.userLessonNote.deleteMany({
       where: {
         userId: databaseUser.id,
         courseSlug,
@@ -144,11 +138,12 @@ export const DELETE = createApiAuthHandler(async (databaseUser, request) => {
         lessonSlug,
       },
     });
+    // Report how many rows were removed so the client can tell a real delete
+    // from a no-op (e.g. deleting a note that no longer exists).
+    return NextResponse.json({ ok: true, deleted: result.count });
   } catch (error) {
     const dbError = new DatabaseError('Failed to delete note', error);
     logError('notes:DELETE', dbError);
     return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
   }
-
-  return NextResponse.json({ ok: true });
 });

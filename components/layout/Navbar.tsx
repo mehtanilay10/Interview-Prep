@@ -4,13 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3, ChevronDown } from "lucide-react";
+import { Menu, X, Search, LogOut, User, Settings2, Bookmark, StickyNote, BarChart3, AlertTriangle, CloudOff, ChevronDown } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { PWAInstallButton } from "@/components/ui/PWAInstallButton";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
 import { SearchErrorBoundary } from "@/components/ui/SearchErrorBoundary";
 import { cn } from "@/lib/utils";
-import { registerShortcut } from "@/hooks/useKeyboardShortcuts";
+import { registerShortcut, unregisterShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useSession, signOut } from "next-auth/react";
 
 export interface NavbarSection {
@@ -92,6 +92,21 @@ export function Navbar({ categories }: NavbarProps) {
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
     });
+    // Unregister on unmount / re-register so a stale handler (which could call
+    // setState on an unmounted component) is never left in the global registry.
+    return () => unregisterShortcut('/');
+  }, [searchMode]);
+
+  // Focus the search input whenever search mode turns on, so opening search via
+  // the navbar button lands the caret in the field ready to type.
+  useEffect(() => {
+    if (!searchMode) return;
+    // The input is rendered in the same commit; wait a frame so the ref is set.
+    const id = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [searchMode]);
 
   useEffect(() => {
@@ -148,6 +163,26 @@ export function Navbar({ categories }: NavbarProps) {
           </button>
           {userMenuOpen && (
             <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
+              <div className="border-b border-border px-4 py-2">
+                <p className="truncate text-sm font-medium text-fg-default">{session.user.name}</p>
+                <p className="truncate text-xs text-fg-muted">{session.user.email}</p>
+              </div>
+              <Link
+                href="/user/profile"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <User className="h-4 w-4" aria-hidden="true" />
+                Profile
+              </Link>
+              <Link
+                href="/user/personalization"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <Settings2 className="h-4 w-4" aria-hidden="true" />
+                Personalization
+              </Link>
               <Link
                 href="/user/progress"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
@@ -173,19 +208,27 @@ export function Navbar({ categories }: NavbarProps) {
                 Notes
               </Link>
               <Link
-                href="/user/personalization"
+                href="/user/offline"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
                 onClick={() => setUserMenuOpen(false)}
               >
-                <Settings2 className="h-4 w-4" aria-hidden="true" />
-                Personalization
+                <CloudOff className="h-4 w-4" aria-hidden="true" />
+                Saved offline
+              </Link>
+              <Link
+                href="/user/danger-zone"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                Danger Zone
               </Link>
               <button
                 onClick={() => {
                   setUserMenuOpen(false);
                   handleSignOut();
                 }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+                className="flex w-full items-center gap-2 border-t border-border px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
                 Sign out
@@ -195,7 +238,7 @@ export function Navbar({ categories }: NavbarProps) {
         </div>
       ) : (
         <Link
-          href="/user/login"
+          href="/login"
           className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
         >
           Sign in
@@ -216,7 +259,7 @@ export function Navbar({ categories }: NavbarProps) {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold text-fg-default hover:text-accent-fg transition-colors">
           <Logo className="w-8 h-8" />
-          <span className="text-base">Interview Prep</span>
+          <span className="text-base">Quotient</span>
         </Link>
 
         {searchMode ? (

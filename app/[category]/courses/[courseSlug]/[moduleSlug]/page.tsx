@@ -9,6 +9,7 @@ import {
   getModuleBySlug,
   getLessonsForModule,
   getCourseCategory,
+  isRegularCourse,
   toLessonNavItem,
 } from '@/lib/content';
 import { buildModuleMetadata } from '@/lib/seo';
@@ -37,7 +38,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
   const { category, courseSlug, moduleSlug } = resolvedParams;
-  const mod = getModuleBySlug(moduleSlug);
+  const course = getCourseBySlug(courseSlug);
+  if (!course || !isRegularCourse(course)) return {};
+  if (category !== getCourseCategory(courseSlug)) return {};
+  // Scope the lookup to the course so a module slug belonging to another
+  // course cannot produce metadata for a page that will 404.
+  const mod = getModuleBySlug(moduleSlug, courseSlug);
   if (!mod) return {};
   return buildModuleMetadata({
     title: mod.title,
@@ -59,7 +65,7 @@ export default async function CourseModuleDetailPage({ params }: Params) {
   const course = getCourseBySlug(courseSlug);
   const courseModules = getModulesForCourse(courseSlug);
   const mod = courseModules.find((m) => m.slug === moduleSlug);
-  if (!course || !mod || course.category === 'problems') notFound();
+  if (!course || !mod || !isRegularCourse(course)) notFound();
 
   // Validate category matches
   const expectedCategory = getCourseCategory(courseSlug);

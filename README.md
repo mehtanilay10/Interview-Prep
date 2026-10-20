@@ -1,6 +1,6 @@
-# Interview Prep
+# Quotient
 
-A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, SQL problem sets, an AI glossary, prompt templates, and learning roadmaps. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
+A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, SQL problem sets, an AI glossary, and prompt templates. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
 
 ---
 
@@ -91,7 +91,7 @@ interview-prep/
 │   ├── page.tsx                            # Home page
 │   ├── globals.css                         # Global styles + CSS custom properties
 │   ├── sitemap.ts                          # Auto-generated sitemap (de-duplicated)
-│   ├── robots.ts                           # robots.txt (disallows /api/ and /user/)
+│   ├── robots.ts                           # robots.txt (disallows /api/, /login, and /user/)
 │   ├── error.tsx / global-error.tsx        # App-level error boundaries
 │   ├── not-found.tsx / loading.tsx         # App-level 404 and loading UI
 │   ├── [category]/                         # ai | architecture | backend | database | devops | frontend | fundamentals
@@ -105,27 +105,45 @@ interview-prep/
 │   │   ├── problems/
 │   │   │   ├── page.tsx                    # Category problem listing
 │   │   │   └── [courseSlug]/...            # Problem course/module/lesson routes
-│   │   └── cheatsheets/
-│   │       ├── page.tsx                    # Category cheat sheet listing
-│   │       └── [technology]/page.tsx       # Individual cheat sheet
-│   ├── interview-questions/
-│   │   ├── page.tsx                        # Interview question listing
-│   │   └── [technology]/
-│   │       ├── page.tsx                    # Technology-specific questions
-│   │       └── [slug]/page.tsx             # Individual question
+│   │   ├── cheatsheets/
+│   │   │   ├── page.tsx                    # Category cheat sheet listing
+│   │   │   └── [technology]/page.tsx       # Individual cheat sheet
+│   │   └── interview-questions/
+│   │       ├── page.tsx                    # Category interview question listing
+│   │       └── [technology]/
+│   │           ├── page.tsx                # Technology-specific questions
+│   │           └── [slug]/page.tsx         # Individual question
 │   ├── ai/
 │   │   ├── glossary/page.tsx               # AI glossary (searchable)
 │   │   └── prompts/page.tsx                # Prompt template library
-│   ├── roadmaps/page.tsx                   # Learning roadmaps
-│   ├── search/page.tsx                     # Search page
-│   ├── user/
-│   │   ├── login/page.tsx                  # Google sign-in page
+│   ├── search/
+│   │   ├── page.tsx                        # Search page
+│   │   └── SearchClient.tsx                # Search results (client)
+│   ├── login/page.tsx                      # Google sign-in page
+│   ├── user/                               # Account area (all auth-gated)
+│   │   ├── layout.tsx                      # Shared shell + vertical UserNav sidebar
+│   │   ├── page.tsx                        # Redirects to /user/profile
+│   │   ├── profile/
+│   │   │   ├── page.tsx                    # Account details and activity summary
+│   │   │   └── ProfileClient.tsx           # Account details (client)
+│   │   ├── personalization/
+│   │   │   ├── page.tsx                    # Preferences
+│   │   │   └── PersonalizationClient.tsx   # Preferences (client)
 │   │   ├── progress/
 │   │   │   ├── page.tsx                    # Progress dashboard (server, auth-gated)
 │   │   │   └── ProgressDashboardClient.tsx # Progress dashboard (client)
-│   │   ├── bookmarks/page.tsx              # Bookmarks (auth-gated)
-│   │   ├── notes/page.tsx                  # Lesson notes (auth-gated)
-│   │   └── personalization/page.tsx        # Preferences (auth-gated)
+│   │   ├── bookmarks/
+│   │   │   ├── page.tsx                    # Bookmarks (auth-gated)
+│   │   │   └── BookmarksClient.tsx         # Bookmarks (client)
+│   │   ├── notes/
+│   │   │   ├── page.tsx                    # Lesson notes (auth-gated)
+│   │   │   └── NotesClient.tsx             # Lesson notes (client)
+│   │   ├── offline/
+│   │   │   ├── page.tsx                    # Lessons queued for offline reading (auth-gated)
+│   │   │   └── OfflineQueueClient.tsx      # Offline queue (client)
+│   │   └── danger-zone/
+│   │       ├── page.tsx                    # Irreversible account resets (auth-gated)
+│   │       └── DangerZone.tsx              # Danger zone actions (client)
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts     # NextAuth API route
 │       ├── progress/route.ts               # Progress CRUD API
@@ -136,12 +154,14 @@ interview-prep/
 │           ├── theme/route.ts              # User theme preference API
 │           ├── preferences/route.ts        # Personalization preferences API
 │           ├── offline-queue/route.ts      # Offline action queue API
-│           └── notes/route.ts              # Lesson notes API (resolves titles/hrefs)
+│           ├── notes/route.ts              # Lesson notes API (resolves titles/hrefs)
+│           ├── account-summary/route.ts    # Account created date + item counts
+│           └── account-reset/route.ts      # Reset one data group (danger zone)
 │
 ├── components/
 │   ├── layout/
 │   │   ├── Navbar.tsx                      # Sticky top nav (content-driven category menus)
-│   │   ├── Footer.tsx                      # Site footer with link columns
+│   │   ├── Footer.tsx                      # Minimal footer: brand + outbound links
 │   │   ├── Breadcrumbs.tsx                 # Breadcrumb navigation
 │   │   ├── LessonSidebar.tsx               # Course/module/lesson sidebar
 │   │   └── MobileLessonDrawer.tsx          # Mobile lesson drawer
@@ -162,6 +182,9 @@ interview-prep/
 │   │   ├── PWAInstallButton.tsx            # In-app install prompt
 │   │   ├── ErrorBoundary.tsx               # Generic error boundary + fallback
 │   │   ├── Skeleton.tsx                    # Loading skeleton
+│   │   ├── Logo.tsx                        # Brand logo mark
+│   │   ├── CalloutBox.tsx                  # Semantic callout (note/tip/warning)
+│   │   ├── EmptyState.tsx                  # Empty-state placeholder
 │   │   ├── PrintButton.tsx                 # Print lesson button
 │   │   └── PdfDownloadButton.tsx           # Download lesson as PDF
 │   ├── auth/
@@ -181,7 +204,12 @@ interview-prep/
 │   │   ├── ImageModal.tsx                  # Zoomable image modal
 │   │   ├── FurtherReading.tsx              # Further reading links section
 │   │   ├── GlossarySearch.tsx              # Client-side glossary filter
-│   │   └── PromptCard.tsx                  # Prompt template card (copy button)
+│   │   ├── PromptCard.tsx                  # Prompt template card (copy button)
+│   │   ├── ProjectCard.tsx                 # Project card (projects sections)
+│   │   ├── ProjectModal.tsx                # Project detail modal
+│   │   └── ToolComparisonCard.tsx          # Side-by-side tool comparison card
+│   ├── interview/
+│   │   └── InterviewTechnologyCard.tsx     # Interview technology card
 │   ├── sections/
 │   │   ├── HeroSection.tsx                 # Home page hero
 │   │   └── SectionHeader.tsx               # Reusable eyebrow+title+description
@@ -201,6 +229,10 @@ interview-prep/
 │   │   ├── NotesModal.tsx                  # Notes editor modal
 │   │   ├── NotesModalContext.tsx           # Notes modal context
 │   │   └── OfflineSaveButton.tsx           # Offline save indicator
+│   ├── user/
+│   │   ├── UserNav.tsx                     # Vertical account sidebar (USER_NAV_ITEMS)
+│   │   ├── PreferencesProvider.tsx         # Applies appearance prefs to <html>
+│   │   └── StatCard.tsx                    # Account stat tile
 │   └── app/
 │       └── ErrorBoundaryWrapper.tsx        # Error boundary wrapper for page content
 │
@@ -208,12 +240,12 @@ interview-prep/
 │   ├── [category]/                         # ai | architecture | backend | database | devops | frontend | fundamentals
 │   │   ├── courses/                        # Structured courses
 │   │   ├── problems/                       # Coding problems
-│   │   └── cheatsheet/                     # Cheat sheets by technology
-│   ├── interview-qa/                       # Interview Q&A by technology
+│   │   ├── cheatsheet/                     # Cheat sheets by technology
+│   │   └── interview-qa/                   # Interview Q&A by technology
 │   ├── ai/glossary/                        # AI glossary terms
 │   ├── ai/prompts/                         # AI prompt templates
-│   ├── ai/roadmaps/                        # Roadmap definitions
 │   ├── cheatsheet.json                     # Cheatsheet section metadata
+│   ├── interview-qa.json                   # Interview-qa section metadata
 │   ├── courses.ts                          # Auto-generated course exports
 │   ├── modules.ts                          # Auto-generated module definitions
 │   ├── lessons.ts                          # Auto-generated lesson definitions
@@ -223,6 +255,7 @@ interview-prep/
 │   ├── useProgress.ts                      # Hybrid progress tracking (localStorage + Neon DB)
 │   ├── useBookmarks.ts                     # Hybrid bookmark tracking (localStorage + Neon DB)
 │   ├── useLocalStorage.ts                  # Generic typesafe localStorage hook
+│   ├── useBodyScrollLock.ts                # Lock body scroll while a modal is open
 │   ├── useUserTheme.ts                     # User theme preference hook
 │   ├── useUserPreferences.ts               # Personalization (font size, density, motion, landing page)
 │   ├── useOfflineQueue.ts                  # Offline action queue hook
@@ -260,10 +293,10 @@ interview-prep/
 ├── scripts/
 │   ├── schema.sql                          # Idempotent PostgreSQL schema equivalent
 │   ├── vercel-build.js                     # Vercel build entrypoint
-│   └── generate-content-indices.ts         # Regenerate content index files
+│   ├── generate-content-indices.ts         # Regenerate content index files
+│   └── test-content.ts                     # Content validation test suite (`yarn test:content`)
 │
 ├── auth.ts                                 # NextAuth v5 configuration
-├── test-content.ts                         # Content validation test suite (`yarn test:content`)
 ├── public/
 │   └── manifest.json                       # PWA manifest
 ├── next.config.ts
@@ -299,11 +332,10 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 |---|---|---|
 | Courses | `content/[category]/courses/` | Structured learning modules |
 | Problems | `content/[category]/problems/` | Coding problems with multiple solutions |
-| Interview Q&A | `content/interview-qa/` | Technology-grouped interview questions |
+| Interview Q&A | `content/[category]/interview-qa/` | Technology-grouped interview questions |
 | Cheat sheets | `content/[category]/cheatsheet/` | Quick-reference code examples |
 | AI glossary | `content/ai/glossary/` | Glossary terms served at `/ai/glossary` |
 | Prompt templates | `content/ai/prompts/` | Prompt library served at `/ai/prompts` |
-| Roadmaps | `content/ai/roadmaps/` | Learning roadmaps served at `/roadmaps` |
 
 ### Adding a new lesson
 

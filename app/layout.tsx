@@ -5,10 +5,11 @@ import { PWARegistration } from '@/components/ui/PWARegistration';
 import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { getNavigationCategories, getPopularCourses } from '@/lib/content';
+import { getNavigationCategories } from '@/lib/content';
 import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { PreferencesProvider } from '@/components/user/PreferencesProvider';
 import { ErrorBoundaryWrapper } from '@/components/app/ErrorBoundaryWrapper';
 import { ProgressProvider } from '@/components/progress/ProgressProvider';
 import { BookmarkProvider } from '@/components/bookmarks/BookmarkProvider';
@@ -18,13 +19,13 @@ const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: {
-    default: 'Interview Prep — Interview Preparation',
-    template: '%s | Interview Prep',
+    default: 'Quotient — Interview Preparation',
+    template: '%s | Quotient',
   },
   description:
     'Interview preparation course. Learn the skills, techniques, and strategies to succeed in technical interviews.',
   keywords: ['interview prep', 'interview skills', 'interview preparation', 'career'],
-  authors: [{ name: 'Interview Prep' }],
+  authors: [{ name: 'Quotient' }],
   robots: { index: true, follow: true },
   manifest: '/manifest.json',
   icons: {
@@ -36,12 +37,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Interview Prep',
+    title: 'Quotient',
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    siteName: 'Interview Prep',
+    siteName: 'Quotient',
   },
 };
 
@@ -51,7 +52,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const categories = getNavigationCategories();
-  const popularCourses = getPopularCourses();
 
   return (
     <html lang="en" suppressHydrationWarning className={inter.className}>
@@ -63,18 +63,20 @@ export default function RootLayout({
         <AuthProvider>
           <ProgressProvider>
             <BookmarkProvider>
-              <PWARegistration />
-              <ContinuePrompt />
-              <ThemeProvider>
-                <Navbar categories={categories} />
-                <main id="main-content" className="flex-1">
-                  <ErrorBoundaryWrapper>
-                    {children}
-                  </ErrorBoundaryWrapper>
-                </main>
-                <Footer categories={categories} popularCourses={popularCourses} />
-                <OfflineIndicator />
-              </ThemeProvider>
+              <PreferencesProvider>
+                <PWARegistration />
+                <ContinuePrompt />
+                <ThemeProvider>
+                  <Navbar categories={categories} />
+                  <main id="main-content" className="flex-1">
+                    <ErrorBoundaryWrapper>
+                      {children}
+                    </ErrorBoundaryWrapper>
+                  </main>
+                  <Footer />
+                  <OfflineIndicator />
+                </ThemeProvider>
+              </PreferencesProvider>
             </BookmarkProvider>
           </ProgressProvider>
         </AuthProvider>

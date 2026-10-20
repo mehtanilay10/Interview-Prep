@@ -16,6 +16,7 @@ import {
   toLessonNavItems,
 } from '@/lib/content';
 import type { LessonNavItem } from '@/types';
+import { buildLessonMetadata } from '@/lib/seo';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { FurtherReading } from '@/components/content/FurtherReading';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
@@ -54,12 +55,18 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
   const { moduleSlug, lessonSlug, courseSlug } = resolvedParams;
-  const lesson = getLessonBySlug(lessonSlug, courseSlug);
+  const course = getCourseBySlug(courseSlug);
+  if (!course || course.category !== 'problems') return {};
+  // Scope by module: a lesson slug can repeat across modules in the same course.
+  const lesson = getLessonBySlug(lessonSlug, courseSlug, moduleSlug);
   if (!lesson) return {};
-  return {
+  return buildLessonMetadata({
     title: `${lesson.title} — Problems`,
     description: lesson.description,
-  };
+    moduleSlug,
+    lessonSlug,
+    basePath: `/${getCourseCategory(courseSlug)}/problems/${courseSlug}`,
+  });
 }
 
 export default async function ProblemDetailPage({ params }: Params) {
@@ -73,8 +80,8 @@ export default async function ProblemDetailPage({ params }: Params) {
     notFound();
   }
   const course = getCourseBySlug(courseSlug);
-  const lesson = getLessonBySlug(lessonSlug, courseSlug);
-  const mod = getModuleBySlug(moduleSlug);
+  const lesson = getLessonBySlug(lessonSlug, courseSlug, moduleSlug);
+  const mod = getModuleBySlug(moduleSlug, courseSlug);
 
   if (!course || !lesson || !mod || course.category !== 'problems') notFound();
 
@@ -100,7 +107,9 @@ export default async function ProblemDetailPage({ params }: Params) {
     lessonsByModule[m.slug] = toLessonNavItems(getLessonsForModule(m.slug, courseSlug));
   }
 
-  // Related lessons
+  // Related lessons resolve within the course by slug; a related slug is
+  // authored against the course, so the module is unknown here — fall back to a
+  // course-scoped lookup.
   const relatedLessons = (lesson.relatedLessons ?? [])
     .map((slug) => getLessonBySlug(slug, courseSlug))
     .filter(Boolean) as NonNullable<ReturnType<typeof getLessonBySlug>>[];

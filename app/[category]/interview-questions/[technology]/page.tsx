@@ -33,10 +33,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
   if (!tech) return {};
   const meta = getCategoryMeta(category);
-  return {
+  return buildMetadata({
     title: `${tech.title} Interview Questions`,
     description: `${tech.questionCount} ${meta.label} ${tech.title} interview questions with detailed answers.`,
-  };
+    path: `/${category}/interview-questions/${technology}`,
+  });
 }
 
 export default async function InterviewTechnologyPage({ params }: Params) {

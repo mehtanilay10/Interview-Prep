@@ -3,12 +3,12 @@ import { createApiAuthHandler } from '@/lib/authMiddleware';
 import { ValidationError, DatabaseError } from '@/lib/errorHandler';
 import { logError } from '@/lib/errorHandler';
 import { rateLimit } from '@/lib/rateLimit';
-import { BookmarkPayloadSchema } from '@/lib/validators';
-import { getCached, setCache } from '@/lib/cache';
+import { BookmarkDeleteSchema, BookmarkEntrySchema, BookmarkPayloadSchema } from '@/lib/validators';
+import { clearCache, getCached, setCache } from '@/lib/cache';
 import type { BookmarkType } from '@prisma/client';
 
-function isBookmarkType(value: unknown): value is BookmarkType {
-  return value === 'lesson' || value === 'problem' || value === 'interview' || value === 'cheatsheet';
+function bookmarksCacheKey(userId: string): string {
+  return `bookmarks:${userId}`;
 }
 
 export const GET = createApiAuthHandler(async (databaseUser) => {
@@ -76,52 +76,42 @@ export const POST = createApiAuthHandler(async (databaseUser, request) => {
   }
 
   const payload = parseResult.data;
-  const items = payload.items ?? ([rawBody] as Array<{ type: BookmarkType; slug: string; title: string; courseSlug: string; moduleSlug: string }>);
 
-  const validItems: Array<{
-    type: BookmarkType;
-    slug: string;
-    title: string;
-    courseSlug: string;
-    moduleSlug: string;
-  }> = [];
-
-  for (const item of items) {
-    if (
-      isBookmarkType(item.type) &&
-      typeof item.slug === 'string' &&
-      typeof item.title === 'string' &&
-      typeof item.courseSlug === 'string' &&
-      typeof item.moduleSlug === 'string'
-    ) {
-      validItems.push({
-        type: item.type,
-        slug: item.slug,
-        title: item.title,
-        courseSlug: item.courseSlug,
-        moduleSlug: item.moduleSlug,
-      });
+  // Accept both `{ items: [...] }` and a single bookmark object. The fallback
+  // is validated with the same entry schema so empty or oversized values are
+  // rejected here instead of being silently persisted.
+  let items: Array<{ type: BookmarkType; slug: string; title: string; courseSlug: string; moduleSlug: string }>;
+  if (payload.items) {
+    items = payload.items;
+  } else {
+    const singleItem = BookmarkEntrySchema.safeParse(rawBody);
+    if (!singleItem.success) {
+      const error = new ValidationError('Invalid bookmark payload');
+      logError('bookmarks:POST', { ...error, details: singleItem.error.issues });
+      return NextResponse.json(
+        { code: error.code, message: error.message, details: singleItem.error.issues },
+        { status: error.statusCode }
+      );
     }
-  }
-
-  if (validItems.length === 0 && items.length !== 0) {
-    const error = new ValidationError('Invalid bookmark payload');
-    logError('bookmarks:POST', error);
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
+    items = [singleItem.data];
   }
 
   try {
-    await prisma.userBookmark.createMany({
-      data: validItems.map((item) => ({
-        userId: databaseUser.id,
-        type: item.type,
-        slug: item.slug,
-        title: item.title,
-        courseSlug: item.courseSlug,
-        moduleSlug: item.moduleSlug,
-      })),
-      skipDuplicates: true,
-    });
+    if (items.length > 0) {
+      await prisma.userBookmark.createMany({
+        data: items.map((item) => ({
+          userId: databaseUser.id,
+          type: item.type,
+          slug: item.slug,
+          title: item.title,
+          courseSlug: item.courseSlug,
+          moduleSlug: item.moduleSlug,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    // Invalidate the cached GET so the new rows are visible immediately.
+    clearCache(bookmarksCacheKey(databaseUser.id));
   } catch (error) {
     const dbError = new DatabaseError('Failed to save bookmarks', error);
     logError('bookmarks:POST', dbError);
@@ -151,34 +141,46 @@ export const DELETE = createApiAuthHandler(async (databaseUser, request) => {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const payload = rawBody as Record<string, unknown>;
-  if (
-    !rawBody ||
-    typeof rawBody !== 'object' ||
-    typeof payload.slug !== 'string' ||
-    typeof payload.type !== 'string' ||
-    !isBookmarkType(payload.type)
-  ) {
+  const cacheKey = bookmarksCacheKey(databaseUser.id);
+
+  // `{ all: true }` removes every bookmark for the user (used by
+  // "clear all" flows). Otherwise a single `{ slug, type }` is required.
+  if (rawBody && typeof rawBody === 'object' && (rawBody as Record<string, unknown>).all === true) {
+    try {
+      const result = await prisma.userBookmark.deleteMany({ where: { userId: databaseUser.id } });
+      clearCache(cacheKey);
+      return NextResponse.json({ ok: true, deleted: result.count });
+    } catch (error) {
+      const dbError = new DatabaseError('Failed to delete bookmarks', error);
+      logError('bookmarks:DELETE', dbError);
+      return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
+    }
+  }
+
+  const parseResult = BookmarkDeleteSchema.safeParse(rawBody);
+  if (!parseResult.success) {
     const error = new ValidationError('Invalid bookmark delete payload');
-    logError('bookmarks:DELETE', error);
+    logError('bookmarks:DELETE', { ...error, details: parseResult.error.issues });
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.statusCode });
   }
 
-  const { slug, type } = payload;
+  const { slug, type } = parseResult.data;
 
   try {
-    await prisma.userBookmark.deleteMany({
+    const result = await prisma.userBookmark.deleteMany({
       where: {
         userId: databaseUser.id,
         slug,
         type,
       },
     });
+    clearCache(cacheKey);
+    // Report how many rows were removed so the client can tell a real delete
+    // from a no-op (e.g. deleting a slug that no longer exists).
+    return NextResponse.json({ ok: true, deleted: result.count });
   } catch (error) {
     const dbError = new DatabaseError('Failed to delete bookmarks', error);
     logError('bookmarks:DELETE', dbError);
     return NextResponse.json({ code: dbError.code, message: dbError.message }, { status: dbError.statusCode });
   }
-
-  return NextResponse.json({ ok: true });
 });

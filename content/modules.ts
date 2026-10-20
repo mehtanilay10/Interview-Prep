@@ -1199,7 +1199,8 @@ const rawModules: any[] = [...rawModulesPart1, ...rawModulesPart2];
 
 export const modules: Module[] = rawModules as unknown as Module[];
 
-export function getModuleBySlug(slug: string): Module | undefined {
+export function getModuleBySlug(slug: string, courseSlug?: string): Module | undefined {
+	if (courseSlug) return modules.find((m) => m.slug === slug && m.courseSlug === courseSlug);
 	return modules.find((m) => m.slug === slug);
 }
 

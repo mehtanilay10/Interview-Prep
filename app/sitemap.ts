@@ -16,7 +16,6 @@ function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRo
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [
     toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/roadmaps`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/ai/glossary`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/ai/prompts`, 0.8, 'weekly'),

@@ -16,6 +16,35 @@ export function slugify(text: string): string {
     .trim();
 }
 
+/** Minimal shape needed to derive a heading anchor. */
+interface HeadingLike {
+  text?: string;
+  anchor?: string;
+}
+
+/**
+ * Derives stable, unique DOM ids for a list of headings.
+ *
+ * Both the table of contents and the heading renderer use this so their
+ * anchors always match. Headings without an explicit `anchor` get a slug of
+ * their text; duplicates get a numeric suffix (`-1`, `-2`, …). The result is
+ * keyed by block index so callers can look an anchor up per rendered block.
+ */
+export function computeHeadingAnchors(
+  headings: { index: number; block: HeadingLike }[]
+): Map<number, string> {
+  const seen = new Map<string, number>();
+  const anchors = new Map<number, string>();
+  for (const { index, block } of headings) {
+    const base = block.anchor || slugify(block.text ?? '');
+    if (!base) continue;
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    anchors.set(index, count === 0 ? base : `${base}-${count}`);
+  }
+  return anchors;
+}
+
 /** Capitalize the first letter of each word */
 export function titleCase(str: string): string {
   return str

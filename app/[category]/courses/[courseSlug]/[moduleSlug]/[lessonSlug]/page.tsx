@@ -12,6 +12,7 @@ import {
   getLessonsForCourse,
   extractTOC,
   getCourseCategory,
+  isRegularCourse,
   toLessonNavItem,
   toLessonNavItems,
 } from '@/lib/content';
@@ -59,7 +60,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
   const { category, moduleSlug, lessonSlug, courseSlug } = resolvedParams;
-  const lesson = getLessonBySlug(lessonSlug, courseSlug);
+  const course = getCourseBySlug(courseSlug);
+  if (!course || !isRegularCourse(course)) return {};
+  if (category !== getCourseCategory(courseSlug)) return {};
+  // Scope by module: a lesson slug can repeat across modules in the same course.
+  const lesson = getLessonBySlug(lessonSlug, courseSlug, moduleSlug);
   if (!lesson) return {};
   return buildLessonMetadata({
     title: lesson.title,
@@ -81,10 +86,10 @@ export default async function CourseLessonDetailPage({ params }: Params) {
     notFound();
   }
   const course = getCourseBySlug(courseSlug);
-  const lesson = getLessonBySlug(lessonSlug, courseSlug);
-  const mod = getModuleBySlug(moduleSlug);
+  const lesson = getLessonBySlug(lessonSlug, courseSlug, moduleSlug);
+  const mod = getModuleBySlug(moduleSlug, courseSlug);
 
-  if (!course || !lesson || !mod || course.category === 'problems') notFound();
+  if (!course || !lesson || !mod || !isRegularCourse(course)) notFound();
 
   // Validate category matches
   const expectedCategory = getCourseCategory(courseSlug);

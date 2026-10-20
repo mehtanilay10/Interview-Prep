@@ -80,7 +80,10 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [syncedToServer, setSyncedToServer] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [prevLoggedIn, setPrevLoggedIn] = useState(isLoggedIn);
+  const [prevLoggedIn, setPrevLoggedIn] = useState(false);
+  // Start at `false` (not `isLoggedIn`) so that when the session resolves to
+  // authenticated — including on remounts where it is already authenticated —
+  // the login transition always fires and local data is synced to the server.
   const serverBookmarksRef = useRef(serverBookmarks);
   serverBookmarksRef.current = serverBookmarks;
   // Guard against re-syncing the same snapshot repeatedly.
@@ -130,6 +133,9 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
       setServerBookmarks(null);
       setSyncedToServer(false);
       setIsInitialLoad(true);
+      // Reset the snapshot guard so a different account logging in on this
+      // device always performs a fresh fetch and sync.
+      lastSyncedRef.current = null;
     }
   }, [isLoggedOut]);
 
@@ -220,7 +226,23 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   const resetBookmarks = useCallback(() => {
     if (!isLoggedIn) return;
     setServerBookmarks(DEFAULT_BOOKMARKS);
-    syncBookmarksToServerFn(DEFAULT_BOOKMARKS);
+    // Prevent the sync effect from re-POSTing the empty snapshot.
+    lastSyncedRef.current = JSON.stringify(DEFAULT_BOOKMARKS);
+    // The POST endpoint is insert-only (it can never delete rows), so a reset
+    // must go through the DELETE endpoint or the bookmarks would reappear on
+    // the next fetch.
+    retryWithBackoff(async () => {
+      const res = await apiFetch('/api/bookmarks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to reset bookmarks: ${res.status}`);
+      }
+    }, { maxRetries: 3, initialDelay: 500, maxDelay: 2000, jitter: true }).catch((err) => {
+      logger.warn('BookmarkProvider', 'Failed to reset bookmarks on server', err);
+    });
   }, [isLoggedIn]);
 
   const value = useMemo(

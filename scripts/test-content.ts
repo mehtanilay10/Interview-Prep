@@ -11,8 +11,8 @@ import {
   isProblemCourseSlug,
   getInterviewCategories,
   getInterviewTechnologies,
-} from './lib/content';
-import type { Module, Lesson } from './types';
+} from '@/lib/content';
+import type { Module, Lesson } from '@/types';
 import fs from 'fs';
 import path from 'path';
 

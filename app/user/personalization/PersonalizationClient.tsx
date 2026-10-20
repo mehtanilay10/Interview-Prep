@@ -1,21 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { useSession } from 'next-auth/react';
 import { useUserPreferences, type UserPreferences } from '@/hooks/useUserPreferences';
-import { useUserTheme } from '@/hooks/useUserTheme';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
-import { User, Settings2, Palette, BookOpen, Accessibility, ChevronDown } from 'lucide-react';
-import Image from 'next/image';
+import { Settings2, Palette, BookOpen, Accessibility, ChevronDown } from 'lucide-react';
 
 interface PersonalizationClientProps {
-  user: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-  };
   /** Destinations offered for the "Default landing page" preference. */
   landingPages: LandingPageOption[];
 }
@@ -136,90 +126,26 @@ function Toggle({
   );
 }
 
-export function PersonalizationClient({ user, landingPages }: PersonalizationClientProps) {
-  const { data: session } = useSession();
-  const isLoggedIn = !!session?.user;
+export function PersonalizationClient({ landingPages }: PersonalizationClientProps) {
   const { preferences, updatePreference, mounted } = useUserPreferences();
-  const { theme, setTheme } = useUserTheme();
 
-  const htmlClasses = useMemo(() => {
-    if (!mounted) return '';
-    const classes = [preferences.fontSize ? `font-size-${preferences.fontSize}` : 'font-size-md'];
-    if (preferences.codeFontSize) {
-      classes.push(`font-size-code-${preferences.codeFontSize}`);
-    }
-    if (preferences.density) {
-      classes.push(`density-${preferences.density}`);
-    }
-    if (preferences.reducedMotion) {
-      classes.push('reduced-motion');
-    }
-    return classes.join(' ');
-  }, [mounted, preferences.fontSize, preferences.codeFontSize, preferences.density, preferences.reducedMotion]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const classesToRemove = [
-      'font-size-sm', 'font-size-md', 'font-size-lg', 'font-size-xl',
-      'font-size-code-sm', 'font-size-code-md', 'font-size-code-lg',
-      'density-comfortable', 'density-compact',
-      'reduced-motion',
-    ];
-    classesToRemove.forEach((cls) => root.classList.remove(cls));
-    if (htmlClasses) {
-      htmlClasses.split(' ').forEach((cls) => {
-        if (cls) root.classList.add(cls);
-      });
-    }
-  }, [htmlClasses]);
+  // Appearance classes (font size, density, reduced motion) are applied
+  // globally by PreferencesProvider in the root layout, so this page only
+  // needs to render the controls.
 
   if (!mounted) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="h-8 w-64 animate-pulse rounded bg-canvas-inset" />
-        <div className="mt-6 space-y-4">
-          <div className="h-48 animate-pulse rounded-xl bg-canvas-inset" />
-          <div className="h-64 animate-pulse rounded-xl bg-canvas-inset" />
-        </div>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading preferences">
+        <div className="h-32 animate-pulse rounded-xl bg-canvas-inset" />
+        <div className="h-48 animate-pulse rounded-xl bg-canvas-inset" />
+        <div className="h-64 animate-pulse rounded-xl bg-canvas-inset" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-fg-default">Personalization</h1>
-        <p className="mt-2 text-fg-muted">
-          Customize your learning experience to match your preferences.
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-canvas p-6">
-          <SectionHeading icon={User} title="Profile" description="Your account information" />
-          <div className="flex items-center gap-4">
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt=""
-                width={56}
-                height={56}
-                className="h-14 w-14 rounded-full object-cover border border-border"
-                unoptimized
-              />
-            ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-canvas-subtle text-fg-muted">
-                <User className="h-6 w-6" aria-hidden="true" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-fg-default truncate">{user.name || 'User'}</p>
-              <p className="text-sm text-fg-muted truncate">{user.email}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-border bg-canvas p-6">
+    <div className="space-y-6">
+      <section className="rounded-xl border border-border bg-canvas p-6">
           <SectionHeading icon={Palette} title="Appearance" description="Visual theme and text size" />
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-4">
@@ -252,13 +178,13 @@ export function PersonalizationClient({ user, landingPages }: PersonalizationCli
             />
             <Toggle
               label="Show completed lessons"
-              description="Display completed lessons in lists and progress views"
+              description="Keep completed lessons visible in course and module lists"
               checked={preferences.showCompleted}
               onChange={(value) => updatePreference('showCompleted', value)}
             />
             <Toggle
               label="Auto-expand code blocks"
-              description="Automatically expand code blocks when viewing lessons"
+              description="Expand long code blocks automatically instead of starting collapsed"
               checked={preferences.autoExpandCode}
               onChange={(value) => updatePreference('autoExpandCode', value)}
             />
@@ -309,7 +235,6 @@ export function PersonalizationClient({ user, landingPages }: PersonalizationCli
             </div>
           </div>
         </section>
-      </div>
     </div>
   );
 }

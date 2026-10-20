@@ -1,6 +1,6 @@
 # AGENTS.md — Instructions for AI Coding Agents
 
-This file gives instructions to AI coding agents (GitHub Copilot, Claude, Cursor, etc.) working on the Interview Prep codebase.
+This file gives instructions to AI coding agents (GitHub Copilot, Claude, Cursor, etc.) working on the Quotient codebase.
 
 Read this before making any changes.
 
@@ -8,7 +8,7 @@ Read this before making any changes.
 
 ## Project overview
 
-Interview Prep is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering interview preparation. It includes:
+Quotient is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering interview preparation. It includes:
 - Structured courses (C#, SQL, React, ASP.NET Core, OOP, etc.)
 - Coding problems with multiple solutions (`content/<category>/problems/`)
 - Interview Q&A organized by category and technology (`content/<category>/interview-qa/`)
@@ -93,7 +93,6 @@ content/
   ai/
     glossary/                 # AI glossary terms (glossary/<topic>/[term].json)
     prompts/                  # AI prompt templates (prompts/<topic>/[prompt].json)
-    roadmaps/                 # Roadmap definitions (roadmaps/[course]-roadmap.json)
   courses.ts                  # Auto-generated exports all courses
   modules.ts                  # Auto-generated exports all modules (courses + problems + cheatsheet + interview-qa)
   lessons.ts                  # Auto-generated exports all lessons (courses + problems + cheatsheet + interview-qa)
@@ -207,15 +206,27 @@ See `types/index.ts` for the full list. Current types:
 - `/[category]/interview-questions` — Category interview question listing
 - `/[category]/interview-questions/[technology]` — Technology-specific questions
 - `/[category]/interview-questions/[technology]/[slug]` — Individual question
-- `/roadmaps` — Learning roadmaps
 - `/ai/glossary` — AI glossary
 - `/ai/prompts` — Prompt templates
 - `/search` — Search page
-- `/user/login` — Google sign-in page
+- `/login` — Google sign-in page
+- `/user` — Account area root; redirects to `/user/profile`
+- `/user/profile` — Account details and activity summary (requires login)
+- `/user/personalization` — Preferences (requires login)
 - `/user/progress` — Progress dashboard (requires login)
 - `/user/bookmarks` — Bookmarks (requires login)
 - `/user/notes` — Lesson notes (requires login)
-- `/user/personalization` — Preferences (requires login)
+- `/user/offline` — Lessons queued for offline reading (requires login)
+- `/user/danger-zone` — Irreversible account resets (requires login)
+
+All authenticated pages except `/login` live in the `app/user/` directory
+(exact URLs are `/user/…` — not a route group), which supplies the shared
+header and the vertical `UserNav` sidebar (`components/user/UserNav.tsx`) and
+performs the auth redirect in `app/user/layout.tsx`. Account sections are
+ordered: profile, personalization, progress, bookmarks, notes, offline,
+danger zone — keep that order in `USER_NAV_ITEMS` and in the `Navbar` user
+menu. Add new account pages there rather than at
+`app/<page>` so they inherit the shell and the login gate.
 
 There are no longer top-level `/courses`, `/problems`, `/cheatsheet`, or
 `/interview-questions` pages — those listings live under each category
@@ -223,8 +234,8 @@ There are no longer top-level `/courses`, `/problems`, `/cheatsheet`, or
 
 ## Navigation and indexing
 
-The top navigation bar and the footer's "Browse by Category" column are computed
-server-side from content — there are no hardcoded category lists:
+The top navigation bar is computed server-side from content — there are no
+hardcoded category lists:
 
 - `getNavigationCategories()` in `lib/content.ts` builds the nav-bar category
   dropdowns (desktop + mobile accordion) from the content directory structure.
@@ -236,18 +247,20 @@ server-side from content — there are no hardcoded category lists:
   `CATEGORY_META` / `CATEGORY_ORDER` in `lib/content.ts`. Categories listed in
   `HIDDEN_CATEGORIES` (currently `fundamentals`) are intentionally omitted from
   the nav bar but remain browsable by URL.
-- The footer's static columns are the `LEARN_LINKS`, `ACCOUNT_LINKS`, and
-  `ABOUT_LINKS` arrays in `components/layout/Footer.tsx`; "Popular Courses"
-  comes from `getPopularCourses()`.
+- The footer is deliberately small: the first part is the brand plus a
+  description of what the site is for, the second part is the `EXTERNAL_LINKS`
+  array in `components/layout/Footer.tsx` (GitHub, Author, YouTube). It takes
+  no props — do not add content columns back to it.
 - `app/sitemap.ts` lists the static top-level routes and then walks all content.
   It de-duplicates URLs, so a page may appear in both places safely.
   Do **not** add login-gated `/user/*` pages to the sitemap.
-- `app/robots.ts` allows everything except `/api/` and `/user/` and points crawlers
-  at the sitemap.
+- `app/robots.ts` allows everything except `/api/`, `/login`, and `/user/` and
+  points crawlers at the sitemap.
 
 Whenever you add a new top-level page:
-1. Add it to the appropriate link array in `components/layout/Footer.tsx`
-   (or to a nav category section in `lib/content.ts` if it belongs under a category)
+1. If it belongs under a category, add it to a nav category section in
+   `lib/content.ts`; the footer only holds the brand block and the three
+   outbound links, so most pages do not belong there
 2. Add it to `app/sitemap.ts` in the static routes array (unless it requires login)
 3. If the page should be crawl-restricted, add it to `app/robots.ts`
 4. Add it to the Routes list above
@@ -277,8 +290,11 @@ Module order within a course is determined by the `order` field in each module's
   - `app/api/user/offline-queue/route.ts` — GET/POST offline action queue
   - `app/api/user/notes/route.ts` — GET/POST/DELETE lesson notes
   - `app/api/user/preferences/route.ts` — GET/POST personalization preferences (font size, density, motion, landing page)
+  - `app/api/user/account-summary/route.ts` — GET account created date + item counts for the profile page
+  - `app/api/user/account-reset/route.ts` — DELETE one data group (`progress`, `bookmarks`, `notes`, `offline`) for the danger zone
   - `app/api/search/route.ts` — GET search
-- The progress dashboard at `/user/progress` is a protected route that redirects unauthenticated users to `/user/login`.
+- The progress dashboard at `/user/progress` is a protected route that redirects unauthenticated users to `/login`; every route under `/user/` is gated the same way by `app/user/layout.tsx`.
+- Appearance preferences (font size, code font size, density, reduced motion) are applied to `<html>` app-wide by `components/user/PreferencesProvider.tsx`, which wraps the app in `app/layout.tsx`. Components read preferences (including `showCompleted` and `autoExpandCode`) through `usePreferencesContext()` from the same file — never call `useUserPreferences()` directly in a shared component, and remember consumers must be client components.
 
 ---
 
@@ -288,7 +304,7 @@ Module order within a course is determined by the `order` field in each module's
 - Use the existing types from `types/index.ts` — extend them don't bypass them
 - Run `yarn typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
-- Content-free href/slug helpers (`getContentItemHref`, `getSearchResultHref`, `getCourseCategory`, `isProblemCourseSlug`, `getInterviewTechSlug`, `getInterviewTechName`) live in `lib/content-hrefs.ts` (re-exported from `lib/content.ts`) so client components can build links without bundling lesson JSON
+- Content-free href/slug helpers (`getContentItemHref`, `getSearchResultHref`, `getCourseCategory`, `isProblemCourseSlug`, `getInterviewTechSlug`, `getInterviewTechName`, `getInterviewTechCategory`) live in `lib/content-hrefs.ts` (re-exported from `lib/content.ts`) so client components can build links without bundling lesson JSON. Category/URL filters (`isRegularCourse`) live in `lib/content.ts`.
 - **`'use client'` components must never import `@/lib/content` directly.** That module pulls in every lesson JSON file (~19 MB), which bloats the client bundle for every page. Pass content data down as props from a server component, enrich it in an API route, or import the lightweight `@/lib/content-hrefs` / `@/content/categories` helpers instead
 - SEO metadata helpers (`buildMetadata`, `buildLessonMetadata`, `buildModuleMetadata`) live in `lib/seo.ts`
 - Auth helpers live in `lib/auth.ts`

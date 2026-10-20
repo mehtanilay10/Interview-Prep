@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { logger } from '@/lib/logger';
@@ -41,6 +41,9 @@ export function useUserTheme() {
 
   const [serverTheme, setServerTheme] = useState<Theme | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Set when the value below was just fetched from the server, so the sync
+  // effect does not echo it straight back (write amplification -> 429s).
+  const skipNextSyncRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -50,6 +53,7 @@ export function useUserTheme() {
     if (isLoggedIn && !serverTheme) {
       fetchThemeFromServer().then((data) => {
         if (data) {
+          skipNextSyncRef.current = true;
           setServerTheme(data);
           setTheme(data);
         }
@@ -58,14 +62,20 @@ export function useUserTheme() {
   }, [isLoggedIn, serverTheme, setTheme]);
 
   useEffect(() => {
-    if (isLoggedIn && serverTheme) {
-      syncThemeToServer(serverTheme);
+    if (!isLoggedIn || !serverTheme) return;
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
     }
+    syncThemeToServer(serverTheme);
   }, [isLoggedIn, serverTheme]);
 
   const updateTheme = useCallback(
     (theme: Theme) => {
       if (isLoggedIn) {
+        // A user-initiated change must always be synced; cancel any pending
+        // "skip echo" from an in-flight server fetch.
+        skipNextSyncRef.current = false;
         setServerTheme(theme);
       }
       setTheme(theme);

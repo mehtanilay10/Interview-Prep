@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ModuleCard } from '@/components/course/ModuleCard';
-import { getAllCourses, getCourseBySlug, getModulesForCourse, getCourseCategory } from '@/lib/content';
+import { getAllCourses, getCourseBySlug, getModulesForCourse, getCourseCategory, isRegularCourse } from '@/lib/content';
+import { buildMetadata } from '@/lib/seo';
 import { CourseErrorBoundary } from '@/components/course/CourseErrorBoundary';
 
 interface Params {
@@ -18,13 +19,17 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
-  const { courseSlug } = resolvedParams;
+  const { category, courseSlug } = resolvedParams;
   const course = getCourseBySlug(courseSlug);
-  if (!course) return {};
-  return {
+  // Only genuine courses render here; problems/cheatsheets/interview-qa have
+  // their own route trees.
+  if (!course || !isRegularCourse(course)) return {};
+  if (category !== getCourseCategory(courseSlug)) return {};
+  return buildMetadata({
     title: course.title,
     description: course.description,
-  };
+    path: `/${category}/courses/${courseSlug}`,
+  });
 }
 
 export default async function CourseDetailPage({ params }: Params) {
@@ -36,7 +41,9 @@ export default async function CourseDetailPage({ params }: Params) {
     notFound();
   }
   const course = getCourseBySlug(courseSlug);
-  if (!course || course.category === 'problems') notFound();
+  // Only genuine courses render here; problems/cheatsheets/interview-qa have
+  // their own route trees.
+  if (!course || !isRegularCourse(course)) notFound();
 
   // Validate category matches
   const expectedCategory = getCourseCategory(courseSlug);

@@ -51,10 +51,6 @@ export function useLessonNotes() {
 
   const [serverNotes, setServerNotes] = useState<LessonNote[] | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [syncedToServer, setSyncedToServer] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const serverNotesRef = useRef(serverNotes);
-  serverNotesRef.current = serverNotes;
   const hasLoadedNotesRef = useRef(false);
 
   useEffect(() => {
@@ -64,15 +60,12 @@ export function useLessonNotes() {
   useEffect(() => {
     if (!isLoggedIn || hasLoadedNotesRef.current) return;
     hasLoadedNotesRef.current = true;
-    setIsInitialLoad(true);
-    setSyncedToServer(false);
     let cancelled = false;
     fetchNotesFromServer().then((data) => {
       if (cancelled) return;
       if (data) {
         setServerNotes(data);
       }
-      setIsInitialLoad(false);
     });
     return () => {
       cancelled = true;
@@ -80,19 +73,8 @@ export function useLessonNotes() {
   }, [isLoggedIn]); // intentionally ignore serverNotes to avoid refetch loops
 
   useEffect(() => {
-    if (!isLoggedIn || !serverNotesRef.current) return;
-    const lastNote = serverNotesRef.current[serverNotesRef.current.length - 1];
-    if (lastNote) {
-      syncNoteToServer(lastNote);
-    }
-    setSyncedToServer(true);
-  }, [isLoggedIn, serverNotes, isInitialLoad]);
-
-  useEffect(() => {
     if (isLoggedOut) {
       setServerNotes(null);
-      setSyncedToServer(false);
-      setIsInitialLoad(true);
       hasLoadedNotesRef.current = false;
     }
   }, [isLoggedOut]);
@@ -127,9 +109,11 @@ export function useLessonNotes() {
         const next = prev
           ? [...prev.filter((n) => !(n.courseSlug === courseSlug && n.moduleSlug === moduleSlug && n.lessonSlug === lessonSlug)), note]
           : [note];
-        syncNoteToServer(note);
         return next;
       });
+      // Sync outside the state updater: updaters must be pure (React may run
+      // them twice), so the network call happens after the state is committed.
+      syncNoteToServer(note);
     },
     [isLoggedIn]
   );
