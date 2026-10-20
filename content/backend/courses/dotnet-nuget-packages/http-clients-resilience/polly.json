@@ -1,5 +1,5 @@
 {
-  "id": "lesson-nuget-018",
+  "id": "lesson-nuget-1304",
   "slug": "polly",
   "moduleSlug": "http-clients-resilience",
   "courseSlug": "dotnet-nuget-packages",
@@ -70,6 +70,35 @@
         "variant": "important",
         "title": "Combine Policies",
         "text": "Use Policy.WrapAsync() to compose multiple policies. A common stack is Retry + CircuitBreaker + Timeout."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Modern API: Resilience Pipelines"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Polly v8 replaced the policy-building syntax with a `ResiliencePipelineBuilder`, where strategies are added in order and compose automatically. Microsoft.Extensions.Http.Resilience builds the same pipeline on top of `IHttpClientFactory`, so a resilient `HttpClient` is a one-line registration rather than hand-wired policy composition."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "csharp",
+        "title": "A resilience pipeline and the HttpClient shortcut",
+        "content": "using Polly;\nusing Polly.Retry;\nusing Polly.CircuitBreaker;\n\nvar pipeline = new ResiliencePipelineBuilder()\n    .AddRetry(new RetryStrategyOptions\n    {\n        MaxRetryAttempts = 3,\n        BackoffType = DelayBackoffType.Exponential,\n        UseJitter = true,\n        ShouldHandle = new PredicateBuilder().Handle<HttpRequestException>(),\n    })\n    .AddCircuitBreaker(new CircuitBreakerStrategyOptions\n    {\n        FailureRatio = 0.5,\n        SamplingDuration = TimeSpan.FromSeconds(30),\n        MinimumThroughput = 10,\n        BreakDuration = TimeSpan.FromSeconds(15),\n    })\n    .AddTimeout(TimeSpan.FromSeconds(5))\n    .Build();\n\nawait pipeline.ExecuteAsync(async token =>\n{\n    using var response = await http.GetAsync(url, token);\n\n    response.EnsureSuccessStatusCode();\n}, cancellationToken);\n\n// Or register a resilient HttpClient in one call:\nbuilder.Services.AddHttpClient<WeatherClient>()\n    .AddStandardResilienceHandler();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: retry must be idempotent and bounded",
+        "text": "Retrying a `POST` that is not idempotent can create duplicate orders, so retry only safe operations or use an idempotency key. Retries must also be bounded and backed off with jitter; unbounded retries turn one slow dependency into a retry storm that takes down the whole system. The circuit breaker is what stops that: once the failure ratio crosses the threshold, calls fail fast so the downstream service can recover instead of being hammered."
       }
     },
     {

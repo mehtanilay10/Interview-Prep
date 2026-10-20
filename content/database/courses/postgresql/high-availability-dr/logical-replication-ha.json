@@ -39,6 +39,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Initial Sync, Conflicts, and Slot Lag"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Logical replication has two phases: an initial copy of the table's existing rows, then a continuous stream of changes from the publisher's WAL. The subscriber applies changes through normal SQL, so a conflicting row — say a unique key that already exists on the subscriber — aborts that transaction and the subscription stops until you resolve it. The publisher's replication slot retains WAL until the subscriber confirms it, so a stalled subscriber will grow the publisher's disk."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Monitor the subscription and the publisher slot",
+        "content": "Run the first query on the subscriber and the second on the publisher. A growing `retained_wal` with an inactive slot is the classic disk-fill warning.",
+        "language": "sql",
+        "code": "-- On the subscriber: replication health\nSELECT subname, pid, received_lsn, latest_end_lsn,\n       now() - last_msg_receipt_time AS since_last_message\nFROM pg_stat_subscription;\n\n-- On the publisher: how much WAL is being retained for this slot?\nSELECT slot_name, active,\n       pg_size_pretty(\n           pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)\n       ) AS retained_wal\nFROM pg_replication_slots\nWHERE slot_name = 'sub_app';"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Logical replication is not for automatic failover",
+        "text": "Logical replication has no concept of a primary: it copies row changes to a subscriber that can still be written to independently, and it does not replay DDL, sequence values, or large objects. Those gaps mean it cannot be promoted transparently in an outage — you would have to reconcile divergence by hand. Use logical replication for cross-version upgrades, selective replication, and Change Data Capture, and use physical streaming replication with a consensus-based failover manager when you need automatic HA."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

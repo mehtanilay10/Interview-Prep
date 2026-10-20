@@ -1,0 +1,171 @@
+{
+  "id": "lesson-sql-183",
+  "slug": "columnstore-indexes",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "Columnstore Indexes",
+  "description": "Use columnar storage, segment elimination, and batch-mode execution to make analytical queries dramatically faster.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "columnstore",
+    "analytics",
+    "batch-mode",
+    "compression",
+    "data-warehouse"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Columnstore Indexes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A rowstore index stores all columns of a row together, which is ideal when a query needs most columns for a few rows. A columnstore index stores each column separately and compresses it, which is ideal when a query scans millions of rows but touches only a few columns. SQL Server 2012 introduced nonclustered columnstore indexes; since SQL Server 2014 you can create a clustered columnstore index (CCI) directly on a table and make it the primary storage."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Rowstore (B-tree)",
+          "Columnstore"
+        ],
+        "rows": [
+          [
+            "Best for",
+            "OLTP, point lookups, small ranges",
+            "Analytics, large scans, aggregations"
+          ],
+          [
+            "Storage layout",
+            "Rows (or row groups)",
+            "Columns, compressed per segment"
+          ],
+          [
+            "Compression",
+            "Page compression at best",
+            "Often 5-10x smaller than rowstore"
+          ],
+          [
+            "Execution",
+            "Row mode",
+            "Batch mode for large scans"
+          ],
+          [
+            "Updates",
+            "In-place",
+            "Delta store, then tuple mover"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Clustered Columnstore for Fact Tables"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A clustered columnstore index replaces the table's heap or clustered index. Load data with bulk insert or `INSERT ... SELECT` in batches of at least 102,400 rows so each batch lands directly in a compressed rowgroup instead of the delta store."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a clustered columnstore index",
+        "content": "Any existing clustered index must be dropped first; the CCI becomes the table's physical storage.",
+        "language": "sql",
+        "code": "DROP INDEX CX_FactSales ON dbo.FactSales;\nGO\n\nCREATE CLUSTERED COLUMNSTORE INDEX CCI_FactSales\nON dbo.FactSales;\nGO\n\n-- Bulk load in large batches\nINSERT INTO dbo.FactSales (OrderDate, ProductId, Quantity, Amount)\nSELECT OrderDate, ProductId, Quantity, Amount\nFROM staging.FactSales;\nGO"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Watch the delta store",
+        "text": "Small inserts and updates go into a rowstore delta store, which is queried alongside the compressed rowgroups. A delta store with millions of rows defeats the purpose of columnstore. Check `sys.dm_db_column_store_row_group_physical_stats` and rebuild the index to move rows into compressed rowgroups."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Nonclustered Columnstore for HTAP"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQL Server 2016 made nonclustered columnstore indexes updatable, so an OLTP table can keep its B-tree clustered index and add a columnstore index for reporting. The optimizer can use that index to answer an analytical query without changing the write path."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Add a nonclustered columnstore index to an OLTP table",
+        "content": "The index covers the columns the reporting query needs, so the query can scan compressed columns without touching the rowstore.",
+        "language": "sql",
+        "code": "CREATE NONCLUSTERED COLUMNSTORE INDEX NCCI_Orders_Analytics\nON dbo.Orders (OrderDate, CustomerId, ProductId, Quantity, Amount);\nGO\n\nSELECT\n    DATEFROMPARTS(YEAR(OrderDate), MONTH(OrderDate), 1) AS Month,\n    SUM(Amount) AS Revenue\nFROM dbo.Orders\nGROUP BY DATEFROMPARTS(YEAR(OrderDate), MONTH(OrderDate), 1)\nORDER BY Month;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Ordered Columnstore (SQL Server 2022)"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Order rows by date to improve segment elimination",
+        "content": "The ORDER clause makes each compressed rowgroup cover a narrower date range, so a query for one month can skip most rowgroups.",
+        "language": "sql",
+        "code": "CREATE CLUSTERED COLUMNSTORE INDEX CCI_FactSales_Ordered\nON dbo.FactSales\nORDER (OrderDate, ProductId)\nWITH (DROP_EXISTING = ON);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: why not columnstore everything?",
+        "text": "Columnstore is poor for single-row lookups and frequent updates, and it has data-type restrictions and higher build cost. It shines when queries scan a large fraction of a big table and aggregate a few columns. A common production design is a B-tree clustered index for the OLTP path plus a nonclustered columnstore index for reporting, or a partitioned table where recent partitions are rowstore and older partitions are columnstore."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Columnstore Indexes Key Points",
+        "points": [
+          "Columnstore stores and compresses each column separately, which is ideal for large analytical scans.",
+          "Clustered columnstore indexes replace the table's rowstore storage; nonclustered columnstore indexes can coexist with a B-tree.",
+          "Batch-mode execution and segment elimination are the main performance wins.",
+          "Bulk load at least 102,400 rows per batch to avoid filling the delta store.",
+          "Updates and small inserts land in the delta store and need the tuple mover or an index rebuild.",
+          "Use columnstore for analytics, not for point lookups or heavy single-row OLTP."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "clustered-vs-nonclustered-indexes",
+    "star-snowflake-schema"
+  ]
+}

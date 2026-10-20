@@ -135,11 +135,9 @@
     {
       "type": "callout",
       "data": {
-        "data": {
-          "variant": "tip",
-          "title": "Common Combination",
-          "text": "Many architectures combine Front Door or Application Gateway with an internal Load Balancer. Front Door handles internet traffic, then passes requests to an internal Load Balancer for distribution across VMs inside a VNet."
-        }
+        "variant": "tip",
+        "title": "Common Combination",
+        "text": "Many architectures combine Front Door or Application Gateway with an internal Load Balancer. Front Door handles internet traffic, then passes requests to an internal Load Balancer for distribution across VMs inside a VNet."
       }
     },
     {
@@ -153,6 +151,45 @@
           "A SaaS app serves users globally and needs instant failover between regions."
         ],
         "expectedOutcome": "You can clearly explain why each scenario maps to a specific service."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Decision Flow"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "azure-traffic-manager-decision",
+        "caption": "Pick the traffic manager by scope and protocol: TCP/UDP inside a VNet, regional HTTP with WAF, or global HTTP at the edge.",
+        "definition": "flowchart TD\n    A[\"Where does traffic enter?\"] --> B{\"Is it TCP or UDP\\nwithout HTTP semantics?\"}\n    B -->|Yes| LB[\"Load Balancer\\nLayer 4, VNet scope\"]\n    B -->|No| C{\"Are users in one region\\nor many?\"}\n    C -->|One region| D{\"Need WAF, path routing,\\nor TLS termination?\"}\n    D -->|Yes| AGW[\"Application Gateway\\nLayer 7, regional\"]\n    D -->|No| LB\n    C -->|Many regions| FD[\"Front Door\\nLayer 7, global anycast\"]\n    FD --> WAF[\"WAF policy at the edge\"]\n    AGW --> WAF2[\"Regional WAF policy\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create Each Service"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Load Balancer, Application Gateway, and Front Door",
+        "content": "These commands create the minimum skeleton for each service. In production you also configure health probes, backend pools, TLS certificates, and WAF policies.",
+        "language": "bash",
+        "code": "# Layer 4: internal load balancer\naz network lb create \\\n  --resource-group rg-demo \\\n  --name lb-internal \\\n  --sku Standard \\\n  --vnet-name vnet-demo \\\n  --subnet snet-app \\\n  --frontend-ip-name fe-internal \\\n  --private-ip-address 10.0.1.100 \\\n  --backend-pool-name be-app\n\n# Layer 7 regional: Application Gateway with WAF\naz network application-gateway create \\\n  --resource-group rg-demo \\\n  --name agw-demo \\\n  --location westeurope \\\n  --sku WAF_v2 \\\n  --capacity 2 \\\n  --vnet-name vnet-demo \\\n  --subnet snet-agw \\\n  --http-settings-port 80 \\\n  --http-settings-protocol Http \\\n  --frontend-port 80 \\\n  --public-ip-address pip-agw\n\n# Global: Front Door profile and endpoint\naz afd profile create \\\n  --resource-group rg-demo \\\n  --profile-name afd-demo \\\n  --sku Premium_AzureFrontDoor\n\naz afd endpoint create \\\n  --resource-group rg-demo \\\n  --profile-name afd-demo \\\n  --endpoint-name demo"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: layer and scope decide the service",
+        "text": "Load Balancer is Layer 4 and cannot inspect HTTP paths, headers, or cookies. Application Gateway is Layer 7 and regional, so it can do path-based routing, TLS termination, and WAF inside one region. Front Door is Layer 7 and global: anycast brings users to the nearest edge, and it can cache, accelerate, and fail over between regions. A common production architecture puts Front Door in front of regional Application Gateways, which in turn route to internal load balancers."
       }
     },
     {

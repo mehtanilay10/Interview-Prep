@@ -30,6 +30,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Replacing Views Without Breaking Dependencies"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`CREATE OR REPLACE VIEW` is safe only when the existing columns keep the same names, order, and types: you may append new columns, but not rename or retype existing ones. When a change does violate that rule, the reliable path is to drop and recreate the view inside a transaction, then rebuild dependent views in the correct order."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Append a column, then find dependents",
+        "content": "Appending a column is a valid replace. To see what depends on a view before dropping it, query the catalog.",
+        "language": "sql",
+        "code": "-- Allowed: append a column at the end\nCREATE OR REPLACE VIEW v_order_summary AS\nSELECT\n    o.id,\n    o.customer_id,\n    o.amount,\n    o.status,\n    o.ordered_at\nFROM orders AS o;\n\n-- What depends on this view?\nSELECT DISTINCT\n    dependent.relname AS dependent_object\nFROM pg_depend d\nJOIN pg_rewrite r   ON r.oid = d.objid\nJOIN pg_class   src ON src.oid = d.refobjid\nJOIN pg_class   dependent ON dependent.oid = r.ev_class\nWHERE src.relname = 'v_order_summary'\n  AND dependent.relname <> 'v_order_summary';"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "CASCADE is a loaded gun",
+        "text": "`DROP VIEW ... CASCADE` silently removes everything that depends on the view, including other views and, in older setups, rules. In production, prefer dropping and recreating the full dependency chain inside a single transaction so a failure rolls everything back rather than leaving a half-dropped schema."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

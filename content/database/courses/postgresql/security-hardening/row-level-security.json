@@ -38,6 +38,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Row-Level Security at the Tenant Boundary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RLS applies a policy to every query automatically, so an application cannot forget a `WHERE tenant_id = ...` clause and leak another tenant's rows. The policy reads the current tenant from a session setting that the application sets at the start of each request. Table owners and superusers bypass RLS unless `FORCE ROW LEVEL SECURITY` is set."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A tenant-isolation policy",
+        "content": "The application sets `app.tenant_id` per request; the policy compares it to the row's tenant. FORCE makes the policy apply even to the table owner.",
+        "language": "sql",
+        "code": "ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;\nALTER TABLE accounts FORCE ROW LEVEL SECURITY;\n\nCREATE POLICY accounts_tenant_isolation\nON accounts\nUSING (tenant_id = current_setting('app.tenant_id', true)::uuid)\nWITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);\n\n-- Per request, the application sets the tenant\nSET LOCAL app.tenant_id = '3f2a9c10-0000-0000-0000-000000000001';\n\nSELECT * FROM accounts;   -- only rows for that tenant are visible"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "RLS is defeated by a missing setting or an owner connection",
+        "text": "If the application forgets to set `app.tenant_id`, `current_setting(..., true)` returns NULL and the policy compares against NULL, which matches nothing — a fail-closed default if you use the two-argument form, but a fail-open mistake if your policy is written to allow NULL. Creating the table as the application role makes it the owner, and owners bypass RLS; use `FORCE ROW LEVEL SECURITY` or a dedicated owner role. Test RLS with the exact role and connection settings the application uses."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

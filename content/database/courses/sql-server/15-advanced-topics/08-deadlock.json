@@ -88,6 +88,53 @@
       }
     },
     {
+      "type": "mermaid",
+      "data": {
+        "id": "sql-server-deadlock-cycle",
+        "caption": "A deadlock cycle: each session holds one lock and waits for the other.",
+        "definition": "flowchart TD\n    S1[\"Session 1\\nholds lock on invoices row 1\"] --> W1[\"Session 1 waits for\\ninvoice_items row 10\"]\n    S2[\"Session 2\\nholds lock on invoice_items row 10\"] --> W2[\"Session 2 waits for\\ninvoices row 1\"]\n    W1 --> S2\n    W2 --> S1\n    W1 --> D[\"SQL Server detects the cycle\"]\n    W2 --> D\n    D --> V[\"One session is chosen\\nas the deadlock victim (error 1205)\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reproducing a Deadlock"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Open two query windows and run each script at the same time. Each transaction takes a lock first and then asks for the row the other transaction already holds, which forms a cycle."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Session 1",
+        "content": "Locks the invoice first, then tries to update an invoice item.",
+        "language": "sql",
+        "code": "BEGIN TRANSACTION;\n\nUPDATE dbo.invoices\nSET customer_id = 100\nWHERE id = 1;\n\n-- Give Session 2 time to take its first lock\nWAITFOR DELAY '00:00:05';\n\nUPDATE dbo.invoice_items\nSET item_name = 'Cool Keyboard'\nWHERE id = 10;\n\nCOMMIT TRANSACTION;"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Session 2",
+        "content": "Locks the invoice item first, then tries to update the invoice.",
+        "language": "sql",
+        "code": "BEGIN TRANSACTION;\n\nUPDATE dbo.invoice_items\nSET amount = 100\nWHERE id = 10;\n\n-- Give Session 1 time to take its first lock\nWAITFOR DELAY '00:00:05';\n\nUPDATE dbo.invoices\nSET total = 250\nWHERE id = 1;\n\nCOMMIT TRANSACTION;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Handling error 1205 in application code",
+        "text": "The victim's transaction is rolled back and the client receives error 1205. Applications should catch that error and retry the whole transaction with a short randomized backoff. `SET DEADLOCK_PRIORITY LOW` on a background job makes it the preferred victim, but it does not prevent deadlocks — consistent access order does."
+      }
+    },
+    {
       "type": "heading",
       "data": {
         "level": 2,

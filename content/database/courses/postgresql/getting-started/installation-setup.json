@@ -7,7 +7,7 @@
   "description": "Install PostgreSQL on Linux, macOS, and Docker, configure pg_hba.conf, and secure client authentication with SCRAM-SHA-256.",
   "order": 3,
   "difficulty": "beginner",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "installation",
     "docker",
@@ -85,14 +85,154 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Native Installs: Linux and macOS"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Containers are excellent for a consistent development environment, but production installs usually come from the distribution packages. Knowing both is expected for a backend or DBA role."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Installing PostgreSQL 16 Natively",
+        "content": "Debian/Ubuntu uses the PostgreSQL APT repository, macOS uses Homebrew.",
+        "code": "# --- Debian / Ubuntu ---\nsudo apt install -y postgresql-common\nsudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh\nsudo apt install -y postgresql-16\nsudo systemctl enable --now postgresql\n\n# --- macOS (Homebrew) ---\nbrew install postgresql@16\nbrew services start postgresql@16\n\n# --- Verify the cluster is listening ---\npg_isready -h localhost -p 5432        # => localhost:5432 - accepting connections\npsql -h localhost -U postgres -c \"SELECT version();\"",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Where the Files Live"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Path",
+          "Contents"
+        ],
+        "rows": [
+          [
+            "`/var/lib/postgresql/16/main` (`PGDATA`)",
+            "The data directory: heap files, `pg_wal`, `pg_xact`. This is what you back up."
+          ],
+          [
+            "`/etc/postgresql/16/main/postgresql.conf`",
+            "Main server configuration."
+          ],
+          [
+            "`/etc/postgresql/16/main/pg_hba.conf`",
+            "Client authentication rules, evaluated top-down."
+          ],
+          [
+            "`/var/log/postgresql/`",
+            "Server logs; the first place to look when startup fails."
+          ],
+          [
+            "`~/.psqlrc`",
+            "Per-user `psql` defaults (prompt, timing, pager)."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Settings You Actually Change First"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A Minimal, Sensible postgresql.conf Baseline",
+        "content": "These four settings matter more than the other three hundred.",
+        "code": "# Identify the server for logs and monitoring\nlisten_addresses = 'localhost'        # '*' only behind a private network\nport = 5432\n\n# Correct memory and disk assumptions\nshared_buffers = 4GB                  # start at ~25% of RAM\neffective_cache_size = 12GB           # tell the planner what the OS cache holds\nmaintenance_work_mem = 512MB          # used by VACUUM and CREATE INDEX\n\n# Durability / write throughput\nwal_level = replica                   # required for streaming replication\nmax_wal_size = 4GB\nsynchronous_commit = on               # 'off' risks losing recent commits on crash\n\n# Logging that pays for itself\nlog_min_duration_statement = 500      # log anything slower than 500 ms\nlog_checkpoints = on\nlog_lock_waits = on",
+        "language": "ini"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "After editing, reload the config without dropping connections: `SELECT pg_reload_conf();` or `sudo systemctl reload postgresql`. Only parameters marked `postmaster` require a full restart."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Never Set `listen_addresses = '*'` on a Public Host",
+        "text": "An internet-reachable `5432` will be probed for weak passwords within minutes. Bind to localhost or a private subnet, and put TLS plus a firewall in front of anything remote."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Production-Ready Provisioning Checklist",
+        "items": [
+          {
+            "text": "Install from the official PostgreSQL repository, not a stale distro package",
+            "hint": "You want at least PostgreSQL 14 for modern features"
+          },
+          {
+            "text": "Set `password_encryption = scram-sha-256` and re-set existing passwords"
+          },
+          {
+            "text": "Create one unprivileged role per application, not shared credentials"
+          },
+          {
+            "text": "Restrict `pg_hba.conf` to the networks that need access"
+          },
+          {
+            "text": "Enable `pg_stat_statements` for query observability"
+          },
+          {
+            "text": "Configure and **test a restore** before you need one"
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Docker or native install for development?",
+            "answer": "Docker for reproducibility across a team (identical version and extensions); native when you need to test OS-level tuning, extensions compiled against the system libs, or replication between local instances."
+          },
+          {
+            "question": "What does `initdb` do?",
+            "answer": "It creates a new data directory and cluster: `initdb -D /var/lib/postgresql/data` initialises catalogs, a default `postgres` database, and the `template1` template. Package installs already call it for you."
+          },
+          {
+            "question": "What is the difference between `pg_hba.conf` and `postgresql.conf`?",
+            "answer": "`pg_hba.conf` answers \"who may connect and how are they authenticated\"; `postgresql.conf` configures server behaviour such as memory, WAL, and logging."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Use Docker containers for local development to ensure parity across developer machines.",
-          "`pg_hba.conf` governs connection security and authentication methods.",
-          "Always use `scram-sha-256` for password encryption in production."
-        ]
+          "Docker Compose gives teams a reproducible local engine; native packages are the norm in production.",
+          "`PGDATA` holds the actual data — that is the directory your backup strategy protects.",
+          "`pg_hba.conf` is evaluated top-down and decides authentication; `scram-sha-256` is the modern default.",
+          "The highest-impact first settings are `shared_buffers`, `effective_cache_size`, `max_wal_size`, and slow-query logging.",
+          "Reload with `pg_reload_conf()`; only `postmaster`-level parameters require a restart."
+        ],
+        "takeaway": "Be able to state the four files: `postgresql.conf`, `pg_hba.conf`, `PGDATA`, and the server log."
       }
     }
   ],

@@ -66,6 +66,59 @@
       }
     },
     {
+      "type": "paragraph",
+      "data": {
+        "text": "Storage accounts are protected by two independent planes. The control plane uses Azure Resource Manager and Azure RBAC. The data plane uses the blob, queue, table, or file endpoint and accepts either a shared key, a SAS token, or an Entra ID token. A managed identity uses the data plane, so the role must be a data role such as Storage Blob Data Reader or Storage Blob Data Contributor."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Disable shared key access and use Entra ID",
+        "content": "Disabling shared keys forces every caller to use Entra ID or a user delegation SAS, which removes the account-wide master key from your threat model.",
+        "language": "bash",
+        "code": "az storage account update -g rg-shop -n shopstorage --allow-shared-key-access false\n\nprincipalId=$(az webapp identity show -g rg-shop -n shop-api --query principalId -o tsv)\n\n# Scope to a single container instead of the whole account\ncontainerId=$(az storage container show --account-name shopstorage --name invoices \\\n  --auth-mode login --query id -o tsv)\n\naz role assignment create \\\n  --assignee-object-id \"$principalId\" \\\n  --assignee-principal-type ServicePrincipal \\\n  --role \"Storage Blob Data Contributor\" \\\n  --scope \"$containerId\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Uploading with a managed identity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The BlobServiceClient constructor accepts a TokenCredential. Because the service URI has no key or SAS, every request is signed with an Entra ID token. Use the account endpoint without a container name, and create container clients from it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Upload a blob with DefaultAzureCredential",
+        "content": "The same code works locally with your developer sign-in and in Azure with the managed identity.",
+        "language": "csharp",
+        "code": "using Azure.Identity;\nusing Azure.Storage.Blobs;\n\nvar serviceClient = new BlobServiceClient(\n    new Uri(\"https://shopstorage.blob.core.windows.net\"),\n    new DefaultAzureCredential());\n\nBlobContainerClient container = serviceClient.GetBlobContainerClient(\"invoices\");\nBlobClient blob = container.GetBlobClient($\"2026/{Guid.NewGuid()}.pdf\");\n\nawait blob.UploadAsync(stream, overwrite: true);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Azurite and local emulators do not support managed identity",
+        "text": "Local emulators use a fixed account and key. Keep a development-only connection string behind a configuration switch, and make sure the production path never falls back to it."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "If asked how to secure blob access, lead with \"disable shared key access and use Entra ID data-plane roles\". Then mention user delegation SAS for time-limited external sharing, private endpoints for network isolation, and the fact that Contributor alone cannot read blob data."
+      }
+    },
+    {
       "type": "exercise",
       "data": {
         "title": "Secure a Storage Container",

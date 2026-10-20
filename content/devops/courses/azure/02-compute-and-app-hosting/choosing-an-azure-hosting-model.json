@@ -145,6 +145,109 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Decision Tree"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "azure-hosting-model-decision-tree",
+        "caption": "A practical decision tree for choosing between VMs, App Service, Functions, Container Apps, and AKS.",
+        "definition": "flowchart TD\n    A[\"Start with the workload\"] --> B{\"Need OS-level control\\nor custom software?\"}\n    B -->|Yes| VM[\"Virtual Machines\"]\n    B -->|No| C{\"Is it event-driven or\\nsporadic?\"}\n    C -->|Yes| FN[\"Azure Functions\"]\n    C -->|No| D{\"Do you need containers?\"}\n    D -->|No| AS[\"App Service\"]\n    D -->|Yes| E{\"Need the Kubernetes API\\nor custom operators?\"}\n    E -->|Yes| AKS[\"AKS\"]\n    E -->|No| CA[\"Container Apps\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Rough Cost Comparison"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The exact prices depend on region and tier, but the shape of the bill is predictable. The table below uses approximate pay-as-you-go figures to show why workload shape matters more than the sticker price of a single service."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Workload",
+          "Likely choice",
+          "What you pay for",
+          "Cost trap"
+        ],
+        "rows": [
+          [
+            "Internal API, 2 requests/minute, business hours",
+            "Functions (Consumption)",
+            "Executions and GB-seconds",
+            "Cold starts if the code is heavy; execution timeout"
+          ],
+          [
+            "Public web app, steady traffic",
+            "App Service (B1 or P1v3)",
+            "The plan, whether or not requests arrive",
+            "Paying for idle capacity at night"
+          ],
+          [
+            "Containerized microservices with variable load",
+            "Container Apps",
+            "Active replicas and idle minimum replicas",
+            "Forgetting to scale to zero, or setting min replicas too high"
+          ],
+          [
+            "Legacy app needing a specific OS driver",
+            "Virtual Machine",
+            "The VM, disk, and networking while it runs",
+            "Patching and operational labor often cost more than the VM"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Estimate before you build",
+        "text": "Use the Azure Pricing Calculator with realistic request volume, execution duration, and data transfer. A service that looks cheap per execution can be expensive at high volume, and an always-on App Service plan can be cheaper than millions of short function executions. Re-evaluate after you have production telemetry."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deploying the Same App to Two Hosts"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The decision is easier to judge when you see the deployment. Both examples below host the same API; the difference is how much infrastructure the platform manages for you. App Service takes an app and a plan, while Container Apps takes a container image and scales to zero."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "App Service versus Container Apps in Bicep",
+        "content": "The App Service snippet is a plan plus a site; the Container Apps snippet is an environment plus an app that references an image. The second is more moving parts, and it buys scale-to-zero and per-second billing.",
+        "language": "bicep",
+        "code": "// Option A: App Service — always on, simplest to operate\nresource plan 'Microsoft.Web/serverfarms@2023-01-01' = {\n  name: 'plan-orders'\n  location: location\n  sku: { name: 'P0v3' }\n  properties: { reserved: true } // Linux\n}\n\nresource app 'Microsoft.Web/sites@2023-01-01' = {\n  name: 'app-orders-${uniqueSuffix}'\n  location: location\n  properties: { serverFarmId: plan.id }\n}\n\n// Option B: Container Apps — container image, scale to zero\nresource env 'Microsoft.App/managedEnvironments@2023-05-01' = {\n  name: 'env-orders'\n  location: location\n}\n\nresource ca 'Microsoft.App/containerApps@2023-05-01' = {\n  name: 'ca-orders'\n  location: location\n  properties: {\n    managedEnvironmentId: env.id\n    template: {\n      containers: [\n        { name: 'orders', image: 'ghcr.io/acme/orders:1.4.0' }\n      ]\n      scale: { minReplicas: 0, maxReplicas: 10 }\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Scale to zero changes the cost model, not just the price",
+        "text": "A scale-to-zero host bills nothing when idle but pays for it with a cold start on the first request after a quiet period. An always-on App Service plan bills whether or not anyone calls it, but never has a cold start. When you compare the two, compare the idle cost and the cold-start budget together — that is the real trade-off, not the headline price."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

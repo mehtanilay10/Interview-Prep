@@ -7,7 +7,7 @@
   "description": "Prevent scheduling overlaps and spatial collisions at the database layer using GiST-backed exclusion constraints.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 30,
+  "estimatedMinutes": 35,
   "tags": [
     "exclusion-constraints",
     "gist",
@@ -36,6 +36,144 @@
         "variant": "tip",
         "title": "Eliminates Application-Level Race Conditions",
         "text": "Without exclusion constraints, preventing scheduling double-bookings requires complex distributed locks or serialized transactions. Exclusion constraints guarantee 100% collision prevention directly inside PostgreSQL."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How an Exclusion Constraint Differs From Unique"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`UNIQUE` is the special case of `EXCLUDE` where the operator is `=`. `EXCLUDE` lets you supply **any** indexed operator, and requires that at least one pair be non-`=` — otherwise you would just write a unique index. It is backed by a GiST or SP-GiST index, so equality on a scalar column needs the `btree_gist` extension to be indexable by GiST."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Booking Overlap Prevention, End to End",
+        "content": "Insert a conflict and observe the error, then query the constraint.",
+        "code": "CREATE EXTENSION IF NOT EXISTS btree_gist;\n\nCREATE TABLE meeting_room_reservations (\n    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    room_id   INT NOT NULL,\n    slot      TSTZRANGE NOT NULL,\n    attendees INT NOT NULL,\n    CONSTRAINT room_slot_no_overlap\n        EXCLUDE USING gist (room_id WITH =, slot WITH &&),\n    CONSTRAINT slot_not_empty CHECK (NOT isempty(slot)),\n    CONSTRAINT slot_is_bounded CHECK (lower_inc(slot) AND NOT upper_inc(slot))\n);\n\nINSERT INTO meeting_room_reservations (room_id, slot, attendees)\nVALUES (1, '[2026-05-01 09:00+00, 2026-05-01 10:00+00)', 4);\n\nINSERT INTO meeting_room_reservations (room_id, slot, attendees)\nVALUES (1, '[2026-05-01 09:30+00, 2026-05-01 10:30+00)', 2);\n-- ERROR: conflicting key value violates exclusion constraint \"room_slot_no_overlap\"\n\n-- The conflicting row is reported in the error DETAIL.\n-- Inspect the constraint definition:\nSELECT conname, pg_get_constraintdef(oid) FROM pg_constraint\nWHERE conname = 'room_slot_no_overlap';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Deferrable: Let the Transaction Resolve Itself"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An exclusion constraint can be `DEFERRABLE`, which is essential when you move a booking by a minute in a single transaction: deleting and re-inserting would otherwise trip the constraint mid-transaction."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Moving a Booking in One Transaction",
+        "content": "Two statements that would conflict if checked immediately.",
+        "code": "ALTER TABLE meeting_room_reservations\n  DROP CONSTRAINT room_slot_no_overlap,\n  ADD CONSTRAINT room_slot_no_overlap\n      EXCLUDE USING gist (room_id WITH =, slot WITH &&) DEFERRABLE INITIALLY IMMEDIATE;\n\nBEGIN;\nSET CONSTRAINTS room_slot_no_overlap DEFERRED;\nUPDATE meeting_room_reservations SET slot = '[2026-05-01 10:00+00, 2026-05-01 11:00+00)' WHERE id = 1;\nCOMMIT;   -- validated once, at commit",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Other Uses of `EXCLUDE`"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Problem",
+          "Constraint expression"
+        ],
+        "rows": [
+          [
+            "No overlapping scheduled shifts per employee",
+            "`EXCLUDE USING gist (employee_id WITH =, shift WITH &&)`"
+          ],
+          [
+            "No two versions of a document with overlapping validity",
+            "`EXCLUDE USING gist (doc_id WITH =, valid_period WITH &&)`"
+          ],
+          [
+            "One active promotion per product",
+            "`EXCLUDE USING gist (product_id WITH =, period WITH &&)` where the index is partial"
+          ],
+          [
+            "No two workers in the same slot (equality only)",
+            "`EXCLUDE USING gist (slot WITH =)` — equivalent to a unique, but demonstrates the syntax"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A Partial Exclusion Constraint",
+        "content": "Only currently-valid rows participate.",
+        "code": "CREATE TABLE product_promotions (\n    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    product_id BIGINT NOT NULL,\n    period     DATERANGE NOT NULL,\n    closed     BOOLEAN NOT NULL DEFAULT false,\n    EXCLUDE USING gist (product_id WITH =, period WITH &&)\n        WHERE (NOT closed)\n);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "The phrase to remember is **\"uniqueness over an operator, not just equality\"**. A booking system enforces non-overlap with `EXCLUDE USING gist (room_id WITH =, stay WITH &&)`, and because the check runs inside the database it is safe under concurrent inserts with no application locking."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "When You Reach for `EXCLUDE`",
+        "items": [
+          {
+            "text": "Is the rule \"no two rows may satisfy this relation\"?"
+          },
+          {
+            "text": "Do the columns combine an equality key with a range/geometry/set column?"
+          },
+          {
+            "text": "Is `btree_gist` installed (for scalar equality columns)?"
+          },
+          {
+            "text": "Would a partial index (`WHERE ...`) express the rule more precisely?"
+          },
+          {
+            "text": "Do you need `DEFERRABLE` for intra-transaction moves?"
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "What is the difference between `EXCLUDE` and `UNIQUE`?",
+            "answer": "`UNIQUE` enforces `=` across the listed columns. `EXCLUDE` lets you name the operator for each column, so you can enforce `&&` (overlap) or geometric relations. A `EXCLUDE` with only `=` operators requires the `btree_gist` extension for scalar columns but is otherwise equivalent to `UNIQUE`."
+          },
+          {
+            "question": "Why does `EXCLUDE` need `btree_gist`?",
+            "answer": "GiST indexes do not natively support btree operators such as `=` for scalar types. `btree_gist` adds that support so a scalar column can participate in a GiST exclusion constraint."
+          },
+          {
+            "question": "What happens on a conflict?",
+            "answer": "The statement fails with `conflicting key value violates exclusion constraint`, and the `DETAIL` names the existing row. Because it is a normal constraint, the whole statement rolls back."
+          }
+        ]
       }
     },
     {

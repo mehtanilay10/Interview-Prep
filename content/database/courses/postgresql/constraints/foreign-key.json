@@ -7,7 +7,7 @@
   "description": "Enforce relationships, configure ON DELETE CASCADE, RESTRICT, and SET NULL, and avoid unindexed foreign key table locks.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "foreign-key",
     "referential-integrity",
@@ -47,14 +47,142 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What the Constraint Guarantees — and What It Costs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A foreign key guarantees that the child value exists in the parent. To do that, PostgreSQL takes a `FOR KEY SHARE` lock on the parent row whenever a child row referencing it is inserted or updated, and checks the child table whenever a parent row is deleted or its key updated. That check is what makes the missing child index so harmful: without an index it is a sequential scan **inside a lock**."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "All Four Referential Actions, Demonstrated",
+        "content": "Pick the action deliberately; the default (`NO ACTION`) is not always what you want.",
+        "code": "CREATE TABLE orders (\n    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,\n    parent_id   BIGINT REFERENCES orders(id) ON DELETE SET NULL,\n    note        TEXT\n);\n\n-- The five referential actions:\n--   NO ACTION   (default) error at the end of the statement -> deferrable\n--   RESTRICT              error immediately, cannot be deferred\n--   CASCADE               delete/update the child rows too\n--   SET NULL              null the child column (must be nullable)\n--   SET DEFAULT           set the child column to its DEFAULT\n\n-- Verify which actions are configured\nSELECT con.conname,\n       pg_get_constraintdef(con.oid) AS definition\nFROM pg_constraint con\nJOIN pg_class c ON c.oid = con.conrelid\nWHERE c.relname = 'orders' AND con.contype = 'f';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Action",
+          "Child rows when parent is deleted",
+          "Typical use"
+        ],
+        "rows": [
+          [
+            "`NO ACTION`",
+            "Error (check can be deferred to commit)",
+            "Default; safest when in doubt"
+          ],
+          [
+            "`RESTRICT`",
+            "Error immediately",
+            "Protect reference data such as currencies"
+          ],
+          [
+            "`CASCADE`",
+            "Deleted too",
+            "Owned children: `order_items`, comments"
+          ],
+          [
+            "`SET NULL`",
+            "Foreign key column set to `NULL`",
+            "Optional relation: `assigned_to`"
+          ],
+          [
+            "`SET DEFAULT`",
+            "Set to the column default",
+            "Rare; a sentinel \"unassigned\" row"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Indexing the Child Side, and Finding Missing Indexes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Audit Every Foreign Key That Lacks an Index",
+        "content": "Run this on any inherited schema; it usually finds several.",
+        "code": "SELECT conrelid::regclass AS child_table,\n       a.attname          AS fk_column,\n       con.conname        AS constraint_name\nFROM pg_constraint con\nJOIN pg_attribute a\n  ON a.attrelid = con.conrelid AND a.attnum = ANY (con.conkey)\nWHERE con.contype = 'f'\n  AND NOT EXISTS (\n      SELECT 1\n      FROM pg_index i\n      WHERE i.indrelid = con.conrelid\n        AND i.indkey::int2[] @> con.conkey::int2[]   -- index covers the FK columns\n  );\n\n-- Generate the fix\n-- CREATE INDEX ON comments (post_id);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Deferrable Constraints Inside a Transaction",
+        "content": "Useful when you must insert child-before-parent in one migration.",
+        "code": "CREATE TABLE order_items (\n    id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    order_id BIGINT NOT NULL,\n    CONSTRAINT order_items_order_fk\n        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE\n        DEFERRABLE INITIALLY IMMEDIATE\n);\n\nBEGIN;\nSET CONSTRAINTS order_items_order_fk DEFERRED;\nINSERT INTO order_items (order_id) VALUES (999);   -- parent does not exist yet\nINSERT INTO orders (id, customer_id) OVERRIDING SYSTEM VALUE VALUES (999, 1);\nCOMMIT;   -- constraint checked here and satisfied",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Foreign Keys Are Not Free",
+        "text": "Each `INSERT` into a child table performs a lookup on the parent, and each parent `DELETE` scans the child. Both are fast with indexes, but on high-throughput ingestion (millions of inserts per minute) teams sometimes drop or defer enforcement during bulk loads with `ALTER TABLE ... DISABLE TRIGGER ALL` — then re-enable and validate afterwards."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Add a Foreign Key to an Existing Table",
+        "description": "Practise the production-safe sequence.",
+        "steps": [
+          "Create a child table with data that has no constraints.",
+          "Add the constraint with `ADD CONSTRAINT ... FOREIGN KEY ... NOT VALID;` (instant, no scan).",
+          "Run `VALIDATE CONSTRAINT` with a `lock_timeout` set.",
+          "Create the index on the child column and confirm with `\\d+ child`."
+        ],
+        "expectedOutcome": "A constraint added without blocking writers for more than a moment."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Does PostgreSQL create an index for a foreign key automatically?",
+            "answer": "No. The parent side needs a unique index (usually from the primary key), but the child side gets nothing. Without an index, every parent delete or key update scans the child table while holding a lock."
+          },
+          {
+            "question": "What is the difference between `RESTRICT` and `NO ACTION`?",
+            "answer": "`NO ACTION` can be deferred to the end of the transaction and only fails if the violation still exists; `RESTRICT` fails immediately and cannot be deferred."
+          },
+          {
+            "question": "Should I use `ON DELETE CASCADE` everywhere?",
+            "answer": "Only where the child has no independent existence. Cascading from a `customers` table to `invoices` can erase financial records; cascading from `orders` to `order_items` is usually correct."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Foreign keys enforce relational consistency across tables.",
-          "Always add indexes to foreign key columns to prevent sequential table lock scans.",
-          "Choose `ON DELETE CASCADE` or `RESTRICT` consciously based on your domain cleanup policy."
-        ]
+          "A foreign key enforces that a child value exists in the parent, taking a `FOR KEY SHARE` lock on the parent row.",
+          "PostgreSQL creates no index on the child column — an unindexed foreign key turns parent deletes into locked sequential scans.",
+          "Choose the referential action consciously: `RESTRICT` to protect, `CASCADE` for owned children, `SET NULL` for optional relations.",
+          "Add constraints to large tables with `NOT VALID` plus `VALIDATE CONSTRAINT` to avoid long blocking scans."
+        ],
+        "takeaway": "\"Index your foreign keys\" plus \"choose ON DELETE deliberately\" is the answer interviewers are listening for."
       }
     }
   ],

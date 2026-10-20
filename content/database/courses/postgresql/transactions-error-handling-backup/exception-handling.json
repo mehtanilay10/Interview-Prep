@@ -31,6 +31,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Catching Specific Errors and Re-raising"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Catch the most specific condition first, because `WHEN others` swallows everything and hides bugs. Inside the handler, `SQLSTATE` holds the five-character code and `SQLERRM` holds the message. Use `RAISE` to re-raise when the error is not something you can meaningfully handle."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Specific handling, then custom errors",
+        "content": "The handler retries on a foreign key violation and raises a domain-specific error otherwise.",
+        "language": "sql",
+        "code": "CREATE OR REPLACE FUNCTION transfer_funds(\n    p_from int,\n    p_to   int,\n    p_amt  numeric\n)\nRETURNS void\nLANGUAGE plpgsql\nAS $$\nBEGIN\n    IF p_amt <= 0 THEN\n        RAISE EXCEPTION 'Transfer amount must be positive: %', p_amt\n            USING ERRCODE = '22023';\n    END IF;\n\n    UPDATE accounts SET balance = balance - p_amt WHERE id = p_from;\n    UPDATE accounts SET balance = balance + p_amt WHERE id = p_to;\nEXCEPTION\n    WHEN foreign_key_violation THEN\n        RAISE WARNING 'Unknown account, SQLSTATE=%', SQLSTATE;\n        RAISE;\n    WHEN others THEN\n        RAISE EXCEPTION 'Transfer failed: % (SQLSTATE %)', SQLERRM, SQLSTATE;\nEND $$;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: exception blocks are subtransactions",
+        "text": "Entering a `BEGIN ... EXCEPTION` block creates an implicit savepoint, and catching an error rolls back to it. That means all changes made inside the protected block before the error are discarded, not just the failed statement. The performance cost is a savepoint per block, so putting an exception block inside a tight loop is expensive. Knowing that an exception handler is a subtransaction explains both the semantics and the overhead."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

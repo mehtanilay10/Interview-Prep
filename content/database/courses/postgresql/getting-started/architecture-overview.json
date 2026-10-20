@@ -7,7 +7,7 @@
   "description": "Understand the multi-process architecture, Postmaster, shared memory segments, WAL buffers, and background worker daemons.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 30,
+  "estimatedMinutes": 35,
   "tags": [
     "architecture",
     "postmaster",
@@ -95,15 +95,128 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "What Happens When You Send a Query"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Understanding the round trip makes every later performance topic — planning, caching, WAL, checkpoints — easier to reason about."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "architecture-overview-query-flow",
+        "caption": "Lifecycle of a single SQL statement",
+        "definition": "flowchart TD\n    A[Client sends SQL] --> B[postmaster accepts connection]\n    B --> C[Dedicated backend process]\n    C --> D[Parser: syntax tree]\n    D --> E[Rewrite: views and rules]\n    E --> F[Planner / optimiser chooses plan]\n    F --> G[Executor reads shared_buffers]\n    G --> H{Cache hit?}\n    H -->|yes| I[Return tuples]\n    H -->|no| J[Read heap page from disk]\n    J --> I\n    I --> K[WAL written before commit]\n    K --> L[Rows sent to client]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Inspecting the Architecture From psql"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every process and memory structure the diagram shows is visible through system views. This is the fastest way to answer \"how many connections are actually active right now?\" in an incident."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Reading Backends, Memory, and WAL From SQL",
+        "content": "Run these on any running instance.",
+        "code": "-- Who is connected and what are they doing?\nSELECT pid, usename, state, wait_event_type, wait_event,\n       now() - query_start AS running_for, left(query, 60) AS query\nFROM pg_stat_activity\nWHERE backend_type = 'client backend'\nORDER BY running_for DESC NULLS LAST;\n\n-- How much memory is the shared cache using?\nSHOW shared_buffers;   -- e.g. 128MB default\nSHOW work_mem;         -- per sort/hash operation, NOT per connection total\n\n-- How many connections are allowed?\nSHOW max_connections;\n\n-- WAL settings that govern durability and write throughput\nSHOW wal_level;\nSHOW max_wal_size;\nSHOW synchronous_commit;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Shared Memory: Where the Real Work Happens"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`shared_buffers` is PostgreSQL's own page cache (8 KB pages by default). It sits **in front of** the operating system page cache, so a read may be satisfied from shared memory, then from the OS cache, and only then from disk. A common starting point is 25% of RAM on a dedicated server, and on the largest machines 8–16 GB is often plenty."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`work_mem` is different: it is allocated **per sort or hash operation**, not per connection. A single query with three joins can allocate `work_mem` several times, so raising it globally is a classic way to cause out-of-memory kills."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The Classic Pool-Sizing Trap",
+        "text": "Because each connection is an OS process, `max_connections = 500` with a 10 MB footprint is 5 GB of RAM before any query runs. Use PgBouncer in `transaction` pooling mode and keep the real connection count in the low hundreds per instance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "WAL, Checkpoints, and Why Periodically Everything Pauses"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Write-ahead logging guarantees durability: a change is written to the WAL and flushed to disk **before** the transaction is reported as committed. The data pages themselves are written lazily by the background writer. A **checkpoint** forces all dirty pages to disk and records a point from which crash recovery can begin; a badly configured checkpoint is the usual cause of periodic latency spikes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Force and Observe a Checkpoint",
+        "content": "Useful in a lab to see the I/O effect; never do this in production on a schedule.",
+        "code": "-- Ask for an immediate checkpoint and time it\nCHECKPOINT;\n\n-- Tune the checkpoint so it spreads writes instead of bursting\n-- postgresql.conf\n-- max_wal_size = 4GB                 # WAL accumulated before a checkpoint is forced\n-- checkpoint_timeout = 15min        # upper bound between checkpoints\n-- checkpoint_completion_target = 0.9 # spread the write over 90% of the interval\n-- checkpoint_flush_after = 256kB    # control OS writeback batching",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Why does PostgreSQL use processes instead of threads?",
+            "answer": "Historical forking model with strong isolation: a crash in one backend cannot corrupt others, and extensions can be written safely in different languages. The cost is higher per-connection memory, which is why connection pooling is standard practice."
+          },
+          {
+            "question": "What is the difference between the background writer and the checkpointer?",
+            "answer": "The background writer continuously trickles dirty pages to disk to smooth I/O; the checkpointer guarantees that all dirty pages up to a consistent point are flushed so crash recovery has a known starting point."
+          },
+          {
+            "question": "Do readers block writers in PostgreSQL?",
+            "answer": "No. MVCC gives every statement a snapshot, so reads never take shared locks that block writes. Writers can still block each other on the same row."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "PostgreSQL uses a multi-process architecture instead of a multi-threaded architecture.",
-          "`shared_buffers` serves as the shared data cache across all backend processes.",
-          "`wal_buffers` and the WAL writer ensure durability before writing to heap pages.",
-          "Connection pooling is required for high concurrency to avoid process exhaustion."
-        ]
+          "The `postmaster` forks one backend process per client connection; each carries real memory cost, so pool your connections.",
+          "`shared_buffers` is PostgreSQL's page cache and `work_mem` is per sort/hash operation — tuning them incorrectly causes memory pressure.",
+          "WAL is flushed before commit, which is what makes ACID durability real; checkpoints bound how much WAL must be replayed after a crash.",
+          "`pg_stat_activity` plus `SHOW` commands let you observe the architecture live during an incident."
+        ],
+        "takeaway": "\"Process-per-connection + shared_buffers + WAL before commit\" is the architecture answer interviewers want."
       }
     }
   ],

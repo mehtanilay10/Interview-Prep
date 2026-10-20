@@ -6,7 +6,7 @@
   "description": "Learn how to create non-clustered indexes using the CREATE INDEX statement.",
   "order": 3,
   "difficulty": "beginner",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "create-index",
     "non-clustered",
@@ -85,6 +85,36 @@
         "content": "Creates a non-clustered index on multiple columns.",
         "language": "sql",
         "code": "CREATE INDEX ix_customers_name\nON sales.customers(last_name, first_name);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Choosing the Key Columns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Column order in a composite index matters: the index can seek on a leading prefix of the key. An index on `(last_name, first_name)` helps queries filtered by `last_name` alone or by both columns, but not by `first_name` alone. The script below shows both a seek-friendly and a seek-unfriendly predicate."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Build a composite index and check its key columns",
+        "content": "The metadata query lists the key order, which is what determines whether a seek is possible.",
+        "code": "CREATE TABLE #People (\n    person_id INT IDENTITY PRIMARY KEY,\n    first_name NVARCHAR(50) NOT NULL,\n    last_name  NVARCHAR(50) NOT NULL\n);\n\nINSERT INTO #People (first_name, last_name)\nVALUES (N'Ada', N'Lovelace'), (N'Grace', N'Hopper');\n\nCREATE INDEX ix_people_name ON #People (last_name, first_name);\n\n-- Seek: filter starts with the leading key column\nSELECT person_id FROM #People WHERE last_name = N'Hopper';\n\n-- Also a seek: both key columns filtered\nSELECT person_id FROM #People WHERE last_name = N'Hopper' AND first_name = N'Grace';\n\n-- Not a seek on this index: the leading key column is missing\nSELECT person_id FROM #People WHERE first_name = N'Grace';\n\nSELECT\n    c.name AS key_column,\n    ic.key_ordinal\nFROM tempdb.sys.index_columns AS ic\nJOIN tempdb.sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id\nWHERE ic.object_id = OBJECT_ID('tempdb..#People')\n  AND ic.index_id = INDEXPROPERTY(OBJECT_ID('tempdb..#People'), 'ix_people_name', 'IndexId')\nORDER BY ic.key_ordinal;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Creating indexes on live systems",
+        "text": "`CREATE INDEX` takes a schema modification lock for a small part of the operation but can block writers for most of the build. Enterprise Edition supports `WITH (ONLINE = ON)`, which keeps the table readable and writable during the build. On smaller editions, schedule index builds in a maintenance window."
       }
     },
     {

@@ -7,7 +7,7 @@
   "description": "Create reusable object types (CREATE TYPE ... AS), domain constraints with validation rules, and custom enums.",
   "order": 6,
   "difficulty": "intermediate",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 30,
   "tags": [
     "composite-types",
     "create-type",
@@ -28,6 +28,117 @@
         "content": "Enforcing valid email format at the type level.",
         "language": "sql",
         "code": "-- 1. Custom Domain with Regex Check Constraint\nCREATE DOMAIN valid_email AS TEXT\nCHECK (VALUE ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2}$');\n\n-- 2. Custom Composite Type for Addresses\nCREATE TYPE address_type AS (\n    street VARCHAR(100),\n    city VARCHAR(50),\n    postal_code VARCHAR(20)\n);\n\nCREATE TABLE clients (\n    id SERIAL PRIMARY KEY,\n    email valid_email NOT NULL,\n    shipping_address address_type\n);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Domains: Reusable Constraints"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **domain** is a base type plus optional `NOT NULL`, `DEFAULT`, and `CHECK` rules. The rule lives in one place and applies to every column declared with that domain — so a new table cannot forget the validation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Domains That Encode Business Rules",
+        "content": "One definition, enforced everywhere.",
+        "code": "CREATE DOMAIN email_address AS TEXT\n    CONSTRAINT email_not_blank CHECK (VALUE = btrim(VALUE) AND position('@' IN VALUE) > 1);\n\nCREATE DOMAIN positive_money AS NUMERIC(12,2)\n    DEFAULT 0\n    CONSTRAINT must_be_positive CHECK (VALUE >= 0);\n\nCREATE DOMAIN iso_country AS TEXT\n    CONSTRAINT two_letters CHECK (VALUE ~ '^[A-Z]{2}$');\n\nCREATE TABLE customers (\n    id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    email   email_address NOT NULL,\n    country iso_country   NOT NULL,\n    balance positive_money NOT NULL\n);\n\nINSERT INTO customers (email, country, balance) VALUES ('ada@example.com', 'gb', 10);\n-- ERROR: value for domain iso_country violates check constraint \"two_letters\"\n\n-- Altering a domain re-validates every dependent column\nALTER DOMAIN positive_money ADD CONSTRAINT not_absurd CHECK (VALUE < 1e12);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Composite Types: Modelling a Value, Not a Row"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A composite type is a named record. It is most useful for returning several values from a function and for storing a small, stable structure inside a column. It is *not* a substitute for a child table when the structure can repeat."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Declaring, Using, and Querying a Composite Type",
+        "content": "Note the `(value).field` access syntax.",
+        "code": "CREATE TYPE address AS (\n    line1       TEXT,\n    city        TEXT,\n    postal_code TEXT,\n    country     iso_country\n);\n\nCREATE TABLE clients (\n    id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    name     TEXT NOT NULL,\n    shipping address\n);\n\nINSERT INTO clients (name, shipping)\nVALUES ('Acme Ltd', ROW('1 Main St','Springfield','12345','US')::address);\n\n-- Access a field: parentheses are required\nSELECT name,\n       (shipping).city          AS city,\n       (shipping).country       AS country\nFROM clients\nWHERE (shipping).country = 'US';\n\n-- Update a single field\nUPDATE clients SET shipping.city = 'Shelbyville' WHERE name = 'Acme Ltd';\n\n-- A function returning a composite value\nCREATE FUNCTION primary_address(c clients) RETURNS address AS $$\n    SELECT c.shipping;\n$$ LANGUAGE sql STABLE;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enums vs. Lookup Tables vs. Domains"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Approach",
+          "Add a value",
+          "Good for"
+        ],
+        "rows": [
+          [
+            "`ENUM` type",
+            "`ALTER TYPE ... ADD VALUE` (must commit before use in PG < 12)",
+            "Small, stable sets known at design time"
+          ],
+          [
+            "`TEXT` + `CHECK`",
+            "Alter the constraint — a table rewrite-free DDL change",
+            "Most new schemas; easiest to evolve"
+          ],
+          [
+            "Lookup table + FK",
+            "`INSERT` a row",
+            "Sets that carry attributes, need ordering, or change often"
+          ],
+          [
+            "Domain",
+            "`ALTER DOMAIN`",
+            "Reusable scalar validation rules"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Composites Are Not Row Inheritance",
+        "text": "A composite value inside a column cannot be joined, indexed field-by-field without an expression index, or constrained per field. If the structure is queried independently, use a child table. Reach for composite types for function return values and genuinely embedded values."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "What is the difference between a domain, a composite type, and an enum?",
+            "answer": "A domain constrains a scalar type; a composite type groups named fields into one value; an enum is a closed set of labelled scalar values. All three are created with `CREATE ... ` but they solve different problems."
+          },
+          {
+            "question": "Do domains hurt performance?",
+            "answer": "No. A domain is the underlying type plus a check that runs on write — the same cost as a per-column `CHECK` constraint, but defined once."
+          },
+          {
+            "question": "Can I index a field inside a composite column?",
+            "answer": "Yes, with an expression index: `CREATE INDEX ON clients (((shipping).country));`. The double parentheses are required because the inner parentheses are part of the field access."
+          }
+        ]
       }
     },
     {

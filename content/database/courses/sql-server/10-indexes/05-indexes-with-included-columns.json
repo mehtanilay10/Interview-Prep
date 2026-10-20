@@ -6,7 +6,7 @@
   "description": "Learn how to add non-key columns to non-clustered indexes to cover more queries and avoid key lookups.",
   "order": 5,
   "difficulty": "beginner",
-  "estimatedMinutes": 18,
+  "estimatedMinutes": 26,
   "tags": [
     "included-columns",
     "covering-index",
@@ -62,6 +62,36 @@
         "content": "Creates an index on email with first_name and last_name included.",
         "language": "sql",
         "code": "CREATE UNIQUE INDEX ix_cust_email_inc\nON sales.customers(email)\nINCLUDE(first_name,last_name);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Included Columns vs. Key Columns"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Included columns are stored at the leaf level of the non-clustered index but are not part of the B-tree sort order. That gives them two advantages over key columns: they do not count towards the 900-byte (1,700-byte for non-clustered from SQL Server 2016) key limit, and they do not need to be sorted on every insert. The script below builds a covering index and confirms the key/included split."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Key column plus included columns",
+        "content": "Only `email` is sorted; `first_name` and `last_name` ride along at the leaf level to satisfy the SELECT list.",
+        "code": "CREATE TABLE #Customers (\n    customer_id INT IDENTITY PRIMARY KEY,\n    email NVARCHAR(100) NOT NULL,\n    first_name NVARCHAR(50) NOT NULL,\n    last_name  NVARCHAR(50) NOT NULL\n);\n\nCREATE UNIQUE INDEX ix_cust_email ON #Customers (email)\n    INCLUDE (first_name, last_name);\n\n-- Fully covered by the index: no key lookup needed\nSELECT email, first_name, last_name\nFROM #Customers\nWHERE email = N'ada@example.com';\n\nSELECT\n    c.name AS column_name,\n    ic.is_included_column\nFROM tempdb.sys.index_columns AS ic\nJOIN tempdb.sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id\nWHERE ic.object_id = OBJECT_ID('tempdb..#Customers')\nORDER BY ic.is_included_column, ic.key_ordinal;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Do not dump every column in the index",
+        "text": "Stuffing all columns into INCLUDE turns the index into a second copy of the table: it doubles storage and slows every write. Include only the columns a specific query needs, and prefer several narrow covering indexes over one wide one."
       }
     },
     {

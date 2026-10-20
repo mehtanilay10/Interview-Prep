@@ -45,6 +45,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Avoiding Lost Updates and Deadlocks"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`SELECT FOR UPDATE` locks the selected rows until the transaction ends, which prevents the classic lost update where two transactions read the same balance and both write back an increment. Deadlocks happen when two transactions acquire the same two locks in opposite order; PostgreSQL detects the cycle and aborts one of them with SQLSTATE `40P01`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A safe increment and an ordered multi-row lock",
+        "content": "For a single counter you can avoid locking entirely with an atomic update. When you must lock several rows, always lock them in a consistent order such as ascending id.",
+        "language": "sql",
+        "code": "-- No explicit lock needed: the update is atomic\nUPDATE counters\nSET value = value + 1\nWHERE name = 'page_views';\n\n-- Lock multiple rows in ascending id order to avoid deadlocks\nBEGIN;\nSELECT id, balance\nFROM accounts\nWHERE id IN (42, 7)\nORDER BY id\nFOR UPDATE;\n\nUPDATE accounts SET balance = balance - 100 WHERE id = 7;\nUPDATE accounts SET balance = balance + 100 WHERE id = 42;\nCOMMIT;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: deadlock prevention is ordering",
+        "text": "You cannot eliminate deadlocks with a setting; you eliminate them with consistent lock ordering. If every transaction that touches rows A and B locks them in the same order, the circular wait is impossible. The fallback is detection and retry: catch SQLSTATE `40P01`, roll back, and retry the transaction with a short randomized backoff. Mentioning both prevention and retry is the complete answer."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

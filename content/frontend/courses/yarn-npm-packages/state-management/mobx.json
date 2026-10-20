@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-027",
   "slug": "mobx",
   "title": "MobX",
-  "description": "Observable state management with automatic reactivity.",
+  "description": "Model observable state with MobX, derive values with computed, and react with the observer HOC.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 8,
+  "estimatedMinutes": 14,
   "tags": [
     "mobx",
     "state",
@@ -17,15 +17,94 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "MobX uses observables and reactions to manage state. Any observable change triggers automatic UI updates."
+        "text": "MobX makes state observable and re-renders any React component that reads it. Instead of dispatching actions, you mutate observables directly and let computed values and reactions update automatically."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "An observable store",
+        "anchor": "store"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/stores/todoStore.ts",
+        "code": "import { makeAutoObservable, runInAction } from 'mobx';\n\nexport type Todo = { id: string; title: string; done: boolean };\n\nexport class TodoStore {\n  todos: Todo[] = [];\n  filter: 'all' | 'open' | 'done' = 'all';\n  loading = false;\n\n  constructor() {\n    makeAutoObservable(this);   // observables, actions, and computeds inferred\n  }\n\n  get visibleTodos() {\n    if (this.filter === 'open') return this.todos.filter((t) => !t.done);\n    if (this.filter === 'done') return this.todos.filter((t) => t.done);\n    return this.todos;\n  }\n\n  add(title: string) {\n    this.todos.push({ id: crypto.randomUUID(), title, done: false });\n  }\n\n  toggle(id: string) {\n    const todo = this.todos.find((t) => t.id === id);\n    if (todo) todo.done = !todo.done;\n  }\n\n  async load() {\n    this.loading = true;\n    try {\n      const res = await fetch('/api/todos');\n      const data = await res.json();\n      runInAction(() => { this.todos = data; this.loading = false; });\n    } catch {\n      runInAction(() => { this.loading = false; });\n    }\n  }\n}\n\nexport const todoStore = new TodoStore();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "makeObservable needs annotations",
+        "text": "`makeObservable(this)` only works when you pass annotation maps or use decorators. Use `makeAutoObservable(this)` (as above) or supply `{ todos: observable, add: action, visibleTodos: computed }` explicitly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reacting in components",
+        "anchor": "react"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "tsx",
+        "caption": "observer components re-render on observable reads",
+        "code": "import { observer } from 'mobx-react-lite';\nimport { todoStore } from './stores/todoStore';\n\nexport const TodoList = observer(function TodoList() {\n  const [title, setTitle] = useState('');\n\n  return (\n    <section>\n      <form onSubmit={(e) => { e.preventDefault(); todoStore.add(title); setTitle(''); }}>\n        <input value={title} onChange={(e) => setTitle(e.target.value)} />\n      </form>\n      {todoStore.loading && <p>Loading…</p>}\n      <ul>\n        {todoStore.visibleTodos.map((todo) => (\n          <li key={todo.id} onClick={() => todoStore.toggle(todo.id)}>\n            {todo.done ? '✓' : '○'} {todo.title}\n          </li>\n        ))}\n      </ul>\n    </section>\n  );\n});"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`observer` wraps the component so reads are tracked and re-renders are automatic. Values that never touch an observable (local `useState` here) keep behaving like normal React state."
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "javascript",
-        "caption": "MobX observable state",
-        "code": "import { makeObservable, observable, action } from \"mobx\";\n\nclass Store {\n  count = 0;\n  constructor() { makeObservable(this); }\n  increment = action(() => { this.count++; });\n}"
+        "title": "Install MobX and its React binding",
+        "content": "",
+        "code": "npm install mobx mobx-react-lite",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Concept",
+          "MobX",
+          "Redux equivalent"
+        ],
+        "rows": [
+          [
+            "State container",
+            "Class field",
+            "Store + slice"
+          ],
+          [
+            "Change",
+            "Direct mutation",
+            "dispatch(action)"
+          ],
+          [
+            "Derived value",
+            "computed getter",
+            "reselect selector"
+          ],
+          [
+            "Consumption",
+            "observer component",
+            "useSelector"
+          ]
+        ]
       }
     },
     {
@@ -34,30 +113,57 @@
         "terms": [
           {
             "term": "Observable",
-            "definition": "State that MobX tracks."
+            "definition": "A value MobX tracks for reads and changes."
           },
           {
-            "term": "Reaction",
-            "definition": "Side effect triggered by state changes."
+            "term": "Action",
+            "definition": "A function that changes observables; batching them keeps derivations consistent."
+          },
+          {
+            "term": "Computed",
+            "definition": "A cached value derived from observables that recomputes only when its inputs change."
+          },
+          {
+            "term": "observer",
+            "definition": "A HOC that subscribes a React component to the observables it reads."
           }
         ]
       }
     },
     {
-      "type": "summary-box",
+      "type": "faq-block",
       "data": {
-        "title": "Key Takeaways",
         "items": [
           {
-            "text": "MobX is fully reactive."
+            "question": "Is MobX still a reasonable choice?",
+            "answer": "Yes, especially for complex domain models where derived data is common. It is less popular than Redux or Zustand in new React apps, but it remains powerful and is widely used in Vue-like reactive architectures."
           },
           {
-            "text": "Minimal boilerplate for complex state."
-          },
-          {
-            "text": "Use makeObservable for class-based stores."
+            "question": "Why wrap async updates in runInAction?",
+            "answer": "MobX enforces that observables change inside actions. After an await you are outside the action, so runInAction re-establishes the batching context."
           }
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Contrast MobX's transparent reactivity (you mutate and the UI follows) with Redux's explicit immutability and action log. Mention `runInAction` as the async gotcha."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "makeAutoObservable turns class fields into observables and methods into actions.",
+          "computed getters cache derived values.",
+          "observer components re-render only for the observables they read.",
+          "Wrap post-await mutations in runInAction."
+        ],
+        "takeaway": "MobX is the counter-example to Redux: mutable, automatic, and implicit — know both sides."
       }
     }
   ],

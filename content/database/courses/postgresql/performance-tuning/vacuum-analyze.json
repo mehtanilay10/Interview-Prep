@@ -45,6 +45,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Freezing, Wraparound, and VACUUM FULL"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every transaction gets a 32-bit id, and after about two billion transactions the counter wraps. To survive wraparound, `VACUUM` freezes old tuples by replacing their transaction id with a special FrozenXID that is always considered visible. If freezing falls behind, PostgreSQL refuses new writes and requires an offline vacuum to avoid data loss. This is why monitoring for the oldest unfrozen transaction is a production necessity."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Check wraparound pressure and reclaim space",
+        "content": "`age(datfrozenxid)` is the number of transactions since the oldest unfrozen id; approaching `autovacuum_freeze_max_age` means you are behind.",
+        "language": "sql",
+        "code": "-- How close is this database to wraparound?\nSELECT\n    datname,\n    age(datfrozenxid) AS xid_age,\n    current_setting('autovacuum_freeze_max_age') AS freeze_max_age\nFROM pg_database\nORDER BY xid_age DESC;\n\n-- Reclaim space to the OS (locks the table, rewrites it)\nVACUUM FULL orders;\n\n-- Cheaper alternative: rebuild a bloat-heavy table online\n-- with a new table + logical swap, or pg_repack"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "VACUUM FULL is not routine maintenance",
+        "text": "Plain `VACUUM` marks space reusable but does not return it to the operating system, and it runs concurrently with reads and writes. `VACUUM FULL` rewrites the entire table into a new file and takes an `ACCESS EXCLUSIVE` lock, so it blocks all access for the duration. On a large production table, use `pg_repack` or an online table rebuild instead. Reaching for `VACUUM FULL` on a busy table is a classic outage story."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

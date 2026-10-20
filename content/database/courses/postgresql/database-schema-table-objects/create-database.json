@@ -7,7 +7,7 @@
   "description": "Create databases, configure templates (template0, template1), set encodings (UTF8), and configure collations.",
   "order": 1,
   "difficulty": "beginner",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 30,
   "tags": [
     "create-database",
     "encoding",
@@ -32,14 +32,175 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cluster vs. Database vs. Schema"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "These three words are used loosely in conversation but mean different things, and mixing them up is a classic interview miss. A **cluster** is one running server on one machine (one `PGDATA` directory). A **database** is a fully isolated catalog inside that cluster — you cannot query across databases in a single statement. A **schema** is just a namespace *inside* one database, and you can join across schemas freely."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Level",
+          "Scope",
+          "Cross-query?",
+          "Created by"
+        ],
+        "rows": [
+          [
+            "Cluster",
+            "One server, one data directory, one port",
+            "—",
+            "`initdb`"
+          ],
+          [
+            "Database",
+            "Catalogs, schemas, extensions, roles usage",
+            "No (without `dblink`/FDW)",
+            "`CREATE DATABASE`"
+          ],
+          [
+            "Schema",
+            "A namespace for tables, views, functions, types",
+            "Yes — fully",
+            "`CREATE SCHEMA`"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Templates: Where New Databases Come From"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "PostgreSQL does not create an empty database from nothing. `CREATE DATABASE` **copies an existing template**. By default that is `template1`, so anything you install in `template1` (extensions, helper functions) is inherited by every new database. `template0` is a pristine, read-only copy you should use when you need a non-default encoding or collation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating Databases With the Right Template",
+        "content": "Copy from template1 to inherit setup; from template0 to change encoding or collation.",
+        "code": "-- Standard database, inherits template1 (extensions, custom functions)\nCREATE DATABASE app_development\n    OWNER    = app_admin\n    ENCODING = 'UTF8'\n    TEMPLATE = template1;\n\n-- Change collation or encoding: must use template0\nCREATE DATABASE app_prod\n    OWNER      = app_admin\n    ENCODING   = 'UTF8'\n    LC_COLLATE = 'en_US.UTF-8'\n    LC_CTYPE   = 'en_US.UTF-8'\n    TEMPLATE   = template0;\n\n-- PostgreSQL 15+: ICU collation chosen per database\nCREATE DATABASE app_icu\n    OWNER      = app_admin\n    ENCODING   = 'UTF8'\n    LOCALE_PROVIDER = 'icu'\n    ICU_LOCALE = 'en-US'\n    TEMPLATE   = template0;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Options That Matter in Production"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Option",
+          "Why you care"
+        ],
+        "rows": [
+          [
+            "`ENCODING`",
+            "Always `UTF8`. Converting later requires a dump/restore."
+          ],
+          [
+            "`LC_COLLATE` / `LC_CTYPE`",
+            "Controls sort order and character classification (`ILIKE`, `UPPER`). Decided at creation, effectively immutable."
+          ],
+          [
+            "`LOCALE_PROVIDER = icu`",
+            "PG 15+. More consistent, versioned collations across operating systems."
+          ],
+          [
+            "`TEMPLATE`",
+            "`template0` needed for any locale/encoding change."
+          ],
+          [
+            "`ALLOW_CONNECTIONS`",
+            "Set `false` for a migration target you do not want clients hitting yet."
+          ],
+          [
+            "`CONNECTION LIMIT`",
+            "Per-database cap, useful to protect a small instance from one tenant."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Listing, Sizing, and Renaming Databases",
+        "content": "Database-level administration from psql.",
+        "code": "-- List databases with size, owner, and encoding\nSELECT datname,\n       pg_size_pretty(pg_database_size(datname)) AS size,\n       pg_encoding_to_char(encoding) AS encoding,\n       datcollate, pg_get_userbyid(datdba) AS owner\nFROM pg_database\nORDER BY pg_database_size(datname) DESC;\n\n-- Rename (cannot rename the database you are currently connected to)\nALTER DATABASE app_development RENAME TO app_dev;\n\n-- Change owner\nALTER DATABASE app_dev OWNER TO app_admin;\n\n-- Prevent new connections and terminate existing ones before a migration\nALTER DATABASE app_dev ALLOW_CONNECTIONS false;\nSELECT pg_terminate_backend(pid)\nFROM pg_stat_activity\nWHERE datname = 'app_dev' AND pid <> pg_backend_pid();",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "`CREATE DATABASE` Cannot Run Inside a Transaction",
+        "text": "Because it copies a template, it must run as a top-level statement. That is why migration tools wrap everything *except* database creation in a transaction, and why `DROP DATABASE` has a `WITH (FORCE)` option in PG 13+ to terminate active connections."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Provision a Fresh Environment",
+        "description": "Practise the provisioning path you would script in a real project.",
+        "steps": [
+          "Connect to `postgres` and create a role: `CREATE ROLE app_admin LOGIN PASSWORD 'secret';`",
+          "Create `app_development` owned by `app_admin` with `UTF8` encoding from `template1`.",
+          "Connect to it with `\\c app_development` and confirm the encoding with `SHOW server_encoding;`.",
+          "Try `CREATE DATABASE test COLLATE \"C\" TEMPLATE template1;` and explain the error — then fix it with `template0`."
+        ],
+        "expectedOutcome": "A database you can connect to, with the correct encoding and owner, created from the right template."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Can I write a query that joins tables across two databases?",
+            "answer": "Not directly. A single connection is bound to one database. Use `postgres_fdw` foreign data wrappers, `dblink`, or logical replication to consolidate the data — or keep related tables in the same database under different schemas."
+          },
+          {
+            "question": "Why does changing collation require a new database?",
+            "answer": "Collation affects how indexes store and compare text, so it is recorded at the cluster/database level. You must create a new database and migrate the data."
+          },
+          {
+            "question": "What is `template0` for?",
+            "answer": "It is a pristine read-only template that lets you choose a different encoding, collation, or locale than `template1`, and it is also useful for restoring a dump that specifies a different encoding."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "A PostgreSQL cluster hosts multiple independent databases.",
-          "Always standardize on `UTF8` character encoding.",
-          "New databases copy schemas and extensions from `template1`."
-        ]
+          "Cluster → database → schema are three nested scopes; new databases are **copied from a template**, not created empty.",
+          "Use `template0` whenever you need a non-default encoding or collation; use `template1` to inherit extensions.",
+          "Always provision with `UTF8`; prefer the ICU locale provider on PostgreSQL 15+.",
+          "`CREATE DATABASE` cannot run inside a transaction block, which affects how migrations are scripted."
+        ],
+        "takeaway": "Aim to answer with the template detail: \"new databases are cloned from template1, so I use template0 when I need a different locale\"."
       }
     }
   ],

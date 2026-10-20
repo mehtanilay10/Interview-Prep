@@ -7,7 +7,7 @@
   "description": "Safely remove tables, manage foreign key cascades with CASCADE vs RESTRICT, and verify IF EXISTS.",
   "order": 5,
   "difficulty": "beginner",
-  "estimatedMinutes": 15,
+  "estimatedMinutes": 25,
   "tags": [
     "drop-table",
     "cascade",
@@ -31,13 +31,121 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Dependencies Decide Whether `DROP` Succeeds"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A table that other objects depend on — a foreign key from a child table, a view, a materialized view — cannot be dropped until those dependencies are gone. By default `DROP TABLE` uses `RESTRICT`, which **refuses** and tells you what depends on it. `CASCADE` silently removes the dependent objects too, which can delete far more than you intended."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Discovering Dependencies Before You Drop",
+        "content": "Always look before you cascade.",
+        "code": "-- What depends on this table?\nSELECT DISTINCT dependent.relname AS dependent_object,\n       dependent.relkind,\n       pg_get_userbyid(dependent.relowner) AS owner\nFROM pg_depend d\nJOIN pg_class dependent ON dependent.oid = d.objid\nJOIN pg_class source    ON source.oid    = d.refobjid\nWHERE source.relname = 'categories' AND source.relkind = 'r';\n\n-- Restrict (default): fails if anything depends on the table\nDROP TABLE categories;                      -- ERROR: cannot drop: other objects depend on it\n\n-- Cascade: removes dependent views and foreign keys as well\nDROP TABLE categories CASCADE;\n\n-- Idempotent form used in scripts\nDROP TABLE IF EXISTS obsolete_logs;\n\n-- Drop several objects in one statement\nDROP TABLE IF EXISTS a, b, c RESTRICT;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "DROP, TRUNCATE, DELETE — Not Interchangeable"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Statement",
+          "Removes",
+          "Transactional?",
+          "Lock",
+          "Can be filtered?"
+        ],
+        "rows": [
+          [
+            "`DELETE FROM t`",
+            "Rows matching `WHERE`",
+            "Yes, and fully logged",
+            "Row-level",
+            "Yes"
+          ],
+          [
+            "`TRUNCATE t`",
+            "All rows",
+            "Yes, but use with care",
+            "ACCESS EXCLUSIVE",
+            "No"
+          ],
+          [
+            "`DROP TABLE t`",
+            "The table, data, indexes, triggers",
+            "Yes",
+            "ACCESS EXCLUSIVE",
+            "n/a"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`TRUNCATE` is far faster than `DELETE` because it deallocates whole pages instead of writing one WAL record per row, and it resets nothing about the sequence unless you add `RESTART IDENTITY`. `DELETE` leaves dead tuples behind for `VACUUM`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Truncating With Identity Reset and Cascade",
+        "content": "Useful in a test suite seed script.",
+        "code": "-- Fast, logged wipe of a table and its children\nTRUNCATE TABLE order_items, orders RESTART IDENTITY CASCADE;\n\n-- Reset a sequence explicitly (e.g. after DELETE)\nALTER SEQUENCE orders_id_seq RESTART WITH 1;\n\n-- Drop a whole schema and everything in it\nDROP SCHEMA IF EXISTS staging CASCADE;\n\n-- Drop a database, terminating connections first (PG 13+)\nDROP DATABASE IF EXISTS old_app WITH (FORCE);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "There Is No `UNDROP TABLE`",
+        "text": "Dropping is transactional, so `BEGIN; DROP TABLE t; ROLLBACK;` is safe — but once committed the data is gone. In production the safe workflow is: rename (`ALTER TABLE t RENAME TO t_dropped_20260101;`) and drop it after a retention window, or restore the table from a logical/physical backup."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "What is the difference between `DROP` and `DELETE`?",
+            "answer": "`DELETE` removes rows and leaves the table structure; `DROP` removes the whole object. `DELETE` is row-by-row and logged for replication, `DROP` is a catalog operation."
+          },
+          {
+            "question": "When would you use `TRUNCATE`?",
+            "answer": "For bulk clearing where you want speed and do not need row-level triggers to fire (though `TRUNCATE` triggers do exist) — for example, resetting a staging table between loads."
+          },
+          {
+            "question": "Does `DROP TABLE` free disk space?",
+            "answer": "It removes the files, so yes, the OS reclaims the space. `DELETE` and `DROP COLUMN` do not immediately — the space is reused internally after `VACUUM`."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Always include `IF EXISTS` to avoid script errors when the table is absent.",
-          "`CASCADE` drops dependent views and foreign keys automatically.",
-          "`RESTRICT` (default) prevents dropping if dependent objects exist."
+          "`DROP TABLE` defaults to `RESTRICT`; `CASCADE` follows and removes dependent views and foreign keys as well.",
+          "Investigate dependencies in `pg_depend`/`pg_class` before dropping anything with `CASCADE`.",
+          "`DELETE`, `TRUNCATE`, and `DROP` differ in scope, speed, locks, and transactional behaviour.",
+          "Production-safe deletion is usually a rename plus a delayed drop, not an immediate drop."
         ]
       }
     }

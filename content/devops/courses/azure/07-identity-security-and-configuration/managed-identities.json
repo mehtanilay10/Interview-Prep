@@ -50,7 +50,7 @@
       "data": {
         "id": "mermaid-managed-identity",
         "caption": "How a managed identity replaces secrets in application code.",
-        "definition": "flowchart TB\n    A[\"App Service / VM / Function\"] -->|\"Request access token\"| M[\"Managed Identity\"]\n    M -->|\"No password needed\"| E[\"Entra ID\"]\n    E -->|\"Returns access token\"| M\n    M -->|\"Returns token\"| A\n    A -->|\"Call with token\"| S[\"Azure Key Vault / SQL / Storage\"]"
+        "definition": "flowchart TD\n    A[\"App Service / VM / Function\"] -->|\"Request access token\"| M[\"Managed Identity\"]\n    M -->|\"No password needed\"| E[\"Entra ID\"]\n    E -->|\"Returns access token\"| M\n    M -->|\"Returns token\"| A\n    A -->|\"Call with token\"| S[\"Azure Key Vault / SQL / Storage\"]"
       }
     },
     {
@@ -69,6 +69,92 @@
         "content": "Use the Azure SDK to request an access token for Key Vault without any secret in code.",
         "code": "using Azure.Identity;\nusing Azure.Security.KeyVault.Secrets;\n\nvar client = new SecretClient(\n    new Uri(\"https://my-vault.vault.azure.net/\"),\n    new DefaultAzureCredential()\n);\n\nKeyVaultSecret secret = await client.GetSecretAsync(\"MySecret\");\nConsole.WriteLine(secret.Value);",
         "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "User-assigned identity end to end"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A user-assigned managed identity is a standalone Azure resource with its own lifecycle. You create it once, attach it to one or more compute resources, and assign it roles. This is the right choice when several apps or slots need the same access, because the identity and its role assignments survive redeployments of the app."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create, attach, and authorize a user-assigned identity",
+        "content": "The identity must be attached to the app before it can request tokens, and it must be granted access to the target resource before the call succeeds.",
+        "language": "bash",
+        "code": "az identity create -g rg-shop -n id-shop-api\n\nprincipalId=$(az identity show -g rg-shop -n id-shop-api --query principalId -o tsv)\nidentityId=$(az identity show -g rg-shop -n id-shop-api --query id -o tsv)\n\n# Attach to the web app (this replaces existing user-assigned identities unless --identities is used)\naz webapp identity assign -g rg-shop -n shop-api --identities \"$identityId\"\n\n# Grant read access to Key Vault\nkvId=$(az keyvault show -n shop-kv --query id -o tsv)\naz role assignment create --assignee-object-id \"$principalId\" \\\n  --assignee-principal-type ServicePrincipal \\\n  --role \"Key Vault Secrets User\" --scope \"$kvId\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How the token is obtained"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Managed identity is not magic and it is not a secret in an environment variable. The compute host exposes a local token endpoint: the Instance Metadata Service at 169.254.169.254 on VMs and virtual machine scale sets, and the IDENTITY_ENDPOINT plus IDENTITY_HEADER pair on App Service, Functions, and Container Apps. The Azure SDK detects the environment, requests a token scoped to the target resource, and caches it in memory until shortly before expiry."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Because the endpoint is local and requires the host context, code running outside Azure cannot use it. That is why DefaultAzureCredential chains several sources: environment variables, workload identity, managed identity, and developer credentials such as the Azure CLI or Visual Studio. The chain lets the same code run locally and in production."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Environment",
+          "Credential source",
+          "Secret stored?"
+        ],
+        "rows": [
+          [
+            "Local developer machine",
+            "Azure CLI or Visual Studio sign-in",
+            "No"
+          ],
+          [
+            "GitHub Actions or Azure DevOps",
+            "Workload identity federation (OIDC)",
+            "No"
+          ],
+          [
+            "AKS pod",
+            "Workload identity federation",
+            "No"
+          ],
+          [
+            "App Service, Functions, Container Apps, VM",
+            "Managed identity",
+            "No"
+          ],
+          [
+            "External system that cannot federate",
+            "Service principal secret or certificate",
+            "Yes - store in Key Vault"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Be ready to contrast system-assigned and user-assigned identities, and to explain that the identity needs both a role assignment on the target and code that requests a token for the right scope. \"It removes secrets, not authorization\" is the key insight."
       }
     },
     {

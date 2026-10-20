@@ -1,0 +1,128 @@
+{
+  "id": "lesson-sql-186",
+  "slug": "sql-server-agent-jobs",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "SQL Server Agent Jobs",
+  "description": "Create, schedule, monitor, and troubleshoot SQL Server Agent jobs for backups, index maintenance, and ETL.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 28,
+  "tags": [
+    "sql-server-agent",
+    "jobs",
+    "scheduling",
+    "msdb",
+    "automation"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "SQL Server Agent Jobs"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQL Server Agent is the built-in scheduler. A job is a named container for one or more steps; a step is a T-SQL command, PowerShell script, SSIS package, or operating-system command; a schedule decides when the job runs. Job definitions, schedules, and history live in the `msdb` database, which is why backing up `msdb` matters as much as backing up user databases."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sqlserver-agent-job-flow",
+        "caption": "A SQL Server Agent job is composed of ordered steps, triggered by one or more schedules, and records each run in msdb history.",
+        "definition": "flowchart TD\n    SCH[\"Schedule\\ndaily at 02:00\"] --> JOB[\"Job\\nNightly Index Maintenance\"]\n    JOB --> S1[\"Step 1\\nT-SQL maintenance\"]\n    S1 -->|success| S2[\"Step 2\\nUpdate statistics\"]\n    S1 -->|failure| NOTIFY[\"Notify operator\\nand retry\"]\n    S2 --> HIST[\"msdb.dbo.sysjobhistory\"]\n    NOTIFY --> HIST\n    JOB --> TARGET[\"Target server(s)\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a Job with T-SQL"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The system procedures in `msdb` are the scriptable equivalent of SQL Server Management Studio's job editor. Create the job, add steps, create and attach a schedule, then add the job to a server. `@freq_type = 4` means daily and `@active_start_time = 020000` means 02:00:00 in HHMMSS form."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a nightly maintenance job",
+        "content": "Retries are configured on the step, so a transient failure does not page anyone at 2 AM.",
+        "language": "sql",
+        "code": "USE msdb;\nGO\n\nEXEC dbo.sp_add_job\n    @job_name    = N'Nightly Index Maintenance',\n    @enabled     = 1,\n    @description = N'Rebuild or reorganize fragmented indexes.';\n\nEXEC dbo.sp_add_jobstep\n    @job_name       = N'Nightly Index Maintenance',\n    @step_name      = N'Run index maintenance',\n    @subsystem      = N'TSQL',\n    @command        = N'EXEC dbo.usp_IndexMaintenance @RebuildThreshold = 30;',\n    @retry_attempts = 2,\n    @retry_interval = 5;\n\nEXEC dbo.sp_add_schedule\n    @schedule_name     = N'Daily at 02:00',\n    @freq_type         = 4,\n    @freq_interval     = 1,\n    @active_start_time = 020000;\n\nEXEC dbo.sp_attach_schedule\n    @job_name      = N'Nightly Index Maintenance',\n    @schedule_name = N'Daily at 02:00';\n\nEXEC dbo.sp_add_jobserver\n    @job_name = N'Nightly Index Maintenance';\nGO"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Read Job History"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Show the last runs of every job",
+        "content": "`step_id = 0` is the job outcome row. `run_status` uses 0 = failed, 1 = succeeded, 3 = canceled, 4 = in progress.",
+        "language": "sql",
+        "code": "SELECT\n    j.name AS job_name,\n    msdb.dbo.agent_datetime(h.run_date, h.run_time) AS run_at,\n    h.run_status,\n    h.run_duration\nFROM msdb.dbo.sysjobs AS j\nJOIN msdb.dbo.sysjobhistory AS h\n    ON h.job_id = j.job_id\nWHERE h.step_id = 0\nORDER BY h.run_date DESC, h.run_time DESC;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Agent jobs fail silently if nobody is watching",
+        "text": "By default, a failed job just records a row in history. Configure an operator and a notification (email or net send) on failure, and set severity-based alerts for errors that matter. Also check that the SQL Server Agent service is running — when it is stopped, nothing fires and no one is told."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Make jobs idempotent and observable",
+        "text": "A job that runs twice should not corrupt data or double-load a table. Write the step so it can be re-run safely, log start and end times to a table, and use `@retry_attempts` for transient failures. For long jobs, add a check that aborts if the previous run is still active rather than stacking executions."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: Agent vs SQL Server Integration Services vs Azure Data Factory",
+        "text": "SQL Server Agent is a scheduler, not an ETL engine. It can run T-SQL, PowerShell, and SSIS packages on a schedule, which is enough for backups, index maintenance, and small extracts. SSIS adds data-flow transformations and connectors. Azure Data Factory is the cloud-native orchestrator with triggers, linked services, and monitoring. A good answer separates scheduling from data movement instead of treating Agent as a full integration platform."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "SQL Server Agent Jobs Key Points",
+        "points": [
+          "A job contains ordered steps and runs on one or more schedules.",
+          "Job metadata and history live in msdb, so back up msdb regularly.",
+          "Use sp_add_job, sp_add_jobstep, sp_add_schedule, sp_attach_schedule, and sp_add_jobserver to script jobs.",
+          "Configure retries on steps and notifications on failure.",
+          "Query sysjobhistory with step_id = 0 to see job outcomes.",
+          "Agent schedules work; SSIS or Data Factory moves and transforms data."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "backup-restore-strategies",
+    "sql-server-integration-services"
+  ]
+}

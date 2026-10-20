@@ -7,7 +7,7 @@
   "description": "Organize database objects into schemas, configure search_path resolution, and implement multi-tenant schema isolation.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "schemas",
     "search-path",
@@ -44,14 +44,143 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Use Schemas Instead of Many Databases?"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Schemas let you separate concerns while keeping everything joinable in one transaction. The two patterns you will meet in real systems are:"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "**Modular monolith** — one schema per bounded context (`billing`, `inventory`, `auth`) with clear ownership. `SELECT ... FROM billing.invoices JOIN auth.users ...` still works.",
+          "**Schema-per-tenant** — every tenant gets `tenant_acme`, `tenant_globex`, … with identical table shapes. Strong isolation, but migrations must iterate over every schema."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "`search_path` Is Resolved Like `PATH`"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An unqualified name such as `invoices` is looked up in each schema on `search_path`, left to right; the first match wins. Only the first schema is used for `CREATE`, which means a misconfigured path can silently create tables in an unexpected place."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Creating a Schema and Directing Resolution",
+        "content": "Note the special `$user` token and the difference between schema creation and privilege.",
+        "code": "-- Create a schema and let the current role use it\nCREATE SCHEMA reporting AUTHORIZATION app_admin;\n\n-- USAGE lets you see/resolve objects; CREATE lets you add new ones\nGRANT USAGE ON SCHEMA reporting TO analyst;\nGRANT CREATE ON SCHEMA reporting TO app_admin;\n\n-- $user resolves to the session user's own schema, if it exists\nSET search_path TO \"$user\", app, public;\nSHOW search_path;    -- \"$user\", app, public\n\n-- Fully-qualified names always win regardless of search_path\nSELECT count(*) FROM reporting.daily_sales;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The `search_path` Privilege Trap",
+        "text": "If an application sets `search_path = public` and a low-privileged role can create objects in `public`, that role can shadow real tables or functions. Remove `CREATE` on `public` from untrusted roles (`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`) and always schema-qualify security-definer functions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Inspecting and Cleaning Up Schemas"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Listing Schemas, Owners, and Object Counts",
+        "content": "Useful when auditing a database with many schemas.",
+        "code": "SELECT n.nspname AS schema,\n       pg_get_userbyid(n.nspowner) AS owner,\n       count(c.oid) FILTER (WHERE c.relkind = 'r') AS tables,\n       count(c.oid) FILTER (WHERE c.relkind = 'v') AS views\nFROM pg_namespace n\nLEFT JOIN pg_class c ON c.relnamespace = n.oid\nWHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema'\nGROUP BY 1, 2\nORDER BY 3 DESC;\n\n-- Move a table between schemas\nALTER TABLE public.legacy_orders SET SCHEMA archive;\n\n-- DROP SCHEMA refuses if it contains objects; CASCADE removes them all\nDROP SCHEMA IF EXISTS tenant_deleted CASCADE;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Per-Tenant Schemas vs. a Tenant Column"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Factor",
+          "Schema per tenant",
+          "`tenant_id` column + RLS"
+        ],
+        "rows": [
+          [
+            "Isolation",
+            "Strong — mistakes must cross schemas",
+            "Logical — enforced by policy"
+          ],
+          [
+            "Migrations",
+            "Must loop over every schema",
+            "One migration for all tenants"
+          ],
+          [
+            "Connection pool",
+            "One pool per tenant or a `search_path` switch",
+            "Shared pool, policy does the filtering"
+          ],
+          [
+            "Sweet spot",
+            "Dozens–hundreds of tenants with hard isolation needs",
+            "Thousands of tenants; shared catalog"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "What is the difference between a database and a schema?",
+            "answer": "A database is an isolated catalog that a connection is bound to; a schema is a namespace within a database. You can join across schemas in one query, but not across databases."
+          },
+          {
+            "question": "What does `search_path` do?",
+            "answer": "It lists the schemas consulted, in order, to resolve unqualified object names. The first schema is also where new objects are created."
+          },
+          {
+            "question": "What happens if two schemas on `search_path` contain a table with the same name?",
+            "answer": "The earlier schema wins. Qualify the name to avoid ambiguity, and remember only the first schema is used for `CREATE TABLE`."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Schemas act as namespaces inside a single database.",
-          "`search_path` dictates the resolution order of unqualified table names.",
-          "Multi-tenant schema patterns provide clean logical separation of customer data."
-        ]
+          "A schema is a namespace inside one database: objects in different schemas are still joinable.",
+          "`search_path` resolves unqualified names left-to-right and determines where new objects are created.",
+          "`USAGE` controls visibility, `CREATE` controls whether a role can add objects — grant them separately.",
+          "Harden `public`: untrusted roles should not have `CREATE` on it, and security-definer functions should set an explicit `search_path`."
+        ],
+        "takeaway": "Mention `search_path` security when you are asked about schemas — it shows production awareness, not just syntax."
       }
     }
   ],

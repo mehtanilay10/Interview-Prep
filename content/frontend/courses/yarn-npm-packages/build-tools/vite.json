@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-014",
   "slug": "vite",
   "title": "Vite",
-  "description": "Next-generation frontend tooling with native ESM.",
+  "description": "How Vite serves native ESM in development, builds with Rollup, and handles env variables, aliases, and proxies.",
   "order": 2,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "difficulty": "beginner",
+  "estimatedMinutes": 14,
   "tags": [
     "vite",
     "build",
@@ -17,36 +17,84 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Vite (French for \"quick\") provides instant server start and lightning-fast hot updates by leveraging native ES modules."
+        "text": "Vite (French for \"fast\") skips bundling during development. The browser requests modules over native ESM and Vite transforms them on demand, so a cold start is measured in milliseconds regardless of app size."
       }
     },
     {
       "type": "heading",
       "data": {
-        "text": "How Vite Works",
-        "level": "h2"
+        "level": 2,
+        "text": "Development is not the build",
+        "anchor": "dev-vs-build"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "In development, Vite serves files as native ESM. No bundling is needed. In production, it uses Rollup to bundle optimized assets."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "language": "bash",
-        "caption": "Create a Vite project",
-        "code": "npm create vite@latest my-app -- --template react-ts\ncd my-app\nnpm install\nnpm run dev"
+        "text": "Two different engines: the dev server uses esbuild for fast TypeScript/JSX transformation plus native ESM for module loading; `vite build` uses Rollup to produce an optimised production bundle. This is why dev-only warnings and production output can differ."
       }
     },
     {
       "type": "mermaid",
       "data": {
         "id": "mermaid-vite-flow",
-        "definition": "flowchart TB\n    A[Source Code] --> B[Dev: Native ESM]\n    A --> C[Build: Rollup]\n    B --> D[Instant HMR]\n    C --> E[Optimized Bundle]",
-        "caption": "Vite development vs production flow"
+        "caption": "Vite uses different engines for dev and build",
+        "definition": "flowchart TD\n    A[Source files] --> B{Command}\n    B -->|vite dev| C[esbuild transforms per module]\n    C --> D[Native ESM over HTTP]\n    D --> E[Hot module replacement]\n    B -->|vite build| F[Rollup graph]\n    F --> G[Tree-shaken hashed assets]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "A realistic vite.config.ts",
+        "anchor": "config"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "vite.config.ts — aliases, proxy, and chunking",
+        "code": "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport { fileURLToPath, URL } from 'node:url';\n\nexport default defineConfig({\n  plugins: [react()],\n  resolve: {\n    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },\n  },\n  server: {\n    port: 5173,\n    proxy: {\n      '/api': { target: 'http://localhost:3000', changeOrigin: true },\n    },\n  },\n  build: {\n    sourcemap: true,\n    rollupOptions: {\n      output: {\n        manualChunks: { vendor: ['react', 'react-dom'] },\n      },\n    },\n  },\n});"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scaffold and build",
+        "content": "",
+        "code": "npm create vite@latest my-app -- --template react-ts\ncd my-app && npm install\nnpm run dev\nnpm run build && npm run preview",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Environment variables",
+        "anchor": "env"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Only variables prefixed with `VITE_` are exposed to client code, and they are inlined at build time — never put secrets in them. Use `.env`, `.env.local` (git-ignored), and mode-specific files such as `.env.production`."
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "Accessing and typing env variables",
+        "code": "// .env\n// VITE_API_URL=https://api.example.com\n\nconst apiUrl = import.meta.env.VITE_API_URL;\n\n// src/vite-env.d.ts\ninterface ImportMetaEnv {\n  readonly VITE_API_URL: string;\n}\ninterface ImportMeta {\n  readonly env: ImportMetaEnv;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "Build-time inlining",
+        "text": "`import.meta.env` values are string-substituted into the bundle. A leaked API key is readable by anyone who downloads the JavaScript, no matter how it is named."
       }
     },
     {
@@ -60,66 +108,46 @@
         "rows": [
           [
             "Dev startup",
-            "Instant",
-            "Slow"
-          ],
-          [
-            "HMR",
-            "Lightning fast",
-            "Slower"
-          ],
-          [
-            "Build",
-            "Rollup-based",
-            "Webpack"
+            "Native ESM, instant",
+            "Bundles the graph first"
           ],
           [
             "Config",
-            "Minimal",
-            "Complex"
+            "Small, typed",
+            "Large, loader/plugin driven"
           ],
           [
-            "Ecosystem",
-            "Growing",
-            "Mature"
+            "Production bundler",
+            "Rollup",
+            "Webpack"
+          ],
+          [
+            "HMR speed",
+            "Very fast",
+            "Slower on large apps"
           ]
         ]
       }
     },
     {
-      "type": "key-terms",
+      "type": "callout",
       "data": {
-        "terms": [
-          {
-            "term": "ESM",
-            "definition": "ECMAScript Modules, the native module system."
-          },
-          {
-            "term": "HMR",
-            "definition": "Hot Module Replacement, updates modules without full reload."
-          },
-          {
-            "term": "Rollup",
-            "definition": "Bundler used by Vite for production builds."
-          }
-        ]
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Explain the unbundled dev server, the Rollup production build, and why `import.meta.env` is safe only for public values."
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
-        "items": [
-          {
-            "text": "Vite uses native ESM for instant dev server."
-          },
-          {
-            "text": "Rollup handles production builds."
-          },
-          {
-            "text": "Vite is the modern standard for new projects."
-          }
-        ]
+        "title": "Key takeaways",
+        "points": [
+          "Vite serves native ESM in dev and bundles with Rollup for production.",
+          "esbuild handles fast per-file transforms during development.",
+          "Prefix public env vars with VITE_; they are inlined at build time.",
+          "Configure aliases and API proxies in vite.config.ts, not in app code."
+        ],
+        "takeaway": "Vite is the default choice for new frontend apps — know why it starts faster than Webpack."
       }
     }
   ],

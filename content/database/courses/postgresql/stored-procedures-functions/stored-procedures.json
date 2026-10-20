@@ -65,6 +65,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Transaction Control and Error Handling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Procedures can start, commit, and roll back transactions, which is the one thing functions cannot do. Wrap the body in an exception block to roll back a failed batch without aborting the entire procedure, then resume from the last committed point."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Batched procedure with per-batch rollback",
+        "content": "Each batch is committed on success; a failure rolls back only that batch and records the error before continuing.",
+        "language": "sql",
+        "code": "CREATE OR REPLACE PROCEDURE archive_old_orders(p_days int)\nLANGUAGE plpgsql\nAS $$\nDECLARE\n    batch_size constant int := 10000;\n    moved      int;\nBEGIN\n    LOOP\n        BEGIN\n            WITH victims AS (\n                SELECT id\n                FROM orders\n                WHERE ordered_at < now() - make_interval(days => p_days)\n                LIMIT batch_size\n            )\n            DELETE FROM orders o\n            USING victims v\n            WHERE o.id = v.id;\n\n            GET DIAGNOSTICS moved = ROW_COUNT;\n            COMMIT;\n\n            EXIT WHEN moved < batch_size;\n        EXCEPTION WHEN others THEN\n            ROLLBACK;\n            RAISE NOTICE 'Batch failed, stopping: %', SQLERRM;\n            EXIT;\n        END;\n    END LOOP;\nEND $$;\n\nCALL archive_old_orders(365);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: why use a procedure at all",
+        "text": "Reach for a procedure when the logic needs to commit in the middle — long data migrations, archiving, or jobs that must not hold a single transaction for hours. Functions are the right tool for pure computation and for anything you want to call from a query. The ability to `COMMIT` inside a `CALL` is the specific capability that makes procedures worth the extra ceremony."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

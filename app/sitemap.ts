@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories } from '@/lib/content';
-import { getCourseCategory, getInterviewTechSlug } from '@/lib/content-hrefs';
+import { getCourseCategory } from '@/lib/content-hrefs';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
 
@@ -16,7 +16,6 @@ function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRo
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [
     toSitemapEntry(`${BASE_URL}/`, 1, 'weekly'),
-    toSitemapEntry(`${BASE_URL}/interview-questions`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/roadmaps`, 0.8, 'weekly'),
     toSitemapEntry(`${BASE_URL}/search`, 0.7, 'weekly'),
     toSitemapEntry(`${BASE_URL}/ai/glossary`, 0.8, 'weekly'),
@@ -50,12 +49,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const technologies = getInterviewTechnologies();
   for (const tech of technologies) {
-    const techSlug = getInterviewTechSlug(tech);
-    entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${techSlug}`));
+    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions`, 0.8, 'weekly'));
+    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions/${tech.slug}`));
 
-    const questions = getInterviewQuestions(tech);
+    const questions = getInterviewQuestions(tech.slug, tech.category);
     for (const q of questions) {
-      entries.push(toSitemapEntry(`${BASE_URL}/interview-questions/${techSlug}/${q.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions/${tech.slug}/${q.slug}`));
     }
   }
 

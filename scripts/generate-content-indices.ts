@@ -12,8 +12,9 @@
  *   content/<category>/courses/<courseSlug>/...
  *   content/<category>/problems/<courseSlug>/...
  *   content/<category>/cheatsheet/<technology>/...
- *   content/interview-qa/...            (technology-based, not category-based)
+ *   content/<category>/interview-qa/<technology>/...
  *   content/cheatsheet.json             (cheatsheet section metadata)
+ *   content/interview-qa.json           (interview-qa section metadata)
  *
  * Run automatically before dev/build so new JSON files are picked up without manual edits.
  */
@@ -30,7 +31,7 @@ const LESSONS_INDEX = path.join(CONTENT_DIR, 'lessons.ts');
 const CATEGORIES_INDEX = path.join(CONTENT_DIR, 'categories.ts');
 
 /** Section directories that make a top-level directory a content category. */
-const SECTION_DIRS = ['courses', 'problems', 'cheatsheet'] as const;
+const SECTION_DIRS = ['courses', 'problems', 'cheatsheet', 'interview-qa'] as const;
 
 interface CourseInfo {
   importPath: string;
@@ -130,8 +131,8 @@ function scanCourses(): CourseInfo[] {
   if (fs.existsSync(path.join(CONTENT_DIR, 'cheatsheet.json'))) {
     addCourse('cheatsheet', 'cheatsheet', './cheatsheet.json');
   }
-  if (fs.existsSync(path.join(CONTENT_DIR, 'interview-qa', 'content.json'))) {
-    addCourse('interview-qa', 'interview-qa', './interview-qa/content.json');
+  if (fs.existsSync(path.join(CONTENT_DIR, 'interview-qa.json'))) {
+    addCourse('interview-qa', 'interview-qa', './interview-qa.json');
   }
 
   return courses.sort((a, b) => a.slug.localeCompare(b.slug));
@@ -175,9 +176,6 @@ function scanModules(): ModuleInfo[] {
     }
   }
 
-  const interviewDir = path.join(CONTENT_DIR, 'interview-qa');
-  if (isDirectory(interviewDir)) walk(interviewDir, '');
-
   return modules.sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
@@ -217,9 +215,6 @@ function scanLessons(): LessonInfo[] {
       if (isDirectory(sectionDir)) walk(sectionDir);
     }
   }
-
-  const interviewDir = path.join(CONTENT_DIR, 'interview-qa');
-  if (isDirectory(interviewDir)) walk(interviewDir);
 
   return lessons.sort((a, b) => a.slug.localeCompare(b.slug));
 }
@@ -311,6 +306,10 @@ interface CategoryInfo {
   categoryBySlug: Map<string, string>;
   /** Slugs of every course that lives under a `problems/` directory. */
   problemCourseSlugs: string[];
+  /** Interview technology slug → URL category. */
+  interviewTechCategory: Map<string, string>;
+  /** Interview question slug → owning technology slug. */
+  interviewLessonTech: Map<string, string>;
 }
 
 /**
@@ -322,6 +321,8 @@ interface CategoryInfo {
 function scanCategories(): CategoryInfo {
   const categoryBySlug = new Map<string, string>();
   const problemCourseSlugs: string[] = [];
+  const interviewTechCategory = new Map<string, string>();
+  const interviewLessonTech = new Map<string, string>();
 
   // A course's `content.json` slug can differ from its directory name (e.g.
   // `problems/csharp/content.json` has slug `csharp-problems`), and runtime
@@ -355,17 +356,56 @@ function scanCategories(): CategoryInfo {
       if (!fs.existsSync(path.join(cheatsheetDir, entry, 'content.json'))) continue;
       if (!categoryBySlug.has(entry)) categoryBySlug.set(entry, category);
     }
+
+    // Interview questions are one technology module per directory. The module
+    // slug *is* the technology slug, so it resolves both the category and the
+    // owning technology of every question inside it.
+    const interviewDir = path.join(CONTENT_DIR, category, 'interview-qa');
+    for (const entry of listDirs(interviewDir)) {
+      const moduleJsonPath = path.join(interviewDir, entry, 'content.json');
+      if (!fs.existsSync(moduleJsonPath)) continue;
+      const slug = readCourseSlug(moduleJsonPath, entry);
+      interviewTechCategory.set(slug, category);
+      try {
+        const parsed = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf8')) as { lessonSlugs?: unknown };
+        if (Array.isArray(parsed.lessonSlugs)) {
+          for (const lessonSlug of parsed.lessonSlugs) {
+            if (typeof lessonSlug === 'string') interviewLessonTech.set(lessonSlug, slug);
+          }
+        }
+      } catch {
+        // ignore malformed JSON
+      }
+    }
   }
 
-  return { categoryBySlug, problemCourseSlugs: problemCourseSlugs.sort() };
+  return {
+    categoryBySlug,
+    problemCourseSlugs: problemCourseSlugs.sort(),
+    interviewTechCategory,
+    interviewLessonTech,
+  };
 }
 
-function generateCategoriesIndex({ categoryBySlug, problemCourseSlugs }: CategoryInfo): string {
+function generateCategoriesIndex({
+  categoryBySlug,
+  problemCourseSlugs,
+  interviewTechCategory,
+  interviewLessonTech,
+}: CategoryInfo): string {
   const categoryEntries = Array.from(categoryBySlug.entries()).sort(([a], [b]) => a.localeCompare(b));
   const categoryLines = categoryEntries
     .map(([slug, category]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(category)},`)
     .join('\n');
   const problemLines = problemCourseSlugs.map((slug) => `\t${JSON.stringify(slug)},`).join('\n');
+  const interviewTechLines = Array.from(interviewTechCategory.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([slug, category]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(category)},`)
+    .join('\n');
+  const interviewLessonLines = Array.from(interviewLessonTech.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([slug, tech]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(tech)},`)
+    .join('\n');
 
   return `/**
  * Auto-generated by \`yarn generate:content\` - do not edit by hand.
@@ -382,6 +422,16 @@ ${categoryLines}
 export const PROBLEM_COURSE_SLUGS: string[] = [
 ${problemLines}
 ];
+
+/** Interview technology (module) slug -> URL category. */
+export const INTERVIEW_TECH_CATEGORY: Record<string, string> = {
+${interviewTechLines}
+};
+
+/** Interview question slug -> owning technology (module) slug. */
+export const INTERVIEW_LESSON_TECH: Record<string, string> = {
+${interviewLessonLines}
+};
 `;
 }
 

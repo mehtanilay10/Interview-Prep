@@ -20,7 +20,6 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {},
-  cacheComponents: true,
   experimental: {
     staticGenerationMaxConcurrency: 8,
     useOffline: true,

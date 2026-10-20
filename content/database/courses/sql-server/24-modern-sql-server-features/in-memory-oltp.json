@@ -1,0 +1,142 @@
+{
+  "id": "lesson-sql-185",
+  "slug": "in-memory-oltp",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "In-Memory OLTP",
+  "description": "Use memory-optimized tables and natively compiled procedures for latch-free, high-concurrency workloads.",
+  "order": 5,
+  "difficulty": "advanced",
+  "estimatedMinutes": 32,
+  "tags": [
+    "in-memory-oltp",
+    "memory-optimized",
+    "hash-index",
+    "natively-compiled",
+    "concurrency"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "In-Memory OLTP"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In-Memory OLTP stores a table entirely in memory and uses optimistic, row-version-based concurrency instead of locks and latches. Writers never block readers, and readers never block writers. SQL Server 2014 introduced the feature; since SQL Server 2016 you can alter memory-optimized tables and use them in more workloads. It is designed for high-contention OLTP, not for analytics."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "MEMORY_OPTIMIZED = ON stores the table in memory; there is no page buffer pool.",
+          "DURABILITY = SCHEMA_AND_DATA persists data in checkpoint files and the log; SCHEMA_ONLY loses data on restart.",
+          "Hash indexes are ideal for point lookups; range indexes are ideal for range scans and sorting.",
+          "Natively compiled procedures compile T-SQL to machine code and avoid the interpreted query path.",
+          "Memory is not unlimited: the table must fit in the memory-optimized filegroup and is subject to a resource governor pool."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a Memory-Optimized Table"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A schema-only session cache",
+        "content": "The primary key uses a hash index sized for the expected number of distinct session ids. A second range index supports cleanup by expiry time.",
+        "language": "sql",
+        "code": "CREATE TABLE dbo.SessionCache\n(\n    SessionId UNIQUEIDENTIFIER NOT NULL\n        CONSTRAINT PK_SessionCache PRIMARY KEY NONCLUSTERED\n        HASH WITH (BUCKET_COUNT = 1048576),\n    UserId    INT NOT NULL,\n    Payload   NVARCHAR(4000) NOT NULL,\n    ExpiresAt DATETIME2 NOT NULL,\n    INDEX IX_SessionCache_ExpiresAt NONCLUSTERED (ExpiresAt)\n)\nWITH\n(\n    MEMORY_OPTIMIZED = ON,\n    DURABILITY = SCHEMA_ONLY\n);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Bucket count matters",
+        "text": "A hash index with too few buckets turns into long collision chains and loses its advantage. Size the bucket count for the peak number of rows, rounded up to a power of two. You can inspect and change it with `ALTER TABLE ... ALTER INDEX ... REBUILD WITH (BUCKET_COUNT = ...)`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Natively Compiled Procedures"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A natively compiled lookup",
+        "content": "Natively compiled procedures can only access memory-optimized tables and must be schema-bound. The isolation level is declared once in BEGIN ATOMIC.",
+        "language": "sql",
+        "code": "CREATE PROCEDURE dbo.GetActiveSession\n    @SessionId UNIQUEIDENTIFIER\nWITH NATIVE_COMPILATION, SCHEMABINDING\nAS\nBEGIN ATOMIC\nWITH\n(\n    TRANSACTION ISOLATION LEVEL = SNAPSHOT,\n    LANGUAGE = N'us_english'\n)\n    SELECT UserId, Payload, ExpiresAt\n    FROM dbo.SessionCache\n    WHERE SessionId = @SessionId\n      AND ExpiresAt > SYSUTCDATETIME();\nEND;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Limitations to know before you commit",
+        "text": "Memory-optimized tables do not support all T-SQL features: foreign keys between memory-optimized and disk-based tables, `TRUNCATE TABLE`, some data types, and cross-database transactions have restrictions. Schema changes require special handling. The table also counts against the memory-optimized resource pool, so a runaway table can starve the instance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Monitor Memory Usage"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Find memory-optimized tables by memory usage",
+        "content": "Use the XTP memory DMV to see how much each table and its indexes consume. Compare against the resource pool limit to catch growth early.",
+        "language": "sql",
+        "code": "SELECT\n    OBJECT_NAME(t.object_id) AS table_name,\n    t.durability_desc,\n    s.memory_used_by_table_kb,\n    s.memory_used_by_indexes_kb\nFROM sys.dm_db_xtp_table_memory_stats AS s\nJOIN sys.tables AS t\n    ON t.object_id = s.object_id\nORDER BY s.memory_used_by_table_kb DESC;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: when is In-Memory OLTP the right answer?",
+        "text": "It is the right answer for very high-concurrency OLTP with short transactions, hot rows, and contention on latches — session state, counters, queues, and similar workloads. It is the wrong answer for large analytical scans, tables that do not fit in memory, or workloads that need the full T-SQL surface. In an interview, say what problem it solves (latch and lock contention) and what it costs (memory, limitations, operational complexity)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "In-Memory OLTP Key Points",
+        "points": [
+          "Memory-optimized tables use optimistic concurrency, so readers and writers do not block each other.",
+          "DURABILITY = SCHEMA_AND_DATA persists data; SCHEMA_ONLY is for caches and session state.",
+          "Hash indexes favor point lookups; range indexes favor scans and ordering.",
+          "Natively compiled procedures are schema-bound and run compiled code.",
+          "Size bucket counts for peak rows and monitor memory with sys.dm_db_xtp_table_memory_stats.",
+          "Use it for high-contention OLTP, not for analytics or tables larger than memory."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "locks-and-blocking",
+    "long-running-transactions"
+  ]
+}

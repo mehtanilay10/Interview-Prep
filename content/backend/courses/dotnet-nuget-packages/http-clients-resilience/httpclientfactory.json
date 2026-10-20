@@ -1,5 +1,5 @@
 {
-  "id": "lesson-nuget-020",
+  "id": "lesson-nuget-1306",
   "slug": "httpclientfactory",
   "moduleSlug": "http-clients-resilience",
   "courseSlug": "dotnet-nuget-packages",
@@ -61,6 +61,35 @@
         "variant": "warning",
         "title": "Avoid new HttpClient()",
         "text": "Creating a new HttpClient for every request can exhaust sockets. Use IHttpClientFactory or reuse a single HttpClient instance instead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Lifetime, Handlers, and Sockets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Creating a new `HttpClient` per request looks harmless but exhausts sockets because each disposed client closes a connection. A single static client avoids that but pins DNS forever. `IHttpClientFactory` solves both: it pools the underlying handlers, rotates them on a schedule to pick up DNS changes, and hands out cheap clients that can be created per request."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "csharp",
+        "title": "A typed client with a testable handler stack",
+        "content": "builder.Services.AddHttpClient<GitHubClient>(client =>\n{\n    client.BaseAddress = new Uri(\"https://api.github.com/\");\n    client.DefaultRequestHeaders.Add(\"User-Agent\", \"InterviewPrep\");\n    client.Timeout = TimeSpan.FromSeconds(10);\n})\n.AddHttpMessageHandler<AuthHandler>();\n\npublic sealed class GitHubClient(HttpClient http)\n{\n    public async Task<Repo?> GetRepoAsync(string owner, string name, CancellationToken token)\n    {\n        using var response = await http.GetAsync($\"repos/{owner}/{name}\", token);\n        response.EnsureSuccessStatusCode();\n\n        return await response.Content.ReadFromJsonAsync<Repo>(cancellationToken: token);\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Where a DelegatingHandler earns its place",
+        "text": "A `DelegatingHandler` sits in the request pipeline and is the right home for cross-cutting HTTP concerns: adding an auth header, logging correlation ids, or applying a Polly pipeline. Because it is registered with the client rather than written in the calling code, every call through the typed client gets the behavior for free."
       }
     },
     {

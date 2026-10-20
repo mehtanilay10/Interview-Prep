@@ -16,12 +16,18 @@ interface PersonalizationClientProps {
     email?: string | null;
     image?: string | null;
   };
+  /** Destinations offered for the "Default landing page" preference. */
+  landingPages: LandingPageOption[];
 }
 
 type FontSize = 'sm' | 'md' | 'lg' | 'xl';
 type CodeFontSize = 'sm' | 'md' | 'lg';
 type Density = 'comfortable' | 'compact';
-type LandingPage = '/' | '/roadmaps' | '/interview-questions';
+
+export interface LandingPageOption {
+  value: string;
+  label: string;
+}
 
 const FONT_SIZES: { value: FontSize; label: string }[] = [
   { value: 'sm', label: 'Small' },
@@ -39,12 +45,6 @@ const CODE_FONT_SIZES: { value: CodeFontSize; label: string }[] = [
 const DENSITIES: { value: Density; label: string }[] = [
   { value: 'comfortable', label: 'Comfortable' },
   { value: 'compact', label: 'Compact' },
-];
-
-const LANDING_PAGES: { value: LandingPage; label: string }[] = [
-  { value: '/', label: 'Home' },
-  { value: '/roadmaps', label: 'Roadmaps' },
-  { value: '/interview-questions', label: 'Interview Questions' },
 ];
 
 function SectionHeading({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description?: string }) {
@@ -136,7 +136,7 @@ function Toggle({
   );
 }
 
-export function PersonalizationClient({ user }: PersonalizationClientProps) {
+export function PersonalizationClient({ user, landingPages }: PersonalizationClientProps) {
   const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
   const { preferences, updatePreference, mounted } = useUserPreferences();
@@ -295,11 +295,11 @@ export function PersonalizationClient({ user }: PersonalizationClientProps) {
             <div className="relative">
               <select
                 id="landing-page"
-                value={LANDING_PAGES.find((p) => p.value === preferences.defaultLanding)?.value ?? '/'}
+                value={landingPages.find((p) => p.value === preferences.defaultLanding)?.value ?? '/'}
                 onChange={(e) => updatePreference('defaultLanding', e.target.value)}
                 className="w-full appearance-none rounded-lg border border-border bg-canvas px-3 py-2 pr-8 text-sm text-fg-default transition-colors hover:border-fg-muted focus:border-accent-fg focus:outline-none"
               >
-                {LANDING_PAGES.map((option) => (
+                {landingPages.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

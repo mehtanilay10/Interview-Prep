@@ -30,7 +30,7 @@ import fullstackSecurityCourse from "./architecture/courses/fullstack-security/c
 import gitLinuxDeveloperWorkflowCourse from "./devops/courses/git-linux-developer-workflow/content.json";
 import graphqlDotnetCourse from "./backend/courses/graphql-dotnet/content.json";
 import hldCourse from "./architecture/problems/hld/content.json";
-import interviewQaCourse from "./interview-qa/content.json";
+import interviewQaCourse from "./interview-qa.json";
 import linqCourse from "./backend/courses/linq/content.json";
 import lldCourse from "./architecture/problems/lld/content.json";
 import messageQueuesEventStreamingCourse from "./architecture/courses/message-queues-event-streaming/content.json";

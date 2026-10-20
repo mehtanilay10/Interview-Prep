@@ -1,0 +1,154 @@
+{
+  "id": "lesson-azure-logic-apps-vs-functions-vs-power-automate",
+  "slug": "logic-apps-vs-functions-vs-power-automate",
+  "moduleSlug": "09-messaging-and-event-driven-architecture",
+  "courseSlug": "azure",
+  "title": "Logic Apps vs Functions vs Power Automate",
+  "description": "Choose between the three main Azure automation options based on who builds the workflow, what it connects to, and how it is governed.",
+  "order": 18,
+  "difficulty": "beginner",
+  "estimatedMinutes": 18,
+  "tags": [
+    "logic-apps",
+    "functions",
+    "power-automate",
+    "integration",
+    "comparison"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Logic Apps vs Functions vs Power Automate"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "All three can react to an event and call other services, so the decision is rarely about capability. It is about who builds the automation, what it connects to, how much code it contains, and how it is governed and billed. Logic Apps is the Azure integration service, Functions is the code-first compute service, and Power Automate is the business-user automation service."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Logic Apps",
+          "Azure Functions",
+          "Power Automate"
+        ],
+        "rows": [
+          [
+            "Primary builder",
+            "Integration developer",
+            "Software developer",
+            "Business user with IT oversight"
+          ],
+          [
+            "Authoring",
+            "Designer plus JSON definition",
+            "Code project and deployment",
+            "Cloud designer and connectors"
+          ],
+          [
+            "Best at",
+            "Orchestrating connectors and approvals",
+            "Custom logic, transforms, and high-volume work",
+            "Personal and departmental workflows"
+          ],
+          [
+            "Control level",
+            "Medium; some custom code via inline actions",
+            "Full control in the runtime you choose",
+            "Low; limited to connectors and expressions"
+          ],
+          [
+            "Governance",
+            "Azure RBAC, policies, VNet integration",
+            "Azure RBAC, policies, VNet integration",
+            "Dataverse and environment policies"
+          ],
+          [
+            "Scaling",
+            "Managed by the platform",
+            "Consumption, Premium, or Dedicated",
+            "Managed by the platform"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "azure-automation-choice-flow",
+        "caption": "Decide by asking who owns the automation and whether custom code is the core of the work.",
+        "definition": "flowchart TD\n    A[\"What needs automating?\"] --> B{\"Is custom code the\\ncore of the work?\"}\n    B -->|Yes| FN[\"Azure Functions\"]\n    B -->|No| C{\"Are the builders business\\nusers in Office 365?\"}\n    C -->|Yes| PA[\"Power Automate\"]\n    C -->|No| D{\"Do you need many connectors,\\napprovals, or a long-running workflow?\"}\n    D -->|Yes| LA[\"Logic Apps\"]\n    D -->|No| FN"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: they compose, they do not compete",
+        "text": "A strong answer describes composition. A Logic App can receive an HTTP request, validate it, and call a Function to run a custom transformation, then publish the result to Service Bus. Power Automate can trigger the same Logic App from a SharePoint list. The choice is about the right layer: code where code belongs, orchestration where orchestration belongs, and citizen automation where that is safe and governed."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Same Workflow in Each Tool"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A workflow that reacts to an event and writes a result can be expressed in all three. Seeing the shape of each makes the trade-off concrete: a Logic App is a declarative connector graph, a Function is code you deploy, and a Power Automate flow is a designer-built flow owned by a business team."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Logic Apps workflow definition (trigger plus action)",
+        "content": "The trigger and the action are declared; the connector does the work. There is no application code to build or deploy.",
+        "language": "json",
+        "code": "{\n  \"definition\": {\n    \"$schema\": \"https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#\",\n    \"triggers\": {\n      \"When_a_blob_is_added\": {\n        \"type\": \"ApiConnection\",\n        \"inputs\": {\n          \"host\": { \"connection\": { \"name\": \"@parameters('$connections')['azureblob']['connectionId']\" } },\n          \"method\": \"get\",\n          \"path\": \"/datasets/default/triggers/batch/onupdatedfile\",\n          \"queries\": { \"folderId\": \"invoices\", \"checkBothCreatedAndModifiedDateTime\": false }\n        }\n      }\n    },\n    \"actions\": {\n      \"Extract_invoice\": {\n        \"type\": \"Function\",\n        \"inputs\": {\n          \"function\": { \"id\": \"@parameters('$functions')['extractInvoice']['id']\" },\n          \"body\": { \"blobPath\": \"@triggerOutputs()?['body/Path']\" }\n        },\n        \"runAfter\": {}\n      },\n      \"Post_to_approvals\": {\n        \"type\": \"ApiConnection\",\n        \"inputs\": {\n          \"host\": { \"connection\": { \"name\": \"@parameters('$connections')['teams']['connectionId']\" } },\n          \"method\": \"post\",\n          \"path\": \"/flowbot/actions/flowcontinuation/POST\",\n          \"body\": \"@body('Extract_invoice')\"\n        },\n        \"runAfter\": { \"Extract_invoice\": [\"Succeeded\"] }\n      }\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "The same trigger as an Azure Function (code you own)",
+        "content": "The logic is code: a trigger binding and the extraction in C#. This is the tool to reach for when the core of the work is custom.",
+        "language": "csharp",
+        "code": "public sealed class InvoiceProcessor(ILogger<InvoiceProcessor> logger)\n{\n    [Function(\"InvoiceProcessor\")]\n    public async Task RunAsync(\n        [BlobTrigger(\"invoices/{name}\")] Stream blob,\n        string name,\n        [Blob(\"extracted/{name}.json\", FileAccess.Write)] Stream output)\n    {\n        logger.LogInformation(\"Processing {Name}\", name);\n\n        var invoice = InvoiceParser.Parse(blob);\n\n        await JsonSerializer.SerializeAsync(output, invoice);\n    }\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Logic Apps is for orchestration and connectors; Functions is for custom code.",
+          "Power Automate targets business users inside Microsoft 365 and Dataverse.",
+          "Choose Logic Apps when the workflow is mostly connecting systems and handling approvals.",
+          "Choose Functions when the workload is code-heavy, high-volume, or needs precise control.",
+          "The three compose: a Logic App can call a Function, and Power Automate can trigger a Logic App.",
+          "Governance differs: Azure resource controls for Logic Apps and Functions, environment policies for Power Automate."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "logic-apps-overview",
+    "azure-functions-overview"
+  ]
+}

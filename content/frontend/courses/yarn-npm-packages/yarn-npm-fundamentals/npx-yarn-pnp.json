@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-005",
   "slug": "npx-yarn-pnp",
   "title": "npx, Yarn PnP, and Execution Models",
-  "description": "Explore package execution with npx, yarn dlx, and Plug and Play.",
+  "description": "Run package binaries without installing them, and understand node_modules versus Plug'n'Play versus pnpm's store.",
   "order": 5,
-  "difficulty": "beginner",
-  "estimatedMinutes": 8,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 12,
   "tags": [
     "npm",
     "yarn",
@@ -16,78 +16,77 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Running package binaries and managing execution environments are crucial for developer productivity and security."
+        "text": "Not every tool deserves a place in `package.json`. Runners such as `npx` and `yarn dlx` execute a package without adding it to your dependencies, and **execution models** decide whether your packages live in `node_modules` at all."
       }
     },
     {
       "type": "heading",
       "data": {
-        "text": "npx (NPM)",
-        "level": "h2"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "npx executes binaries from node_modules/.bin or fetches packages temporarily without installing them."
+        "level": 2,
+        "text": "Running binaries without installing",
+        "anchor": "running-binaries"
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "bash",
-        "caption": "Run create-react-app without installing globally",
-        "code": "npx create-react-app my-app\nnpx eslint src/**/*.ts"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "text": "Yarn Dlx",
-        "level": "h2"
+        "title": "One-off tools with npx, Yarn dlx, and pnpm dlx",
+        "content": "",
+        "code": "npx create-next-app@latest my-app\nnpx --yes prettier@3 --write .\n\n# Yarn Berry\nyarn dlx create-next-app@latest my-app\n\n# pnpm\npnpm dlx create-next-app@latest my-app",
+        "language": "bash"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "yarn dlx is Yarn's equivalent to npx. It downloads the package to a global cache and runs it."
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "language": "bash",
-        "caption": "Run a package with Yarn Dlx",
-        "code": "yarn dlx create-react-app my-app"
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "text": "Plug and Play (PnP)",
-        "level": "h2"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "PnP eliminates node_modules entirely. Instead, Yarn stores packages in a global cache and generates a .pnp.cjs loader file."
+        "text": "`npx` first looks for the binary in `node_modules/.bin` (so it runs your locally installed, version-pinned tool), then the npm cache, and only downloads as a last resort. That is why `npm run` and `npx` agree on which version of `eslint` they run."
       }
     },
     {
       "type": "callout",
       "data": {
         "variant": "warning",
-        "title": "Compatibility",
-        "text": "Some tools do not support PnP out of the box. Check compatibility before migrating a project."
+        "title": "Unpinned npx is a supply-chain risk",
+        "text": "`npx some-tool` runs whatever version is published right now. Always pin (`npx tool@1.2.3`) in documentation and CI, and prefer adding stable tools as devDependencies."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Plug'n'Play: no node_modules",
+        "anchor": "pnp"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Yarn Berry can store packages in a global cache and generate a single `.pnp.cjs` file that maps every import to a zip path. Installs become faster, the tree is checked for undeclared dependencies, and CI can skip extraction entirely. The trade-off is tooling that assumes `node_modules` on disk."
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "yaml",
+        "caption": ".yarnrc.yml — choose the linker",
+        "code": "nodeLinker: pnp        # default in Yarn 4 (no node_modules)\n# or\nnodeLinker: node-modules  # compatibility escape hatch"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Adopt PnP and handle tools that need real files",
+        "content": "",
+        "code": "yarn install                     # writes .pnp.cjs + .yarn/cache\nnode .yarn/sdks/typescript/bin/tsc --noEmit\n\nyarn add -D @yarnpkg/pnpify\nyarn pnpify --sdk vscode         # editor discovers types",
+        "language": "bash"
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-pnp-flow",
-        "definition": "flowchart TB\n    A[Source Code] --> B[.pnp.cjs]\n    B --> C[Global Cache]\n    C --> D[Package Binary]\n    D --> E[Execution]\n    F[node_modules] -.->|Not used| E",
-        "caption": "PnP execution flow vs node_modules"
+        "id": "mermaid-execution-models",
+        "caption": "Execution models: node_modules, PnP, and pnpm store",
+        "definition": "flowchart TD\n    A[Import request] --> B{Linker}\n    B -->|node_modules| C[Resolve file in node_modules]\n    B -->|PnP| D[Resolve zip path via .pnp.cjs]\n    B -->|pnpm| E[Resolve symlink into virtual store]\n    C --> F[Load package]\n    D --> F\n    E --> F"
       }
     },
     {
@@ -95,35 +94,20 @@
       "data": {
         "terms": [
           {
-            "term": "npx",
-            "definition": "NPM package runner."
+            "term": "npx / yarn dlx / pnpm dlx",
+            "definition": "Runners that execute a package binary without adding it to package.json."
           },
           {
-            "term": "yarn dlx",
-            "definition": "Yarn package runner."
+            "term": "Plug'n'Play (PnP)",
+            "definition": "A Yarn install strategy that removes node_modules and resolves imports from zipped packages in a global cache."
           },
           {
-            "term": "PnP",
-            "definition": "Yarn's node_modules alternative."
+            "term": "nodeLinker",
+            "definition": "The Yarn setting that selects pnp or node-modules resolution."
           },
           {
-            "term": "Global cache",
-            "definition": "Shared storage for package binaries."
-          }
-        ]
-      }
-    },
-    {
-      "type": "faq-block",
-      "data": {
-        "items": [
-          {
-            "question": "Is PnP faster?",
-            "answer": "Yes. It avoids disk I/O from node_modules and improves install speed significantly."
-          },
-          {
-            "question": "Can I mix PnP and node_modules?",
-            "answer": "No. A project must choose one strategy."
+            "term": ".yarn/cache",
+            "definition": "Yarn Berry's zero-install cache of package zips, optionally committed for offline installs."
           }
         ]
       }
@@ -131,18 +115,14 @@
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
-        "items": [
-          {
-            "text": "npx and yarn dlx run binaries without global installs."
-          },
-          {
-            "text": "PnP removes node_modules for faster installs."
-          },
-          {
-            "text": "Verify tool compatibility before adopting PnP."
-          }
-        ]
+        "title": "Key takeaways",
+        "points": [
+          "npx and yarn dlx run binaries without polluting dependencies — pin versions.",
+          "PnP removes node_modules, speeds up installs, and rejects undeclared dependencies.",
+          "nodeLinker: node-modules is the pragmatic fallback when a tool needs real files.",
+          "pnpm keeps a content-addressable store and symlinks packages into place."
+        ],
+        "takeaway": "Knowing the three node_modules strategies and their trade-offs is what separates \"I use npm\" from \"I understand the toolchain\"."
       }
     }
   ],

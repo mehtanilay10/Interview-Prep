@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-004",
   "slug": "workspaces-monorepos",
   "title": "Workspaces and Monorepos",
-  "description": "Manage multiple packages in a single repository with workspaces.",
+  "description": "Link local packages, hoist dependencies, and run tasks across a monorepo with npm, Yarn, and pnpm workspaces.",
   "order": 4,
-  "difficulty": "beginner",
-  "estimatedMinutes": 10,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 14,
   "tags": [
     "npm",
     "yarn",
@@ -16,170 +16,131 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Monorepos host multiple packages in a single repository. Workspaces allow package managers to link local packages and hoist shared dependencies."
+        "text": "A **monorepo** keeps several packages in one repository. **Workspaces** make the package manager aware of them: local packages are symlinked into `node_modules` instead of being published, and shared dependencies are hoisted to the root."
       }
     },
     {
       "type": "heading",
       "data": {
-        "text": "Why Monorepos?",
-        "level": "h2"
+        "level": 2,
+        "text": "Why teams adopt monorepos",
+        "anchor": "why-monorepos"
       }
     },
     {
       "type": "bullet-list",
       "data": {
+        "title": "Benefits",
         "items": [
-          "Single version control for related packages",
-          "Easier cross-package refactoring",
-          "Shared tooling and configuration",
-          "Atomic commits across packages"
+          "Atomic commits across packages — a breaking change and its call sites land together.",
+          "Shared tooling: one TypeScript, ESLint, and test config.",
+          "Local packages resolve without publishing to a registry.",
+          "Easier to enforce consistent versions and run affected-only CI."
         ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Declaring workspaces",
+        "anchor": "declaring-workspaces"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "json",
+        "caption": "Root package.json with workspaces (npm, Yarn, pnpm-compatible)",
+        "code": "{\n  \"name\": \"acme\",\n  \"private\": true,\n  \"workspaces\": [\"packages/*\", \"apps/*\"],\n  \"scripts\": {\n    \"build\": \"npm run build --workspaces --if-present\",\n    \"test\": \"npm run test --workspaces --if-present\"\n  }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The root `package.json` is `\"private\": true` because workspaces are never published as a single package. pnpm uses the same globs in `pnpm-workspace.yaml` instead."
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "yaml",
+        "caption": "pnpm-workspace.yaml",
+        "code": "packages:\n  - \"packages/*\"\n  - \"apps/*\""
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Working with a specific workspace",
+        "anchor": "workspace-commands"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Add a dependency to one package, not the root",
+        "content": "",
+        "code": "# npm\nnpm install zod --workspace packages/ui\nnpm run test --workspace packages/ui\n\n# Yarn\ncd packages/ui && yarn add zod\nyarn workspace ui run test\n\n# pnpm\npnpm add zod --filter @acme/ui\npnpm --filter @acme/ui test",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Inside the repo, packages reference each other with a workspace range. npm and pnpm understand `workspace:*`; Yarn Berry requires the protocol. This guarantees the local version is linked while developing."
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "json",
+        "caption": "packages/app/package.json — depend on a sibling",
+        "code": "{\n  \"name\": \"@acme/app\",\n  \"dependencies\": {\n    \"@acme/ui\": \"workspace:*\"\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Hoisting, and when it bites",
+        "anchor": "hoisting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Hoisting lifts compatible versions of a package to the root `node_modules` so they are installed once. It saves disk space and install time, but it also means a package can import a dependency it never declared (phantom dependency) — code that works locally can fail when published. pnpm and Yarn PnP refuse phantom dependencies, which is exactly why they catch these bugs early."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-workspaces-hoisting",
+        "caption": "How workspaces link and hoist packages",
+        "definition": "flowchart TD\n    A[Root package.json workspaces globs] --> B[Resolve each package]\n    B --> C[Symlink @acme/ui into node_modules]\n    B --> D[Hoist shared deps once at root]\n    C --> E[apps/app imports @acme/ui]\n    D --> E"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "Common Use Case",
-        "text": "A design system monorepo might contain the core component library, documentation site, and Storybook in one repository."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "text": "Yarn Workspaces",
-        "level": "h3"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "language": "json",
-        "caption": "Root package.json with workspaces",
-        "code": "{\n  \"private\": true,\n  \"workspaces\": [\n    \"packages/*\",\n    \"apps/*\"\n  ]\n}"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "Yarn hoists dependencies to the root node_modules when possible, reducing duplication. Packages reference each other via the workspace protocol."
-      }
-    },
-    {
-      "type": "heading",
-      "data": {
-        "text": "NPM Workspaces",
-        "level": "h3"
-      }
-    },
-    {
-      "type": "example",
-      "data": {
-        "language": "json",
-        "caption": "Root package.json with NPM workspaces",
-        "code": "{\n  \"private\": true,\n  \"workspaces\": [\n    \"packages/*\",\n    \"apps/*\"\n  ]\n}"
-      }
-    },
-    {
-      "type": "paragraph",
-      "data": {
-        "text": "NPM workspaces work similarly but historically had fewer features than Yarn. Modern NPM versions have caught up significantly."
-      }
-    },
-    {
-      "type": "comparison-cards",
-      "data": {
-        "items": [
-          {
-            "title": "Yarn Workspaces",
-            "description": "First-class support, PnP ready, hoisting by default, fast installs."
-          },
-          {
-            "title": "NPM Workspaces",
-            "description": "Built-in, no extra setup, improving performance, standard lockfile."
-          }
-        ]
-      }
-    },
-    {
-      "type": "table",
-      "data": {
-        "headers": [
-          "Feature",
-          "Yarn",
-          "NPM"
-        ],
-        "rows": [
-          [
-            "Workspaces",
-            "Yes",
-            "Yes"
-          ],
-          [
-            "Hoisting",
-            "Yes",
-            "Yes"
-          ],
-          [
-            "PnP Support",
-            "Yes",
-            "No"
-          ],
-          [
-            "Install Speed",
-            "Very Fast",
-            "Fast"
-          ],
-          [
-            "Protocol Linking",
-            "workspace:",
-            "workspace:"
-          ]
-        ]
-      }
-    },
-    {
-      "type": "key-terms",
-      "data": {
-        "terms": [
-          {
-            "term": "Monorepo",
-            "definition": "A single repository containing multiple packages."
-          },
-          {
-            "term": "Workspace",
-            "definition": "A package within a monorepo."
-          },
-          {
-            "term": "Hoisting",
-            "definition": "Moving dependencies to the root to deduplicate."
-          },
-          {
-            "term": "PnP",
-            "definition": "Plug'n'Play, Yarn's alternative to node_modules."
-          }
-        ]
+        "variant": "important",
+        "title": "One lockfile, one install",
+        "text": "In a workspace monorepo the lockfile lives at the root. Run installs from the root, not from each package, or you will create divergent trees."
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
-        "items": [
-          {
-            "text": "Monorepos simplify multi-package development."
-          },
-          {
-            "text": "Workspaces link local packages automatically."
-          },
-          {
-            "text": "Both Yarn and NPM support workspaces."
-          },
-          {
-            "text": "Choose based on ecosystem needs and tooling."
-          }
-        ]
+        "title": "Key takeaways",
+        "points": [
+          "Workspaces symlink local packages and hoist shared dependencies.",
+          "The root manifest is private; the root lockfile governs every package.",
+          "Reference siblings with workspace:* so the local version is always linked.",
+          "Hoisting is fast but hides phantom dependencies — strict managers surface them."
+        ],
+        "takeaway": "Monorepos trade repository size for atomic changes; workspaces are the tool that makes that trade practical."
       }
     }
   ],

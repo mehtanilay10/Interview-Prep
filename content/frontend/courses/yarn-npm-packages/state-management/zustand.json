@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-025",
   "slug": "zustand",
   "title": "Zustand",
-  "description": "Small, fast, and flexible state management.",
+  "description": "Build a small global store with Zustand v5, select the slices you need, and persist it safely.",
   "order": 2,
   "difficulty": "intermediate",
-  "estimatedMinutes": 8,
+  "estimatedMinutes": 14,
   "tags": [
     "zustand",
     "state",
@@ -17,15 +17,110 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Zustand is a minimal state management solution using hooks. It requires no boilerplate providers or reducers."
+        "text": "Zustand is a tiny state library built on `useSyncExternalStore`. A store is just a hook; there is no provider required, which makes it an easy replacement for context-heavy state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a typed store",
+        "anchor": "create-store"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/stores/cartStore.ts",
+        "code": "import { create } from 'zustand';\n\ntype CartItem = { id: string; name: string; price: number };\n\ntype CartState = {\n  items: CartItem[];\n  addItem: (item: CartItem) => void;\n  removeItem: (id: string) => void;\n  total: () => number;\n};\n\nexport const useCartStore = create<CartState>((set, get) => ({\n  items: [],\n  addItem: (item) => set((state) => ({ items: [...state.items, item] })),\n  removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),\n  total: () => get().items.reduce((sum, item) => sum + item.price, 0),\n}));"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The `create<CartState>()(...)` form is the TypeScript-friendly signature in Zustand v4/v5. `set` merges the returned object into state; `get` reads the current state inside actions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Select only what you need",
+        "anchor": "selectors"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "tsx",
+        "caption": "Selecting state without over-rendering",
+        "code": "import { useCartStore } from './stores/cartStore';\n\n// Re-renders only when items.length changes\nexport function CartBadge() {\n  const count = useCartStore((state) => state.items.length);\n  return <span>{count}</span>;\n}\n\n// Multiple values: use shallow equality to avoid a render per new object\nimport { useShallow } from 'zustand/react/shallow';\n\nexport function CartSummary() {\n  const { items, total } = useCartStore(\n    useShallow((state) => ({ items: state.items, total: state.total() }))\n  );\n  return <p>{items.length} items — ${total}</p>;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Selecting the whole store re-renders on every change",
+        "text": "`useCartStore()` with no selector subscribes to everything. Always select the smallest slice, and reach for `useShallow` when the selector returns a new object or array."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Persistence and async actions",
+        "anchor": "persist"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "Persisting part of the store",
+        "code": "import { create } from 'zustand';\nimport { persist } from 'zustand/middleware';\n\nexport const useSettingsStore = create(\n  persist(\n    (set) => ({\n      theme: 'light' as 'light' | 'dark',\n      toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),\n    }),\n    { name: 'settings', partialize: (state) => ({ theme: state.theme }) }\n  )\n);"
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "javascript",
-        "caption": "Zustand store",
-        "code": "import create from \"zustand\";\n\nconst useStore = create(set => ({\n  bears: 0,\n  increase: () => set(state => ({ bears: state.bears + 1 }))\n}));"
+        "title": "Install and reset between tests",
+        "content": "",
+        "code": "npm install zustand\n\n// In a test setup file:\n// import { useCartStore } from \"../stores/cartStore\";\n// beforeEach(() => useCartStore.setState({ items: [] }));",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Library",
+          "Model",
+          "Provider needed"
+        ],
+        "rows": [
+          [
+            "Redux Toolkit",
+            "Single store, reducers, actions",
+            "Yes"
+          ],
+          [
+            "Zustand",
+            "Store hook, mutable set",
+            "No"
+          ],
+          [
+            "Jotai",
+            "Independent atoms",
+            "Yes (optional)"
+          ],
+          [
+            "Context + useReducer",
+            "Tree-scoped reducer",
+            "Provider"
+          ]
+        ]
       }
     },
     {
@@ -33,31 +128,58 @@
       "data": {
         "terms": [
           {
-            "term": "Hook",
-            "definition": "React function to use state."
+            "term": "Store",
+            "definition": "A hook created by create() that holds state and actions."
           },
           {
-            "term": "Store",
-            "definition": "Global state container."
+            "term": "Selector",
+            "definition": "A function passed to the store hook that extracts one value and determines re-renders."
+          },
+          {
+            "term": "useShallow",
+            "definition": "Equality helper that prevents a new object from triggering a render on every store change."
+          },
+          {
+            "term": "persist middleware",
+            "definition": "Serialises selected state to storage and rehydrates it on load."
           }
         ]
       }
     },
     {
-      "type": "summary-box",
+      "type": "faq-block",
       "data": {
-        "title": "Key Takeaways",
         "items": [
           {
-            "text": "Zustand is tiny and unopinionated."
+            "question": "Zustand or Redux?",
+            "answer": "Zustand for small-to-medium apps and quick adoption with minimal ceremony; Redux Toolkit when you want a strict, inspectable action log, DevTools time travel, or a large team standard."
           },
           {
-            "text": "No context providers needed."
-          },
-          {
-            "text": "Perfect for small to medium apps."
+            "question": "Does Zustand cause stale reads in actions?",
+            "answer": "No. Use the get() helper inside an action to read fresh state instead of closing over the render-time value."
           }
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Explain that Zustand avoids context re-renders because components subscribe to individual selectors, and that it has no provider and no action types."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "create<T>()(...) defines state and actions in one hook.",
+          "Select the smallest slice; use useShallow for derived objects.",
+          "persist middleware serialises a subset of state.",
+          "No provider makes Zustand easy to adopt incrementally."
+        ],
+        "takeaway": "Zustand is the usual answer to \"do I really need Redux?\" — know its selector-based performance story."
       }
     }
   ],

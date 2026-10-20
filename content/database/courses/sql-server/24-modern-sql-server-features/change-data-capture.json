@@ -1,0 +1,142 @@
+{
+  "id": "lesson-sql-184",
+  "slug": "change-data-capture",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "Change Data Capture (CDC)",
+  "description": "Capture inserts, updates, and deletes from the transaction log and consume them from the CDC change tables.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "cdc",
+    "change-data-capture",
+    "etl",
+    "integration",
+    "lsn"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Change Data Capture (CDC)"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CDC reads the transaction log and writes a row to a change table for every insert, update, and delete on an enabled table. Unlike temporal tables, which keep the latest version of each row, CDC preserves the ordered stream of individual changes, including both the before and after image of an update. That makes it the standard SQL Server mechanism for feeding a warehouse, a cache, or another service incrementally."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sqlserver-cdc-flow",
+        "caption": "The capture job reads committed transactions from the log and writes them to per-table change tables; consumers read change tables by LSN range.",
+        "definition": "flowchart TD\n    APP[\"Application writes\\nto dbo.Orders\"] --> LOG[\"Transaction log\"]\n    LOG --> CAP[\"CDC capture job\\nreads committed log records\"]\n    CAP --> CT[\"cdc.dbo_Orders_CT\\none row per change\"]\n    CON[\"Consumer (ETL, service)\"] -->|reads LSN range| CT\n    CLN[\"CDC cleanup job\"] -->|deletes old changes| CT\n    CT --> AUD[\"Audit and replay\"]\n    CT --> DWH[\"Incremental load\\ninto warehouse\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Enable CDC on a Database and Table"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CDC is enabled per database and then per table. The table must have a primary key or a unique index, because CDC uses that key to identify rows. `@supports_net_changes = 1` creates the net-changes function, which returns only the final state of each row in a range instead of every intermediate change."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enable CDC and verify the capture instance",
+        "content": "The capture instance is named `dbo_Orders` by default. `cdc.change_tables` lists every table currently being captured.",
+        "language": "sql",
+        "code": "EXEC sys.sp_cdc_enable_db;\nGO\n\nEXEC sys.sp_cdc_enable_table\n    @source_schema       = N'dbo',\n    @source_name         = N'Orders',\n    @role_name           = N'cdc_reader',\n    @supports_net_changes = 1;\nGO\n\nSELECT\n    schema_name,\n    table_name,\n    capture_instance,\n    supports_net_changes\nFROM cdc.change_tables;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Read the Changes"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every change is stamped with a log sequence number (LSN). A consumer records the last LSN it processed and asks for everything after it. The `__$operation` column tells you what happened: 1 = delete, 2 = insert, 3 = update before image, 4 = update after image."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Read all changes in a range",
+        "content": "In production, replace `@from_lsn` with the last LSN your consumer committed, not the minimum retained LSN.",
+        "language": "sql",
+        "code": "DECLARE @from_lsn BINARY(10) = sys.fn_cdc_get_min_lsn('dbo_Orders');\nDECLARE @to_lsn   BINARY(10) = sys.fn_cdc_get_max_lsn();\n\nSELECT\n    CASE __$operation\n        WHEN 1 THEN 'delete'\n        WHEN 2 THEN 'insert'\n        WHEN 3 THEN 'update (before)'\n        WHEN 4 THEN 'update (after)'\n    END AS operation,\n    __$start_lsn,\n    __$seqval,\n    OrderId,\n    CustomerId,\n    Amount,\n    __$update_mask\nFROM cdc.fn_cdc_get_all_changes_dbo_Orders(\n    @from_lsn, @to_lsn, N'all'\n)\nORDER BY __$start_lsn, __$seqval, __$operation;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Control Retention and Cleanup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Keep three days of change data",
+        "content": "The cleanup job deletes change rows older than the retention period. Shorten retention if the change tables grow too large; lengthen it if a consumer can be offline longer than the current window.",
+        "language": "sql",
+        "code": "EXEC sys.sp_cdc_change_job\n    @job_type  = N'cleanup',\n    @retention = 4320;   -- minutes (3 days)\n\n-- Confirm both CDC jobs are running\nEXEC sys.sp_cdc_help_jobs;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "CDC depends on SQL Server Agent",
+        "text": "The capture and cleanup jobs are SQL Server Agent jobs. If the Agent service is stopped, changes accumulate in the log and capture falls behind. CDC is available in SQL Server and Azure SQL Managed Instance, but not in Azure SQL Database — there you use change tracking or an external mechanism such as Synapse Link."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: CDC vs temporal vs change tracking",
+        "text": "Temporal tables keep row history for point-in-time queries and auditing. Change tracking stores only the keys of changed rows, not the values, and is cheap. CDC stores the full before/after image of every change in order, which is what an ETL pipeline needs. If someone asks how to incrementally load a warehouse from SQL Server, CDC is the expected answer; if they ask how to audit who changed a row, temporal or an audit table is the expected answer."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Change Data Capture Key Points",
+        "points": [
+          "CDC captures inserts, updates, and deletes from the transaction log into per-table change tables.",
+          "Enable it with sp_cdc_enable_db and sp_cdc_enable_table; the table needs a primary key.",
+          "Consumers read changes by LSN range using fn_cdc_get_all_changes_* or fn_cdc_get_net_changes_*.",
+          "__$operation distinguishes delete, insert, and before/after update images.",
+          "Capture and cleanup are SQL Server Agent jobs; monitor that both are running.",
+          "Retention controls how long changes remain available; consumers must keep up or lose data."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "temporal-tables",
+    "sql-server-integration-services"
+  ]
+}

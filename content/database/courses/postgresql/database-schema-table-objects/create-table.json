@@ -7,7 +7,7 @@
   "description": "Create robust relational tables, configure fillfactor, unlogged tables, and storage options.",
   "order": 3,
   "difficulty": "beginner",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 35,
   "tags": [
     "create-table",
     "ddl",
@@ -41,6 +41,159 @@
         "content": "Setting fillfactor to 80% to leave room for HOT updates.",
         "language": "sql",
         "code": "CREATE UNLOGGED TABLE user_sessions (\n    session_id VARCHAR(64) PRIMARY KEY,\n    user_id UUID NOT NULL,\n    data JSONB NOT NULL,\n    expires_at TIMESTAMPTZ NOT NULL\n) WITH (fillfactor = 80);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "A Complete Table, Annotated"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The following table uses the column features you are expected to know: a generated primary key, `NOT NULL` with a default, a foreign key with an explicit `ON DELETE` action, a check constraint, a generated column, and a composite type — all in one statement."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Production-Style CREATE TABLE",
+        "content": "Every clause here has a reason; be ready to explain each one.",
+        "code": "CREATE TABLE orders (\n    -- IDENTITY is the SQL-standard replacement for SERIAL\n    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    customer_id  BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,\n    status       TEXT   NOT NULL DEFAULT 'pending'\n                 CHECK (status IN ('pending','paid','shipped','cancelled')),\n    subtotal     NUMERIC(12,2) NOT NULL CHECK (subtotal >= 0),\n    tax_rate     NUMERIC(5,4)  NOT NULL DEFAULT 0.20 CHECK (tax_rate BETWEEN 0 AND 1),\n    -- generated column: computed on read, cannot be written to\n    total        NUMERIC(14,2) GENERATED ALWAYS AS (subtotal * (1 + tax_rate)) STORED,\n    tags         TEXT[] NOT NULL DEFAULT '{}',\n    metadata     JSONB  NOT NULL DEFAULT '{}'::jsonb,\n    placed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),\n    -- named constraints are far easier to drop or reference later\n    CONSTRAINT orders_customer_placed_uniq UNIQUE (customer_id, placed_at)\n) WITH (fillfactor = 90);\n\nCOMMENT ON TABLE orders IS 'Customer orders; one row per checkout';\nCOMMENT ON COLUMN orders.tax_rate IS 'Ratio, not a percentage (0.20 = 20%)';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "`SERIAL` vs. `IDENTITY`"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "`SERIAL` / `BIGSERIAL`",
+          "`GENERATED ... AS IDENTITY`"
+        ],
+        "rows": [
+          [
+            "Standard",
+            "PostgreSQL-specific",
+            "SQL standard"
+          ],
+          [
+            "Ownership",
+            "Creates a sequence; column does not own it cleanly",
+            "Sequence is owned by the column"
+          ],
+          [
+            "Permissions",
+            "You must grant `USAGE` on the sequence separately",
+            "No separate sequence grant needed"
+          ],
+          [
+            "Overriding",
+            "Any insert can supply a value",
+            "`GENERATED ALWAYS` rejects explicit values unless `OVERRIDING SYSTEM VALUE`"
+          ],
+          [
+            "Recommendation",
+            "Legacy schemas",
+            "New schemas"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Storage Parameters"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Parameter",
+          "Default",
+          "Effect"
+        ],
+        "rows": [
+          [
+            "`fillfactor`",
+            "100",
+            "Percentage of each page filled on insert. Lower values (70–90) leave room for HOT updates and reduce index churn on update-heavy tables."
+          ],
+          [
+            "`autovacuum_enabled`",
+            "on",
+            "Per-table override for autovacuum; useful for tiny hot tables or huge append-only tables."
+          ],
+          [
+            "`toast_tuple_target`",
+            "2048 bytes",
+            "Threshold at which a row is compressed/offloaded to the TOAST table."
+          ],
+          [
+            "`parallel_workers`",
+            "auto",
+            "Per-table parallel scan worker override."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Note that constraints can be added **after** the table exists, which is how large migrations avoid long locks: `ALTER TABLE orders ADD CONSTRAINT ... NOT VALID;` then `VALIDATE CONSTRAINT`."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Signal",
+        "text": "When asked to design a table, say the parts out loud: pick the primary key type, add `NOT NULL` where the domain demands it, choose an `ON DELETE` action deliberately, and name your constraints so they can be referenced in migrations."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Design and Create a Schema",
+        "description": "Model a small blog and create it.",
+        "steps": [
+          "Design `users(id, email UNIQUE, created_at)` and `posts(id, author_id, title, body, published_at)`.",
+          "Choose `ON DELETE CASCADE` for `author_id` and justify it out loud.",
+          "Add a `CHECK` constraint on `published_at` being in the past or null.",
+          "Inspect what you created with `\\d+ posts` and confirm the index PostgreSQL added for the foreign key."
+        ],
+        "expectedOutcome": "A working schema whose constraints encode the business rules rather than relying on application code."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Should foreign keys always be indexed?",
+            "answer": "The *referenced* side (usually the primary key) is indexed automatically. The *referencing* column is not, and without an index, deletes and updates on the parent do a sequential scan of the child table. Index it unless a composite index covers it."
+          },
+          {
+            "question": "What is the difference between `NUMERIC` and `FLOAT` for money?",
+            "answer": "`NUMERIC` is exact decimal arithmetic; `FLOAT`/`DOUBLE PRECISION` are binary floating point and cannot represent 0.10 exactly. Never store money in a float."
+          },
+          {
+            "question": "Are table names case-sensitive?",
+            "answer": "Unquoted identifiers are folded to lowercase. `CREATE TABLE Orders` creates `orders`; `CREATE TABLE \"Orders\"` creates a case-sensitive name that then requires double quotes everywhere."
+          }
+        ]
       }
     },
     {

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, BookOpen, LayoutGrid, Compass, Zap, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getCourseStats, getAllCourses, getCourseCategory } from '@/lib/content';
+import { getCourseStats, getAllCourses, getCourseCategory, getInterviewCategories } from '@/lib/content';
 import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
@@ -16,6 +16,10 @@ export default function HomePage() {
   const stats = getCourseStats();
   const courses = getAllCourses().filter((c) => !c.isInterview);
   const firstCourse = courses[0];
+
+  // Interview questions are category-first, so the call to action points at the
+  // first category that hosts them.
+  const [firstInterviewCategory] = getInterviewCategories();
 
   const featureCards = [
     {
@@ -64,6 +68,9 @@ export default function HomePage() {
         totalLessons={stats.totalLessons}
         totalHours={stats.totalHours}
         startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
+        interviewHref={
+          firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/'
+        }
       />
 
       {/* Who is this for */}

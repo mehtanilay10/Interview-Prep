@@ -7,7 +7,7 @@
   "description": "Understand character storage in PostgreSQL, debunk the VARCHAR performance myth, and utilize collations.",
   "order": 2,
   "difficulty": "beginner",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 30,
   "tags": [
     "text",
     "varchar",
@@ -57,6 +57,122 @@
             "Padded with whitespace!",
             "Avoid in modern schemas; whitespace padding wastes storage"
           ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Myth, Stated Precisely"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In PostgreSQL all three text types use the same on-disk representation, the `varlena` header. The only difference is that `VARCHAR(n)` and `CHAR(n)` check the length when a value is stored. There is **no performance difference** in reads, indexes, or joins between `TEXT` and `VARCHAR(255)`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "TEXT, VARCHAR, and CHAR Behave Differently",
+        "content": "Notice the padding and the length semantics.",
+        "code": "CREATE TABLE text_demo (\n    t TEXT,\n    v VARCHAR(5),\n    c CHAR(5)\n);\n\nINSERT INTO text_demo (t, v, c) VALUES ('hello world', 'hello', 'hi');\n\nSELECT t, length(t) AS t_len,\n       v, length(v) AS v_len,\n       c, length(c) AS c_len,           -- 5, padded with spaces\n       '[' || c || ']' AS padded\nFROM text_demo;\n\n-- length() counts characters, octet_length() counts bytes\nSELECT length('café'), octet_length('café');   -- 4, 5 in UTF-8\n\n-- VARCHAR(n) truncation is an error, not silent\nINSERT INTO text_demo (v) VALUES ('toolong');\n-- ERROR: value too long for type character varying(5)",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Collation Changes Comparison, Not Storage"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`TEXT` ordering and comparison depend on the database collation. With a locale-aware collation, `'a' < 'B'` can be true; with the `C` collation it is false because comparison is byte order. This affects index usability as well as results."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sorting, Pattern Matching, and Case Handling",
+        "content": "Collation and `ILIKE` in one view.",
+        "code": "SHOW lc_collate;                       -- e.g. en_US.UTF-8\n\n-- Locale-aware comparisons ignore accents/case in some collations. Force a known one:\nSELECT 'a' < 'B' COLLATE \"C\"    AS byte_order,   -- true\n       'a' < 'B' COLLATE \"en-US-x-icu\" AS locale_order;\n\n-- Case-insensitive match: ILIKE, or citext (extension)\nSELECT 'Alice' ILIKE 'alice' AS matches;          -- true\n\n-- Index-friendly prefix search needs the pattern operator\nSELECT * FROM users WHERE email LIKE 'ada%';      -- can use a btree index with C collation\n\n-- Regex and full-text are different tools\nSELECT 'ada@example.com' ~ '^[^@]+@[^@]+$'         AS regex_ok,   -- true\n       to_tsvector('english','the quick brown fox') AS fts_vector;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Length Limits as Domain Rules"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use `VARCHAR(n)` only when the limit is a genuine business rule (a two-letter country code, a 20-character licence plate). Preferring `TEXT` plus a `CHECK` constraint conveys the same rule and is easier to change later, because altering a `VARCHAR(n)` length still requires an `ACCESS EXCLUSIVE` lock (though it does not rewrite the table)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Enforcing a Domain Rule With TEXT + CHECK",
+        "content": "Equivalent to VARCHAR(n), but explicit and easy to evolve.",
+        "code": "CREATE TABLE customers (\n    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    email     TEXT NOT NULL,\n    country   TEXT NOT NULL CHECK (char_length(country) = 2),\n    CONSTRAINT customers_email_format\n        CHECK (email ~ '^[^@[:space:]]+@[^@[:space:]]+\\.[A-Za-z]{2,}$')\n);\n\n-- Case-insensitive uniqueness without citext:\nCREATE UNIQUE INDEX customers_email_lower_uniq ON customers (lower(email));\n\nINSERT INTO customers (email, country) VALUES ('Ada@Example.com', 'GB');\nINSERT INTO customers (email, country) VALUES ('ada@example.com', 'GB');\n-- ERROR: duplicate key value violates unique constraint \"customers_email_lower_uniq\"",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The `CHAR(n)` Padding Trap",
+        "text": "Values in a `CHAR(n)` column are blank-padded to `n` characters, which surprises anyone comparing them to `TEXT` values and wastes space. There is essentially no reason to choose `CHAR(n)` in a new schema — use `TEXT` or `VARCHAR(n)`."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "If asked \"is `VARCHAR(255)` faster than `TEXT` in PostgreSQL?\", the answer is **no** — they share the same storage format, and only the length check differs. If asked \"which should I use?\", say `TEXT` with a `CHECK` constraint, using `VARCHAR(n)` only when the limit is a real business rule."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Prove That Length Does Not Affect Speed",
+        "description": "Settle the myth with `EXPLAIN (ANALYZE, BUFFERS)`.",
+        "steps": [
+          "Create two tables with the same 1,000,000 rows: one `t TEXT`, one `v VARCHAR(255)`.",
+          "Index each on the column and run `ANALYZE`.",
+          "Compare `EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM t WHERE ...` for both.",
+          "Show that the plans and buffer counts are equivalent."
+        ],
+        "expectedOutcome": "You can cite an experiment, not folklore, in the interview."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Is there any reason to use `CHAR(n)`?",
+            "answer": "Only for fixed-width values where padding is semantically irrelevant, such as two-character country codes. Even then `VARCHAR(2)` or `TEXT` with a check is clearer."
+          },
+          {
+            "question": "How do I store case-insensitive data?",
+            "answer": "Use a unique index on `lower(col)` (no extension needed), or the `citext` extension if you want the column itself to compare case-insensitively."
+          },
+          {
+            "question": "What does `n` in `VARCHAR(n)` mean — bytes or characters?",
+            "answer": "Characters. A `VARCHAR(3)` column accepts `'café'` because it is four bytes but three characters."
+          }
         ]
       }
     },

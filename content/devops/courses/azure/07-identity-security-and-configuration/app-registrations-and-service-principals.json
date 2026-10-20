@@ -88,6 +88,89 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The object model in detail"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An app registration creates an application object in your tenant. That object is the definition: display name, redirect URIs, client ID, API permissions, exposed scopes, and app roles. A service principal is the local representation of an application in one tenant. It is the thing you assign roles to and the thing that actually authenticates. One application object can have service principals in many tenants: your own, plus one per customer tenant for a multi-tenant app."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Object",
+          "Scope",
+          "What it holds",
+          "How you use it"
+        ],
+        "rows": [
+          [
+            "Application (app registration)",
+            "One tenant, usable in many",
+            "Client ID, redirect URIs, permissions, secrets",
+            "Define and configure the app"
+          ],
+          [
+            "Service principal",
+            "One tenant",
+            "Local identity, role assignments, consent",
+            "Authenticate and authorize"
+          ],
+          [
+            "Managed identity service principal",
+            "One tenant",
+            "Azure-managed credential, no secret",
+            "Passwordless access from Azure resources"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a registration, service principal, and secret",
+        "content": "A scripted equivalent of the portal flow. Capture the app ID once and reuse it.",
+        "language": "bash",
+        "code": "appId=$(az ad app create --display-name \"orders-api\" --sign-in-audience AzureADMyOrg --query appId -o tsv)\n\n# Create the service principal in the current tenant\naz ad sp create --id \"$appId\"\n\n# Create a client secret valid for one year (store it in Key Vault, never in Git)\naz ad app credential reset --id \"$appId\" --years 1 --query \"{clientId:appId, secret:password}\" -o json\n\n# Add a delegated permission, for example Microsoft Graph User.Read\naz ad app permission add --id \"$appId\" \\\n  --api 00000003-0000-0000-c000-000000000000 \\\n  --api-permissions e1fe6dd8-ba31-4d61-89e7-88639da4683d=Scope"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Prefer federated credentials over secrets"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A client secret is a password with an expiry date. Federated identity credentials remove it. The external platform (GitHub Actions, Azure DevOps, Kubernetes) issues a short-lived OIDC token that Entra ID exchanges for an access token, trusting a specific issuer, subject, and audience. Nothing long-lived is stored."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Trust a GitHub Actions workflow with OIDC",
+        "content": "The subject must match the repository and branch or environment exactly. Put the JSON in a file so quoting does not get in the way.",
+        "language": "bash",
+        "code": "# federated-credential.json\n# {\n#   \"name\": \"github-main\",\n#   \"issuer\": \"https://token.actions.githubusercontent.com\",\n#   \"subject\": \"repo:my-org/my-repo:ref:refs/heads/main\",\n#   \"audiences\": [\"api://AzureADTokenExchange\"]\n# }\n\naz ad app federated-credential create \\\n  --id \"$appId\" \\\n  --parameters @federated-credential.json"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Secrets expire silently",
+        "text": "A client secret that expires at 2 a.m. will break production at 2 a.m. If you must use one, store it in Key Vault, set an expiry you monitor, and automate rotation. Federated credentials avoid the problem entirely."
+      }
+    },
+    {
       "type": "exercise",
       "data": {
         "title": "Practice: Register a Demo App",

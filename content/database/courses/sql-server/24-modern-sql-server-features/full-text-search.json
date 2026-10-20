@@ -1,0 +1,159 @@
+{
+  "id": "lesson-sql-187",
+  "slug": "full-text-search",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "Full-Text Search",
+  "description": "Build full-text indexes and query them with CONTAINS, FREETEXT, and CONTAINSTABLE for linguistic search.",
+  "order": 7,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 26,
+  "tags": [
+    "full-text-search",
+    "contains",
+    "freetext",
+    "contains-table",
+    "word-breaker"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Full-Text Search"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`LIKE '%keyboard%'` cannot use an index and degrades as the table grows. Full-text search builds a separate index of words and their positions, maintained by the full-text engine. It understands word boundaries, inflections, and stop words, and it can rank results by relevance. SQL Server has shipped full-text search since SQL Server 2000; the modern implementation uses the `sys.fulltext_*` catalog views and asynchronous population."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a Catalog and Index"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A full-text index needs a unique, single-column, non-nullable key index on the table. `CHANGE_TRACKING AUTO` keeps the full-text index in sync as rows change; `MANUAL` requires you to call `ALTER FULLTEXT INDEX ... START UPDATE POPULATION` after changes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a full-text catalog and index",
+        "content": "The language identifier 1033 is US English; it selects the word breaker and stoplist used to tokenize the text.",
+        "language": "sql",
+        "code": "CREATE FULLTEXT CATALOG ProductCatalog AS DEFAULT;\nGO\n\nCREATE FULLTEXT INDEX ON dbo.Products\n(\n    Name        LANGUAGE 1033,\n    Description LANGUAGE 1033\n)\nKEY INDEX PK_Products\nON ProductCatalog\nWITH CHANGE_TRACKING AUTO;\nGO"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Query with CONTAINS and FREETEXT"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`CONTAINS` is precise: it matches exact words, prefixes, inflections, and proximity. `FREETEXT` is looser: it splits the search string into words and matches any of them, including inflectional forms, so it behaves more like a search box than a query language."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CONTAINS with NEAR and FORMSOF",
+        "content": "This finds products where 'wireless' and 'keyboard' appear within five words of each other, and products whose text contains an inflection of 'keyboard'.",
+        "language": "sql",
+        "code": "SELECT ProductId, Name, Description\nFROM dbo.Products\nWHERE CONTAINS((Name, Description), 'NEAR((wireless, keyboard), 5)')\n   OR CONTAINS((Name, Description), 'FORMSOF(INFLECTIONAL, keyboard)');"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rank results with CONTAINSTABLE",
+        "content": "CONTAINSTABLE returns a KEY column and a RANK column, so you can join back to the table and order by relevance.",
+        "language": "sql",
+        "code": "SELECT\n    p.ProductId,\n    p.Name,\n    ft.RANK\nFROM dbo.Products AS p\nJOIN CONTAINSTABLE(\n        dbo.Products,\n        (Name, Description),\n        'FORMSOF(INFLECTIONAL, keyboard)'\n     ) AS ft\n    ON ft.[KEY] = p.ProductId\nORDER BY ft.RANK DESC;"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Predicate",
+          "Behavior",
+          "Use when"
+        ],
+        "rows": [
+          [
+            "LIKE '%term%'",
+            "Substring match, no index support",
+            "Small tables or exact substring requirements"
+          ],
+          [
+            "CONTAINS",
+            "Word/phrase, prefix, inflection, proximity, weighted terms",
+            "You need precise linguistic control"
+          ],
+          [
+            "FREETEXT",
+            "Splits input into words and matches any inflection",
+            "You want a simple search box"
+          ],
+          [
+            "CONTAINSTABLE",
+            "CONTAINS plus a relevance rank",
+            "You need to order results by relevance"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Population is asynchronous",
+        "text": "A newly created full-text index does not contain rows immediately. The population runs in the background, so test queries right after creation may return nothing. Check `sys.fulltext_indexes` and the full-text crawl logs. Stop words and the chosen language change results in ways that surprise people — test with real data."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: full-text vs LIKE vs a search engine",
+        "text": "Full-text search is a good fit when the corpus lives in SQL Server and you need word-based matching with ranking on a single table. It is not a replacement for Elasticsearch or Azure AI Search when you need faceting, fuzzy matching, cross-entity relevance, or horizontal scale. The honest answer is that SQL Server full-text handles modest search needs well and becomes awkward at search-engine scale."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Full-Text Search Key Points",
+        "points": [
+          "Full-text search indexes words and positions, unlike LIKE which scans substrings.",
+          "Create a full-text catalog, then a full-text index with a unique key index.",
+          "CHANGE_TRACKING AUTO keeps the index current; MANUAL requires explicit population.",
+          "CONTAINS is precise; FREETEXT is looser; CONTAINSTABLE adds relevance ranking.",
+          "Population is asynchronous, so results lag behind writes.",
+          "Use a dedicated search engine when you need faceting, fuzzy matching, or horizontal scale."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "seek-vs-scan",
+    "included-columns-and-covering-indexes"
+  ]
+}

@@ -6,9 +6,16 @@ interface HeroSectionProps {
   totalHours: number;
   /** Destination for the primary "Start Learning" call to action. */
   startHref?: string;
+  /** Destination for the "Interview Questions" call to action. */
+  interviewHref?: string;
 }
 
-export function HeroSection({ totalLessons, totalHours, startHref = '/' }: HeroSectionProps) {
+export function HeroSection({
+  totalLessons,
+  totalHours,
+  startHref = '/',
+  interviewHref = '/backend/interview-questions',
+}: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-canvas py-16 sm:py-24">
       {/* Subtle grid background */}
@@ -56,7 +63,7 @@ export function HeroSection({ totalLessons, totalHours, startHref = '/' }: HeroS
             Learn AI Basics
           </Link>
           <Link
-            href="/interview-questions"
+            href={interviewHref}
             className="flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 font-medium text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
           >
             Interview Questions

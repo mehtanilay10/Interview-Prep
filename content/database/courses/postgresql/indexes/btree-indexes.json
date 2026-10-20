@@ -44,6 +44,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Ordering Matters: Equality Then Range"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Within a composite B-tree, place equality columns first and the range or sort column last. An index on `(tenant_id, created_at)` can seek directly to one tenant and then scan a contiguous block of dates, so `ORDER BY created_at` needs no sort. Swap the order and the planner has to scan many separate ranges."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Equality, then range, then sorted output",
+        "content": "Because the index is ordered by created_at within each tenant, the range scan returns rows in the requested order and the plan shows no Sort node.",
+        "language": "sql",
+        "code": "CREATE INDEX idx_orders_tenant_created\nON orders (tenant_id, created_at DESC);\n\nEXPLAIN ANALYZE\nSELECT id, created_at\nFROM orders\nWHERE tenant_id = 7\n  AND created_at >= now() - interval '7 days'\nORDER BY created_at DESC\nLIMIT 20;\n-- Index Scan using idx_orders_tenant_created on orders\n--   Index Cond: ((tenant_id = 7) AND (created_at >= ...))\n--   Buffers: shared hit=6"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Functions and casts break the index",
+        "text": "Wrapping the indexed column in a function or cast makes the predicate non-sargable: `WHERE created_at::date = '2024-05-01'` cannot use an index on `created_at`. Write it as a range (`created_at >= '2024-05-01' AND created_at < '2024-05-02'`) or create an expression index on the exact expression the query uses."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

@@ -7,7 +7,7 @@
   "description": "Model temporal spans and numeric ranges using TSRANGE, DATERANGE, INT4RANGE, and the overlap operator &&.",
   "order": 5,
   "difficulty": "advanced",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "range-types",
     "tsrange",
@@ -28,6 +28,139 @@
         "content": "Using the overlap operator && to detect conflicting room reservations.",
         "language": "sql",
         "code": "CREATE TABLE room_bookings (\n    id SERIAL PRIMARY KEY,\n    room_number INT,\n    stay_duration DATERANGE\n);\n\n-- Find bookings overlapping with Christmas week\nSELECT * FROM room_bookings\nWHERE stay_duration && daterange('2024-12-24', '2024-12-31');"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Bounds and Inclusivity"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A range literal is written `[lower, upper)`. Square brackets include the bound; parentheses exclude it. The default is `[)`, and it is the convention that avoids double-counting: an event from Monday 00:00 to Tuesday 00:00 and the next from Tuesday 00:00 do not overlap because the boundary belongs to exactly one range."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Constructing and Inspecting Ranges",
+        "content": "`lower_inc` and `upper_inc` make the boundary semantics explicit.",
+        "code": "SELECT '[2026-01-01, 2026-02-01)'::daterange AS default_bounds,\n       '[2026-01-01, 2026-02-01]'::daterange AS closed_bounds,\n       daterange('2026-01-01', '2026-02-01', '[)') AS explicit;\n\nSELECT lower(r) AS start, upper(r) AS end,\n       lower_inc(r) AS includes_start,\n       upper_inc(r) AS includes_end\nFROM (SELECT '[2026-01-01, 2026-02-01)'::daterange AS r) s;\n\n-- Unbounded and empty ranges\nSELECT daterange('2026-01-01', NULL) AS open_ended,\n       daterange(NULL, '2026-12-31') AS from_beginning,\n       'empty'::daterange            AS empty_range;\n\n-- Canonical form: [) ranges with no inclusive upper bound\nSELECT '[2026-01-01, 2026-02-01]'::daterange;   -- displays as [2026-01-01,2026-02-02)",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Operators Worth Memorising"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Operator",
+          "Meaning",
+          "Example"
+        ],
+        "rows": [
+          [
+            "`&&`",
+            "Overlaps",
+            "`stay && daterange('2026-12-24', '2026-12-31')`"
+          ],
+          [
+            "`@>`",
+            "Contains element or range",
+            "`stay @> '2026-12-25'::date`"
+          ],
+          [
+            "`<@`",
+            "Is contained by",
+            "`stay <@ paid_period`"
+          ],
+          [
+            "`-|-`",
+            "Adjacent (touching, not overlapping)",
+            "`a -|- b`"
+          ],
+          [
+            "`-`",
+            "Difference",
+            "`a - b`"
+          ],
+          [
+            "`+`",
+            "Union (when contiguous/overlapping)",
+            "`a + b`"
+          ],
+          [
+            "`*`",
+            "Intersection",
+            "`a * b`"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Preventing Double Bookings With an Exclusion Constraint",
+        "content": "This is the killer feature: the database guarantees no overlap.",
+        "code": "CREATE EXTENSION IF NOT EXISTS btree_gist;   -- needed for the room_number equality part\n\nCREATE TABLE room_bookings (\n    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    room_number INT NOT NULL,\n    stay        DATERANGE NOT NULL,\n    -- No two rows may have the same room with overlapping stays\n    CONSTRAINT no_overlap\n        EXCLUDE USING gist (room_number WITH =, stay WITH &&),\n    CONSTRAINT stay_valid CHECK (NOT isempty(stay))\n);\n\nINSERT INTO room_bookings (room_number, stay)\nVALUES (101, daterange('2026-12-24','2026-12-28'));\n\nINSERT INTO room_bookings (room_number, stay)\nVALUES (101, daterange('2026-12-27','2026-12-30'));\n-- ERROR: conflicting key value violates exclusion constraint \"no_overlap\"\n\n-- Bookings that overlap Christmas week\nSELECT * FROM room_bookings\nWHERE stay && daterange('2026-12-24','2026-12-31');",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Note that the exclusion constraint needs a GiST index, and mixing an equality column with a range needs the `btree_gist` extension. That combination — `EXCLUDE USING gist (key WITH =, period WITH &&)` — is the standard way to enforce non-overlap for bookings, pricing tiers, and employment periods."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "When asked \"how do you prevent overlapping date ranges without application locks?\", answer: a GiST **exclusion constraint** over `(key WITH =, period WITH &&)`. It is enforced inside the database, so it holds even under concurrent inserts."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Enforce Non-Overlapping Pricing Tiers",
+        "description": "Apply the pattern to a different domain.",
+        "steps": [
+          "Create `price_tiers(product_id, period daterange, price numeric)`.",
+          "Add an exclusion constraint so one product cannot have overlapping tiers.",
+          "Insert two overlapping tiers and observe the error.",
+          "Write a query that finds the price in effect on a given date using `@>`."
+        ],
+        "expectedOutcome": "A table whose integrity is guaranteed by the engine, not by hope."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Should I use a range type or two columns?",
+            "answer": "Use a range type when overlap detection, containment, or adjacency matters — the operators and GiST indexing are worth it. Two columns are fine for simple reporting where you never ask \"do these overlap?\"."
+          },
+          {
+            "question": "Why is the default bound `[)`?",
+            "answer": "It makes ranges partitionable: consecutive ranges can share a boundary without overlapping, which is exactly what you want for scheduling and accounting periods."
+          },
+          {
+            "question": "How do ranged queries use an index?",
+            "answer": "Create a GiST index on the range column. The planner can use it for `&&`, `@>`, and `<@`; a btree index cannot answer overlap questions."
+          }
+        ]
       }
     },
     {

@@ -1,0 +1,187 @@
+{
+  "id": "lesson-sql-181",
+  "slug": "json-in-sql-server",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "JSON in SQL Server",
+  "description": "Store, validate, query, shred, produce, and index JSON documents inside SQL Server.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 30,
+  "tags": [
+    "json",
+    "openjson",
+    "json-value",
+    "for-json",
+    "computed-column"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JSON in SQL Server"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQL Server added JSON support in SQL Server 2016. Until the native `json` type in SQL Server 2025, JSON is stored as `nvarchar(max)` (or `nvarchar(n)`) alongside relational columns. The engine does not store it in a parsed binary format, so validation and indexing are explicit decisions you make. That sounds limiting, but it means JSON can live in the same table, transaction, and backup as the rest of your data."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Validate at the boundary",
+        "text": "Add `CHECK (ISJSON(column) = 1)` so invalid JSON cannot be written. `ISJSON` returns 1 for a valid object or array. Without the check, a single malformed payload will break every `OPENJSON` query that reads the column."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Store and Validate JSON"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A table with a JSON column",
+        "content": "The `Lines` column holds an array of order lines, while `OrderId` and `Customer` stay relational.",
+        "language": "sql",
+        "code": "CREATE TABLE dbo.Orders\n(\n    OrderId  INT NOT NULL PRIMARY KEY,\n    Customer NVARCHAR(100) NOT NULL,\n    Lines    NVARCHAR(MAX) NOT NULL\n        CONSTRAINT CK_Orders_Lines_JSON CHECK (ISJSON(Lines) = 1)\n);\nGO\n\nINSERT INTO dbo.Orders (OrderId, Customer, Lines)\nVALUES\n(1, N'Ada',   N'[{\"sku\":\"KB-01\",\"qty\":1,\"price\":79.00},{\"sku\":\"MS-02\",\"qty\":2,\"price\":25.50}]'),\n(2, N'Grace', N'[{\"sku\":\"KB-01\",\"qty\":3,\"price\":79.00}]');"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Read a Single Value or Object"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`JSON_VALUE` extracts a scalar (string, number, boolean) and returns `nvarchar(4000)`. `JSON_QUERY` extracts an object or array and returns `nvarchar(max)`. Both use a JSON path expression, where `$` is the root, `$.property` selects a property, and `$[0]` selects the first array element."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "JSON_VALUE and JSON_QUERY",
+        "content": "The scalar values are extracted directly; the array is summed by shredding it with OPENJSON in a subquery.",
+        "language": "sql",
+        "code": "SELECT\n    OrderId,\n    JSON_VALUE(Lines, '$[0].sku') AS first_sku,\n    JSON_VALUE(Lines, '$[0].qty') AS first_qty,\n    JSON_QUERY(Lines, '$')        AS whole_array,\n    (\n        SELECT SUM(\n            CAST(JSON_VALUE(value, '$.qty') AS INT)\n            * CAST(JSON_VALUE(value, '$.price') AS DECIMAL(10, 2))\n        )\n        FROM OPENJSON(Lines)\n    ) AS order_total\nFROM dbo.Orders;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Shred an Array into Rows"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`OPENJSON` turns a JSON array into a rowset. With the `WITH` clause you declare a schema, which gives you typed columns and avoids casting every value by hand. Use `CROSS APPLY` to join the shredded rows back to their parent row."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "OPENJSON with an explicit schema",
+        "content": "Each order line becomes one row with typed `sku`, `qty`, and `price` columns.",
+        "language": "sql",
+        "code": "SELECT\n    o.OrderId,\n    o.Customer,\n    j.sku,\n    j.qty,\n    j.price,\n    j.qty * j.price AS line_total\nFROM dbo.Orders AS o\nCROSS APPLY OPENJSON(o.Lines)\nWITH\n(\n    sku   NVARCHAR(20)  '$.sku',\n    qty   INT           '$.qty',\n    price DECIMAL(10, 2) '$.price'\n) AS j\nORDER BY o.OrderId, j.sku;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Produce JSON from a Query"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "FOR JSON PATH",
+        "content": "`FOR JSON PATH` shapes the result set as JSON. Wrapping the array in `JSON_QUERY` keeps it as JSON instead of escaping it into a string.",
+        "language": "sql",
+        "code": "SELECT\n    o.OrderId,\n    o.Customer,\n    JSON_QUERY(o.Lines) AS Lines\nFROM dbo.Orders AS o\nFOR JSON PATH, ROOT('orders');"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Function",
+          "Purpose",
+          "Returns"
+        ],
+        "rows": [
+          [
+            "ISJSON",
+            "Validates that a string contains JSON",
+            "1 or 0"
+          ],
+          [
+            "JSON_VALUE",
+            "Extracts a scalar value",
+            "nvarchar(4000)"
+          ],
+          [
+            "JSON_QUERY",
+            "Extracts an object or array",
+            "nvarchar(max)"
+          ],
+          [
+            "OPENJSON",
+            "Shreds JSON into a rowset",
+            "Rowset"
+          ],
+          [
+            "FOR JSON",
+            "Formats a query result as JSON",
+            "nvarchar(max)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: indexing JSON",
+        "text": "You cannot put a normal index directly on an `nvarchar(max)` JSON column. The standard trick is a persisted computed column that calls `JSON_VALUE`, then a regular index on that column. `OPENJSON` requires database compatibility level 130 or higher, and `JSON_VALUE` silently returns NULL if the path does not exist or the value is an object/array — which is why validating with `ISJSON` and testing paths matters."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "JSON in SQL Server Key Points",
+        "points": [
+          "JSON is stored as nvarchar(max) with a CHECK (ISJSON(...) = 1) constraint.",
+          "JSON_VALUE extracts scalars, JSON_QUERY extracts objects and arrays.",
+          "OPENJSON with a WITH clause shreds arrays into typed rows.",
+          "FOR JSON PATH produces JSON from a query result.",
+          "Index JSON by persisting a JSON_VALUE computed column and indexing it.",
+          "JSON is best for payloads that vary by row; keep frequently filtered and joined attributes as real columns."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "query-optimization",
+    "statistics-and-cardinality-estimation"
+  ]
+}

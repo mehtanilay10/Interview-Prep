@@ -63,6 +63,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Setting Up a Streaming Replica"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A physical replica is created with `pg_basebackup`, which copies the data directory and configures the standby to stream WAL. On the primary, a replication slot guarantees the WAL the replica still needs is retained even if the replica disconnects."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a replication slot and a standby",
+        "content": "The slot is created on the primary; `pg_basebackup` then clones the data directory and starts streaming. The `-R` flag writes the connection settings automatically.",
+        "language": "bash",
+        "code": "# On the primary: create a slot so WAL is retained for this replica\npsql -h primary -c \"SELECT * FROM pg_create_physical_replication_slot('replica1_slot');\"\n\n# On the standby host: clone the primary and start streaming\npg_basebackup \\\n  -h primary \\\n  -D /var/lib/postgresql/16/main \\\n  -U replicator \\\n  -Fp -Xs -P -R \\\n  -S replica1_slot\n\n# Verify replication is streaming\npsql -h primary -c \"SELECT client_addr, state, sync_state, replay_lag FROM pg_stat_replication;\""
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Watch for replica lag and slot bloat",
+        "text": "Replication slots prevent WAL removal, which is exactly what you want for a healthy replica — but if a replica goes away permanently and its slot is not dropped, the primary's disk fills with WAL and eventually stops accepting writes. Monitor `pg_replication_slots` for a growing `pg_wal_lsn_diff` and drop abandoned slots. Query `pg_stat_replication.replay_lag` to catch a replica falling behind before it becomes an outage."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

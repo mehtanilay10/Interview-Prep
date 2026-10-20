@@ -28,7 +28,7 @@ interface BookmarksClientProps {
 
 function bookmarkHref(item: BookmarkItem): string {
   if (item.type === 'interview') {
-    return `/interview-questions/${item.moduleSlug}/${item.slug}`;
+    return getContentItemHref('interview-qa', item.moduleSlug, item.slug);
   }
   return getContentItemHref(item.courseSlug, item.moduleSlug, item.slug);
 }

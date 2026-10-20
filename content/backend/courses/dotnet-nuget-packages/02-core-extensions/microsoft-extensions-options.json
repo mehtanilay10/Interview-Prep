@@ -4,10 +4,10 @@
   "moduleSlug": "core-extensions",
   "courseSlug": "dotnet-nuget-packages",
   "title": "Microsoft.Extensions.Options",
-  "description": "A library for configuring and accessing options in .NET applications.",
+  "description": "A library for configuring and accessing strongly-typed options in .NET applications.",
   "order": 1,
   "difficulty": "beginner",
-  "estimatedMinutes": 12,
+  "estimatedMinutes": 14,
   "tags": [
     "options",
     "configuration",
@@ -18,22 +18,37 @@
       "type": "heading",
       "data": {
         "level": 2,
-        "text": "What is the Options Pattern?"
+        "text": "What is the Options pattern?"
       }
     },
     {
       "type": "paragraph",
       "data": {
-        "text": "The Options pattern provides a way to use classes to provide strongly-typed access to application settings. Microsoft.Extensions.Options provides the core interfaces and classes for this pattern."
+        "text": "The Options pattern replaces magic strings and `IConfiguration[\"Some:Key\"]` lookups with strongly-typed classes. You bind a configuration section to a POCO once, and consumers depend on that POCO instead of on the configuration system. This makes settings discoverable, testable, and validatable."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Microsoft.Extensions.Options` is part of the shared framework for ASP.NET Core and the generic host. In a plain console app you can install it as a package; the JSON binder lives in `Microsoft.Extensions.Configuration.Binder`."
       }
     },
     {
       "type": "example",
       "data": {
-        "title": "Defining and Binding Options",
-        "content": "Create and bind an options class.",
+        "title": "Install for a console app",
+        "content": "ASP.NET Core apps already reference these; console apps need them explicitly.",
+        "language": "bash",
+        "code": "dotnet add package Microsoft.Extensions.Options\ndotnet add package Microsoft.Extensions.Configuration.Json\ndotnet add package Microsoft.Extensions.Configuration.Binder"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bind a section and consume it",
+        "content": "Register the options class, then inject the right interface for the scenario.",
         "language": "csharp",
-        "code": "public class MyOptions\n{\n    public string ApiKey { get; set; } = string.Empty;\n    public int TimeoutSeconds { get; set; }\n}\n\n// Registration\nbuilder.Services.Configure<MyOptions>(builder.Configuration.GetSection(\"MyOptions\"));\n\n// Consumption\npublic class MyService\n{\n    private readonly MyOptions _options;\n    public MyService(IOptions<MyOptions> options)\n    {\n        _options = options.Value;\n    }\n}"
+        "code": "public class SmtpOptions\n{\n    public const string SectionName = \"Smtp\";\n\n    [Required]\n    public string Host { get; set; } = string.Empty;\n\n    [Range(1, 65535)]\n    public int Port { get; set; } = 587;\n\n    public string UserName { get; set; } = string.Empty;\n}\n\n// Registration + fail-fast validation on startup\nbuilder.Services\n    .AddOptions<SmtpOptions>()\n    .Bind(builder.Configuration.GetSection(SmtpOptions.SectionName))\n    .ValidateDataAnnotations()\n    .ValidateOnStart();\n\n// Consumption\npublic class MailService(IOptions<SmtpOptions> options)\n{\n    private readonly SmtpOptions _smtp = options.Value;\n}"
       }
     },
     {
@@ -41,16 +56,20 @@
       "data": {
         "terms": [
           {
-            "term": "IOptions",
-            "definition": "Access to options, recomputed on each resolution."
+            "term": "IOptions<T>",
+            "definition": "Singleton access to the configured value. Use it when the value never changes at runtime."
           },
           {
-            "term": "IOptionsSnapshot",
-            "definition": "Options that are recomputed when changed (scoped lifetime)."
+            "term": "IOptionsSnapshot<T>",
+            "definition": "Scoped access that re-reads configuration per request, so changed appsettings are picked up (or the value reloads when passed as a parameter)."
           },
           {
-            "term": "IOptionsMonitor",
-            "definition": "Options that support change notifications and reload."
+            "term": "IOptionsMonitor<T>",
+            "definition": "Singleton that supports change notifications via OnChange and is safe to use in long-lived services."
+          },
+          {
+            "term": "ValidateOnStart",
+            "definition": "Runs validation during application startup so a bad configuration fails the deploy instead of the first request."
           }
         ]
       }
@@ -59,8 +78,37 @@
       "type": "callout",
       "data": {
         "variant": "tip",
-        "title": "Validation",
-        "text": "Use `ValidateDataAnnotations()` or custom validation to ensure options are valid."
+        "title": "Interview answer",
+        "text": "The classic trap is resolving `IOptionsSnapshot<T>` inside a singleton: snapshot is scoped, so injecting it into a singleton throws at runtime. Use `IOptionsMonitor<T>` in singletons, and enable `ValidateOnStart` so misconfiguration is caught before traffic arrives."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Binding Configuration to Typed Options"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Options pattern turns raw configuration keys into a typed class. Instead of reading `Configuration[\"Smtp:Host\"]` as a string at each call site, you bind a section to a class once and inject `IOptions<T>` where it is needed. That removes magic strings and puts the shape of the settings in one place."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "csharp",
+        "title": "A typed options class with validation",
+        "content": "public sealed class SmtpOptions\n{\n    public const string Section = \"Smtp\";\n\n    public required string Host { get; init; }\n    public required int Port { get; init; }\n    public string? Username { get; init; }\n}\n\nbuilder.Services\n    .AddOptions<SmtpOptions>()\n    .Bind(builder.Configuration.GetSection(SmtpOptions.Section))\n    .ValidateDataAnnotations()\n    .ValidateOnStart();\n\npublic sealed class Mailer(IOptions<SmtpOptions> options)\n{\n    private readonly SmtpOptions _smtp = options.Value;\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "IOptions vs IOptionsSnapshot vs IOptionsMonitor",
+        "text": "`IOptions<T>` is a singleton and never changes after start. `IOptionsSnapshot<T>` is scoped and re-reads the section once per request, which suits settings that change without a restart. `IOptionsMonitor<T>` is a singleton that reacts to changes through `OnChange`. Choosing the right one is the distinction interviewers probe."
       }
     },
     {
@@ -68,14 +116,18 @@
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Options provides strongly-typed configuration",
-          "IOptions is singleton-scoped",
-          "IOptionsSnapshot is scoped"
+          "Options bind configuration sections to strongly-typed classes",
+          "IOptions is singleton, IOptionsSnapshot is scoped, IOptionsMonitor supports change notifications",
+          "ValidateDataAnnotations + ValidateOnStart catch bad configuration at startup",
+          "Named options (`Configure<T>(name, ...)`) support multiple configurations of the same type"
         ],
-        "takeaway": "The Options pattern is the standard way to handle configuration in ASP.NET Core."
+        "takeaway": "Use the Options pattern whenever a service needs settings, and validate them once at startup."
       }
     }
   ],
-  "relatedLessons": [],
+  "relatedLessons": [
+    "microsoft-extensions-configuration",
+    "microsoft-extensions-dependencyinjection"
+  ],
   "furtherReading": []
 }

@@ -7,7 +7,7 @@
   "description": "Guarantee distinctness with UNIQUE constraints, enforce business logic with CHECK expressions, and handle multiple NULLs.",
   "order": 3,
   "difficulty": "beginner",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 30,
   "tags": [
     "unique",
     "check",
@@ -41,6 +41,119 @@
         "content": "Validating that price is positive and discounted price is lower than list price.",
         "language": "sql",
         "code": "CREATE TABLE products (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    price NUMERIC(10, 2) NOT NULL,\n    sale_price NUMERIC(10, 2),\n    CONSTRAINT chk_price_positive CHECK (price > 0),\n    CONSTRAINT chk_sale_lower_than_price CHECK (sale_price IS NULL OR sale_price < price)\n);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How NULL Interacts With UNIQUE"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In SQL, `NULL` means \"unknown\", and two unknowns are not equal. A standard `UNIQUE` constraint therefore permits many rows whose constrained columns are `NULL`. PostgreSQL 15 added `NULLS NOT DISTINCT` to invert that behaviour when a single `NULL` should be allowed."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Both Behaviours, Side by Side",
+        "content": "This is a very common interview question.",
+        "code": "CREATE TABLE contacts_default (\n    id    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    email TEXT UNIQUE                     -- multiple NULLs allowed\n);\nCREATE TABLE contacts_strict (\n    id    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    email TEXT UNIQUE NULLS NOT DISTINCT  -- PG 15+: only one NULL\n);\n\nINSERT INTO contacts_default (email) VALUES (NULL), (NULL);  -- both accepted\nINSERT INTO contacts_strict  (email) VALUES (NULL);\nINSERT INTO contacts_strict  (email) VALUES (NULL);\n-- ERROR: duplicate key value violates unique constraint\n\n-- To make every email case-insensitively unique, index the expression:\nCREATE UNIQUE INDEX contacts_strict_email_lower\n    ON contacts_strict (lower(email)) NULLS NOT DISTINCT;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Partial and Expression Uniqueness"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A plain `UNIQUE` constraint is really a unique **index**. Once you see it that way, you can express conditions that a naive constraint cannot: unique only among active rows, unique on a derived value, or unique on a combination."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Conditional and Derived Uniqueness",
+        "content": "Partial unique indexes solve the \"one active record per user\" problem.",
+        "code": "CREATE TABLE api_keys (\n    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    user_id    BIGINT NOT NULL,\n    key_hash   TEXT   NOT NULL,\n    revoked_at TIMESTAMPTZ\n);\n\n-- A user may have many revoked keys, but only one live key\nCREATE UNIQUE INDEX api_keys_one_active\n    ON api_keys (user_id)\n    WHERE revoked_at IS NULL;\n\n-- Unique on a normalised value\nCREATE UNIQUE INDEX users_username_ci_uniq ON users (lower(username));\n\n-- Unique on a prefix (useful for case/whitespace-insensitive codes)\nCREATE UNIQUE INDEX promo_codes_norm_uniq ON promo_codes (upper(btrim(code)));",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "CHECK Constraints: What They Can and Cannot Do"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "They can reference any column in the same row, use functions marked `IMMUTABLE`/`STABLE`, and use `CASE`, `regex` (`~`), and `ANY`/`ALL` with arrays.",
+          "They **cannot** reference other rows or other tables — that needs a foreign key, an exclusion constraint, or a trigger.",
+          "They are evaluated on `INSERT` and `UPDATE` only; a `CHECK` that is true today stays stored even if the expression would now be false.",
+          "A `CHECK` that evaluates to `NULL` passes, because `NULL` is not `false`. Guard with `col IS NOT NULL OR ...` when that matters."
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CHECK Constraints With Real Business Rules",
+        "content": "Includes a before/after update validation.",
+        "code": "CREATE TABLE bookings (\n    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    check_in   DATE NOT NULL,\n    check_out  DATE NOT NULL,\n    guests     SMALLINT NOT NULL DEFAULT 1,\n    status     TEXT NOT NULL DEFAULT 'pending',\n\n    CONSTRAINT dates_ordered   CHECK (check_out > check_in),\n    CONSTRAINT stay_not_absurd CHECK (check_out - check_in <= 365),\n    CONSTRAINT guests_positive CHECK (guests BETWEEN 1 AND 20),\n    CONSTRAINT known_status    CHECK (status IN ('pending','confirmed','cancelled')),\n    -- NULL passes a check: make the intent explicit\n    CONSTRAINT cancel_reason   CHECK (status <> 'cancelled' OR cancelled_reason IS NOT NULL)\n);\n\nINSERT INTO bookings (check_in, check_out, guests)\nVALUES ('2026-05-01','2026-05-04', 2);\n\nINSERT INTO bookings (check_in, check_out) VALUES ('2026-05-04','2026-05-01');\n-- ERROR: new row for relation \"bookings\" violates check constraint \"dates_ordered\"",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "If asked \"does `UNIQUE` allow multiple `NULL`s?\", say yes, because `NULL` is not equal to `NULL` — and mention `UNIQUE NULLS NOT DISTINCT` (PG 15+) and partial unique indexes as the two ways to get stricter behaviour."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Constrain a Subscription Table",
+        "description": "Apply the concepts together.",
+        "steps": [
+          "Create `subscriptions(user_id, plan, started_at, cancelled_at)` with `plan` restricted to a known set.",
+          "Add a check that `cancelled_at` is `NULL` or after `started_at`.",
+          "Add a partial unique index so each user has at most one active (not cancelled) subscription.",
+          "Prove both rules with failing inserts."
+        ],
+        "expectedOutcome": "A schema where invalid subscription states are impossible to store."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "When should a rule live in the database instead of the application?",
+            "answer": "When it is a true invariant: uniqueness, referential integrity, and domain ranges. Database constraints hold under concurrent writes, background jobs, and manual fixes — application code cannot."
+          },
+          {
+            "question": "Does a `CHECK` constraint slow down inserts?",
+            "answer": "Marginally. The expression is evaluated per modified row; for cheap expressions the cost is negligible compared to the surrounding I/O."
+          },
+          {
+            "question": "Can I add a `CHECK` constraint without scanning the table?",
+            "answer": "Yes: `ADD CONSTRAINT ... CHECK (...) NOT VALID;` skips validation, then `VALIDATE CONSTRAINT` verifies existing rows with a lighter lock."
+          }
+        ]
       }
     },
     {

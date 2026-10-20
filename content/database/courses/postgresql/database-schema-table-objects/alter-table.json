@@ -7,7 +7,7 @@
   "description": "Modify existing tables, rename columns, change data types, and manage table locks during migrations.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 35,
   "tags": [
     "alter-table",
     "schema-evolution",
@@ -35,6 +35,173 @@
         "content": "Adding columns with default values in modern PostgreSQL does not rewrite the table.",
         "language": "sql",
         "code": "-- 1. Add column with constant default (instantaneous metadata change in PG 11+)\nALTER TABLE users \nADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT false;\n\n-- 2. Rename column (instant metadata change)\nALTER TABLE users \nRENAME COLUMN is_verified TO email_verified;\n\n-- 3. Change column type using explicit cast expression\nALTER TABLE metrics \nALTER COLUMN count TYPE BIGINT USING count::BIGINT;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Lock Level Is the Whole Story"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In production, the danger with `ALTER TABLE` is rarely correctness — it is the lock it takes. Most `ALTER TABLE` variants take an `ACCESS EXCLUSIVE` lock, which blocks **reads as well as writes**, and the lock is held until the transaction commits. If the migration also does a long data backfill, every query on that table queues behind it."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Operation",
+          "Lock taken",
+          "Rewrites table?",
+          "Notes"
+        ],
+        "rows": [
+          [
+            "`ADD COLUMN ... DEFAULT <constant>`",
+            "ACCESS EXCLUSIVE",
+            "No (PG 11+)",
+            "Fast metadata-only change."
+          ],
+          [
+            "`ADD COLUMN ... DEFAULT <volatile expression>`",
+            "ACCESS EXCLUSIVE",
+            "Yes",
+            "e.g. `DEFAULT random()` requires a rewrite — add, then backfill."
+          ],
+          [
+            "`DROP COLUMN`",
+            "ACCESS EXCLUSIVE",
+            "No",
+            "Metadata only; disk space reclaimed later."
+          ],
+          [
+            "`ALTER COLUMN TYPE`",
+            "ACCESS EXCLUSIVE",
+            "Usually",
+            "Rewrites the whole table unless the cast is binary-coercible (e.g. `varchar(50)`→`text`)."
+          ],
+          [
+            "`SET NOT NULL`",
+            "ACCESS EXCLUSIVE",
+            "No (PG 12+)",
+            "Scans the table to verify, but no rewrite once validated."
+          ],
+          [
+            "`ADD CONSTRAINT ... NOT VALID`",
+            "ACCESS EXCLUSIVE (brief)",
+            "No",
+            "Skips the validation scan; validate later with a `SHARE UPDATE EXCLUSIVE` lock."
+          ],
+          [
+            "`VALIDATE CONSTRAINT`",
+            "SHARE UPDATE EXCLUSIVE",
+            "No",
+            "Runs concurrently with reads and writes."
+          ],
+          [
+            "`CREATE INDEX CONCURRENTLY`",
+            "SHARE UPDATE EXCLUSIVE",
+            "No",
+            "Does not block writes; cannot run inside a transaction."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Safe Migration Recipe"
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Adding a Column With a Default, Safely",
+        "items": [
+          {
+            "text": "Set a short lock timeout so the migration fails fast instead of queuing behind a long query",
+            "hint": "`SET lock_timeout = '3s';`"
+          },
+          {
+            "text": "Add the column as NULLable with no default",
+            "hint": "Instant; no rewrite"
+          },
+          {
+            "text": "Backfill existing rows in batches",
+            "hint": "Avoid one huge UPDATE; keeps bloat and lock time low"
+          },
+          {
+            "text": "Add the default for new rows",
+            "hint": "`ALTER COLUMN ... SET DEFAULT` is metadata-only"
+          },
+          {
+            "text": "Add `NOT NULL` — or, on PG 12+, the constraint is validated without a rewrite",
+            "hint": "Use `NOT VALID` + `VALIDATE CONSTRAINT` if you need to avoid the scan lock"
+          }
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Zero-Downtime Column Addition and Backfill",
+        "content": "Run the backfill outside the DDL transaction, in batches.",
+        "code": "-- 1. Fail fast rather than blocking every reader of the table\nSET lock_timeout = '3s';\n-- 1b. Never wait for an ACCESS EXCLUSIVE lock forever:\n-- statement_timeout = '5min';\n\n-- 2. Metadata-only: nullable, no default\nALTER TABLE users ADD COLUMN is_verified BOOLEAN;\n\n-- 3. Backfill in batches to keep transactions short\nUPDATE users\nSET    is_verified = false\nWHERE  is_verified IS NULL\n  AND  id IN (SELECT id FROM users WHERE is_verified IS NULL LIMIT 5000);\n-- repeat until 0 rows, or use the id-range pattern below\n-- UPDATE users SET is_verified = false WHERE id BETWEEN 1 AND 100000 AND is_verified IS NULL;\n\n-- 4. Now declare the default for new rows (no rewrite)\nALTER TABLE users ALTER COLUMN is_verified SET DEFAULT false;\n\n-- 5. And finally enforce NOT NULL\nALTER TABLE users ALTER COLUMN is_verified SET NOT NULL;\n\n-- Rename a column (instant) and change a type with an explicit cast\nALTER TABLE users RENAME COLUMN is_verified TO email_verified;\nALTER TABLE metrics ALTER COLUMN count TYPE BIGINT USING count::BIGINT;\nALTER TABLE metrics ALTER COLUMN count SET STATISTICS 1000;  -- better planner estimates",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Expand and Contract"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "alter-table-expand-contract",
+        "caption": "Expand/contract: the pattern that keeps deploys backwards compatible",
+        "definition": "flowchart TD\n    A[Old code + old schema] --> B[Expand: add new nullable column]\n    B --> C[Deploy code that writes BOTH columns]\n    C --> D[Backfill old rows]\n    D --> E[Switch reads to the new column]\n    E --> F[Contract: drop old column in a later release]\n    F --> G[New code + new schema]"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The key insight is that the schema change is split across **two deployments**. Deploying the schema first (expand) means the running old code still works. Dropping in a later release (contract) means a rollback is still possible until you are confident."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Never Rename in Place During a Deploy",
+        "text": "A rename is instant for the database but instantly breaks any app server running the previous version. Expand/contract — add the new name, dual-write, migrate readers, drop the old name — avoids the outage."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Why does `ALTER TABLE ... ADD COLUMN ... DEFAULT false` not rewrite the table?",
+            "answer": "Since PostgreSQL 11, a non-volatile default is stored as a single catalog entry that applies to existing rows on read, so only new rows ever materialise the value."
+          },
+          {
+            "question": "How do I add a `NOT NULL` constraint without a long lock?",
+            "answer": "Add it as a `CHECK` constraint with `NOT VALID`, then run `VALIDATE CONSTRAINT` (which takes only a `SHARE UPDATE EXCLUSIVE` lock), and finally `ALTER COLUMN ... SET NOT NULL`, which can use the proven check constraint instead of rescanning."
+          },
+          {
+            "question": "Can `CREATE INDEX CONCURRENTLY` run in a migration transaction?",
+            "answer": "No. It must be its own statement outside a transaction block. If it fails it can leave an invalid index you must drop and recreate."
+          }
+        ]
       }
     },
     {

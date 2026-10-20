@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-028",
   "slug": "xstate",
   "title": "XState",
-  "description": "State machines and statecharts for predictable state.",
+  "description": "Model business workflows as state machines with XState v5, run them with actors, and drive React from snapshots.",
   "order": 5,
-  "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "difficulty": "advanced",
+  "estimatedMinutes": 18,
   "tags": [
     "xstate",
     "state",
@@ -17,23 +17,97 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "XState models state as finite state machines. This eliminates impossible states and makes complex flows predictable."
+        "text": "XState expresses behaviour as a state machine: a finite set of states, the events that move between them, and the effects each transition runs. Invalid transitions become impossible to reach, which is why checkout and authentication flows benefit most."
       }
     },
     {
-      "type": "example",
+      "type": "heading",
       "data": {
-        "language": "javascript",
-        "caption": "XState toggle machine",
-        "code": "import { createMachine, interpret } from \"xstate\";\n\nconst toggleMachine = createMachine({\n  id: \"toggle\",\n  initial: \"inactive\",\n  states: {\n    inactive: { on: { TOGGLE: \"active\" } },\n    active: { on: { TOGGLE: \"inactive\" } }\n  }\n});"
+        "level": 2,
+        "text": "Define the machine",
+        "anchor": "define"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/machines/checkoutMachine.ts (XState v5)",
+        "code": "import { createMachine, assign } from 'xstate';\n\ntype Context = { email: string; error?: string };\n\nexport const checkoutMachine = createMachine({\n  id: 'checkout',\n  initial: 'collecting',\n  context: { email: '' } as Context,\n  states: {\n    collecting: {\n      on: {\n        SUBMIT: { target: 'validating', actions: assign({ email: ({ event }) => event.email }) },\n      },\n    },\n    validating: {\n      invoke: {\n        src: fromPromise(async ({ input }: { input: Context }) => {\n          const res = await fetch('/api/validate', {\n            method: 'POST',\n            body: JSON.stringify({ email: input.email }),\n          });\n          if (!res.ok) throw new Error('Invalid email');\n          return true;\n        }),\n        input: ({ context }) => context,\n        onDone: 'confirmed',\n        onError: { target: 'collecting', actions: assign({ error: ({ event }) => String(event.error) }) },\n      },\n    },\n    confirmed: { type: 'final' },\n  },\n});\n\nimport { fromPromise } from 'xstate';"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Actions transform context; `invoke` runs async work (here a promise actor) and routes to `onDone` or `onError`. Notice the error path returns to `collecting` with the message in context instead of leaving the machine in a broken state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Run it in React",
+        "anchor": "react"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "tsx",
+        "caption": "useMachine plus snapshot checks",
+        "code": "import { useMachine } from '@xstate/react';\nimport { checkoutMachine } from './machines/checkoutMachine';\n\nexport function Checkout() {\n  const [snapshot, send] = useMachine(checkoutMachine);\n\n  if (snapshot.matches('confirmed')) return <p>Thanks! Confirmation sent.</p>;\n\n  return (\n    <form onSubmit={(e) => {\n      e.preventDefault();\n      const email = new FormData(e.currentTarget).get('email');\n      send({ type: 'SUBMIT', email: String(email) });\n    }}>\n      <input name=\"email\" type=\"email\" required disabled={snapshot.matches('validating')} />\n      {snapshot.context.error && <p role=\"alert\">{snapshot.context.error}</p>}\n      <button disabled={snapshot.matches('validating')}>\n        {snapshot.matches('validating') ? 'Validating…' : 'Submit'}\n      </button>\n    </form>\n  );\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "XState v5 changed the API",
+        "text": "`interpret()` was replaced by `createActor()` and `useMachine` from `@xstate/react`. Machines now use promise/logic actors (`fromPromise`, `fromCallback`) instead of services, and `state.matches` reads from a snapshot. Code written for v4 will not compile on v5."
       }
     },
     {
       "type": "mermaid",
       "data": {
-        "id": "mermaid-xstate-toggle",
-        "definition": "stateDiagram-v2\n    [*] --> inactive\n    inactive --> active: TOGGLE\n    active --> inactive: TOGGLE",
-        "caption": "Simple toggle state machine"
+        "id": "mermaid-xstate-checkout",
+        "caption": "Checkout machine: explicit states and transitions",
+        "definition": "flowchart TD\n    A[collecting] -->|SUBMIT| B[validating]\n    B -->|onDone| C[confirmed]\n    B -->|onError| A\n    C --> D[final]"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Install and visualise",
+        "content": "",
+        "code": "npm install xstate @xstate/react\nnpx @statelyai/inspect   # or paste the machine into stately.ai/viz",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Situation",
+          "State machine?"
+        ],
+        "rows": [
+          [
+            "A boolean toggle or modal",
+            "Not worth it — useState suffices"
+          ],
+          [
+            "Multi-step form with validation",
+            "Good fit"
+          ],
+          [
+            "Async request with retry and cancel",
+            "Good fit"
+          ],
+          [
+            "Global list of todos",
+            "Plain store is simpler"
+          ]
+        ]
       }
     },
     {
@@ -41,35 +115,58 @@
       "data": {
         "terms": [
           {
-            "term": "State machine",
-            "definition": "Finite set of states with transitions."
+            "term": "State",
+            "definition": "One of a finite set of modes the machine can be in, such as collecting or validating."
           },
           {
-            "term": "Statechart",
-            "definition": "Extended state machine with hierarchy."
+            "term": "Event",
+            "definition": "A message (SUBMIT, RETRY) that may trigger a transition."
           },
           {
-            "term": "Transition",
-            "definition": "Change from one state to another."
+            "term": "Context",
+            "definition": "Extended state that changes during transitions, such as the email value."
+          },
+          {
+            "term": "Actor",
+            "definition": "A running machine instance; in v5 you create it with createActor and read snapshots."
           }
         ]
       }
     },
     {
-      "type": "summary-box",
+      "type": "faq-block",
       "data": {
-        "title": "Key Takeaways",
         "items": [
           {
-            "text": "XState eliminates impossible states."
+            "question": "When is XState overkill?",
+            "answer": "When the behaviour is a single boolean or a list of independent values. State machines pay off when transitions are constrained by another piece of state and \"impossible\" combinations keep appearing in bug reports."
           },
           {
-            "text": "Visualize state machines with diagrams."
-          },
-          {
-            "text": "Great for complex async flows."
+            "question": "XState or useReducer?",
+            "answer": "useReducer is a state container without a statechart. It cannot describe guards, nested/parallel states, or async invocation, and it will happily accept an event that should be impossible."
           }
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Name a concrete flow (checkout, upload, onboarding) where a machine removed impossible states, and be able to explain context versus state and why actors replaced services in v5."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "States are finite; events cause transitions; context stores extended state.",
+          "invoke runs async actors and routes success and failure explicitly.",
+          "XState v5 uses createActor and snapshot.matches, not interpret.",
+          "Use machines for constrained workflows, not for every piece of state."
+        ],
+        "takeaway": "XState is the strongest answer when an interviewer asks how you prevent invalid states in a complex flow."
       }
     }
   ],

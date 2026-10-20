@@ -7,7 +7,7 @@
   "description": "Enforce required fields with NOT NULL, avoid locking high-traffic tables when adding NOT NULL, and use NOT VALID.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 25,
   "tags": [
     "not-null",
     "zero-downtime",
@@ -42,6 +42,97 @@
         "content": "Adding non-null constraint without locking the table.",
         "language": "sql",
         "code": "-- Step 1: Add check constraint marked as NOT VALID (instantaneous lock)\nALTER TABLE users \nADD CONSTRAINT chk_users_phone_not_null \nCHECK (phone IS NOT NULL) NOT VALID;\n\n-- Step 2: Validate the constraint concurrently without blocking writes\nALTER TABLE users \nVALIDATE CONSTRAINT chk_users_phone_not_null;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "`NULL` Is Not `NOT NULL`'s Only Problem"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`NOT NULL` stops missing values, but `NULL` still leaks into comparisons. Know the semantics cold, because interviewers ask about it constantly."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Three-Valued Logic in One Screen",
+        "content": "EXPLAIN nothing — just observe the results.",
+        "code": "SELECT NULL = NULL            AS eq,          -- NULL (unknown)\n       NULL IS NULL           AS is_null,     -- true\n       NULL IS NOT DISTINCT FROM NULL AS same, -- true\n       NULL <> 5              AS neq,         -- NULL\n       NULL AND false         AS and_false,   -- false\n       NULL OR  true          AS or_true,     -- true\n       coalesce(NULL, 'x')    AS coalesced,   -- x\n       nullif(0, 0)           AS nullif_col;  -- NULL\n\n-- A WHERE clause keeps only rows where the predicate is TRUE\n-- Rows in which the predicate is NULL are silently dropped.\nSELECT * FROM t WHERE nullable_col <> 5;      -- excludes NULL rows!\nSELECT * FROM t WHERE nullable_col IS DISTINCT FROM 5;  -- includes them",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The `NOT IN` / `NOT NULL` Trap",
+        "text": "`col NOT IN (SELECT nullable_col FROM other)` returns **no rows** if the subquery yields even one `NULL`, because `x <> NULL` is unknown for every row. Prefer `NOT EXISTS`, or add `WHERE other.nullable_col IS NOT NULL`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Zero-Downtime `NOT NULL` on a Large Table",
+        "content": "The canonical safe pattern: prove it with a check, then adopt it.",
+        "code": "-- 0. Never queue behind a long-running query\nSET lock_timeout = '3s';\n\n-- 1. Instant: add an unvalidated check\nALTER TABLE users\n  ADD CONSTRAINT users_phone_not_null\n  CHECK (phone IS NOT NULL) NOT VALID;\n\n-- 2. Validates existing rows with SHARE UPDATE EXCLUSIVE (reads/writes continue)\nALTER TABLE users VALIDATE CONSTRAINT users_phone_not_null;\n\n-- 3. PostgreSQL 12+ recognises the proven check and skips a new full scan\nALTER TABLE users ALTER COLUMN phone SET NOT NULL;\n\n-- 4. The check has done its job and can go\nALTER TABLE users DROP CONSTRAINT users_phone_not_null;\n\n-- On PostgreSQL 12+, SET NOT NULL alone no longer rewrites the table,\n-- but it still scans to verify, so step 3 is fast only after step 2.",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Two further details worth knowing: on PostgreSQL 11+ a `DEFAULT` does not make the column `NOT NULL`, and a `NOT NULL` constraint is checked **before** a `CHECK` constraint, so ordering matters only for which error message you see."
+      }
+    },
+    {
+      "type": "checklist",
+      "data": {
+        "title": "Adding a Required Column to a Busy Table",
+        "items": [
+          {
+            "text": "Set `lock_timeout` so the DDL does not queue behind a long query"
+          },
+          {
+            "text": "Add the column as nullable, with no default"
+          },
+          {
+            "text": "Backfill in batches; monitor with `pg_stat_activity`"
+          },
+          {
+            "text": "Add `CHECK ... NOT VALID` and then `VALIDATE CONSTRAINT`"
+          },
+          {
+            "text": "`ALTER COLUMN ... SET NOT NULL`, then set a `DEFAULT` for new inserts"
+          },
+          {
+            "text": "Drop the temporary check constraint"
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Does `NULL = NULL` evaluate to true?",
+            "answer": "No. It evaluates to `NULL` (unknown). Use `IS NULL` or `IS NOT DISTINCT FROM` for equality semantics that include nulls."
+          },
+          {
+            "question": "Why did my `NOT IN` query return nothing?",
+            "answer": "Almost certainly because the subquery contained a `NULL`. `x <> NULL` is unknown, so the predicate is never true. Switch to `NOT EXISTS`."
+          },
+          {
+            "question": "Is `NULL` stored at all?",
+            "answer": "Yes — as a null bitmap in the row header. A nullable column therefore has a small storage overhead relative to a `NOT NULL` column, which is one more reason to declare `NOT NULL` when the domain requires it."
+          }
+        ]
       }
     },
     {

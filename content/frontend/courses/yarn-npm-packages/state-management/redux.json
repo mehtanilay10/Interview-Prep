@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-024",
   "slug": "redux",
   "title": "Redux Toolkit",
-  "description": "Modern Redux with Redux Toolkit and RTK Query.",
+  "description": "Model state with slices, wire the store with react-redux, and fetch server data with RTK Query.",
   "order": 1,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 18,
   "tags": [
     "redux",
     "state",
@@ -17,51 +17,142 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Redux Toolkit is the official, opinionated toolset for efficient Redux development. It simplifies store setup, reducers, and async logic."
+        "text": "Redux keeps application state in one store that can only change through dispatched actions. Redux Toolkit (RTK) removes the classic boilerplate: `createSlice` writes actions and reducers together, and Immer lets reducers be written with mutable-looking code."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "A slice defines state and transitions",
+        "anchor": "slice"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/features/counter/counterSlice.ts",
+        "code": "import { createSlice, type PayloadAction } from '@reduxjs/toolkit';\n\ntype CounterState = { value: number };\n\nconst initialState: CounterState = { value: 0 };\n\nconst counterSlice = createSlice({\n  name: 'counter',\n  initialState,\n  reducers: {\n    increment(state) { state.value += 1; },          // Immer draft\n    decrement(state) { state.value -= 1; },\n    incrementBy(state, action: PayloadAction<number>) {\n      state.value += action.payload;\n    },\n  },\n});\n\nexport const { increment, decrement, incrementBy } = counterSlice.actions;\nexport const selectCount = (state: { counter: CounterState }) => state.counter.value;\nexport default counterSlice.reducer;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Return the draft or mutate it — not both",
+        "text": "Inside `createSlice` you can mutate `state` (Immer produces a new object) or return a new value, but mixing the two confuses the reader. Mutate the draft for consistency, and never mutate state outside a reducer."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The store and React bindings",
+        "anchor": "store-and-react"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/app/store.ts and a component using typed hooks",
+        "code": "import { configureStore } from '@reduxjs/toolkit';\nimport counterReducer from '../features/counter/counterSlice';\n\nexport const store = configureStore({ reducer: { counter: counterReducer } });\nexport type RootState = ReturnType<typeof store.getState>;\nexport type AppDispatch = typeof store.dispatch;\n\n// src/app/hooks.ts\nimport { useDispatch, useSelector } from 'react-redux';\nexport const useAppDispatch = useDispatch.withTypes<AppDispatch>();\nexport const useAppSelector = useSelector.withTypes<RootState>();"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "tsx",
+        "caption": "Wrapping the app and reading state",
+        "code": "import { Provider } from 'react-redux';\nimport { store } from './app/store';\nimport { useAppDispatch, useAppSelector } from './app/hooks';\nimport { increment } from './features/counter/counterSlice';\n\nfunction Counter() {\n  const count = useAppSelector((state) => state.counter.value);\n  const dispatch = useAppDispatch();\n  return <button onClick={() => dispatch(increment())}>count: {count}</button>;\n}\n\nexport function App() {\n  return <Provider store={store}><Counter /></Provider>;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Server state with RTK Query",
+        "anchor": "rtk-query"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "RTK Query treats remote data as a cache, not as hand-written loading flags. An API slice generates hooks with cache tags, so a mutation can invalidate the queries it affects."
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/features/api/apiSlice.ts",
+        "code": "import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';\n\nexport const api = createApi({\n  reducerPath: 'api',\n  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),\n  tagTypes: ['Product'],\n  endpoints: (build) => ({\n    getProducts: build.query<{ id: string; name: string }[], void>({\n      query: () => 'products',\n      providesTags: ['Product'],\n    }),\n    addProduct: build.mutation<void, { name: string }>({\n      query: (body) => ({ url: 'products', method: 'POST', body }),\n      invalidatesTags: ['Product'],\n    }),\n  }),\n});\n\nexport const { useGetProductsQuery, useAddProductMutation } = api;"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-redux-flow",
+        "caption": "Redux data flow: a dispatch becomes new state and a re-render",
+        "definition": "flowchart TD\n    A[UI component] --> B[dispatch action]\n    B --> C[Reducer slice]\n    C --> D[Immer draft produces new state]\n    D --> E[Store notifies subscribers]\n    E --> F[useSelector re-renders affected components]"
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "javascript",
-        "caption": "Create a slice with Redux Toolkit",
-        "code": "import { createSlice, configureStore } from \"@reduxjs/toolkit\";\n\nconst counterSlice = createSlice({\n  name: \"counter\",\n  initialState: 0,\n  reducers: {\n    increment: state => state + 1\n  }\n});\n\nconst store = configureStore({ reducer: counterSlice.reducer });"
+        "title": "Install and add the Redux DevTools middleware",
+        "content": "configureStore enables DevTools and thunk by default.",
+        "code": "npm install @reduxjs/toolkit react-redux\nnpm run dev   # inspect dispatched actions in the Redux DevTools browser extension",
+        "language": "bash"
       }
     },
     {
-      "type": "key-terms",
+      "type": "table",
       "data": {
-        "terms": [
-          {
-            "term": "Slice",
-            "definition": "Combines reducer and actions for a feature."
-          },
-          {
-            "term": "Store",
-            "definition": "Single source of truth."
-          },
-          {
-            "term": "RTK Query",
-            "definition": "Data fetching and caching built into Redux."
-          }
+        "headers": [
+          "Concern",
+          "Tool"
+        ],
+        "rows": [
+          [
+            "Client state",
+            "createSlice + react-redux"
+          ],
+          [
+            "Server state",
+            "RTK Query"
+          ],
+          [
+            "Async side effects",
+            "createAsyncThunk or RTK Query"
+          ],
+          [
+            "Debugging",
+            "Redux DevTools time travel"
+          ]
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Be precise about \"single source of truth, state is read-only, changes are made by pure reducers\". Then add the modern part: RTK removed the boilerplate, Immer provides the mutable syntax, and RTK Query separates client from server state."
       }
     },
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
-        "items": [
-          {
-            "text": "Redux Toolkit reduces boilerplate."
-          },
-          {
-            "text": "Immer enables mutable syntax."
-          },
-          {
-            "text": "RTK Query handles server state."
-          }
-        ]
+        "title": "Key takeaways",
+        "points": [
+          "createSlice combines actions and reducers; Immer enables draft mutation.",
+          "The store is created with configureStore and provided with <Provider>.",
+          "Typed useAppSelector/useAppDispatch hooks remove repeated generic annotations.",
+          "RTK Query caches server data and invalidates it with tags."
+        ],
+        "takeaway": "Redux is still tested heavily — describe the data flow and why Redux Toolkit changed the recommended way of writing it."
       }
     }
   ],

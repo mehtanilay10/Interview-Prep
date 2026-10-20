@@ -7,7 +7,7 @@
   "description": "Query pg_class, pg_attribute, and information_schema to inspect schemas, table sizes, and column definitions.",
   "order": 6,
   "difficulty": "intermediate",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 30,
   "tags": [
     "catalogs",
     "pg-class",
@@ -32,14 +32,147 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "`pg_catalog` vs. `information_schema`"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "PostgreSQL keeps every definition in the `pg_catalog` schema. The SQL-standard `information_schema` is a portable view layer on top of it. Interviewers like the distinction: `information_schema` is portable but slower and incomplete, while `pg_catalog` is PostgreSQL-specific and exposes everything."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Question",
+          "`pg_catalog` source",
+          "Portable alternative"
+        ],
+        "rows": [
+          [
+            "What tables exist?",
+            "`pg_class` where `relkind = 'r'`",
+            "`information_schema.tables`"
+          ],
+          [
+            "What columns and types?",
+            "`pg_attribute` joined to `pg_type`",
+            "`information_schema.columns`"
+          ],
+          [
+            "What is the default value?",
+            "`pg_attrdef` → `pg_get_expr()`",
+            "`column_default`"
+          ],
+          [
+            "Which indexes exist?",
+            "`pg_index` + `pg_class`",
+            "Not standardised"
+          ],
+          [
+            "Who can do what?",
+            "`relacl`, `pg_roles`",
+            "`information_schema.table_privileges`"
+          ],
+          [
+            "Table activity and bloat",
+            "`pg_stat_user_tables`",
+            "Not available"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The Queries You Will Actually Reuse"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Table Sizes: Heap, Indexes, TOAST, Total",
+        "content": "This is the query that answers \"where did all my disk go?\".",
+        "code": "SELECT n.nspname AS schema,\n       c.relname AS table_name,\n       pg_size_pretty(pg_relation_size(c.oid))                          AS heap,\n       pg_size_pretty(pg_indexes_size(c.oid))                           AS indexes,\n       pg_size_pretty(pg_total_relation_size(c.oid))                    AS total\nFROM pg_class c\nJOIN pg_namespace n ON n.oid = c.relnamespace\nWHERE c.relkind = 'r'\n  AND n.nspname = 'public'\nORDER BY pg_total_relation_size(c.oid) DESC\nLIMIT 10;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Introspect Columns and Constraints",
+        "content": "Replaces guessing at a schema you did not write.",
+        "code": "SELECT column_name, data_type, is_nullable, column_default\nFROM information_schema.columns\nWHERE table_schema = 'public' AND table_name = 'orders'\nORDER BY ordinal_position;\n\n-- Constraints with their definitions, straight from the catalog\nSELECT con.conname,\n       con.contype,                 -- p=PK, f=FK, u=unique, c=check, x=exclusion\n       pg_get_constraintdef(con.oid) AS definition\nFROM pg_constraint con\nJOIN pg_class c ON c.oid = con.conrelid\nWHERE c.relname = 'orders';\n\n-- Every index on a table, including expression and partial indexes\nSELECT indexname, indexdef FROM pg_indexes\nWHERE schemaname = 'public' AND tablename = 'orders';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Live Table Activity",
+        "content": "The starting point for any bloat or vacuum investigation.",
+        "code": "SELECT relname,\n       seq_scan, idx_scan,\n       n_live_tup, n_dead_tup,\n       round(100.0 * n_dead_tup / GREATEST(n_live_tup + n_dead_tup, 1), 1) AS dead_pct,\n       last_vacuum, last_autovacuum\nFROM pg_stat_user_tables\nORDER BY n_dead_tup DESC\nLIMIT 10;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Why This Matters",
+        "text": "Almost every \"the database is slow\" investigation starts with catalog queries: which table is biggest, which index is unused (`idx_scan = 0`), and how much dead tuple bloat exists. Being fluent here is a strong senior-engineer signal."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Build a Schema Report",
+        "description": "Write one query that lists each table with its size, row estimate, index count, and dead-tuple percentage.",
+        "steps": [
+          "Join `pg_class`, `pg_namespace`, and `pg_stat_user_tables`.",
+          "Use `pg_total_relation_size` and `pg_size_pretty` for size.",
+          "Count indexes from `pg_index` filtered by `indrelid`.",
+          "Order by total size descending and run it against a database with real data."
+        ],
+        "expectedOutcome": "A reusable health report you could paste into a runbook."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Should I query `information_schema` or `pg_catalog`?",
+            "answer": "Use `information_schema` for portable, simple questions; use `pg_catalog` when you need PostgreSQL-specific detail such as index definitions, dead tuple counts, or physical sizes."
+          },
+          {
+            "question": "How do I find unused indexes?",
+            "answer": "`SELECT relname, indexrelname, idx_scan FROM pg_stat_statements`-adjacent views — specifically `pg_stat_user_indexes WHERE idx_scan = 0`. Drop them only after confirming the statistics window covers a full business cycle (call `pg_stat_reset()` and re-measure)."
+          },
+          {
+            "question": "Why is a table bigger than the sum of its rows?",
+            "answer": "Dead tuples from MVCC, page padding, TOAST data, and indexes. Use `pgstattuple` for a precise live/dead breakdown."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "PostgreSQL's system catalogs (`pg_class`, `pg_stat_user_tables`) provide deep introspective metadata.",
-          "Use `pg_size_pretty()` to format byte counts into human-readable MB/GB.",
-          "System catalogs power database migration tools, ORM introspection, and DBA dashboards."
-        ]
+          "All schema metadata lives in `pg_catalog`; `information_schema` is a portable view over it.",
+          "`pg_total_relation_size` = heap + indexes + TOAST; always look at all three when sizing a table.",
+          "`pg_get_constraintdef` and `pg_get_indexdef` give you back the exact DDL to recreate an object.",
+          "`pg_stat_user_tables` exposes scans, live/dead tuples, and last vacuum — the entry point for tuning."
+        ],
+        "takeaway": "Being able to introspect a foreign schema with catalog queries is one of the most practical skills in this module."
       }
     }
   ],

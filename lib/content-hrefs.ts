@@ -12,7 +12,7 @@
  * importing these helpers from `@/lib/content`.
  */
 
-import { COURSE_URL_CATEGORY, PROBLEM_COURSE_SLUGS } from '@/content/categories';
+import { COURSE_URL_CATEGORY, PROBLEM_COURSE_SLUGS, INTERVIEW_TECH_CATEGORY, INTERVIEW_LESSON_TECH } from '@/content/categories';
 import type { SearchResult } from '@/types';
 
 // ── Course category / problem lookups ────────────────────────────────────────
@@ -117,9 +117,12 @@ export function getContentItemHref(
   lessonSlug?: string | null
 ): string {
   if (courseSlug === 'interview-qa') {
-    return moduleSlug && lessonSlug
-      ? `/interview-questions/${moduleSlug}/${lessonSlug}`
-      : '/interview-questions';
+    const tech = getInterviewTechnologySlug(moduleSlug, lessonSlug);
+    const category = tech ? getInterviewTechCategory(tech) : undefined;
+    if (!tech || !category) return '/';
+    return lessonSlug
+      ? `/${category}/interview-questions/${tech}/${lessonSlug}`
+      : `/${category}/interview-questions/${tech}`;
   }
 
   // Cheatsheets: one lesson per technology module; the category is derived
@@ -148,10 +151,15 @@ export function getContentItemHref(
 /**
  * Display name → URL slug for every interview technology.
  *
+ * The interview technology slug is also the module slug, so the same value is
+ * used in the content tree (`content/<category>/interview-qa/<slug>/`) and in
+ * the URL (`/<category>/interview-questions/<slug>/`). The generated
+ * `INTERVIEW_LESSON_TECH` map is authoritative for runtime lookups; this map
+ * only converts a lesson's display name into a slug.
+ *
  * Maintenance rule: when adding a new interview question technology, update
- * this map (and `TECH_NAME_MAP` below) alongside the lesson JSON `technology`
- * field. Slugs that need no special casing may be omitted — they fall back to
- * a generic slugify — but entries here keep historical URLs stable.
+ * this map alongside the lesson JSON `technology` field. Slugs that need no
+ * special casing may be omitted — they fall back to a generic slugify.
  */
 const TECH_SLUG_MAP: Record<string, string> = {
   'c#': 'csharp',
@@ -172,26 +180,6 @@ const TECH_SLUG_MAP: Record<string, string> = {
   'security': 'security',
 };
 
-/** URL slug → display name (the inverse of {@link TECH_SLUG_MAP}). */
-const TECH_NAME_MAP: Record<string, string> = {
-  csharp: 'C#',
-  'aspnet-core': 'ASP.NET Core',
-  oop: 'OOP',
-  javascript: 'JavaScript',
-  general: 'General',
-  'system-design': 'System Design',
-  behavioral: 'Behavioral',
-  'sql-server': 'SQL Server',
-  'fullstack-scenarios': 'Full-Stack Scenarios',
-  'performance-optimization': 'Performance Optimization',
-  'cicd-pipelines': 'CI/CD Pipelines',
-  'entity-framework-core': 'Entity Framework Core',
-  'backend-database': 'Backend & Database',
-  react: 'React',
-  architecture: 'architecture',
-  security: 'security',
-};
-
 /** URL-safe fallback for technologies without an explicit map entry. */
 function fallbackTechSlug(technology: string): string {
   return technology
@@ -206,9 +194,25 @@ export function getInterviewTechSlug(technology: string): string {
   return TECH_SLUG_MAP[key] ?? fallbackTechSlug(key);
 }
 
-/** Converts an interview technology URL slug (e.g. "csharp") back to its display name. */
-export function getInterviewTechName(slug: string): string {
-  return TECH_NAME_MAP[slug] ?? slug;
+/** The content category an interview technology lives in (e.g. "backend"). */
+export function getInterviewTechCategory(technologySlug: string): string | undefined {
+  return INTERVIEW_TECH_CATEGORY[technologySlug];
+}
+
+/**
+ * Resolves the technology that owns an interview question.
+ *
+ * `moduleSlug` is the technology slug for records created after the
+ * category-first restructure. Records created before it stored the old
+ * level-based module slug, so the question slug is used as a fallback.
+ */
+function getInterviewTechnologySlug(
+  moduleSlug?: string | null,
+  lessonSlug?: string | null
+): string | undefined {
+  if (lessonSlug && INTERVIEW_LESSON_TECH[lessonSlug]) return INTERVIEW_LESSON_TECH[lessonSlug];
+  if (moduleSlug && INTERVIEW_TECH_CATEGORY[moduleSlug]) return moduleSlug;
+  return moduleSlug ?? undefined;
 }
 
 // ── Search result hrefs ──────────────────────────────────────────────────────
@@ -219,8 +223,15 @@ export function getSearchResultHref(result: SearchResult): string {
     if (isProblemCourseSlug(result.courseSlug)) {
       return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
     }
-    if (result.courseSlug === 'interview-qa' && result.technology) {
-      return `/interview-questions/${getInterviewTechSlug(result.technology)}/${result.slug}`;
+    if (result.courseSlug === 'interview-qa') {
+      const tech =
+        getInterviewTechnologySlug(result.moduleSlug, result.slug) ??
+        (result.technology ? getInterviewTechSlug(result.technology) : undefined);
+      const techCategory = tech ? getInterviewTechCategory(tech) : undefined;
+      if (tech && techCategory) {
+        return `/${techCategory}/interview-questions/${tech}/${result.slug}`;
+      }
+      return '/';
     }
     if (result.courseSlug === 'cheatsheet') {
       return `/${category}/cheatsheets/${result.slug}`;
@@ -233,6 +244,10 @@ export function getSearchResultHref(result: SearchResult): string {
     if (result.courseSlug === 'cheatsheet') {
       return `/${category}/cheatsheets/${result.slug}`;
     }
+    if (result.courseSlug === 'interview-qa') {
+      const techCategory = getInterviewTechCategory(result.slug);
+      return techCategory ? `/${techCategory}/interview-questions/${result.slug}` : '/';
+    }
     if (isProblemCourseSlug(result.courseSlug)) {
       return `/${category}/problems/${result.courseSlug}/${result.slug}`;
     }
@@ -240,8 +255,10 @@ export function getSearchResultHref(result: SearchResult): string {
   }
 
   if (result.type === 'course') {
+    // The interview-qa pseudo-course has no landing page of its own — its
+    // questions are listed per category.
     if (result.slug === 'interview-qa') {
-      return '/interview-questions';
+      return '/';
     }
     const category = getCourseCategory(result.slug);
     if (isProblemCourseSlug(result.slug)) {

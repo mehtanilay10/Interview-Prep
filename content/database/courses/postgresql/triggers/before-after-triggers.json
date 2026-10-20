@@ -31,6 +31,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Statement-Level Triggers for Bulk Auditing"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A row-level trigger runs once per affected row, so a statement that updates a million rows calls it a million times. A statement-level trigger runs once for the whole statement and uses transition tables (`REFERENCING NEW TABLE AS ...`) to see every affected row at once, which is far cheaper for bulk operations."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Auditing a whole statement in one call",
+        "content": "The transition table `changed` holds every row the UPDATE touched; the trigger writes one audit row per changed record in a single INSERT.",
+        "language": "sql",
+        "code": "CREATE OR REPLACE FUNCTION audit_bulk_change()\nRETURNS trigger\nLANGUAGE plpgsql\nAS $$\nBEGIN\n    INSERT INTO orders_audit (operation, order_id, changed_at)\n    SELECT TG_OP, order_id, now()\n    FROM changed;\n\n    RETURN NULL;\nEND $$;\n\nCREATE TRIGGER trg_orders_audit_bulk\nAFTER UPDATE ON orders\nREFERENCING NEW TABLE AS changed\nFOR EACH STATEMENT\nEXECUTE FUNCTION audit_bulk_change();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Choose BEFORE to mutate, AFTER to react",
+        "text": "Use `BEFORE` when you need to change the row that is about to be written or reject it by returning `NULL`. Use `AFTER` when the write has already happened and you want to log it, update a summary table, or notify another system. A `BEFORE` trigger that returns `NULL` silently cancels the row, which is easy to miss during debugging."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

@@ -1,5 +1,5 @@
 {
-  "id": "lesson-nuget-024",
+  "id": "lesson-nuget-608",
   "slug": "background-service",
   "moduleSlug": "messaging-events",
   "courseSlug": "dotnet-nuget-packages",
@@ -71,6 +71,35 @@
         "variant": "warning",
         "title": "Graceful Shutdown",
         "text": "Always respect the `stoppingToken` in your ExecuteAsync loop to allow graceful shutdown."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Scoped Work Inside a Singleton Host"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A `BackgroundService` is a singleton, so it cannot inject a scoped service directly. Instead it creates a scope from `IServiceScopeFactory` for each unit of work, which gives it the same per-request lifetime semantics as the web pipeline. `IHostedService` registers alongside the web host, so it starts and stops with the application."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "language": "csharp",
+        "title": "A background worker with a scope per iteration",
+        "content": "public sealed class OutboxPublisher(\n    IServiceScopeFactory scopeFactory,\n    ILogger<OutboxPublisher> logger) : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            using (var scope = scopeFactory.CreateScope())\n            {\n                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n\n                var pending = await db.Outbox\n                    .Where(m => m.PublishedAt == null)\n                    .Take(50)\n                    .ToListAsync(stoppingToken);\n\n                foreach (var message in pending)\n                {\n                    // publish and mark as sent\n                }\n            }\n\n            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);\n        }\n    }\n}\n\nbuilder.Services.AddHostedService<OutboxPublisher>();"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Handle the stop signal and exceptions",
+        "text": "The loop must observe `stoppingToken` so shutdown is graceful, or the host waits for the timeout. An unhandled exception inside `ExecuteAsync` stops the worker permanently in some hosts, so wrap each iteration in a `try/catch`, log the failure, and continue. Sleeping without the token is the other common mistake, because it delays shutdown."
       }
     },
     {

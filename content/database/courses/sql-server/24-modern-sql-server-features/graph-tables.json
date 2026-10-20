@@ -1,0 +1,120 @@
+{
+  "id": "lesson-sql-188",
+  "slug": "graph-tables",
+  "moduleSlug": "modern-sql-server-features",
+  "courseSlug": "sql-server",
+  "title": "Graph Tables",
+  "description": "Model nodes and edges with SQL Server graph tables and traverse relationships with MATCH.",
+  "order": 8,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": [
+    "graph",
+    "node",
+    "edge",
+    "match",
+    "many-to-many"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Graph Tables"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "SQL Server 2017 added graph tables for many-to-many relationships that are awkward to model with junction tables. A node table represents entities; an edge table represents relationships between nodes. Under the hood they are still tables with hidden columns (`$node_id`, `$edge_id`, `$from_id`, `$to_id`), so they participate in transactions, backups, and security like any other table. The `MATCH` predicate expresses traversal patterns that would otherwise need recursive CTEs."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sqlserver-graph-model",
+        "caption": "Person nodes are connected by Friend edges; each edge stores the relationship attributes and references its two endpoint nodes.",
+        "definition": "flowchart TD\n    P1[\"Person\\nAda\"] -->|Friend since 2024| P2[\"Person\\nGrace\"]\n    P2 -->|Friend since 2023| P3[\"Person\\nAlan\"]\n    P1 -->|Friend since 2022| P3\n    P1 --- N1[\"NODE table dbo.Person\"]\n    P2 --- N1\n    P3 --- N1\n    E1[\"EDGE table dbo.Friend\\nSince\"] --- P1\n    E1 --- P2"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create Node and Edge Tables"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Node tables use `AS NODE`; edge tables use `AS EDGE`. You can add ordinary columns to both. Edge tables can also have edge constraints (SQL Server 2019+) that restrict which node tables an edge may connect."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Person nodes and Friend edges",
+        "content": "Insert nodes first, then insert edges by selecting the generated `$node_id` values from the node table.",
+        "language": "sql",
+        "code": "CREATE TABLE dbo.Person\n(\n    PersonId INT NOT NULL PRIMARY KEY,\n    Name     NVARCHAR(100) NOT NULL\n) AS NODE;\nGO\n\nCREATE TABLE dbo.Friend\n(\n    Since DATE NULL\n) AS EDGE;\nGO\n\nINSERT INTO dbo.Person (PersonId, Name)\nVALUES (1, N'Ada'), (2, N'Grace'), (3, N'Alan');\n\nINSERT INTO dbo.Friend ($from_id, $to_id, Since)\nSELECT p1.$node_id, p2.$node_id, '2024-01-01'\nFROM dbo.Person AS p1\nJOIN dbo.Person AS p2\n    ON p2.PersonId = 2\nWHERE p1.PersonId = 1;\n\nINSERT INTO dbo.Friend ($from_id, $to_id, Since)\nSELECT p1.$node_id, p2.$node_id, '2022-06-15'\nFROM dbo.Person AS p1\nJOIN dbo.Person AS p2\n    ON p2.PersonId = 3\nWHERE p1.PersonId = 1;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Traverse with MATCH"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Direct friends and friends of friends",
+        "content": "The first query returns Ada's direct friends. The second chains two edge patterns to reach friends of friends.",
+        "language": "sql",
+        "code": "-- Direct friends\nSELECT\n    p1.Name AS person,\n    p2.Name AS friend,\n    f.Since\nFROM dbo.Person AS p1, dbo.Friend AS f, dbo.Person AS p2\nWHERE MATCH(p1-(f)->p2)\n  AND p1.PersonId = 1;\n\n-- Friends of friends\nSELECT\n    p1.Name AS person,\n    p3.Name AS friend_of_friend\nFROM dbo.Person AS p1,\n     dbo.Friend AS f1,\n     dbo.Person AS p2,\n     dbo.Friend AS f2,\n     dbo.Person AS p3\nWHERE MATCH(p1-(f1)->p2-(f2)->p3)\n  AND p1.PersonId = 1\n  AND p3.PersonId <> p1.PersonId;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "SHORTEST_PATH and edge constraints",
+        "text": "`MATCH` supports `SHORTEST_PATH` for shortest-path queries between two nodes, and SQL Server 2019 added edge constraints so an edge table can only connect specific node tables. Both features are useful, but they change how the optimizer plans the query — test with realistic graph sizes."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: graph tables vs a junction table",
+        "text": "A junction table plus recursive CTE can model the same relationships and is often simpler for fixed-depth queries. Graph tables become attractive when relationships are first-class (multiple edge types and attributes), when queries traverse variable-depth paths, and when you want the traversal expressed declaratively. They are not a graph database: there is no distributed traversal engine, and deep traversals can still be expensive."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Takeaways"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Graph Tables Key Points",
+        "points": [
+          "Node tables use AS NODE; edge tables use AS EDGE and carry the relationship attributes.",
+          "Hidden columns $node_id, $edge_id, $from_id, and $to_id identify endpoints.",
+          "Insert edges by selecting the node ids from the node table.",
+          "MATCH expresses traversal patterns with a visual arrow syntax.",
+          "Chained MATCH patterns and SHORTEST_PATH handle multi-hop queries.",
+          "Graph tables are still tables: they participate in transactions, backups, and security."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [
+    "how-the-query-optimizer-chooses-a-plan",
+    "execution-plans"
+  ]
+}

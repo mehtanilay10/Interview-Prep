@@ -32,6 +32,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Column-Level Encryption with pgcrypto"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Volume encryption protects the disk, but anyone who queries the database still sees plaintext. Field-level encryption with `pgcrypto` protects the value itself, so a leaked backup or a query with broad privileges still shows ciphertext. The trade-off is that encrypted columns cannot be indexed or range-queried normally, since the same plaintext encrypts to different bytes each time."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Encrypt and decrypt a sensitive column",
+        "content": "A random initialization vector is stored alongside the ciphertext. Decryption requires the key, which should come from a KMS or a session parameter, not a literal in the SQL.",
+        "language": "sql",
+        "code": "CREATE EXTENSION IF NOT EXISTS pgcrypto;\n\nALTER TABLE patients ADD COLUMN ssn_enc bytea;\n\n-- Encrypt on write (key supplied by the application, not hard-coded)\nUPDATE patients\nSET ssn_enc = pgp_sym_encrypt(ssn, current_setting('app.enc_key'))\nWHERE ssn IS NOT NULL;\n\n-- Decrypt on read for authorised users only\nSELECT\n    id,\n    pgp_sym_decrypt(ssn_enc, current_setting('app.enc_key')) AS ssn\nFROM patients\nWHERE id = 42;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Key management is the hard part",
+        "text": "Encrypting the column is easy; protecting the key is the real problem. If the key lives in the same database, the same backup, or the application config, the encryption adds little. In practice the key belongs in a managed KMS and should be fetched at runtime, rotated on a schedule, and never written into SQL text or logs. Also decide deliberately whether you can accept losing the ability to index and search that column."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

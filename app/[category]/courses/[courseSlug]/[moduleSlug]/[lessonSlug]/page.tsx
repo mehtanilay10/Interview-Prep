@@ -37,6 +37,12 @@ interface Params {
   params: Promise<{ category: string; courseSlug: string; moduleSlug: string; lessonSlug: string }>;
 }
 
+// Every lesson is prerendered to a static file at build time. This is safe for
+// Vercel's per-deployment route limit (2048) only because `cacheComponents` is
+// disabled in next.config.ts: without it, statically generated pages are emitted
+// as static assets rather than as counted route entries. Do NOT re-enable
+// `cacheComponents` while prerendering all lessons here, or the route count
+// will exceed the limit again.
 export async function generateStaticParams() {
   const courses = getAllCourses();
   return courses.flatMap((c) => {

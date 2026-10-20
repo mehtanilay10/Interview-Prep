@@ -44,6 +44,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Maintaining Partitions Automatically"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A partitioned table only stores data in partitions that exist, so an insert with a partition key outside every bound fails until you create the matching partition. In practice you create future partitions ahead of time — with a scheduled job or a tool like `pg_partman` — so writes never hit a missing range. Old partitions are expired by dropping them, which is a metadata operation rather than a large `DELETE`."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Attach a future partition and drop an expired one",
+        "content": "Creating partitions for future months ahead of time keeps inserts from failing. Detaching and dropping a whole partition is instant compared to deleting its rows.",
+        "language": "sql",
+        "code": "-- Create next month's partition before writes need it\nCREATE TABLE orders_2024_07 PARTITION OF orders\nFOR VALUES FROM ('2024-07-01') TO ('2024-08-01');\n\n-- Confirm pruning: only the July partition is read\nEXPLAIN (COSTS false)\nSELECT count(*)\nFROM orders\nWHERE ordered_at >= DATE '2024-07-01'\n  AND ordered_at <  DATE '2024-08-01';\n\n-- Expire an old partition in O(1) instead of a huge DELETE\nALTER TABLE orders DETACH PARTITION orders_2023_01;\nDROP TABLE orders_2023_01;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Pruning needs the partition key in the predicate",
+        "text": "If the query does not filter on the partition key, the planner must scan every partition, so a partitioned table can be slower than a single table because of the extra planning and per-partition overhead. Filter or join on the partition column directly, avoid wrapping it in a function, and remember that a partition index is a local index: it does not speed a query that spans every partition."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

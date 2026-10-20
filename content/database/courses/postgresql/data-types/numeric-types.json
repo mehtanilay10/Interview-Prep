@@ -7,7 +7,7 @@
   "description": "Master SMALLINT, INTEGER, BIGINT, NUMERIC/DECIMAL, REAL, and DOUBLE PRECISION for scientific and financial accuracy.",
   "order": 1,
   "difficulty": "beginner",
-  "estimatedMinutes": 20,
+  "estimatedMinutes": 30,
   "tags": [
     "data-types",
     "numeric",
@@ -79,14 +79,146 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Integer Types in Practice"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Integers are exact and fast. The only real decision is how big they need to be. A `SMALLINT` column that later hits 32,767 rows is a production incident, so the safe default for identifiers is `BIGINT` — 8 bytes is cheap, and running out of `INTEGER` range on a busy table is not."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Integer Arithmetic, Overflow, and Casting",
+        "content": "PostgreSQL raises an error on overflow rather than silently wrapping.",
+        "code": "SELECT 2147483647::int + 1;\n-- ERROR:  integer out of range\n\nSELECT (2147483647::int + 1)::bigint;   -- correct: widen before adding\n\n-- Division of integers truncates: watch out in averages\nSELECT 7 / 2 AS integer_division,          -- 3\n       7::numeric / 2 AS exact_division;    -- 3.5\n\n-- Rounding helpers\nSELECT round(2.5::numeric, 0) AS half_up,   -- 3 (numeric rounds half away from zero)\n       trunc(2.9)             AS truncated; -- 2\n\n-- Casting text to integer is strict: '12abc' raises an error\nSELECT '12abc'::integer;                    -- ERROR: invalid input syntax",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Never Use `FLOAT` for Money"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Binary floating point cannot represent 0.1 exactly. Sum enough of them and the error becomes visible — the classic `0.1 + 0.2 = 0.30000000000000004` problem. `NUMERIC(p, s)` stores a scaled integer with an exact decimal scale, so currency arithmetic is exact."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "The Float Trap and the Numeric Fix",
+        "content": "A one-cent discrepancy in a payments table is a bug report.",
+        "code": "-- Float accumulates error\nSELECT 0.1::float8 + 0.2::float8 = 0.3::float8;   -- false\n\n-- NUMERIC is exact\nSELECT 0.1::numeric + 0.2::numeric = 0.3::numeric; -- true\n\nCREATE TABLE invoices (\n    id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    amount   NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),   -- max 9,999,999,999.99\n    tax_rate NUMERIC(5, 4)  NOT NULL DEFAULT 0.2000\n);\n\nINSERT INTO invoices (amount) VALUES (19.99), (5.01);\nSELECT sum(amount) AS exact_total FROM invoices;   -- 25.00\n\n-- NUMERIC division: set the scale explicitly\nSELECT round(19.99::numeric * 0.20, 2) AS tax;      -- 4.00",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Choosing a Type: A Decision Table"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Need",
+          "Use",
+          "Avoid"
+        ],
+        "rows": [
+          [
+            "Surrogate key on a growing table",
+            "`BIGINT GENERATED ALWAYS AS IDENTITY`",
+            "`INTEGER`, `SMALLINT`"
+          ],
+          [
+            "Money / quantities where cents matter",
+            "`NUMERIC(p, s)`",
+            "`REAL`, `DOUBLE PRECISION`"
+          ],
+          [
+            "Scientific measurements, coordinates",
+            "`DOUBLE PRECISION`",
+            "`NUMERIC` (slow, unnecessary precision)"
+          ],
+          [
+            "Boolean flags",
+            "`BOOLEAN`",
+            "`SMALLINT` / `CHAR(1)`"
+          ],
+          [
+            "Percentages with fixed scale",
+            "`NUMERIC(5, 4)`",
+            "Float"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "The expected answer to \"which numeric type would you use for money?\" is `NUMERIC` (alias `DECIMAL`), because binary floating point cannot represent decimal fractions exactly. Add that `NUMERIC` is slower than `BIGINT`, so some teams store **integer minor units** (cents) instead — both are correct, and naming the trade-off is what earns the point."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Prove the Float Problem",
+        "description": "Demonstrate floating-point error and fix it.",
+        "steps": [
+          "Insert 100 rows of `0.1::real` into a table and sum them.",
+          "Compare the result with `100 * 0.1::numeric`.",
+          "Explain in one sentence why the values differ.",
+          "Design an `accounts` table with a `balance NUMERIC(14,2)` and a `CHECK (balance >= 0)` constraint."
+        ],
+        "expectedOutcome": "You can reproduce and explain binary floating-point rounding on demand."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Is `INTEGER` faster than `BIGINT`?",
+            "answer": "Marginally: 4 vs 8 bytes affects cache density and index size, but on modern hardware that rarely justifies the risk of overflow. Use `BIGINT` for identifiers and `INTEGER`/`SMALLINT` for small enumerated values."
+          },
+          {
+            "question": "What is `MONEY` and why is it discouraged?",
+            "answer": "A built-in type with locale-dependent formatting and fixed scale of 4. It is tied to `lc_monetary`, which makes it fragile across environments; `NUMERIC(12,2)` is more portable and explicit."
+          },
+          {
+            "question": "Does `NUMERIC` waste storage?",
+            "answer": "It uses a variable-length decimal representation, roughly 4 bytes per 4 digits plus overhead. It is more expensive than `BIGINT` but exact — use it where exactness is required."
+          }
+        ]
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",
         "points": [
-          "Always use `NUMERIC / DECIMAL` for currency to prevent floating point drift.",
-          "Use `BIGINT` for auto-incrementing primary keys on high-velocity tables.",
-          "Use `SMALLINT` for constrained lookup values to save cache memory."
-        ]
+          "Use `BIGINT GENERATED ALWAYS AS IDENTITY` for primary keys; `SMALLINT` only for small, bounded code values.",
+          "`NUMERIC`/`DECIMAL` is exact and is the correct choice for money; floating point is not.",
+          "Integer division truncates — cast to `NUMERIC` before dividing when you need a fraction.",
+          "PostgreSQL errors on integer overflow rather than silently wrapping."
+        ],
+        "takeaway": "Money → `NUMERIC`. IDs → `BIGINT`. Science → `DOUBLE PRECISION`. That is the whole interview answer."
       }
     }
   ],

@@ -31,6 +31,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Expression Indexes for Case-Insensitive Lookups"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An expression index stores the result of an expression, so the query must use the exact same expression to benefit. The classic case is case-insensitive email lookup: index `lower(email)` and write `WHERE lower(email) = lower($1)`. The index works on any expression PostgreSQL can compute deterministically, including `date_trunc` and JSON path extraction."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Index the expression the query actually uses",
+        "content": "The index matches `lower(email)`, so the lookup becomes an index scan instead of a sequential scan with a function filter.",
+        "language": "sql",
+        "code": "CREATE UNIQUE INDEX ux_users_lower_email\nON users (lower(email));\n\nEXPLAIN ANALYZE\nSELECT id, email\nFROM users\nWHERE lower(email) = lower('Ada@Example.com');\n-- Index Scan using ux_users_lower_email on users\n--   Index Cond: (lower(email) = 'ada@example.com')\n\n-- Partial + expression combined: only active rows, indexed by month\nCREATE INDEX idx_orders_active_month\nON orders (date_trunc('month', created_at))\nWHERE status = 'ACTIVE';"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "The expression must match exactly",
+        "text": "PostgreSQL only uses an expression index when the query contains an expression it can prove equivalent to the indexed one. `WHERE upper(email) = ...` will not use an index on `lower(email)`. Keep the exact form in a reusable predicate or view so application code and the index do not drift apart."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

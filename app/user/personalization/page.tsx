@@ -1,7 +1,8 @@
 import { Metadata } from 'next';
-import { getCurrentUser, requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { PersonalizationClient } from './PersonalizationClient';
+import { getCategoryMeta, getInterviewCategories } from '@/lib/content';
+import { PersonalizationClient, type LandingPageOption } from './PersonalizationClient';
 
 export const metadata: Metadata = {
   title: 'Personalization | Interview Prep',
@@ -14,6 +15,17 @@ export default async function PersonalizationPage() {
     redirect('/user/login');
   }
 
+  // Interview questions are category-first, so every category that hosts them
+  // is offered as a landing destination.
+  const landingPages: LandingPageOption[] = [
+    { value: '/', label: 'Home' },
+    { value: '/roadmaps', label: 'Roadmaps' },
+    ...getInterviewCategories().map((category) => ({
+      value: `/${category}/interview-questions`,
+      label: `${getCategoryMeta(category).label} Interview Questions`,
+    })),
+  ];
+
   return (
     <PersonalizationClient
       user={{
@@ -22,6 +34,7 @@ export default async function PersonalizationPage() {
         email: user.email ?? null,
         image: user.image ?? null,
       }}
+      landingPages={landingPages}
     />
   );
 }

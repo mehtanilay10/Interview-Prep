@@ -7,7 +7,7 @@
   "description": "Store, query, and index JSONB documents and native PostgreSQL arrays using operators ->, ->>, @>, and GIN indexing.",
   "order": 4,
   "difficulty": "intermediate",
-  "estimatedMinutes": 30,
+  "estimatedMinutes": 35,
   "tags": [
     "jsonb",
     "arrays",
@@ -85,6 +85,163 @@
         "content": "Creating a GIN index and querying via the containment operator @>.",
         "language": "sql",
         "code": "-- 1. Create table with JSONB column\nCREATE TABLE event_logs (\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n    payload JSONB NOT NULL\n);\n\n-- 2. Create GIN index for containment queries\nCREATE INDEX idx_logs_payload_gin ON event_logs USING gin (payload);\n\n-- 3. High-performance containment search (uses GIN index!)\nSELECT id, payload->>'action' AS action\nFROM event_logs\nWHERE payload @> '{\"user\": {\"tier\": \"enterprise\"}}';"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "JSON vs. JSONB: The Practical Difference"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "`JSON`",
+          "`JSONB`"
+        ],
+        "rows": [
+          [
+            "Storage",
+            "Original text",
+            "Parsed binary tree"
+          ],
+          [
+            "Duplicated keys",
+            "Kept as written",
+            "Last value wins; duplicates dropped"
+          ],
+          [
+            "Key order",
+            "Preserved",
+            "Not preserved"
+          ],
+          [
+            "Whitespace",
+            "Preserved",
+            "Removed"
+          ],
+          [
+            "Indexing",
+            "Only expression indexes on extracted paths",
+            "Full GIN index support, containment, key existence"
+          ],
+          [
+            "Equality operator",
+            "No",
+            "Yes, `=` works"
+          ],
+          [
+            "Write cost",
+            "Cheaper (no parse)",
+            "Higher (parse and normalise)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Choose `JSONB` almost always. The only common reason to keep `JSON` is that you must reproduce the exact input bytes (for example, to verify a signature over the original document)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Querying JSONB Without Fooling Yourself"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Navigation, Containment, and Path Queries",
+        "content": "Note which expressions can use a GIN index.",
+        "code": "CREATE TABLE events (\n    id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    payload JSONB NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nINSERT INTO events (payload) VALUES\n  ('{\"action\":\"login\",\"user\":{\"id\":42,\"tier\":\"pro\"},\"tags\":[\"web\",\"mfa\"]}'),\n  ('{\"action\":\"purchase\",\"user\":{\"id\":42,\"tier\":\"pro\"},\"total\":19.99}');\n\n-- -> returns jsonb, ->> returns text (compare to strings with ->>)\nSELECT payload->>'action'        AS action,\n       payload->'user'->>'tier'  AS tier,\n       payload#>>'{user,id}'     AS user_id,\n       (payload->'user'->>'id')::int AS user_id_int\nFROM events;\n\n-- Containment @> is GIN-indexable\nSELECT * FROM events WHERE payload @> '{\"user\":{\"tier\":\"pro\"}}';\n\n-- Key existence (also GIN-indexable)\nSELECT * FROM events WHERE payload ? 'total';\n\n-- Array membership\nSELECT * FROM events WHERE payload->'tags' ? 'mfa';",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Building and Updating JSONB",
+        "content": "Read-modify-write without replacing the whole document.",
+        "code": "-- Build documents\nSELECT jsonb_build_object('id', 1, 'tags', jsonb_build_array('a','b'));\nSELECT jsonb_object_agg(id, payload->>'action') FROM events GROUP BY 1 LIMIT 1;\n\n-- Merge: the right-hand side wins on conflicts\nUPDATE events\nSET    payload = payload || '{\"source\":\"mobile\"}'::jsonb\nWHERE  id = 1;\n\n-- Set a deeply nested key, and remove one\nUPDATE events SET payload = jsonb_set(payload, '{user,tier}', '\"enterprise\"') WHERE id = 1;\nUPDATE events SET payload = payload #- '{user,tier}'                         WHERE id = 1;\n\n-- Expand arrays into rows\nSELECT id, tag FROM events, jsonb_array_elements_text(payload->'tags') AS tag;\n\n-- Index the whole document, a path, or a specific key\nCREATE INDEX events_payload_gin  ON events USING gin (payload jsonb_path_ops);  -- smaller, containment only\nCREATE INDEX events_action_idx   ON events ((payload->>'action'));              -- btree on a scalar path",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Native Arrays"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Arrays are typed, one- or multi-dimensional, and index from 1 — not 0. They are ideal for a small, bounded list (tags, roles) and a poor fit for a one-to-many relation that needs its own attributes."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Array Literals, Operators, and Unnesting",
+        "content": "Indexing starts at 1; `&&` means overlap.",
+        "code": "CREATE TABLE posts (\n    id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    tags TEXT[] NOT NULL DEFAULT '{}'\n);\n\nINSERT INTO posts (tags) VALUES (ARRAY['sql','postgres']), ('{performance,indexing}');\n\nSELECT tags[1]               AS first_tag,       -- 1-based\n       array_length(tags, 1) AS tag_count,\n       'sql' = ANY(tags)     AS has_sql,\n       tags && ARRAY['indexing'] AS overlaps\nFROM posts;\n\n-- Unnest to rows for joining against a tags table\nSELECT p.id, t.tag FROM posts p, unnest(p.tags) AS t(tag) WHERE t.tag = 'sql';\nUPDATE posts SET tags = array_append(tags, 'deep') WHERE id = 1;\n\n-- GIN index for array containment/overlap\nCREATE INDEX posts_tags_gin ON posts USING gin (tags);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Do Not Put Large Mutable Documents Behind a GIN Index Without Thinking",
+        "text": "A GIN index makes containment queries fast but every update to the document rewrites index entries (GIN has a pending list to mitigate this, but a hot JSONB row still costs more than a normal update). If you update a document thousands of times a day, project its hot fields into real columns."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "Use JSONB when the shape is genuinely dynamic and you mostly query by containment (`@>`) or a few known paths. Promote frequently-filtered keys into real columns with btree indexes — hybrid \"document plus columns\" designs are the common production answer."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Model Both Ways and Compare",
+        "description": "Experience the trade-off directly.",
+        "steps": [
+          "Create `events` with a raw JSONB payload plus a GIN index.",
+          "Create a normalised `events_normalised` with `action TEXT`, `user_id BIGINT`, `tags TEXT[]`.",
+          "Write the same three queries against both.",
+          "Compare `EXPLAIN (ANALYZE, BUFFERS)` output and the size on disk."
+        ],
+        "expectedOutcome": "You can articulate when to normalise and when JSONB is the right call."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Is JSONB a replacement for MongoDB?",
+            "answer": "For many workloads yes — SQL, transactions, and joins around a document column are usually simpler than running a second database. But JSONB has no per-document schema validation by default (use `CHECK (jsonb_typeof(...))` or a JSON schema validator), and very large documents hit TOAST compression."
+          },
+          {
+            "question": "Why did `-` cause a `jsonb - text` vs `jsonb - text[]` ambiguity for me?",
+            "answer": "Because both operators exist. Cast explicitly: `payload - 'key'` removes a key, `payload - ARRAY['a','b']` removes several, `payload - 1` removes an array element."
+          },
+          {
+            "question": "How do I validate JSONB shape?",
+            "answer": "Add a `CHECK` constraint (for example `CHECK (jsonb_typeof(payload) = 'object')`) or use the `jsonb_matches_schema()` function from the `pg_jsonschema`/`is_jsonb_valid` extension."
+          }
+        ]
       }
     },
     {

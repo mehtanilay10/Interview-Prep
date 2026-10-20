@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-018",
   "slug": "turbo",
   "title": "Turborepo",
-  "description": "High-performance build system for JavaScript and TypeScript monorepos.",
+  "description": "Define task pipelines, cache outputs, and run only affected packages in a JavaScript monorepo.",
   "order": 6,
   "difficulty": "intermediate",
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 14,
   "tags": [
     "turbo",
     "monorepo",
@@ -17,50 +17,62 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Turborepo is a build system for JavaScript/TypeScript monorepos. It caches task outputs and runs tasks in parallel."
+        "text": "Turborepo is a task runner for monorepos. It reads your workspace graph, runs tasks in dependency order and in parallel, and caches the outputs so unchanged work is never repeated — locally or in CI."
       }
     },
     {
       "type": "heading",
       "data": {
-        "text": "Core Features",
-        "level": "h2"
+        "level": 2,
+        "text": "A turbo.json pipeline",
+        "anchor": "pipeline"
       }
     },
     {
-      "type": "bullet-list",
+      "type": "code",
       "data": {
-        "items": [
-          "Intelligent caching of build outputs",
-          "Parallel task execution",
-          "Task pipelines with dependency graphs",
-          "Remote caching for CI/CD",
-          "Zero-config for many setups"
-        ]
+        "language": "json",
+        "caption": "turbo.json (Turbo 2.x uses \"tasks\")",
+        "code": "{\n  \"$schema\": \"https://turbo.build/schema.json\",\n  \"tasks\": {\n    \"build\": {\n      \"dependsOn\": [\"^build\"],\n      \"outputs\": [\"dist/**\", \".next/**\"]\n    },\n    \"test\": {\n      \"dependsOn\": [\"build\"],\n      \"outputs\": [\"coverage/**\"]\n    },\n    \"lint\": { \"outputs\": [] },\n    \"dev\": { \"cache\": false, \"persistent\": true }\n  }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`^build` means \"run the build of every dependency first\". `outputs` tells Turbo what to cache — if you omit it, a cache hit restores nothing and the next task fails. `persistent: true` is for long-running dev servers, which must opt out of caching."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Filtering and caching",
+        "anchor": "filtering"
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "bash",
-        "caption": "Run tasks with Turborepo",
-        "code": "npx turbo run build lint test"
+        "title": "Run only what changed",
+        "content": "",
+        "code": "npx turbo run build --filter=@acme/ui...   # the package and its dependencies\nnpx turbo run test --filter=...[HEAD^1]     # packages changed since the last commit\nnpx turbo run build --dry-run=json          # inspect the task graph\nnpx turbo login && npx turbo link           # enable remote cache",
+        "language": "bash"
       }
     },
     {
       "type": "mermaid",
       "data": {
         "id": "mermaid-turbo-flow",
-        "definition": "flowchart TB\n    A[Source] --> B[Lint]\n    B --> C[Build]\n    C --> D[Test]\n    D --> E[Output Cache]\n    F[Remote Cache] --> E",
-        "caption": "Turborepo pipeline with caching"
+        "caption": "Turborepo resolves dependencies, then caches task outputs",
+        "definition": "flowchart TD\n    A[Changed files] --> B[Compute affected packages]\n    B --> C{Dependency order}\n    C --> D[Build dependencies]\n    D --> E[Build package]\n    E --> F{Cache hit?}\n    F -->|Yes| G[Restore outputs from cache]\n    F -->|No| H[Run task and store outputs]"
       }
     },
     {
       "type": "callout",
       "data": {
-        "variant": "info",
-        "title": "Vercel Integration",
-        "text": "Turborepo is maintained by Vercel and integrates seamlessly with Next.js and Nx."
+        "variant": "important",
+        "title": "Cache correctness depends on inputs",
+        "text": "Turbo hashes source files, environment variables, and dependency outputs. If a task depends on an env var, declare it in `env` or `globalEnv`; otherwise a cache hit can replay results produced with different configuration."
       }
     },
     {
@@ -68,16 +80,35 @@
       "data": {
         "terms": [
           {
-            "term": "Turborepo",
-            "definition": "Monorepo build system."
+            "term": "Pipeline / task graph",
+            "definition": "The dependency rules that decide which tasks run and in what order."
           },
           {
-            "term": "Task",
-            "definition": "An npm/yarn script in a package."
+            "term": "Remote cache",
+            "definition": "A shared cache (Vercel or self-hosted) so CI and teammates reuse each other's outputs."
           },
           {
-            "term": "Cache",
-            "definition": "Stored output to skip redundant work."
+            "term": "Filter",
+            "definition": "A selector such as --filter=@acme/ui... that limits a run to one package and its deps."
+          },
+          {
+            "term": "Persistent task",
+            "definition": "A long-running task (dev server) that is never cached and runs until stopped."
+          }
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "items": [
+          {
+            "question": "Turborepo or Nx?",
+            "answer": "Both provide task graphs and caching. Turborepo is deliberately small and lets you keep your package manager and scripts; Nx adds generators, plugins, and stronger project boundaries. Choose Turborepo for a light touch, Nx for an opinionated platform."
+          },
+          {
+            "question": "Does Turborepo replace my package manager?",
+            "answer": "No. It orchestrates scripts defined in each package.json and works with npm, Yarn, and pnpm workspaces."
           }
         ]
       }
@@ -85,18 +116,14 @@
     {
       "type": "summary-box",
       "data": {
-        "title": "Key Takeaways",
-        "items": [
-          {
-            "text": "Turborepo speeds up monorepo builds."
-          },
-          {
-            "text": "Caching avoids redundant work."
-          },
-          {
-            "text": "Works with npm, yarn, and pnpm."
-          }
-        ]
+        "title": "Key takeaways",
+        "points": [
+          "Turbo runs workspace tasks in dependency order and in parallel.",
+          "Declare outputs so cache hits can restore build artifacts.",
+          "Use filters to run only affected packages in CI.",
+          "Declare env vars that affect output or caching becomes unsound."
+        ],
+        "takeaway": "The interview point is not the config syntax — it is that caching only works when inputs and outputs are declared correctly."
       }
     }
   ],

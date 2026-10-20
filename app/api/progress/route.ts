@@ -35,7 +35,9 @@ function buildLessonHref(category: ProgressCategory, moduleSlug: string, lessonS
   }
 
   if (category === 'interviewQuestions') {
-    return `/interview-questions/${moduleSlug}/${lessonSlug}`;
+    // Legacy rows may still carry the old level-based module slug; the href
+    // builder resolves the owning technology from the question slug.
+    return getContentItemHref('interview-qa', moduleSlug, lessonSlug);
   }
 
   const courseSlug = getModuleBySlug(moduleSlug)?.courseSlug;

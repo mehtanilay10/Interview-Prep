@@ -7,7 +7,7 @@
   "description": "Master TIMESTAMPTZ vs TIMESTAMP, INTERVAL arithmetic, AT TIME ZONE conversion, and ISO 8601 formatting.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 25,
+  "estimatedMinutes": 35,
   "tags": [
     "timestamps",
     "timestamptz",
@@ -42,6 +42,159 @@
         "content": "Computing dynamic time offsets cleanly.",
         "language": "sql",
         "code": "-- Adding intervals to current time\nSELECT \n    NOW() AS current_time_utc,\n    NOW() - INTERVAL '30 days' AS thirty_days_ago,\n    NOW() + INTERVAL '2 hours 15 minutes' AS future_time,\n    -- Converting timezone explicitly\n    NOW() AT TIME ZONE 'America/New_York' AS new_york_time;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "The One Sentence That Wins the Point"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`TIMESTAMP WITH TIME ZONE` does **not** store a time zone. It stores an absolute instant (microseconds since 2000-01-01 UTC) and displays it in the current session's `TimeZone` setting. `TIMESTAMP WITHOUT TIME ZONE` stores a wall-clock reading with no instant attached. That distinction explains every DST bug you will ever see."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "How the Same Instant Looks in Different Time Zones",
+        "content": "Set the session time zone and watch the same stored instant render differently.",
+        "code": "CREATE TABLE events (\n    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    happened  TIMESTAMPTZ NOT NULL DEFAULT now(),\n    local_wall TIMESTAMP   -- wall clock; meaning depends on the reader\n);\n\nINSERT INTO events (happened, local_wall) VALUES ('2026-03-08 07:30:00Z', '2026-03-08 02:30');\n\nSET TimeZone = 'UTC';\nSELECT happened, local_wall FROM events;\n\nSET TimeZone = 'America/New_York';\nSELECT happened, local_wall FROM events;   -- happened shifts to 02:30-05; local_wall does not\n\n-- Extract a component in a chosen zone\nSELECT (happened AT TIME ZONE 'Europe/London') AS london_wall FROM events;\n\nSHOW TimeZone;   -- current session setting",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The Daylight-Saving Gap",
+        "text": "On 2026-03-08 in New York, 02:30 **does not exist** — the clock jumps from 02:00 to 03:00. A `TIMESTAMP` column holding that value silently refers to nothing, and arithmetic across the transition can be off by an hour. `TIMESTAMPTZ` has no such gap because it stores an instant."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Arithmetic With `INTERVAL`"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Intervals, Truncation, and Buckets",
+        "content": "Interval arithmetic is exact and reads well.",
+        "code": "SELECT now()                            AS now,\n       now() - INTERVAL '30 days'         AS thirty_days_ago,\n       now() + INTERVAL '2 hours 15 min'  AS later,\n       date_trunc('month', now())          AS start_of_month,\n       now() + INTERVAL '1 mon'            AS same_day_next_month;\n\n-- Interval components\nSELECT EXTRACT(epoch FROM INTERVAL '1 day 2 hours') AS seconds,   -- 93600\n       EXTRACT(days  FROM INTERVAL '1 day 2 hours') AS days;      -- 1\n\n-- Age between two timestamps as a human interval\nSELECT age(now(), '1986-07-01'::date) AS postgres_age;\n\n-- Grouping by day requires a stable bucket\nSELECT date_trunc('day', happened) AS day, count(*)\nFROM events\nGROUP BY 1 ORDER BY 1;",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "`now()` vs. `CURRENT_TIMESTAMP` vs. `clock_timestamp()`"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`now()` and `CURRENT_TIMESTAMP` are the **transaction start time** and are identical; every row in a transaction sees the same value. `statement_timestamp()` is the statement start and `clock_timestamp()` advances during a statement. Use `now()` for `created_at`, and remember that long transactions stamp late rows with the transaction start time — a classic bug in batch letter generation."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Formatting, Parsing, and Ranges",
+        "content": "ISO 8601 output and half-open ranges.",
+        "code": "SELECT to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SSOF')        AS iso8601,\n       to_char(now(), 'FMDay, FMMonth FMDD, YYYY')         AS pretty;\n\n-- Parse with an explicit format so locale settings cannot change the meaning\nSELECT to_timestamp('03/15/2026 14:30', 'MM/DD/YYYY HH24:MI') AS parsed;\n\n-- Half-open month window: the index-friendly way to filter a time range\nSELECT count(*) FROM events\nWHERE happened >= '2026-03-01 00:00:00+00'\n  AND happened <  '2026-04-01 00:00:00+00';\n\n-- Time zones are IANA names, never fixed offsets\nSELECT now() AT TIME ZONE 'Asia/Kolkata';\n\nSELECT make_interval(days => 30, hours => 6);",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Type",
+          "Storage",
+          "Stores",
+          "Use for"
+        ],
+        "rows": [
+          [
+            "`TIMESTAMPTZ`",
+            "8 bytes",
+            "An absolute instant (UTC)",
+            "Everything operational: `created_at`, `expires_at`, logs"
+          ],
+          [
+            "`TIMESTAMP`",
+            "8 bytes",
+            "A wall-clock reading, no zone",
+            "Imported wall-clock data, \"local time at the store\""
+          ],
+          [
+            "`DATE`",
+            "4 bytes",
+            "A calendar date",
+            "Birthdays, accounting periods"
+          ],
+          [
+            "`TIME` / `TIMETZ`",
+            "8/12 bytes",
+            "Time of day",
+            "Opening hours (and even then, a zone is usually relevant)"
+          ],
+          [
+            "`INTERVAL`",
+            "16 bytes",
+            "Months, days, microseconds",
+            "Durations and offsets"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Interview Answer",
+        "text": "The rule to state: **store instants as `TIMESTAMPTZ`, render in the user's zone**. Filter ranges as half-open (`>= start AND < end`) so that midnight boundaries cannot double-count or drop rows."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Recreate a DST Bug and Fix It",
+        "description": "Make the failure concrete.",
+        "steps": [
+          "Create a `TIMESTAMP` column and insert `'2026-11-01 01:30'` twice, once before and once after the fall-back transition.",
+          "Order the rows and explain why they are ambiguous.",
+          "Rewrite the table using `TIMESTAMPTZ` and re-insert using explicit offsets.",
+          "Show that both rows are now distinguishable."
+        ],
+        "expectedOutcome": "You can explain the DST ambiguity from a reproduction, not from memory."
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Common Interview Questions",
+        "items": [
+          {
+            "question": "Does `TIMESTAMPTZ` store the client time zone?",
+            "answer": "No. It stores an instant and converts for display using the session `TimeZone`. Different clients see different local renderings of the same instant."
+          },
+          {
+            "question": "Should I store UTC strings or `TIMESTAMPTZ`?",
+            "answer": "Use `TIMESTAMPTZ`. Storing text loses type safety, indexing semantics, and interval arithmetic, and invites mixed formats."
+          },
+          {
+            "question": "Why is `now()` the same for every row in a transaction?",
+            "answer": "It returns the transaction timestamp so that a single statement sees a consistent time. Use `clock_timestamp()` if you truly need the wall clock, or `statement_timestamp()` per statement."
+          }
+        ]
       }
     },
     {

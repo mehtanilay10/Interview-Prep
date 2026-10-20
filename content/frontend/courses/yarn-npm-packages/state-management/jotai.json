@@ -2,10 +2,10 @@
   "id": "lesson-yarn-npm-026",
   "slug": "jotai",
   "title": "Jotai",
-  "description": "Atomic state management for React with minimal boilerplate.",
+  "description": "Model state as atoms in Jotai, derive computed values, and avoid re-render storms with the value/set hooks.",
   "order": 3,
   "difficulty": "intermediate",
-  "estimatedMinutes": 8,
+  "estimatedMinutes": 14,
   "tags": [
     "jotai",
     "state",
@@ -17,15 +17,103 @@
     {
       "type": "paragraph",
       "data": {
-        "text": "Jotai is an atomic state manager for React. Each piece of state is an independent atom that components can subscribe to."
+        "text": "Jotai is an atomic state manager: each atom is an independent piece of state, and components subscribe only to the atoms they read. Derived atoms are computed from other atoms, so business logic lives outside components."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Atoms and derived atoms",
+        "anchor": "atoms"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "src/atoms/cart.ts",
+        "code": "import { atom } from 'jotai';\n\nexport type CartItem = { id: string; name: string; price: number };\n\nexport const itemsAtom = atom<CartItem[]>([]);\n\nexport const totalAtom = atom((get) =>\n  get(itemsAtom).reduce((sum, item) => sum + item.price, 0)\n);\n\n// A write-only atom coordinates a complex update\nexport const addItemAtom = atom(null, (get, set, item: CartItem) => {\n  set(itemsAtom, [...get(itemsAtom), item]);\n});"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Reading and writing without over-rendering",
+        "anchor": "hooks"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "tsx",
+        "caption": "Components subscribe to individual atoms",
+        "code": "import { useAtomValue, useSetAtom } from 'jotai';\nimport { itemsAtom, totalAtom, addItemAtom } from './atoms/cart';\n\nexport function Total() {\n  const total = useAtomValue(totalAtom);   // re-renders only when total changes\n  return <p>Total: ${total}</p>;\n}\n\nexport function AddButton() {\n  const add = useSetAtom(addItemAtom);     // never re-renders from state\n  return <button onClick={() => add({ id: crypto.randomUUID(), name: 'Pen', price: 2 })}>Add</button>;\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Prefer `useAtomValue` when you only read and `useSetAtom` when you only write. `useAtom` is convenient but subscribes the component to both, which is the usual cause of unnecessary renders."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Async atoms and providers",
+        "anchor": "async-and-provider"
+      }
+    },
+    {
+      "type": "code",
+      "data": {
+        "language": "ts",
+        "caption": "An async read atom plus a scoped Provider",
+        "code": "import { atom } from 'jotai';\n\nexport const productsAtom = atom(async () => {\n  const res = await fetch('/api/products');\n  if (!res.ok) throw new Error('Failed to load products');\n  return (await res.json()) as { id: string; name: string }[];\n});\n\n// src/main.tsx — one Provider per request when server-rendering\n// import { Provider } from 'jotai';\n// <Provider>{<App />}</Provider>"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Suspend-based async atoms integrate with React Suspense, so render a `<Suspense>` boundary and an error boundary around consumers. On the server, pass a fresh `Provider` store per request so state does not leak between users."
       }
     },
     {
       "type": "example",
       "data": {
-        "language": "javascript",
-        "caption": "Jotai atoms",
-        "code": "import { atom, useAtom } from \"jotai\";\n\nconst countAtom = atom(0);\n\nfunction Counter() {\n  const [count, setCount] = useAtom(countAtom);\n  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;\n}"
+        "title": "Install Jotai",
+        "content": "",
+        "code": "npm install jotai\n# Optional devtools\nnpm install -D jotai-devtools",
+        "language": "bash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Situation",
+          "Choose"
+        ],
+        "rows": [
+          [
+            "One huge store with many unrelated fields",
+            "Redux or Zustand"
+          ],
+          [
+            "Many small independent values",
+            "Jotai"
+          ],
+          [
+            "State derived from other state",
+            "Derived atoms"
+          ],
+          [
+            "Server request-scoped state",
+            "Jotai Provider per request"
+          ]
+        ]
       }
     },
     {
@@ -34,30 +122,57 @@
         "terms": [
           {
             "term": "Atom",
-            "definition": "A single unit of state."
+            "definition": "A unit of state; a primitive atom holds a value, a derived atom computes one."
           },
           {
-            "term": "Derived atom",
-            "definition": "An atom computed from other atoms."
+            "term": "Write atom",
+            "definition": "A write-only atom (first argument null) that encapsulates a state transition."
+          },
+          {
+            "term": "useAtomValue",
+            "definition": "Hook that subscribes to an atom's value for read-only components."
+          },
+          {
+            "term": "Provider",
+            "definition": "Scopes a set of atoms to a React subtree; required for per-request isolation in SSR."
           }
         ]
       }
     },
     {
-      "type": "summary-box",
+      "type": "faq-block",
       "data": {
-        "title": "Key Takeaways",
         "items": [
           {
-            "text": "Jotai uses atomic design for state."
+            "question": "Does Jotai work with React Server Components?",
+            "answer": "Atom definitions are plain JavaScript and can be imported anywhere, but hooks such as useAtomValue are client-side only. Server Components can read the initial values you pass down as props."
           },
           {
-            "text": "Minimal re-renders by default."
-          },
-          {
-            "text": "Works great with React Server Components."
+            "question": "Jotai vs Zustand?",
+            "answer": "Jotai models many independent values; Zustand models one store with actions. Both are small, and both avoid context re-renders when used with selectors."
           }
         ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Describe atoms as independently subscribable state, derived atoms as memoised computed values, and the Provider as the server-safety boundary."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key takeaways",
+        "points": [
+          "Atoms are the unit of state; components subscribe individually.",
+          "Derived atoms compute values from other atoms.",
+          "useAtomValue/useSetAtom reduce unnecessary re-renders.",
+          "Use a Provider per request when server rendering."
+        ],
+        "takeaway": "Jotai's atomic model is the cleanest answer to \"how do I avoid context re-renders?\""
       }
     }
   ],

@@ -112,11 +112,9 @@
     {
       "type": "callout",
       "data": {
-        "data": {
-          "variant": "tip",
-          "title": "Hybrid Approach",
-          "text": "You can use both public and private endpoints for the same service. For example, expose Key Vault privately to your VNet while allowing a third-party vendor to use the public endpoint with IP firewall rules."
-        }
+        "variant": "tip",
+        "title": "Hybrid Approach",
+        "text": "You can use both public and private endpoints for the same service. For example, expose Key Vault privately to your VNet while allowing a third-party vendor to use the public endpoint with IP firewall rules."
       }
     },
     {
@@ -130,6 +128,51 @@
           "A partner vendor needs to upload files to your Storage account."
         ],
         "expectedOutcome": "You can justify why each scenario uses public, private, or both endpoint types."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How the Two Paths Resolve"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "azure-public-vs-private-endpoint",
+        "caption": "A public endpoint resolves to a public IP over the internet; a private endpoint resolves to a private IP inside the VNet through a private DNS zone.",
+        "definition": "flowchart TD\n    APP[\"App in VNet\"] --> DNS{\"Which hostname\\ndoes it resolve?\"}\n    DNS -->|public name| PUBIP[\"Public IP\\nof the service\"]\n    PUBIP --> FW[\"Service firewall\\nmust allow the client\"]\n    FW --> SVC[\"Azure service\"]\n    DNS -->|privatelink name| PRIVIP[\"Private IP\\nin the delegated subnet\"]\n    PRIVIP --> PE[\"Private endpoint\\nNIC\"]\n    PE --> SVC\n    NET[\"Internet client\"] --> PUBIP\n    NET -.->|blocked when public\\naccess is disabled| FW"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Create a Private Endpoint with the CLI"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A private endpoint is a network interface in your subnet that connects to a specific sub-resource of a service. Creating the endpoint is only half the job: you must also disable public access (if the service supports it) and make sure DNS resolves the service name to the private IP."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Private endpoint for a storage account",
+        "content": "The `--group-id blob` selects the Blob sub-resource. The private DNS zone makes `mystorage12345.blob.core.windows.net` resolve to the private IP inside the VNet.",
+        "language": "bash",
+        "code": "# Turn off public network access\naz storage account update \\\n  --name mystorage12345 \\\n  --resource-group rg-demo \\\n  --public-network-access Disabled\n\n# Create the private endpoint in the app subnet\naz network private-endpoint create \\\n  --name pe-storage-blob \\\n  --resource-group rg-demo \\\n  --vnet-name vnet-demo \\\n  --subnet snet-app \\\n  --private-connection-resource-id $(az storage account show \\\n      --name mystorage12345 \\\n      --resource-group rg-demo \\\n      --query id --output tsv) \\\n  --group-id blob \\\n  --connection-name conn-storage-blob \\\n  --private-dns-zone privatelink.blob.core.windows.net"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The DNS zone must be linked to every VNet that needs it",
+        "text": "The most common private-endpoint failure is not networking — it is DNS. If the private DNS zone `privatelink.blob.core.windows.net` is not linked to the client VNet, the name keeps resolving to the public IP and traffic never reaches the private endpoint. Also remember that creating a private endpoint does not disable the public endpoint by itself; you must set public network access to Disabled or restrict it with firewall rules."
       }
     },
     {

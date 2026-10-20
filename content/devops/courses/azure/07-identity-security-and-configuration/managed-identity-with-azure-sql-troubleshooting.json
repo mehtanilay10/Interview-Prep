@@ -1,0 +1,185 @@
+{
+  "id": "lesson-azure-managed-identity-with-azure-sql-troubleshooting",
+  "slug": "managed-identity-with-azure-sql-troubleshooting",
+  "moduleSlug": "07-identity-security-and-configuration",
+  "courseSlug": "azure",
+  "title": "Troubleshooting Managed Identity with Azure SQL",
+  "description": "Diagnose the common failures when an Azure-hosted app uses a managed identity to connect to Azure SQL, and fix them with contained users, correct token scopes, and least-privilege grants.",
+  "order": 10,
+  "difficulty": "beginner",
+  "estimatedMinutes": 13,
+  "tags": [
+    "azure",
+    "identity",
+    "security",
+    "entra-id",
+    "developer"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Azure SQL Authentication Options"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Azure SQL supports SQL authentication (username and password) and Entra ID authentication. Entra ID authentication includes managed identities, which remove the need to store SQL credentials anywhere."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When using a managed identity, Azure SQL validates the token issued by Entra ID. You create a contained database user mapped to the external identity."
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Azure SQL Auth Methods",
+        "items": [
+          "SQL Authentication — username/password stored in SQL",
+          "Entra ID Universal with MFA — interactive user login",
+          "Service Principal — app-to-app authentication",
+          "Managed Identity — passwordless for Azure-hosted apps"
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a Contained User for a Managed Identity",
+        "content": "Map a managed identity to a database user so it can connect to Azure SQL.",
+        "code": "-- Connect as Azure AD admin and run:\nCREATE USER [my-app] FROM EXTERNAL PROVIDER;\nALTER ROLE db_datareader ADD MEMBER [my-app];\nALTER ROLE db_datawriter ADD MEMBER [my-app];",
+        "language": "sql"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Connection String with Managed Identity (C#)",
+        "content": "Use SqlClient with Azure.Identity for passwordless SQL authentication.",
+        "code": "using Azure.Identity;\nusing Microsoft.Data.SqlClient;\n\nvar connectionString = \"Server=tcp:my-sql.database.windows.net,1433;Database=myDb;\";\nvar credential = new DefaultAzureCredential();\nvar token = credential.GetToken(\n    new TokenRequestContext(new[] { \"https://database.windows.net/.default\" })\n);\n\nusing var conn = new SqlConnection(connectionString);\nconn.AccessToken = token.Token;\nawait conn.OpenAsync();\n\nusing var cmd = new SqlCommand(\"SELECT GETDATE()\", conn);\nvar result = await cmd.ExecuteScalarAsync();\nConsole.WriteLine(`SQL time: {result}`);",
+        "language": "csharp"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common failures and how to diagnose them"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "This lesson focuses on what goes wrong after you have enabled the identity. Module 6 covers the happy path in detail; here the goal is to recognize the handful of errors that account for almost every managed identity failure against Azure SQL."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Symptom",
+          "Likely cause",
+          "Fix"
+        ],
+        "rows": [
+          [
+            "Login failed for user (18456)",
+            "No contained database user for the identity",
+            "Create the user with CREATE USER ... FROM EXTERNAL PROVIDER in the target database"
+          ],
+          [
+            "Principal name not found",
+            "CREATE USER ran in master, or the identity is not in the tenant",
+            "Connect to the application database, not master, and use the exact identity name"
+          ],
+          [
+            "Cannot find the user because it does not exist",
+            "Caller lacks directory read permission, or the Entra admin is missing",
+            "Set an Entra ID admin on the logical server and grant Directory Readers if needed"
+          ],
+          [
+            "Token audience is invalid",
+            "Token requested for the wrong resource",
+            "Use the scope https://database.windows.net/.default"
+          ],
+          [
+            "Works locally, fails in Azure",
+            "Developer credential used locally; identity not attached or authorized",
+            "Attach the identity and verify the role or database user in Azure"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Inspect database principals and role membership",
+        "content": "Run this in the application database as an Entra administrator. External users have type E (Entra user) or X (external user or group).",
+        "language": "sql",
+        "code": "SELECT name, type, type_desc, authentication_type_desc\nFROM sys.database_principals\nWHERE type IN ('E', 'X');\n\nSELECT dp.name AS member_name, r.name AS role_name\nFROM sys.database_role_members rm\nJOIN sys.database_principals r ON rm.role_principal_id = r.principal_id\nJOIN sys.database_principals dp ON rm.member_principal_id = dp.principal_id\nWHERE dp.name = 'shop-api';"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why CREATE USER can fail"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CREATE USER ... FROM EXTERNAL PROVIDER asks Azure SQL to look up the identity in Microsoft Graph. That lookup needs an Entra ID administrator on the logical server and, for service principals and groups, directory read permission. A clean pattern is to sign in as the server Entra admin, run the statement in the user database, and grant only the roles the app needs. If the identity is a group, create the user for the group and add the managed identity to that group in Entra ID."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Create a contained user and grant least privilege",
+        "content": "Prefer explicit table permissions or a custom role over db_owner. The identity name must match the managed identity or group name exactly.",
+        "language": "sql",
+        "code": "CREATE USER [shop-api] FROM EXTERNAL PROVIDER;\n\n-- Read and write only the tables the service needs\nGRANT SELECT, INSERT, UPDATE ON dbo.Orders TO [shop-api];\nGRANT SELECT ON dbo.Products TO [shop-api];\n\n-- Or use built-in roles when broader access is acceptable\n-- ALTER ROLE db_datareader ADD MEMBER [shop-api];\n-- ALTER ROLE db_datawriter ADD MEMBER [shop-api];"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "A reliable answer to \"the managed identity cannot connect to SQL\" is a checklist: identity attached, token scope correct, contained user created in the right database, Entra admin configured, and firewall or private endpoint reachable. Naming the 18456 error and the scope https://database.windows.net/.default shows hands-on experience."
+      }
+    },
+    {
+      "type": "exercise",
+      "data": {
+        "title": "Connect an App to Azure SQL",
+        "description": "Enable managed identity on an App Service, create an Azure SQL database user, and query data without a SQL password.",
+        "steps": [
+          "Create an Azure SQL database and set an Azure AD admin.",
+          "Enable managed identity on your App Service.",
+          "Run T-SQL to create a contained user FROM EXTERNAL PROVIDER.",
+          "Update your app to use DefaultAzureCredential with SqlClient."
+        ],
+        "expectedOutcome": "Your app connects to Azure SQL using a managed identity with no password stored anywhere."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Managed identity removes the need for SQL authentication passwords.",
+          "CREATE USER ... FROM EXTERNAL PROVIDER maps an Entra ID identity to SQL.",
+          "DefaultAzureCredential + SqlClient provides a clean passwordless pattern."
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

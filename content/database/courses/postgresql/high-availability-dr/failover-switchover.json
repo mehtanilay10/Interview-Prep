@@ -36,6 +36,36 @@
       }
     },
     {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Performing a Planned Switchover"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A switchover is a controlled failover: you demote the current primary, let the replica catch up, and promote the replica. The goal is to do it with no data loss and minimal downtime. In a managed cluster this is one command; by hand, the sequence is to stop writes, wait for the replica to be fully caught up, promote it, and repoint the application."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Manual switchover sequence",
+        "content": "Catch-up is confirmed by comparing WAL positions, so promotion happens only after zero lag.",
+        "language": "sql",
+        "code": "-- 1. On the primary: stop writes and confirm the replica is caught up\nSELECT client_addr, state, sync_state, replay_lag\nFROM pg_stat_replication;\n\nSELECT pg_current_wal_lsn();          -- note this LSN\n\n-- 2. On the standby: confirm it has replayed the same LSN\nSELECT pg_last_wal_replay_lsn();\n\n-- 3. On the standby: promote it to primary\nSELECT pg_promote();\n\n-- 4. Confirm it now accepts writes\nSELECT pg_is_in_recovery();           -- false means it is the new primary"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Interview angle: split-brain is the failure you design against",
+        "text": "The dangerous scenario is a network partition where the replica is promoted while the old primary still thinks it is primary, so two nodes accept writes and diverge. No single PostgreSQL server can prevent that alone. Production clusters use a distributed consensus store (etcd or Consul via Patroni, or a witness in repmgr) so only a node with a quorum-granted leader lease can act as primary. Fencing the old primary — shutting it down or revoking its storage — is the second half of the answer."
+      }
+    },
+    {
       "type": "summary-box",
       "data": {
         "title": "Key Takeaways",

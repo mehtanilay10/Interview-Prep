@@ -9,7 +9,6 @@ import mod01AwsFundamentalsCloudConceptsModule from "./devops/courses/aws/01-aws
 import mod01AzureDeveloperFoundationsModule from "./devops/courses/azure/01-azure-developer-foundations/content.json";
 import mod01AzureForDotnetOverviewModule from "./backend/courses/azure-for-aspnet/01-azure-for-dotnet-overview/content.json";
 import mod01AzureFoundationsProblemsModule from "./devops/problems/azure/01-azure-foundations-problems/content.json";
-import mod01BeginnerQuestionsModule from "./interview-qa/01-beginner-questions/content.json";
 import mod01CorsConfigurationModule from "./architecture/courses/fullstack-security/01-cors-configuration/content.json";
 import mod01CreationalPatternsModule from "./architecture/courses/design-patterns/01-creational-patterns/content.json";
 import mod01DockerFundamentalsModule from "./devops/courses/devops/01-docker-fundamentals/content.json";
@@ -46,7 +45,6 @@ import mod02ElasticBeanstalkEcsDeploymentModule from "./backend/courses/aws-for-
 import mod02EncapsulationDataHidingModule from "./fundamentals/courses/oops-concepts/02-encapsulation-data-hiding/content.json";
 import mod02HigherOrderComponentsModule from "./frontend/courses/react-advanced-patterns/02-higher-order-components/content.json";
 import mod02IdentityAccessGovernanceModule from "./devops/courses/aws/02-identity-access-governance/content.json";
-import mod02IntermediateQuestionsModule from "./interview-qa/02-intermediate-questions/content.json";
 import mod02JestBasicsModule from "./frontend/courses/react-testing/02-jest-basics/content.json";
 import mod02JwtModule from "./backend/courses/authentication-authorization/02-jwt/content.json";
 import mod02JwtAuthenticationModule from "./architecture/courses/fullstack-security/02-jwt-authentication/content.json";
@@ -66,7 +64,6 @@ import mod02StructuralPatternsModule from "./architecture/courses/design-pattern
 import mod02TypesInReactModule from "./frontend/courses/typescript-for-react/02-types-in-react/content.json";
 import mod02VariablesTypesModule from "./backend/courses/csharp-fundamentals/02-variables-types/content.json";
 import mod02XunitBasicsModule from "./backend/courses/unit-testing-dotnet/02-xunit-basics/content.json";
-import mod03AdvancedQuestionsModule from "./interview-qa/03-advanced-questions/content.json";
 import mod03ApiDesignProblemsModule from "./backend/problems/aspnet-core/03-api-design-problems/content.json";
 import mod03AspnetWebModule from "./backend/courses/dotnet-nuget-packages/03-aspnet-web/content.json";
 import mod03AzureServerlessProblemsModule from "./devops/problems/azure/03-azure-serverless-problems/content.json";
@@ -126,7 +123,6 @@ import mod04OopModule from "./backend/courses/csharp-fundamentals/04-oop/content
 import mod04PolymorphismModule from "./fundamentals/courses/oops-concepts/04-polymorphism/content.json";
 import mod04PrismaRelationsModule from "./frontend/courses/prisma/04-prisma-relations/content.json";
 import mod04ReduxMiddlewareModule from "./frontend/courses/redux/04-redux-middleware/content.json";
-import mod04ScenarioBasedModule from "./interview-qa/04-scenario-based/content.json";
 import mod04SetOperationsModule from "./database/courses/sql-server/04-set-operations/content.json";
 import mod04SortingGroupingModule from "./backend/courses/linq/04-sorting-grouping/content.json";
 import mod04StateReducersModule from "./frontend/courses/react-advanced-patterns/04-state-reducers/content.json";
@@ -161,7 +157,6 @@ import mod05SecureApiDesignModule from "./architecture/courses/fullstack-securit
 import mod05SerializationMappingModule from "./backend/courses/dotnet-nuget-packages/05-serialization-mapping/content.json";
 import mod05StorageAndDataServicesModule from "./devops/courses/azure/05-storage-and-data-services/content.json";
 import mod05StorageServicesModule from "./devops/courses/aws/05-storage-services/content.json";
-import mod05SystemDesignModule from "./interview-qa/05-system-design/content.json";
 import mod05TddModule from "./backend/courses/unit-testing-dotnet/05-tdd/content.json";
 import mod06AdvancedAuthorizationModule from "./backend/courses/authentication-authorization/06-advanced-authorization/content.json";
 import mod06AdvancedTestingPatternsModule from "./frontend/courses/react-testing/06-advanced-testing-patterns/content.json";
@@ -189,7 +184,6 @@ import mod06PerformanceModule from "./backend/courses/graphql-dotnet/06-performa
 import mod06PerformancePatternsModule from "./frontend/courses/react-advanced-patterns/06-performance-patterns/content.json";
 import mod06PrismaAdvancedFeaturesModule from "./frontend/courses/prisma/06-prisma-advanced-features/content.json";
 import mod06ProductionPatternsModule from "./ai/courses/dotnet-ai-backend/06-production-patterns/content.json";
-import mod06RapidFireModule from "./interview-qa/06-rapid-fire/content.json";
 import mod06ReactPatternsModule from "./frontend/courses/typescript-for-react/06-react-patterns/content.json";
 import mod06ReduxTestingModule from "./frontend/courses/redux/06-redux-testing/content.json";
 import mod06SetOperationsModule from "./backend/courses/linq/06-set-operations/content.json";
@@ -207,7 +201,6 @@ import mod07DesignPrinciplesModule from "./fundamentals/courses/oops-concepts/07
 import mod07EnvironmentSecretsModule from "./architecture/courses/fullstack-security/07-environment-secrets/content.json";
 import mod07ErrorHandlingModule from "./backend/courses/graphql-dotnet/07-error-handling/content.json";
 import mod07IdentitySecurityAndConfigurationModule from "./devops/courses/azure/07-identity-security-and-configuration/content.json";
-import mod07InterviewTrapsModule from "./interview-qa/07-interview-traps/content.json";
 import mod07LoadBalancingApplicationIntegrationModule from "./devops/courses/aws/07-load-balancing-application-integration/content.json";
 import mod07MiddlewarePipelineModule from "./backend/courses/aspnet-core/07-middleware-pipeline/content.json";
 import mod07ModernCsharpModule from "./backend/courses/csharp-fundamentals/07-modern-csharp/content.json";
@@ -233,7 +226,6 @@ import mod08LocalStateManagementModule from "./frontend/courses/apollo/08-local-
 import mod08LoggingConfigurationModule from "./backend/courses/aspnet-core-web-api/08-logging-configuration/content.json";
 import mod08NetworkingAndApiPlatformsModule from "./devops/courses/azure/08-networking-and-api-platforms/content.json";
 import mod08PerformanceOptimizationModule from "./frontend/courses/react-query/08-performance-optimization/content.json";
-import mod08PerformanceOptimizationModule1 from "./interview-qa/08-performance-optimization/content.json";
 import mod08QuantifiersElementOperatorsModule from "./backend/courses/linq/08-quantifiers-element-operators/content.json";
 import mod08ReduxRealWorldModule from "./frontend/courses/redux/08-redux-real-world/content.json";
 import mod08SecurityCryptographyModule from "./backend/courses/dotnet-nuget-packages/08-security-cryptography/content.json";
@@ -245,7 +237,6 @@ import mod08StateMachinesXstateModule from "./frontend/courses/react-advanced-pa
 import mod08StylingModule from "./frontend/courses/react-fundamentals/08-styling/content.json";
 import mod08TestingDebuggingProblemsModule from "./backend/problems/aspnet-core/08-testing-debugging-problems/content.json";
 import mod09AuthenticationAuthorizationModule from "./backend/courses/aspnet-core/09-authentication-authorization/content.json";
-import mod09CicdPipelinesModule from "./interview-qa/09-cicd-pipelines/content.json";
 import mod09ComponentCompositionStrategiesModule from "./frontend/courses/react-advanced-patterns/09-component-composition-strategies/content.json";
 import mod09ConstraintsModule from "./database/courses/sql-server/09-constraints/content.json";
 import mod09ContainersKubernetesModule from "./devops/courses/aws/09-containers-kubernetes/content.json";
@@ -293,6 +284,7 @@ import mod19HighAvailabilityDisasterRecoveryModule from "./devops/courses/aws/19
 import mod20AwsArchitectureDesignPatternsModule from "./devops/courses/aws/20-aws-architecture-design-patterns/content.json";
 import mod20AzureSqlModule from "./database/courses/sql-server/20-azure-sql/content.json";
 import mod21ModernDataToolsModule from "./database/courses/sql-server/21-modern-data-tools/content.json";
+import mod24ModernSqlServerFeaturesModule from "./database/courses/sql-server/24-modern-sql-server-features/content.json";
 import advancedAsyncConcurrencyThreadingModule from "./backend/courses/csharp-fundamentals/advanced-async-concurrency-threading/content.json";
 import advancedCRuntimeMemoryConcurrencyModule from "./backend/courses/csharp-fundamentals/advanced-c-runtime-memory-concurrency/content.json";
 import advancedGitWorkflowsModule from "./devops/courses/git-linux-developer-workflow/advanced-git-workflows/content.json";
@@ -321,11 +313,12 @@ import apiVersioningProblemsModule from "./backend/problems/api-design/api-versi
 import apolloModule from "./frontend/courses/apollo/content.json";
 import apolloModule1 from "./frontend/cheatsheet/apollo/content.json";
 import appRouterRenderingModule from "./frontend/courses/next-js-full-stack-react/app-router-rendering/content.json";
-import architectureFollowUpsModule from "./interview-qa/architecture-follow-ups/content.json";
+import architectureModule from "./architecture/interview-qa/architecture/content.json";
 import aspNetCoreInternalsProductionHostingModule from "./backend/courses/aspnet-core/asp-net-core-internals-production-hosting/content.json";
 import aspnetCoreModule from "./backend/courses/aspnet-core/content.json";
 import aspnetCoreModule1 from "./backend/problems/aspnet-core/content.json";
 import aspnetCoreModule2 from "./backend/cheatsheet/aspnet-core/content.json";
+import aspnetCoreModule3 from "./backend/interview-qa/aspnet-core/content.json";
 import aspnetCoreWebApiModule from "./backend/courses/aspnet-core-web-api/content.json";
 import aspnetSystemDesignModule from "./architecture/problems/system-design/aspnet-system-design/content.json";
 import atmMachineModule from "./architecture/problems/lld/atm-machine/content.json";
@@ -338,13 +331,12 @@ import azureModule from "./devops/courses/azure/content.json";
 import azureModule1 from "./devops/problems/azure/content.json";
 import azureModule2 from "./devops/cheatsheet/azure/content.json";
 import azureForAspnetModule from "./backend/courses/azure-for-aspnet/content.json";
-import backendDatabaseFollowUpsModule from "./interview-qa/backend-database-follow-ups/content.json";
+import backendDatabaseModule from "./backend/interview-qa/backend-database/content.json";
 import bankingAppModule from "./architecture/problems/lld/banking-app/content.json";
-import behavioralInterviewQuestionsModule from "./interview-qa/behavioral-interview-questions/content.json";
+import behavioralModule from "./fundamentals/interview-qa/behavioral/content.json";
 import browserReactPerformanceModule from "./architecture/courses/frontend-performance-engineering/browser-react-performance/content.json";
 import buildOptimizationModule from "./architecture/courses/frontend-performance-engineering/build-optimization/content.json";
 import buildToolsModule from "./frontend/courses/yarn-npm-packages/build-tools/content.json";
-import cNetFollowUpsModule from "./interview-qa/c-net-follow-ups/content.json";
 import cacheInvalidationModule from "./architecture/courses/redis-caching-strategies/cache-invalidation/content.json";
 import cachingInAspnetCoreModule from "./architecture/courses/redis-caching-strategies/caching-in-aspnet-core/content.json";
 import cachingInNodejsModule from "./architecture/courses/redis-caching-strategies/caching-in-nodejs/content.json";
@@ -354,6 +346,7 @@ import capacityEstimationModule from "./architecture/courses/system-design-inter
 import chatSystemHldModule from "./architecture/problems/hld/chat-system-hld/content.json";
 import chatbotsInDepthModule from "./ai/courses/ai-basics/chatbots-in-depth/content.json";
 import ciCdSafeDeliveryModule from "./devops/courses/devops/ci-cd-safe-delivery/content.json";
+import cicdPipelinesModule from "./devops/interview-qa/cicd-pipelines/content.json";
 import claudeModule from "./ai/courses/claude/content.json";
 import claudeApiAndIntegrationsModule from "./ai/courses/claude/claude-api-and-integrations/content.json";
 import claudeArtifactsModule from "./ai/courses/claude/claude-artifacts/content.json";
@@ -368,6 +361,7 @@ import consistencyAvailabilityModule from "./architecture/courses/system-design-
 import constraintsModule from "./database/courses/postgresql/constraints/content.json";
 import csharpModule from "./backend/problems/csharp/content.json";
 import csharpModule1 from "./backend/cheatsheet/csharp/content.json";
+import csharpModule2 from "./backend/interview-qa/csharp/content.json";
 import csharpFundamentalsModule from "./backend/courses/csharp-fundamentals/content.json";
 import dataFetchingPatternsModule from "./frontend/courses/next-js-full-stack-react/data-fetching-patterns/content.json";
 import dataManagementModule from "./architecture/courses/microservices-architecture/data-management/content.json";
@@ -396,6 +390,7 @@ import efCoreModule1 from "./backend/cheatsheet/ef-core/content.json";
 import efCorePerformanceOrmTradeOffsModule from "./backend/courses/ef-core/ef-core-performance-orm-trade-offs/content.json";
 import elevatorSystemModule from "./architecture/problems/lld/elevator-system/content.json";
 import embeddingsAndVectorsModule from "./ai/courses/ai-basics/embeddings-and-vectors/content.json";
+import entityFrameworkCoreModule from "./backend/interview-qa/entity-framework-core/content.json";
 import errorHandlingDesignModule from "./backend/problems/api-design/error-handling-design/content.json";
 import eventDrivenArchitectureModule from "./architecture/courses/microservices-architecture/event-driven-architecture/content.json";
 import eventSourcingModule from "./architecture/courses/message-queues-event-streaming/event-sourcing/content.json";
@@ -408,7 +403,9 @@ import frontendFrameworksModule from "./frontend/courses/yarn-npm-packages/front
 import frontendPerformanceEngineeringModule from "./architecture/courses/frontend-performance-engineering/content.json";
 import fullStackApiDesignModule from "./frontend/courses/next-js-full-stack-react/full-stack-api-design/content.json";
 import fullStackSeniorProjectsModule from "./architecture/problems/full-stack-senior-projects/content.json";
+import fullstackScenariosModule from "./architecture/interview-qa/fullstack-scenarios/content.json";
 import fullstackSecurityModule from "./architecture/courses/fullstack-security/content.json";
+import generalModule from "./fundamentals/interview-qa/general/content.json";
 import gettingStartedModule from "./ai/courses/claude/getting-started/content.json";
 import gettingStartedModule1 from "./database/courses/postgresql/getting-started/content.json";
 import gitBisectDebuggingModule from "./devops/courses/git-linux-developer-workflow/git-bisect-debugging/content.json";
@@ -436,8 +433,8 @@ import instagramFeedModule from "./architecture/problems/hld/instagram-feed/cont
 import instagramPhotoSharingModule from "./architecture/problems/lld/instagram-photo-sharing/content.json";
 import introToAiCodingModule from "./ai/courses/codex/intro-to-ai-coding/content.json";
 import javascriptModule from "./frontend/cheatsheet/javascript/content.json";
+import javascriptModule1 from "./frontend/interview-qa/javascript/content.json";
 import joinsModule from "./database/courses/postgresql/joins/content.json";
-import leadershipOwnershipModule from "./interview-qa/leadership-ownership/content.json";
 import libraryManagementModule from "./architecture/problems/lld/library-management/content.json";
 import linkedinProfessionalModule from "./architecture/problems/lld/linkedin-professional/content.json";
 import linkedinProfessionalHldModule from "./architecture/problems/hld/linkedin-professional-hld/content.json";
@@ -456,7 +453,6 @@ import messageQueueFundamentalsModule from "./architecture/courses/message-queue
 import messageQueuesEventStreamingModule from "./architecture/courses/message-queues-event-streaming/content.json";
 import microservicesArchitectureModule from "./architecture/courses/microservices-architecture/content.json";
 import microservicesFundamentalsModule from "./architecture/courses/microservices-architecture/microservices-fundamentals/content.json";
-import mockInterviewScenariosModule from "./interview-qa/mock-interview-scenarios/content.json";
 import modernDataToolsModule from "./database/courses/postgresql/modern-data-tools/content.json";
 import modernStateApplicationArchitectureModule from "./frontend/courses/react-advanced-patterns/modern-state-application-architecture/content.json";
 import modernWebSecurityIdentityModule from "./architecture/courses/fullstack-security/modern-web-security-identity/content.json";
@@ -468,12 +464,14 @@ import nextJsFullStackReactModule from "./frontend/courses/next-js-full-stack-re
 import normalizationExercisesModule from "./database/problems/database-design/normalization-exercises/content.json";
 import notificationSystemModule from "./architecture/problems/hld/notification-system/content.json";
 import observabilityModule from "./architecture/courses/microservices-architecture/observability/content.json";
+import oopModule from "./fundamentals/interview-qa/oop/content.json";
 import oopsConceptsModule from "./fundamentals/courses/oops-concepts/content.json";
 import parkingLotSystemModule from "./architecture/problems/lld/parking-lot-system/content.json";
 import paymentGatewayModule from "./architecture/problems/lld/payment-gateway/content.json";
 import paymentGatewayHldModule from "./architecture/problems/hld/payment-gateway-hld/content.json";
 import performanceObservabilityModule from "./backend/courses/aspnet-core/performance-observability/content.json";
 import performanceOptimizationModule from "./architecture/courses/redis-caching-strategies/performance-optimization/content.json";
+import performanceOptimizationModule1 from "./architecture/interview-qa/performance-optimization/content.json";
 import performanceTuningModule from "./database/courses/postgresql/performance-tuning/content.json";
 import personalAiStackModule from "./ai/courses/ai-basics/personal-ai-stack/content.json";
 import postgresqlModule from "./database/courses/postgresql/content.json";
@@ -500,11 +498,11 @@ import ragAndMemoryModule from "./ai/courses/ai-basics/rag-and-memory/content.js
 import rateLimiterModule from "./architecture/problems/hld/rate-limiter/content.json";
 import rateLimitingDesignModule from "./backend/problems/api-design/rate-limiting-design/content.json";
 import reactModule from "./frontend/cheatsheet/react/content.json";
+import reactModule1 from "./frontend/interview-qa/react/content.json";
 import reactAdvancedPatternsModule from "./frontend/courses/react-advanced-patterns/content.json";
 import reactDataFetchingModule from "./frontend/courses/yarn-npm-packages/react-data-fetching/content.json";
 import reactEcosystemModule from "./frontend/courses/yarn-npm-packages/react-ecosystem/content.json";
 import reactFormsInputModule from "./frontend/courses/yarn-npm-packages/react-forms-input/content.json";
-import reactFrontendFollowUpsModule from "./interview-qa/react-frontend-follow-ups/content.json";
 import reactFundamentalsModule from "./frontend/courses/react-fundamentals/content.json";
 import reactHooksPatternsModule from "./frontend/courses/yarn-npm-packages/react-hooks-patterns/content.json";
 import reactInternalsModernRenderingModule from "./frontend/courses/react-fundamentals/react-internals-modern-rendering/content.json";
@@ -531,6 +529,7 @@ import safetyAndLimitationsModule from "./ai/courses/ai-basics/safety-and-limita
 import scalabilityPatternsModule from "./architecture/courses/system-design-interviews/scalability-patterns/content.json";
 import schemaDesignScenariosModule from "./database/problems/database-design/schema-design-scenarios/content.json";
 import searchAutocompleteModule from "./architecture/problems/hld/search-autocomplete/content.json";
+import securityModule from "./backend/interview-qa/security/content.json";
 import securityAndTestingModule from "./ai/courses/codex/security-and-testing/content.json";
 import securityHardeningModule from "./database/courses/postgresql/security-hardening/content.json";
 import securityInMicroservicesModule from "./architecture/courses/microservices-architecture/security-in-microservices/content.json";
@@ -546,6 +545,7 @@ import spotifyMusicHldModule from "./architecture/problems/hld/spotify-music-hld
 import sqlModule from "./database/problems/sql/content.json";
 import sqlServerModule from "./database/courses/sql-server/content.json";
 import sqlServerModule1 from "./database/cheatsheet/sql-server/content.json";
+import sqlServerModule2 from "./database/interview-qa/sql-server/content.json";
 import stateManagementModule from "./frontend/courses/next-js-full-stack-react/state-management/content.json";
 import stateManagementModule1 from "./frontend/courses/yarn-npm-packages/state-management/content.json";
 import stayingCurrentModule from "./ai/courses/ai-basics/staying-current/content.json";
@@ -554,6 +554,7 @@ import streamProcessingModule from "./architecture/courses/message-queues-event-
 import stylingModule from "./frontend/courses/yarn-npm-packages/styling/content.json";
 import submodulesSubtreesModule from "./devops/courses/git-linux-developer-workflow/submodules-subtrees/content.json";
 import systemDesignModule from "./architecture/problems/system-design/content.json";
+import systemDesignModule1 from "./architecture/interview-qa/system-design/content.json";
 import systemDesignForSeniorsModule from "./fundamentals/courses/senior-software-engineering/system-design-for-seniors/content.json";
 import systemDesignFrameworkModule from "./architecture/courses/system-design-interviews/system-design-framework/content.json";
 import systemDesignInterviewsModule from "./architecture/courses/system-design-interviews/content.json";
@@ -604,7 +605,6 @@ const rawModulesPart1 = [
 	{ ...mod01AzureDeveloperFoundationsModule, urlCategory: "devops" },
 	{ ...mod01AzureForDotnetOverviewModule, urlCategory: "backend" },
 	{ ...mod01AzureFoundationsProblemsModule, urlCategory: "devops" },
-	{ ...mod01BeginnerQuestionsModule, urlCategory: "" },
 	{ ...mod01CorsConfigurationModule, urlCategory: "architecture" },
 	{ ...mod01CreationalPatternsModule, urlCategory: "architecture" },
 	{ ...mod01DockerFundamentalsModule, urlCategory: "devops" },
@@ -641,7 +641,6 @@ const rawModulesPart1 = [
 	{ ...mod02EncapsulationDataHidingModule, urlCategory: "fundamentals" },
 	{ ...mod02HigherOrderComponentsModule, urlCategory: "frontend" },
 	{ ...mod02IdentityAccessGovernanceModule, urlCategory: "devops" },
-	{ ...mod02IntermediateQuestionsModule, urlCategory: "" },
 	{ ...mod02JestBasicsModule, urlCategory: "frontend" },
 	{ ...mod02JwtModule, urlCategory: "backend" },
 	{ ...mod02JwtAuthenticationModule, urlCategory: "architecture" },
@@ -661,7 +660,6 @@ const rawModulesPart1 = [
 	{ ...mod02TypesInReactModule, urlCategory: "frontend" },
 	{ ...mod02VariablesTypesModule, urlCategory: "backend" },
 	{ ...mod02XunitBasicsModule, urlCategory: "backend" },
-	{ ...mod03AdvancedQuestionsModule, urlCategory: "" },
 	{ ...mod03ApiDesignProblemsModule, urlCategory: "backend" },
 	{ ...mod03AspnetWebModule, urlCategory: "backend" },
 	{ ...mod03AzureServerlessProblemsModule, urlCategory: "devops" },
@@ -721,7 +719,6 @@ const rawModulesPart1 = [
 	{ ...mod04PolymorphismModule, urlCategory: "fundamentals" },
 	{ ...mod04PrismaRelationsModule, urlCategory: "frontend" },
 	{ ...mod04ReduxMiddlewareModule, urlCategory: "frontend" },
-	{ ...mod04ScenarioBasedModule, urlCategory: "" },
 	{ ...mod04SetOperationsModule, urlCategory: "database" },
 	{ ...mod04SortingGroupingModule, urlCategory: "backend" },
 	{ ...mod04StateReducersModule, urlCategory: "frontend" },
@@ -756,7 +753,6 @@ const rawModulesPart1 = [
 	{ ...mod05SerializationMappingModule, urlCategory: "backend" },
 	{ ...mod05StorageAndDataServicesModule, urlCategory: "devops" },
 	{ ...mod05StorageServicesModule, urlCategory: "devops" },
-	{ ...mod05SystemDesignModule, urlCategory: "" },
 	{ ...mod05TddModule, urlCategory: "backend" },
 	{ ...mod06AdvancedAuthorizationModule, urlCategory: "backend" },
 	{ ...mod06AdvancedTestingPatternsModule, urlCategory: "frontend" },
@@ -784,7 +780,6 @@ const rawModulesPart1 = [
 	{ ...mod06PerformancePatternsModule, urlCategory: "frontend" },
 	{ ...mod06PrismaAdvancedFeaturesModule, urlCategory: "frontend" },
 	{ ...mod06ProductionPatternsModule, urlCategory: "ai" },
-	{ ...mod06RapidFireModule, urlCategory: "" },
 	{ ...mod06ReactPatternsModule, urlCategory: "frontend" },
 	{ ...mod06ReduxTestingModule, urlCategory: "frontend" },
 	{ ...mod06SetOperationsModule, urlCategory: "backend" },
@@ -802,7 +797,6 @@ const rawModulesPart1 = [
 	{ ...mod07EnvironmentSecretsModule, urlCategory: "architecture" },
 	{ ...mod07ErrorHandlingModule, urlCategory: "backend" },
 	{ ...mod07IdentitySecurityAndConfigurationModule, urlCategory: "devops" },
-	{ ...mod07InterviewTrapsModule, urlCategory: "" },
 	{ ...mod07LoadBalancingApplicationIntegrationModule, urlCategory: "devops" },
 	{ ...mod07MiddlewarePipelineModule, urlCategory: "backend" },
 	{ ...mod07ModernCsharpModule, urlCategory: "backend" },
@@ -828,7 +822,6 @@ const rawModulesPart1 = [
 	{ ...mod08LoggingConfigurationModule, urlCategory: "backend" },
 	{ ...mod08NetworkingAndApiPlatformsModule, urlCategory: "devops" },
 	{ ...mod08PerformanceOptimizationModule, urlCategory: "frontend" },
-	{ ...mod08PerformanceOptimizationModule1, urlCategory: "" },
 	{ ...mod08QuantifiersElementOperatorsModule, urlCategory: "backend" },
 	{ ...mod08ReduxRealWorldModule, urlCategory: "frontend" },
 	{ ...mod08SecurityCryptographyModule, urlCategory: "backend" },
@@ -840,7 +833,6 @@ const rawModulesPart1 = [
 	{ ...mod08StylingModule, urlCategory: "frontend" },
 	{ ...mod08TestingDebuggingProblemsModule, urlCategory: "backend" },
 	{ ...mod09AuthenticationAuthorizationModule, urlCategory: "backend" },
-	{ ...mod09CicdPipelinesModule, urlCategory: "" },
 	{ ...mod09ComponentCompositionStrategiesModule, urlCategory: "frontend" },
 	{ ...mod09ConstraintsModule, urlCategory: "database" },
 	{ ...mod09ContainersKubernetesModule, urlCategory: "devops" },
@@ -888,6 +880,7 @@ const rawModulesPart1 = [
 	{ ...mod20AwsArchitectureDesignPatternsModule, urlCategory: "devops" },
 	{ ...mod20AzureSqlModule, urlCategory: "database" },
 	{ ...mod21ModernDataToolsModule, urlCategory: "database" },
+	{ ...mod24ModernSqlServerFeaturesModule, urlCategory: "database" },
 	{ ...advancedAsyncConcurrencyThreadingModule, urlCategory: "backend" },
 	{ ...advancedCRuntimeMemoryConcurrencyModule, urlCategory: "backend" },
 	{ ...advancedGitWorkflowsModule, urlCategory: "devops" },
@@ -916,11 +909,12 @@ const rawModulesPart1 = [
 	{ ...apolloModule, urlCategory: "frontend" },
 	{ ...apolloModule1, urlCategory: "frontend" },
 	{ ...appRouterRenderingModule, urlCategory: "frontend" },
-	{ ...architectureFollowUpsModule, urlCategory: "" },
+	{ ...architectureModule, urlCategory: "architecture" },
 	{ ...aspNetCoreInternalsProductionHostingModule, urlCategory: "backend" },
 	{ ...aspnetCoreModule, urlCategory: "backend" },
 	{ ...aspnetCoreModule1, urlCategory: "backend" },
 	{ ...aspnetCoreModule2, urlCategory: "backend" },
+	{ ...aspnetCoreModule3, urlCategory: "backend" },
 	{ ...aspnetCoreWebApiModule, urlCategory: "backend" },
 	{ ...aspnetSystemDesignModule, urlCategory: "architecture" },
 	{ ...atmMachineModule, urlCategory: "architecture" },
@@ -933,13 +927,12 @@ const rawModulesPart1 = [
 	{ ...azureModule1, urlCategory: "devops" },
 	{ ...azureModule2, urlCategory: "devops" },
 	{ ...azureForAspnetModule, urlCategory: "backend" },
-	{ ...backendDatabaseFollowUpsModule, urlCategory: "" },
+	{ ...backendDatabaseModule, urlCategory: "backend" },
 	{ ...bankingAppModule, urlCategory: "architecture" },
-	{ ...behavioralInterviewQuestionsModule, urlCategory: "" },
+	{ ...behavioralModule, urlCategory: "fundamentals" },
 	{ ...browserReactPerformanceModule, urlCategory: "architecture" },
 	{ ...buildOptimizationModule, urlCategory: "architecture" },
 	{ ...buildToolsModule, urlCategory: "frontend" },
-	{ ...cNetFollowUpsModule, urlCategory: "" },
 	{ ...cacheInvalidationModule, urlCategory: "architecture" },
 	{ ...cachingInAspnetCoreModule, urlCategory: "architecture" },
 	{ ...cachingInNodejsModule, urlCategory: "architecture" },
@@ -949,6 +942,7 @@ const rawModulesPart1 = [
 	{ ...chatSystemHldModule, urlCategory: "architecture" },
 	{ ...chatbotsInDepthModule, urlCategory: "ai" },
 	{ ...ciCdSafeDeliveryModule, urlCategory: "devops" },
+	{ ...cicdPipelinesModule, urlCategory: "devops" },
 	{ ...claudeModule, urlCategory: "ai" },
 	{ ...claudeApiAndIntegrationsModule, urlCategory: "ai" },
 	{ ...claudeArtifactsModule, urlCategory: "ai" },
@@ -963,6 +957,7 @@ const rawModulesPart1 = [
 	{ ...constraintsModule, urlCategory: "database" },
 	{ ...csharpModule, urlCategory: "backend" },
 	{ ...csharpModule1, urlCategory: "backend" },
+	{ ...csharpModule2, urlCategory: "backend" },
 	{ ...csharpFundamentalsModule, urlCategory: "backend" },
 	{ ...dataFetchingPatternsModule, urlCategory: "frontend" },
 	{ ...dataManagementModule, urlCategory: "architecture" },
@@ -991,6 +986,7 @@ const rawModulesPart1 = [
 	{ ...efCorePerformanceOrmTradeOffsModule, urlCategory: "backend" },
 	{ ...elevatorSystemModule, urlCategory: "architecture" },
 	{ ...embeddingsAndVectorsModule, urlCategory: "ai" },
+	{ ...entityFrameworkCoreModule, urlCategory: "backend" },
 	{ ...errorHandlingDesignModule, urlCategory: "backend" },
 	{ ...eventDrivenArchitectureModule, urlCategory: "architecture" },
 	{ ...eventSourcingModule, urlCategory: "architecture" },
@@ -1003,7 +999,9 @@ const rawModulesPart1 = [
 	{ ...frontendPerformanceEngineeringModule, urlCategory: "architecture" },
 	{ ...fullStackApiDesignModule, urlCategory: "frontend" },
 	{ ...fullStackSeniorProjectsModule, urlCategory: "architecture" },
+	{ ...fullstackScenariosModule, urlCategory: "architecture" },
 	{ ...fullstackSecurityModule, urlCategory: "architecture" },
+	{ ...generalModule, urlCategory: "fundamentals" },
 	{ ...gettingStartedModule, urlCategory: "ai" },
 	{ ...gettingStartedModule1, urlCategory: "database" },
 	{ ...gitBisectDebuggingModule, urlCategory: "devops" },
@@ -1031,8 +1029,8 @@ const rawModulesPart1 = [
 	{ ...instagramPhotoSharingModule, urlCategory: "architecture" },
 	{ ...introToAiCodingModule, urlCategory: "ai" },
 	{ ...javascriptModule, urlCategory: "frontend" },
+	{ ...javascriptModule1, urlCategory: "frontend" },
 	{ ...joinsModule, urlCategory: "database" },
-	{ ...leadershipOwnershipModule, urlCategory: "" },
 	{ ...libraryManagementModule, urlCategory: "architecture" },
 	{ ...linkedinProfessionalModule, urlCategory: "architecture" },
 	{ ...linkedinProfessionalHldModule, urlCategory: "architecture" },
@@ -1051,7 +1049,6 @@ const rawModulesPart1 = [
 	{ ...messageQueuesEventStreamingModule, urlCategory: "architecture" },
 	{ ...microservicesArchitectureModule, urlCategory: "architecture" },
 	{ ...microservicesFundamentalsModule, urlCategory: "architecture" },
-	{ ...mockInterviewScenariosModule, urlCategory: "" },
 	{ ...modernDataToolsModule, urlCategory: "database" },
 	{ ...modernStateApplicationArchitectureModule, urlCategory: "frontend" },
 	{ ...modernWebSecurityIdentityModule, urlCategory: "architecture" },
@@ -1063,12 +1060,14 @@ const rawModulesPart1 = [
 	{ ...normalizationExercisesModule, urlCategory: "database" },
 	{ ...notificationSystemModule, urlCategory: "architecture" },
 	{ ...observabilityModule, urlCategory: "architecture" },
+	{ ...oopModule, urlCategory: "fundamentals" },
 	{ ...oopsConceptsModule, urlCategory: "fundamentals" },
 	{ ...parkingLotSystemModule, urlCategory: "architecture" },
 	{ ...paymentGatewayModule, urlCategory: "architecture" },
 	{ ...paymentGatewayHldModule, urlCategory: "architecture" },
 	{ ...performanceObservabilityModule, urlCategory: "backend" },
 	{ ...performanceOptimizationModule, urlCategory: "architecture" },
+	{ ...performanceOptimizationModule1, urlCategory: "architecture" },
 	{ ...performanceTuningModule, urlCategory: "database" },
 	{ ...personalAiStackModule, urlCategory: "ai" },
 	{ ...postgresqlModule, urlCategory: "database" },
@@ -1095,14 +1094,14 @@ const rawModulesPart1 = [
 	{ ...rateLimiterModule, urlCategory: "architecture" },
 	{ ...rateLimitingDesignModule, urlCategory: "backend" },
 	{ ...reactModule, urlCategory: "frontend" },
+	{ ...reactModule1, urlCategory: "frontend" },
+	{ ...reactAdvancedPatternsModule, urlCategory: "frontend" },
 ];
 
 const rawModulesPart2 = [
-	{ ...reactAdvancedPatternsModule, urlCategory: "frontend" },
 	{ ...reactDataFetchingModule, urlCategory: "frontend" },
 	{ ...reactEcosystemModule, urlCategory: "frontend" },
 	{ ...reactFormsInputModule, urlCategory: "frontend" },
-	{ ...reactFrontendFollowUpsModule, urlCategory: "" },
 	{ ...reactFundamentalsModule, urlCategory: "frontend" },
 	{ ...reactHooksPatternsModule, urlCategory: "frontend" },
 	{ ...reactInternalsModernRenderingModule, urlCategory: "frontend" },
@@ -1129,6 +1128,7 @@ const rawModulesPart2 = [
 	{ ...scalabilityPatternsModule, urlCategory: "architecture" },
 	{ ...schemaDesignScenariosModule, urlCategory: "database" },
 	{ ...searchAutocompleteModule, urlCategory: "architecture" },
+	{ ...securityModule, urlCategory: "backend" },
 	{ ...securityAndTestingModule, urlCategory: "ai" },
 	{ ...securityHardeningModule, urlCategory: "database" },
 	{ ...securityInMicroservicesModule, urlCategory: "architecture" },
@@ -1144,6 +1144,7 @@ const rawModulesPart2 = [
 	{ ...sqlModule, urlCategory: "database" },
 	{ ...sqlServerModule, urlCategory: "database" },
 	{ ...sqlServerModule1, urlCategory: "database" },
+	{ ...sqlServerModule2, urlCategory: "database" },
 	{ ...stateManagementModule, urlCategory: "frontend" },
 	{ ...stateManagementModule1, urlCategory: "frontend" },
 	{ ...stayingCurrentModule, urlCategory: "ai" },
@@ -1152,6 +1153,7 @@ const rawModulesPart2 = [
 	{ ...stylingModule, urlCategory: "frontend" },
 	{ ...submodulesSubtreesModule, urlCategory: "devops" },
 	{ ...systemDesignModule, urlCategory: "architecture" },
+	{ ...systemDesignModule1, urlCategory: "architecture" },
 	{ ...systemDesignForSeniorsModule, urlCategory: "fundamentals" },
 	{ ...systemDesignFrameworkModule, urlCategory: "architecture" },
 	{ ...systemDesignInterviewsModule, urlCategory: "architecture" },

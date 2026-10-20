@@ -35,6 +35,9 @@ interface Params {
   params: Promise<{ category: string; courseSlug: string; moduleSlug: string; lessonSlug: string }>;
 }
 
+// Every problem lesson is prerendered to a static file at build time. This is
+// safe for Vercel's per-deployment route limit only because `cacheComponents` is
+// disabled in next.config.ts (see the course lesson page for details).
 export async function generateStaticParams() {
   const courses = getProblemCourses();
   return courses.flatMap((c) => {

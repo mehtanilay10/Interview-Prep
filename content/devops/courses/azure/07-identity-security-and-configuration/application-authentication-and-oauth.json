@@ -60,10 +60,98 @@
     {
       "type": "mermaid",
       "data": {
-          "id": "mermaid-oauth-flow",
-          "caption": "How the Authorization Code flow moves data between the app, browser, and Entra ID.",
-          "definition": "sequenceDiagram\n    participant U as User\n    participant A as App\n    participant E as Entra ID\n    U->>A: Click \"Sign in\"\n    A->>E: Redirect to /authorize\n    E->>U: Show login & consent\n    U->>E: Enter credentials\n    E->>A: Redirect with auth code\n    A->>E: POST /token with code\n    E->>A: Return access token\n    A->>E: Call API with access token"
-        }
+        "id": "mermaid-oauth-flow",
+        "caption": "How the Authorization Code flow moves data between the app, browser, and Entra ID.",
+        "definition": "sequenceDiagram\n    participant U as User\n    participant A as App\n    participant E as Entra ID\n    U->>A: Click \"Sign in\"\n    A->>E: Redirect to /authorize\n    E->>U: Show login & consent\n    U->>E: Enter credentials\n    E->>A: Redirect with auth code\n    A->>E: POST /token with code\n    E->>A: Return access token\n    A->>E: Call API with access token"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "ID tokens vs access tokens"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "OAuth 2.0 issues access tokens. OpenID Connect, which sits on top of OAuth 2.0, adds an ID token. They are not interchangeable. An access token is meant for an API: its audience is the API, and it carries scopes or app roles. An ID token is meant for the client application: its audience is the client ID, and it proves that the user authenticated. Sending an ID token to your API, or trusting an access token as proof of a user identity without validating it, is a common and serious mistake."
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Property",
+          "ID token",
+          "Access token"
+        ],
+        "rows": [
+          [
+            "Purpose",
+            "Tell the client who the user is",
+            "Authorize calls to an API"
+          ],
+          [
+            "Audience (aud)",
+            "The client application ID",
+            "The API application ID or App ID URI"
+          ],
+          [
+            "Typical lifetime",
+            "Short (about 1 hour)",
+            "Short (about 1 hour, varies)"
+          ],
+          [
+            "Who validates it",
+            "The client after sign-in",
+            "The API on every request"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Authorization Code flow with PKCE in code"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The Authorization Code flow is the default for web apps, desktop apps, and single-page apps. Public clients such as SPAs and desktop apps must use PKCE (Proof Key for Code Exchange) instead of a client secret, because they cannot keep a secret. The code below uses the Microsoft Authentication Library (MSAL) for Node."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Acquire a token with MSAL and PKCE",
+        "content": "Generate the authorization URL, then exchange the returned code for tokens. MSAL generates and remembers the PKCE verifier for you.",
+        "language": "ts",
+        "code": "import { ConfidentialClientApplication } from \"@azure/msal-node\";\n\nconst client = new ConfidentialClientApplication({\n  clientId: process.env.CLIENT_ID!,\n  authority: `https://login.microsoftonline.com/${process.env.TENANT_ID}`,\n  clientSecret: process.env.CLIENT_SECRET, // omit for public clients using PKCE\n});\n\n// 1. Redirect the user here\nconst authUrl = await client.getAuthCodeUrl({\n  scopes: [\"openid\", \"profile\", \"offline_access\", \"api://my-api/Orders.Read\"],\n  redirectUri: \"https://app.example.com/auth/callback\",\n  prompt: \"select_account\",\n});\n\n// 2. Exchange the ?code= value from the callback for tokens\nconst result = await client.acquireTokenByCode({\n  code: req.query.code as string,\n  scopes: [\"openid\", \"profile\", \"offline_access\", \"api://my-api/Orders.Read\"],\n  redirectUri: \"https://app.example.com/auth/callback\",\n});\n\nconsole.log(result.accessToken, result.idToken);"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Common OAuth mistakes",
+        "items": [
+          "Using the implicit flow for new applications. It returns tokens in the URL fragment and is no longer recommended.",
+          "Storing tokens in localStorage in a browser app. Any XSS bug can read them; prefer secure, HTTP-only cookies with a backend-for-frontend.",
+          "Forgetting to validate the state parameter, which enables login CSRF.",
+          "Requesting broad scopes such as User.ReadWrite.All when a single delegated scope is enough.",
+          "Hardcoding a client secret in a SPA. Public clients use PKCE, not secrets."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "What interviewers look for",
+        "text": "Expect to be asked \"authentication versus authorization\" and \"ID token versus access token\". A strong answer also mentions consent, scopes, and the fact that the resource server, not the client, must validate the token. Naming PKCE for public clients is a clear senior signal."
+      }
     },
     {
       "type": "summary-box",
