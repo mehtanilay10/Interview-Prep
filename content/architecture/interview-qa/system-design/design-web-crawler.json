@@ -1,0 +1,214 @@
+{
+  "id": "lesson-sd-web-crawler",
+  "slug": "design-web-crawler",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a web crawler.",
+  "description": "Crawl frontier at scale: politeness, URL deduplication, fetch-scheduling architecture, content storage, and trap avoidance.",
+  "order": 16,
+  "difficulty": "advanced",
+  "estimatedMinutes": 26,
+  "tags": [
+    "interview",
+    "system-design",
+    "distributed-systems",
+    "storage"
+  ],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a web crawler that can fetch and index a large portion of the web."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Start from seed URLs, discover new links by fetching and parsing pages",
+          "Polite crawling: respect robots.txt, per-domain rate limits, identifiable user agent",
+          "Never fetch the same URL twice (URL normalization + dedup)",
+          "Prioritize: important/fresh pages crawled more often than obscure ones",
+          "Robust against traps: infinite calendars, generated URLs, redirect loops",
+          "Persist raw content for downstream indexing pipelines"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-crawler-arch",
+        "caption": "Distributed crawler: frontier, fetchers, parsers, and dedup store",
+        "definition": "graph TD\n    A[Seed URLs] --> B[(Frontier Queue - Kafka)]\n    B --> C[Fetcher Pool 1]\n    B --> D[Fetcher Pool 2]\n    B --> E[Fetcher Pool N]\n    C --> F[(Content Store - S3/Blob)]\n    C --> G[Parser Workers]\n    G --> H{URL seen?}\n    H -->|No| B\n    H -->|Yes| I[Drop]\n    J[(URL Dedup - Redis/Bloom + KV)] --> H\n    K[Politeness Scheduler - per-domain queues] --> B\n    L[robots.txt Cache] --> C"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The core loop is fetch → store → parse → extract links → dedup → enqueue. Scale comes from the **frontier** (a durable queue, typically Kafka) feeding thousands of stateless fetchers, and from **sharding by domain** so politeness and ordering are enforceable per host."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "URL normalization before dedup: lowercase host, strip fragments, resolve redirects, sort query params, collapse default ports — else the same page is fetched many times",
+          "Dedup at two levels: probabilistic (Bloom filter, billions of URLs, tiny memory — false positives acceptable) + exact KV store for confirmed URLs",
+          "Frontier design: per-domain queues (politeness) inside a global priority queue (importance); a domain's queue wakes on its next allowed fetch time",
+          "Politeness: max N concurrent fetches per domain, delay between requests, honor robots.txt Crawl-delay; cache robots.txt per domain with TTL",
+          "Prioritization: PageRank/link depth, content freshness, update frequency history, sitemap hints; re-crawl policy differs from discovery policy",
+          "Trap avoidance: URL-length/param-count limits, path-depth caps, per-domain discovered-URL budgets, redirect-hop limits, pattern detection (calendars with incrementing dates)",
+          "Content store: raw HTML blobs in object storage (cheap, durable) keyed by content hash; metadata (URL, fetch time, headers, hash) in a KV/relational store for the index pipeline",
+          "Failure handling: fetch failures retry with backoff (respect 429/Retry-After and 503); permanent 404s tombstoned; soft-404 detection via content heuristics",
+          "Parser scale-out: parsing/extracting is CPU-bound — separate worker pool from I/O-bound fetchers; dedup check happens before enqueue to keep the frontier small"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The frontier is the whole design",
+        "text": "A naive single queue produces both impoliteness (10k URLs from one site back-to-back) and starvation (small sites never reached). Sharding the frontier per domain with priority scheduling is what makes a crawler both fast and a good citizen — everything else is plumbing around that decision."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Entity",
+          "Key Fields",
+          "Description"
+        ],
+        "rows": [
+          [
+            "UrlRecord",
+            "url_hash, normalized_url, first_seen, last_fetched, status",
+            "Dedup + fetch history per URL"
+          ],
+          [
+            "FetchTask",
+            "url_hash, domain, priority, next_fetch_at, attempt",
+            "Frontier entry; per-domain scheduling"
+          ],
+          [
+            "PageBlob",
+            "content_hash, storage_key, size, fetched_at",
+            "Raw HTML in object storage"
+          ],
+          [
+            "DomainState",
+            "domain, robots_txt, crawl_delay, last_fetch_at, budget",
+            "Politeness and trap accounting"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Edge Cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Infinite URL spaces (calendars, session-id URLs) — budget and pattern caps per domain",
+          "Redirect chains and cross-domain redirects — resolve, normalize, and re-apply politeness to the final domain",
+          "Duplicate content at different URLs — content hashing lets the indexer canonicalize",
+          "robots.txt changing mid-crawl — TTL cache with fail-closed on fetch error for disallowed paths",
+          "Politeness vs freshness tension for news sites — higher crawl rates for high-churn domains, with their permission",
+          "Legal/ToS boundaries: rate limits, copyrighted content storage policy — a design constraint, not an afterthought"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How do you handle JavaScript-rendered pages?",
+            "answer": "A headless-browser pool (Playwright/Chromium) for URLs flagged as JS-heavy — 10-100x costlier than HTTP fetch, so only a fraction of traffic goes through it; or rely on the site's own prerendering/sitemaps."
+          },
+          {
+            "question": "How does re-crawling differ from discovery?",
+            "answer": "Discovery explores unknown URLs; re-crawling polls known pages based on observed change frequency. Track per-URL content-hash history and adapt intervals — stable pages get longer gaps, news pages get minutes."
+          },
+          {
+            "question": "Where does Kafka fit vs a custom queue?",
+            "answer": "Kafka gives durable, replayable, partitioned throughput; the per-domain politeness layer sits on top (scheduler), since Kafka partitioning alone doesn't provide rate shaping."
+          },
+          {
+            "question": "How do you measure crawler health?",
+            "answer": "Frontier depth, fetch success rate by class (2xx/3xx/4xx/5xx/timeout), pages/day per fetcher, dedup hit rate, average robots-blocked ratio, and parse-pipeline lag."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Frontier sharded by domain: politeness and priority scheduling in one design",
+          "Normalize + dedup (Bloom + exact KV) before enqueue",
+          "Fetchers (I/O) and parsers (CPU) scale separately; content in object storage",
+          "Trap budgets, robots.txt, and retry semantics are first-class components"
+        ],
+        "takeaway": "A crawler is a scheduling problem wearing a networking costume — the frontier's per-domain politeness and priority design decides whether you're a search engine or a menace."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "design-distributed-cache",
+    "design-file-storage",
+    "design-notification-system"
+  ],
+  "furtherReading": [
+    {
+      "title": "Design and Implementation of a Modern Web Crawler (Google)",
+      "url": "https://research.google/pubs/pub45646/",
+      "type": "article",
+      "author": "Google Research"
+    },
+    {
+      "title": "Mercator: A Scalable, Extensible Web Crawler",
+      "url": "https://courses.cs.washington.edu/courses/cse561/13wi/papers/crawler.pdf",
+      "type": "article",
+      "author": "University of Washington"
+    }
+  ]
+}

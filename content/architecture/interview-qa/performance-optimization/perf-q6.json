@@ -1,0 +1,146 @@
+{
+  "id": "lesson-iq-perf-q6",
+  "slug": "perf-q6",
+  "moduleSlug": "performance-optimization",
+  "title": "A third-party API is slow. How do you protect your service?",
+  "description": "Timeouts, caching, hedging, degradation, and decoupling: making an unreliable dependency a bounded part of your latency budget.",
+  "order": 6,
+  "difficulty": "intermediate",
+  "tags": [
+    "interview",
+    "performance",
+    "resilience",
+    "integrations"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** A third-party API is slow. How do you protect your service?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Bound the damage first: a **tight timeout** (the dependency can never consume more than its slice of your latency budget), **retry only idempotent calls** with backoff, a **circuit breaker** so a dead vendor fails fast instead of tying up threads, and a **cached or degraded fallback** so users still get something (last-known rates, placeholder data, queued processing). Then reduce exposure: **batch and prefetch** vendor calls instead of per-request fan-out, **decouple asynchronously** (queue the integration — the user doesn't wait for the vendor), and if the vendor is on a critical sync path, negotiate SLAs or evaluate alternatives. Measure per-dependency latency (tracing spans) so the vendor's contribution to your p99 is visible."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Budget math: if your p99 target is 500ms and the vendor's p99 is 800ms, no amount of tuning fixes it — move them off the sync path",
+          "Timeouts per attempt, sized to the budget (e.g., 300ms), not the default infinite HttpClient timeout",
+          "Retries: only if idempotent (GET, or POST with Idempotency-Key); 1–2 attempts max on a user-facing path",
+          "Circuit breaker: after N timeouts/5xx, fail fast for 30s; serve fallback while open",
+          "Fallbacks: cache last successful response (with staleness the business accepts), default values, or 'we'll process this shortly' async acknowledgment",
+          "Hedging (advanced): fire a second call after p95 of the first — lowers tail latency at the cost of duplicate vendor load; only with idempotency",
+          "Batching/prefetch: one call for 50 rows beats 50 calls; background refresh keeps caches warm",
+          "Async decoupling: publish 'ChargeRequested' to a queue; the vendor call happens in a worker with its own retry/DLQ — user gets instant acknowledgment",
+          "Vendor-side facts: ask for their p99/SLA, connection reuse, regional endpoints; DNS/TLS setup overhead often dominates short calls"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bounded vendor call with cache fallback in .NET",
+        "language": "csharp",
+        "code": "public async Task<ExchangeRate> GetRate(string pair, CancellationToken ct)\\n{\\n    // 1) Serve recent data if the breaker is open or the call would timeout\\n    if (_breaker.State == CircuitState.Open && _cache.TryGetValue(pair, out var stale))\\n        return stale;                       // deliberately stale beats unavailable\\n\\n    try\\n    {\\n        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);\\n        cts.CancelAfter(TimeSpan.FromMilliseconds(300));  // budget-bounded\\n\\n        var fresh = await _http.GetFromJsonAsync<ExchangeRate>(\\n            $\"/rates/{pair}\", cts.Token);\\n\\n        _cache.Set(pair, fresh, TimeSpan.FromMinutes(5));\\n        return fresh;\\n    }\\n    catch (Exception ex) when (ex is TaskCanceledException or HttpRequestException)\\n    {\\n        _breaker.OnFailure();                                  // trips after threshold\\n        if (_cache.TryGetValue(pair, out var cached))\\n            return cached;                                      // degraded but functional\\n        throw new DependencyUnavailableException(\"rates\", ex);\\n    }\\n}\\n// Pipeline adds retry (idempotent GET, backoff+jitter) around this.\\n\\n// ❌ Per-request fan-out: 50 vendor calls per page = your p99 IS their p99\\n// ✅ Batch endpoint or background prefetch into cache\\n// ✅ If the answer isn't needed for the response: queue it (outbox + worker)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Default (100s) HttpClient timeout — one hung vendor pins your worker threads",
+          "Retrying non-idempotent vendor POSTs — duplicate charges on their side",
+          "No per-dependency tracing — the vendor's share of your p99 is invisible",
+          "Blocking the user response on a vendor that isn't needed for that response",
+          "Serving stale cache with no staleness bound or logging — silent data rot",
+          "One shared circuit-breaker policy for all vendors — the slow one shouldn't trip the fast one's budget"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you size a timeout when you don't know the vendor's distribution?",
+          "When is a hedged request worth the duplicate load?",
+          "How do you keep a queue-fed vendor integration observable?",
+          "How would you prove to the business that async processing is acceptable here?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Timeout → bounded retries → breaker → cache/degraded fallback, in that order",
+          "The vendor's latency budget must fit inside yours, or they leave the sync path",
+          "Batch/prefetch; decouple with queues when the answer isn't needed immediately",
+          "Per-dependency tracing makes the vendor's p99 contribution visible"
+        ],
+        "takeaway": "You can't make a third party faster — you can only make their worst day a bounded, visible, survivable slice of yours."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "perf-q1",
+    "perf-q4"
+  ],
+  "furtherReading": [
+    {
+      "title": "Rate-limiting patterns and best practices — Microsoft",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "HttpClient timeout guidance",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Performance Optimization",
+  "estimatedMinutes": 18
+}

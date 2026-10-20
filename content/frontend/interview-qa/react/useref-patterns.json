@@ -1,0 +1,142 @@
+{
+  "id": "lesson-iq-useref-patterns",
+  "slug": "useref-patterns",
+  "moduleSlug": "react",
+  "title": "What is useRef and when is it the right tool?",
+  "description": "DOM refs, mutable boxes that survive renders, the latest-ref pattern, and why ref mutations don't re-render.",
+  "order": 20,
+  "difficulty": "intermediate",
+  "tags": [
+    "react",
+    "hooks",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is useRef and when is it the right tool?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`useRef` returns a mutable container whose `.current` value **persists across renders without causing them**. It has two main jobs: (1) holding a reference to a DOM node (or any imperative instance — video player, canvas, WebSocket, IntersectionObserver) so you can interact with it directly; and (2) storing mutable values that must survive re-renders — timestamps of the last render, previous props, timers, abort controllers — without triggering re-renders when they change. If a value should visibly change in the UI, it belongs in state; if changing it must NOT re-render, it belongs in a ref."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How it works:**\n- `const ref = useRef(initial)` returns the **same object** every render; only `.current` changes. That object identity is why effects can depend on it safely\n- Passing `ref={inputRef}` to a JSX element populates `.current` with the DOM node after mount (and nulls it on unmount)\n- Writing `ref.current = x` is a plain mutation — React doesn't know, doesn't re-render, no scheduling involved\n- Initial value is used only on first render; `useRef()` with no argument gives `undefined`\n\n**When it's the right tool:**\n- **Imperative DOM interaction**: focus(), scrollIntoView(), measuring with getBoundingClientRect, playing media\n- **Non-DOM instances**: `new WebSocket(...)`, `new IntersectionObserver(...)`, chart-library instances — things created once and managed by hand\n- **Mutable values that shouldn't trigger renders**: last-click timestamp, previous props for comparison, an `AbortController` to cancel stale work, a timer handle\n- **The latest-ref pattern**: effects that should read the newest props/state without re-subscribing — store them in a ref updated each render, so a long-lived subscription (keydown listener, interval) calls `ref.current()` without re-registering\n- Scheduling without effects: `useRef` + `requestAnimationFrame` handles where state would loop\n\n**When it's the wrong tool:**\n- Rendering data derived from it — refs don't trigger renders; the UI will show stale values\n- Reading `.current` during render to make decisions — it may be from a previous render; use state or the render-phase read pattern (`const prev = useRef(); const delta = value - prev.current`) only with care\n- As a substitute for state management — no subscriptions, no reactivity\n- Passing ref-created values to memoized children — mutations won't update them\n\n**Related mechanics:**\n- `forwardRef` (or ref as a prop in React 19) lets a parent reach a child's DOM node\n- Callback refs (`ref={(node) => ...}`) run on mount/unmount — useful for measuring or wiring instances, with cleanup\n- Refs in StrictMode mount/unmount/remount in dev — a ref set to an instance must tolerate double-invocation of effects"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "DOM ref, mutable box, and the latest-ref pattern",
+        "language": "javascript",
+        "code": "// 1) DOM interaction\nfunction LoginField() {\n  const inputRef = useRef(null);\n  useEffect(() => { inputRef.current?.focus(); }, []);\n  return <input ref={inputRef} name=\"email\" />;\n}\n\n// 2) Mutable value that must NOT cause re-renders\nfunction SaveTimer() {\n  const lastSavedAt = useRef(null);\n  const controllerRef = useRef(null);            // AbortController across renders\n\n  async function save() {\n    controllerRef.current?.abort();              // cancel the previous in-flight save\n    controllerRef.current = new AbortController();\n    await api.save(payload, { signal: controllerRef.current.signal });\n    lastSavedAt.current = Date.now();            // no re-render — and we don't want one\n  }\n  return <button onClick={save}>Save</button>;\n}\n\n// 3) Latest-ref pattern: long-lived listener reads fresh values without re-subscribing\nfunction useHotkeys(handler) {\n  const handlerRef = useRef(handler);\n  useEffect(() => { handlerRef.current = handler; });   // updated every render\n\n  useEffect(() => {\n    const onKeyDown = (e) => handlerRef.current(e);     // always the newest handler\n    window.addEventListener('keydown', onKeyDown);\n    return () => window.removeEventListener('keydown', onKeyDown);  // registered ONCE\n  }, []);\n}\n\n// 4) Callback ref for measuring (runs on mount/unmount)\nfunction Measured({ onHeight }) {\n  const ref = useCallback((node) => {\n    if (node) onHeight(node.getBoundingClientRect().height);\n  }, [onHeight]);\n  return <section ref={ref}>...</section>;\n}\n\n// ❌ Wrong tool: derived UI value in a ref\n// const countRef = useRef(0);\n// countRef.current += 1;  // UI never updates — no re-render is scheduled\n// For anything the user should see, use useState/useReducer."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The core rule: state for visible data, refs for imperative handles and invisible mutable values\n- Knowing ref identity is stable across renders and mutations don't re-render\n- Practical patterns: latest-ref, abort controllers, callback refs for measuring\n- Awareness that reading refs during render can be stale"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Storing rendered data in a ref — the UI never updates because no re-render is triggered",
+          "Reading ref.current during render for branching logic — it can hold a previous render's value",
+          "Re-creating a listener effect because the ref holds a function that changes — use the latest-ref pattern",
+          "Mutating ref.current and expecting memoized children or effects to react",
+          "Using a ref where state + effect already solves it (manual subscription to your own state)",
+          "Forgetting that StrictMode remounts effects in dev — instance refs need double-effect safety"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Why does the latest-ref pattern let an effect run once while still seeing fresh props?",
+          "How do callback refs differ from object refs, and when do you need the cleanup form?",
+          "What changed about refs in React 19 (ref as a prop, cleanup functions)?",
+          "How would you implement a stopwatch with refs and one state for display?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "useRef: stable mutable box; .current changes without re-renders",
+          "Use for DOM nodes, imperative instances, timers, controllers, latest values",
+          "Never for data the UI should display — that's state",
+          "Latest-ref pattern keeps long-lived listeners fresh without re-subscribing"
+        ],
+        "takeaway": "Refs are React's escape hatch to the imperative world: hold handles and invisible mutable state there, and keep anything the user sees in state."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "react-b02",
+    "react-i02",
+    "custom-hooks"
+  ],
+  "furtherReading": [
+    {
+      "title": "useRef reference",
+      "url": "https://react.dev/reference/react/useRef",
+      "type": "article",
+      "author": "React Team"
+    },
+    {
+      "title": "You Might Not Need an Effect",
+      "url": "https://react.dev/learn/you-might-not-need-an-effect",
+      "type": "article",
+      "author": "React Team"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "React",
+  "estimatedMinutes": 22
+}

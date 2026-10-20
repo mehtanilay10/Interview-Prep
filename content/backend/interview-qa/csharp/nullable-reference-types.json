@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-nullable-reference-types",
+  "slug": "nullable-reference-types",
+  "moduleSlug": "csharp",
+  "title": "What are nullable reference types in C#?",
+  "description": "Compiler-null-safety annotations: how NRT changes the contract, ? and !, nullability warnings, and migrating legacy code.",
+  "order": 47,
+  "difficulty": "intermediate",
+  "tags": [
+    "C#",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are nullable reference types in C#?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Nullable reference types (C# 8+, enabled with `#nullable enable`) are a **compile-time null-safety system** — annotations the compiler uses to warn about possible `NullReferenceException`s before they run. `string` means 'never null by contract' and generates warnings on possible nulls; `string?` means 'null is part of the value' and requires a null check before dereferencing. It is **not runtime enforcement**: no exception is thrown automatically, no type changes at runtime — it's a disciplined contract between producers and consumers that turns a whole class of runtime crashes into build warnings."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The mechanics:**\n- `#nullable enable` per file, project-wide via `<Nullable>enable</Nullable>` in the csproj (default for new .NET projects)\n- `string name` — contract: never null. Assigning null warns (CS8600); dereferencing a maybe-null warns (CS8602)\n- `string? name` — null is expected. Dereferencing without a check warns; the compiler tracks flow and **learns from your checks**: `if (name is not null) name.Trim()` — no warning\n- `null!` (null-forgiving) — 'I know this is null but stop warning' — for initialization patterns where the framework fills it later (EF navigation properties, constructor-injected services)\n- Attributes express intent in APIs: `[NotNullWhen(true)]`, `[MaybeNull]`, `[AllowNull]`, `[MemberNotNull]` — they teach the compiler about out-params and guards\n- Value types: `int?` was always nullable; NRT is specifically about **reference types**\n\n**What it changes in practice:**\n- Warnings (CS86xx), not errors — you choose when to escalate with `<TreatWarningsAsErrors>`\n- Flow analysis is per-variable and path-sensitive — branches teach the compiler state\n- Public API nullability becomes part of the contract: consumers of your library see warnings based on your annotations\n- Doesn't detect every NRE: null can flow through reflection, uninitialized fields, or `!`-suppressed code\n\n**Migrating legacy code:**\n- Enable per-project gradually: start with `<Nullable>annotations</Nullable>` (annotate but don't warn), then flip to `enable`\n- Silence hot spots with `#nullable disable` around noisy generated files, then re-enable file by file\n- Don't sprinkle `!` to go green — that just moves the NullReferenceException runtime without fixing the contract\n- Design fixes beat annotation fixes: TryGet patterns (`bool TryParse(string, out string? result)`), constructor guarantees, and non-null defaults remove the nulls instead of describing them"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Flow analysis, guards, and API attributes",
+        "language": "csharp",
+        "code": "#nullable enable\n\npublic class UserService\n{\n    // Non-null parameter — passing null warns at the call site (CS8625)\n    public User GetOrCreate(string email)\n    {\n        var user = _repo.Find(email);\n        return user ?? new User(email);         // return type User — never null, compiler verified\n    }\n\n    // Nullable return — callers MUST check (CS8603 if they don't)\n    public User? Find(string id) => _repo.Find(id);\n\n    public string Describe(string? nickname)   // null is part of the contract\n    {\n        if (nickname is null) return \"anonymous\";   // compiler learns from the check\n        return nickname.Trim();                       // no CS8602 — flow analysis proved non-null\n    }\n\n    // Null-forgiving for framework-filled members (constructor injection, EF)\n    private readonly AppDbContext _db = null!;   // DI assigns before first use\n\n    public bool TryGetDefault(string id, [NotNullWhen(true)] out User? user)\n    {\n        user = _repo.Find(id);\n        return user is not null;                 // the attribute tells callers:\n    }                                            // if true, user is non-null — no warning\n}\n\n// Call-site contract:\n// var u = svc.Find(\"42\");\n// u.ToString();              // ⚠ CS8602 — possible null reference\n// if (u is not null) u.ToString();   // ✓ flow analysis clears it\n// var w = svc.GetOrCreate(\"a@b.c\");\n// w.ToString();              // ✓ non-null contract — no warning\n\n// ❌ Don't mute everything:\n// var x = svc.Find(id)!;    // compiles clean, crashes later — moving the NRE, not fixing it"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Annotations are a contract, not a runtime feature",
+        "text": "At runtime, `string` and `string?` are the same type — nothing is checked and nothing throws. The value is entirely in the compile-time warnings and in what your API communicates to consumers. Treat nullability annotations like types on your public surface: accurate annotations make callers safe by construction; dishonest ones (`null!` everywhere) are worse than no annotations at all."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing NRT is compile-time only — warnings, not runtime checks\n- Flow analysis: the compiler learns from null checks and guard clauses\n- Practical tools: `?`, `null!`, `[NotNullWhen]`, Try-patterns\n- Honest limits: reflection, generated code, and `!` abuse fall outside the system"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Suppressing every warning with ! to get a green build — the NREs just move to runtime",
+          "Marking a property string (non-null) that your deserializer frequently leaves null",
+          "Forgetting that flow analysis is per-variable — calling a method that returns the same value doesn't inherit the proof",
+          "Enabling NRT project-wide in a legacy codebase in one PR — enable in annotations mode first",
+          "Assuming NRT guarantees no NullReferenceException — unannotated code and reflection bypass it",
+          "Mixing annotated and unannotated assemblies without checking how warnings surface at boundaries"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What does null! actually do — does it change anything at runtime?",
+          "How do you annotate an out parameter so callers aren't warned when you return false?",
+          "How would you migrate a 5-year-old codebase to nullable enable without stopping feature work?",
+          "What's the difference between `string?` and a nullable value type like `int?`?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "NRT = compile-time null-safety via annotations and flow analysis",
+          "`string` = never null by contract; `string?` = null is expected",
+          "The compiler learns from is-null checks; guards + [NotNullWhen] extend that to APIs",
+          "Warnings, not errors or runtime checks — null! suppresses, doesn't fix",
+          "Migrate gradually: annotations mode first, then enable, then treat warnings as errors"
+        ],
+        "takeaway": "Nullable reference types let you prove null-handling at compile time — annotate honestly, let flow analysis do the work, and design nulls out of the API instead of annotating around them."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "beginner-q13",
+    "records-vs-classes",
+    "pattern-matching-switch-expressions"
+  ],
+  "furtherReading": [
+    {
+      "title": "Nullable reference types (C# docs)",
+      "url": "https://learn.microsoft.com/dotnet/csharp/nullable-references",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Nullable attributes reference",
+      "url": "https://learn.microsoft.com/dotnet/csharp/language-reference/attributes/nullable-analysis",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "C#",
+  "estimatedMinutes": 24
+}

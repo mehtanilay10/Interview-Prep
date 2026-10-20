@@ -1,0 +1,140 @@
+{
+  "id": "lesson-iq-routing-minimal-apis",
+  "slug": "routing-minimal-apis",
+  "moduleSlug": "aspnet-core",
+  "title": "How does routing work in ASP.NET Core — MVC vs attribute routes vs minimal APIs?",
+  "description": "Endpoint routing, route constraints, parameter binding in minimal APIs, and when each style fits.",
+  "order": 15,
+  "difficulty": "intermediate",
+  "tags": [
+    "aspnet-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does routing work in ASP.NET Core — MVC vs attribute routes vs minimal APIs?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Routing is a two-phase system: **endpoint routing** (early in the pipeline) matches the request method + URL template to an endpoint, then **endpoint execution** (MVC action invoker or the minimal-API delegate) runs it. MVC controllers can declare routes conventionally (`[Route(\"api/[controller]\")]` + `[HttpGet(\"{id}\")]`) or with attribute routes; minimal APIs declare everything inline (`app.MapGet(\"/todos/{id}\", ...)`). Route **constraints** (`{id:int}`, `{slug:regex(...)}?`) filter matches, and ambiguous or unmatched routes produce 400/404 — not your code running with wrong data."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How a request finds its endpoint:**\n1. `UseRouting` (implicit in WebApplication) builds the route table from all registered endpoints\n2. Matching considers HTTP method, URL segments, literals vs parameters, and constraints\n3. Literal segments beat parameters (`/products/new` vs `/products/{id}`) — specificity decides; ambiguity throws at startup\n4. `UseEndpoints`/framework executes the matched endpoint (action or delegate), surrounded by middleware, auth, and filters\n\n**The three styles:**\n- **Conventional (attribute-free) routing** — central `MapControllerRoute`, templates in `Program.cs`; classic for MVC page apps\n- **Attribute routing** — `[Route]`/`[HttpGet(\"api/orders/{id:int}\")]` on controllers; explicit, colocated, supports route templates like `api/{controller}/{id?}` and tokens (`[Route(Root = ...)]`)\n- **Minimal APIs** — `MapGet/MapPost` directly on the builder; parameters bind by convention: scalars from route/query, complex types from body (`[FromBody]`), `[FromHeader]`, `HttpContext`, `CancellationToken`, `IServiceProvider` via DI — DI-injected parameters need attributes or are inferred for registered service types\n\n**Constraints and patterns:**\n- Types: `int`, `long`, `guid`, `bool`, `decimal` (culture-safe), `datetime`, `min`, `max`, `range`, `alpha`, `regex`, `required`\n- Optional segments: `{id?}`; catch-all: `{*path}` / `{**path}`\n- Multiple routes for one handler via `WithTags`/metadata for OpenAPI (Swashbuckle/NSwag reads `WithName`, `WithSummary`)\n- Route values are strings — parse/validate; a constraint mismatch means **no match (404)**, not a failed parse in your action\n- Prefer constraints over manual parsing: they participate in matching, OpenAPI docs, and link generation\n\n**Choosing:** controllers for larger apps with filters/model state; minimal APIs for thin endpoints, microservices, and high-throughput small surfaces — both share routing, auth, and DI infrastructure"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Three routing styles side by side",
+        "language": "csharp",
+        "code": "// 1) Conventional (central template)\n// app.MapControllerRoute(name: \"default\",\n//     pattern: \"{controller=Home}/{action=Index}/{id?}\");\n\n// 2) Attribute routing on a controller\n[Route(\"api/v{version:apiVersion}/orders\")]\n[ApiController]\npublic class OrdersController : ControllerBase\n{\n    [HttpGet(\"{id:guid}\")]                       // constraint filters matches\n    public ActionResult<Order> Get(Guid id) => Ok();\n\n    [HttpGet(\"search\")]\n    public ActionResult Search([FromQuery] string? q) => Ok();\n}\n\n// 3) Minimal API — everything inline, binding by convention\napp.MapGet(\"/todos/{id:int}\", async (int id, TodoDb db, CancellationToken ct) =>\n        await db.Todos.FindAsync(new object[] { id }, ct) is { } todo\n            ? Results.Ok(todo)\n            : Results.NotFound())\n    .WithName(\"GetTodo\")                         // link generation + OpenAPI id\n    .RequireAuthorization(\"CanReadTodos\")         // policy metadata\n    .WithOpenApi();\n\napp.MapPost(\"/todos\", async (CreateTodo dto, TodoDb db) => { /* dto from body */ });\napp.MapGet(\"/health/ready\", (HttpContext ctx) => Results.Ok())\n    .ExcludeFromDescription();\n\n// Route constraint alternatives to manual parsing:\n// /todos/{id:int}      → \"abc\" gives 404, not a FormatException in your code\n// /files/{**path}      → catch-all for nested paths\n// /tags/{slug:regex(^[[a-z0-9-]]+$)} → pattern enforcement at match time"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Understanding two-phase routing (match, then execute) and middleware order around it\n- The role of constraints vs manual validation, and specificity/ambiguity rules\n- Minimal API binding conventions and DI interplay\n- When to choose controllers vs minimal APIs — and that both share the same infrastructure"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Manually parsing strings when a constraint would reject the route earlier",
+          "Two routes matching the same request — ambiguity discovered in production, not at startup",
+          "Catching format errors in actions for values the route could have constrained",
+          "Minimal API complex parameters silently bound from the wrong source (missing [FromBody])",
+          "Forgetting that route templates are case-insensitive but generated URLs are literal",
+          "Putting route-dependent logic before UseRouting in custom middleware"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you version routes — URI, header, or media type?",
+          "What happens when two endpoints match the same URL?",
+          "How do minimal API parameters get bound and how do you add a custom binder?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Endpoint routing matches first; MVC/minimal delegate executes second",
+          "Constraints filter matches at routing time — 404, not parse errors",
+          "Attribute routes colocate URLs; conventional routes centralize them",
+          "Minimal APIs share routing, auth, and DI with MVC — the surface style differs"
+        ],
+        "takeaway": "Express route shape in the template with constraints; let the router reject what doesn't fit so handlers only see valid input."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "model-binding-validation",
+    "mvc-lifecycle",
+    "aspnet-b02"
+  ],
+  "furtherReading": [
+    {
+      "title": "Routing in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/mvc/controllers/routing",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Minimal APIs in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 26
+}

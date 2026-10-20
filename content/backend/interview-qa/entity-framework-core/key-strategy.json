@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-ef-key-strategy",
+  "slug": "key-strategy",
+  "moduleSlug": "entity-framework-core",
+  "title": "How do you choose a primary key strategy in EF Core?",
+  "description": "Identity vs GUID vs GUID-comb vs HiLo, value generation settings, and keyless entities.",
+  "order": 7,
+  "difficulty": "intermediate",
+  "tags": [
+    "ef-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you choose a primary key strategy in EF Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "It depends on distribution and access patterns. **Identity (int/bigint, database-generated)** is the default for single-database systems: tiny, index-friendly, but exposes counts and can't be assigned before insert. **GUIDs** are client-assignable and safe across services, but as clustered keys they fragment indexes — use them non-clustered, or a **sequential GUID** (SQL Server `uniqueidentifier` with `NEWSEQUENTIALID()` / `uuid_generate_v1c`, or .NET `Guid.CreateVersion7()`). **HiLo** gives integer keys assigned client-side in blocks, avoiding insert round-trips. And some projections need **no key at all** — `HasNoKey()`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Options compared:**\n- **Database identity (int/bigint):** sequential, compact (4/8 bytes), ideal B-tree fill — the workhorse. Downside: value unknown until insert (breaks ordering of events pre-insert), values are enumerable (information leak), and merged systems double up\n- **Random GUID (`Guid.NewGuid()`):** unique everywhere, great for distributed inserts and message ids — but random order in a clustered index causes page splits and 4x+ storage overhead\n- **Sequential GUID:** keeps global uniqueness with time-ordered insertion — the pragmatic default when you want keys in URLs or client-generated aggregates\n- **HiLo / database sequence:** EF allocates key ranges (`Sequence`), so app code assigns keys without a per-row round-trip; gaps are normal, ordering survives, but concurrent allocators must coordinate\n- **Natural keys:** only if genuinely immutable, short, and universally known — business keys tend to drift (renames, merges)\n- **Composite keys:** supported (`HasKey(a => new { a.BlogId, a.PostId })`), natural for join tables; remember value-object mapping via owned types\n\n**EF Core mechanics:**\n- Convention: `int Id` → `ValueGeneratedOnAdd` (identity)\n- Explicit: `.ValueGeneratedNever()`, `.UseIdentityColumn()`, `.HasDefaultValueSql(\"NEWSEQUENTIALID()\")`, `.HasSequence(\"MySeq\")`\n- Client-side generation: set `.ValueGeneratedOnAdd` with a GUID/temp-id pattern, or `TemporaryNumber` values until save\n- Keyless: `HasNoKey()` for unmapped/projection queries — no tracking identity, no SaveChanges"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Configuring key strategies",
+        "language": "csharp",
+        "code": "protected override void OnModelCreating(ModelBuilder b)\n{\n    // 1) Default: int identity — fine for a monolith's own database\n    b.Entity<Order>(e =>\n    {\n        e.HasKey(o => o.Id);\n        e.Property(o => o.Id).UseIdentityColumn();\n    });\n\n    // 2) Sequential GUID: client-assignable, index-friendly (SQL Server)\n    b.Entity<Event>(e =>\n    {\n        e.HasKey(x => x.Id);\n        e.Property(x => x.Id)\n          .HasDefaultValueSql(\"NEWSEQUENTIALID()\");   // DB-side, time-ordered\n    });\n\n    // .NET 8+: also fine to assign Guid.CreateVersion7() in app code\n    // var id = Guid.CreateVersion7();   // time-ordered by construction\n\n    // 3) HiLo: integers, allocated in blocks, assigned before INSERT\n    b.Entity<Comment>(e =>\n    {\n        e.HasKey(c => c.Id);\n        e.Property(c => c.Id).UseHiLo(\"CommentHiLo\");\n    });\n\n    // 4) Immutable business surrogate: never generate, app assigns\n    b.Entity<Sku>().Property(s => s.Code).ValueGeneratedNever();\n\n    // 5) Keyless projection entity — read-only, not saved\n    b.Entity<SalesSummary>().HasNoKey().ToView(\"vw_SalesByDay\");\n}\n\n// Rule of thumb:\n// single DB, no key in URLs          → int/bigint identity\n// distributed inserts / keys in URLs → sequential GUID (v7 or DB function)\n// high-rate insert, no round-trips   → HiLo / sequence"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Why random GUIDs as clustered keys hurt (fragmentation, page splits)\n- Awareness of client-assignable keys for distributed/microservice inserts\n- EF mechanics: value generation attributes, sequences, HasNoKey\n- Honesty about natural keys and when composite keys are right"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "GUID as clustered PK by default — slow inserts, bloated indexes on big tables",
+          "Exposing sequential ints in URLs as an enumeration/competition oracle",
+          "Assuming Guid.NewGuid() is ordered — only v6/v7 (or DB sequential functions) are",
+          "Merging two databases with int identity — guaranteed key collisions",
+          "Using a mutable business field (email, SKU that gets reused) as the key",
+          "Forgetting that HiLo leaves permanent gaps — number sequences aren't gapless"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How would you migrate an existing int key table to GUIDs without downtime?",
+          "What does EF do with the key value when SaveChangesAsync returns?",
+          "Clustered vs non-clustered index — which should a GUID key be, and why?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "int/bigint identity for single-database defaults",
+          "Sequential GUID (v7 / NEWSEQUENTIALID) when keys must be client-assigned",
+          "HiLo for block-assigned integers without per-row round-trips",
+          "HasNoKey() for read-only projections; composite keys for join tables"
+        ],
+        "takeaway": "Match the key to distribution and index behavior — sequential and compact wins inside one database; globally unique and time-ordered wins across services."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "code-first-db-first",
+    "ef-core-relationships-cascade"
+  ],
+  "furtherReading": [
+    {
+      "title": "EF Core key value generation",
+      "url": "https://learn.microsoft.com/ef/core/modeling/key-configuration",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Guid.CreateVersion7 (RFC 9562)",
+      "url": "https://learn.microsoft.com/dotnet/api/system.guid.createversion7",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 25
+}

@@ -1,0 +1,145 @@
+{
+  "id": "lesson-iq-prevent-sql-injection",
+  "slug": "prevent-sql-injection",
+  "moduleSlug": "security",
+  "title": "How do you prevent SQL injection in a .NET application?",
+  "description": "Parameterized queries, ORM usage, dynamic identifier whitelisting, and least-privilege databases.",
+  "order": 4,
+  "difficulty": "intermediate",
+  "tags": [
+    "security",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you prevent SQL injection in a .NET application?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Never build SQL by concatenating untrusted input. Use parameterized commands (ADO.NET `SqlParameter`, EF Core LINQ or interpolated `FromSql`, Dapper parameters) so the database engine always treats input as **data**, not code. Parameters cannot fix dynamic identifiers (`ORDER BY` columns), so whitelist those against a fixed list. Defense in depth: give the app's login only the privileges it needs."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How the attack works:**\n- Input like `' OR '1'='1` closes the string literal and adds a condition that is always true → every row returns\n- Stacked statements (`'; DROP TABLE Users;--`) execute extra commands when multiple statements are allowed\n- Injection also reaches into `LIKE`, `ORDER BY`-adjacent logic, and even XML/JSON SQL functions\n- The bug is in how the query is *assembled*, not in what the input \"looks like\""
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Prevention layers:**\n- **Parameterized queries** — the plan is compiled once; input can never change query shape\n- **EF Core LINQ** — expressions translate to parameters automatically\n- **Interpolated raw SQL** (`FromSql($\"... {value}\")`) — the compiler turns `{value}` into a parameter\n- **Never** format/concatenate into `FromSqlRaw`, `SqlCommand`, or Dapper SQL\n- **Whitelist dynamic identifiers** — column names and sort directions cannot be parameters; map allowed values explicitly\n- **Least privilege** — the app's SQL login should not own the schema or hold DDL rights, so a successful injection still cannot `DROP TABLE`\n- Input validation and WAFs are additional layers, not substitutes for parameters"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Vulnerable vs safe data access",
+        "language": "csharp",
+        "code": "// VULNERABLE — input becomes SQL text\nvar sql = \"SELECT * FROM Users WHERE Email = '\" + email + \"'\";\n// email = \"x' OR '1'='1\"       → returns all users\n// email = \"x'; DROP TABLE Users;--\" → extra statement executes\n\n// SAFE — parameterized command\nawait using var cmd = new SqlCommand(\n    \"SELECT * FROM Users WHERE Email = @email\", connection);\nvar p = cmd.Parameters.Add(\"@email\", SqlDbType.NVarChar, 254);\np.Value = email;\n\n// SAFE — EF Core LINQ parameterizes for you\nvar user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);\n\n// SAFE — interpolated raw SQL compiles {email} into a parameter\nvar rows = await db.Users\n    .FromSql($\"SELECT * FROM Users WHERE Email = {email}\")\n    .ToListAsync();\n\n// RISKY — \"raw\" APIs are only safe with interpolation, not strings\nvar unsafeRows = await db.Users\n    .FromSqlRaw($\"SELECT * FROM Users WHERE Email = '{email}'\")\n    .ToListAsync();\n\n// DYNAMIC IDENTIFIERS — parameters cannot rename columns; whitelist instead\nvar column = sortBy?.ToLowerInvariant() switch\n{\n    \"name\"    => \"Name\",\n    \"created\" => \"CreatedAt\",\n    _ => throw new ArgumentException(\"Unsupported sort field\")\n};\nvar direction = ascending ? \"ASC\" : \"DESC\";  // two fixed values only\nvar listSql = $\"SELECT * FROM Products ORDER BY {column} {direction}\";"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Muscle memory for parameters over string building\n- Knowing that ORMs are not automatically safe (formatted raw SQL bypasses them)\n- Awareness of the identifier-whitelisting gap that parameters leave open\n- Defense-in-depth thinking: database privileges as a second wall"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Believing stored procedures make concatenated input safe — they don't",
+          "Sanitizing input with quotes/keywords instead of parameterizing",
+          "Assuming EF Core protects you, then passing formatted strings to FromSqlRaw",
+          "Building ORDER BY / table names from request values without a whitelist",
+          "Running the app as a sysadmin-grade SQL login, so one injection owns the server",
+          "Using AddWithValue with implicit conversions as a habit — prefer typed parameter adds for predictable plan behavior"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do parameterized queries actually work below the API (precompiled plans)?",
+          "How would you hunt for injection risks in a legacy codebase?",
+          "Second-order injection: what is it and why does parameterizing the input still matter later?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Concatenated input = SQL injection; parameters make input data, not code",
+          "EF Core LINQ and interpolated FromSql parameterize automatically",
+          "Whitelist dynamic identifiers — ORDER BY columns can't be parameters",
+          "Least-privilege database accounts limit the blast radius"
+        ],
+        "takeaway": "Parameterize every value, whitelist every identifier, and give the database login only what it needs — layered defenses survive one mistake."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "prevent-xss",
+    "authentication-vs-authorization"
+  ],
+  "furtherReading": [
+    {
+      "title": "SQL injection prevention in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/security/data-protection/introduction",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "A03:2021 — Injection (OWASP Top 10)",
+      "url": "https://owasp.org/Top10/A03_2021-Injection/",
+      "type": "article",
+      "author": "OWASP"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Security",
+  "estimatedMinutes": 25
+}

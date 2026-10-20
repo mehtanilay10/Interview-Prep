@@ -1,0 +1,138 @@
+{
+  "id": "lesson-iq-event-driven-architecture",
+  "slug": "event-driven-architecture",
+  "moduleSlug": "architecture",
+  "title": "When would you use event-driven communication between services?",
+  "description": "Events vs commands, pub/sub decoupling, eventual consistency, ordering and replay, and the operational costs of async architectures.",
+  "order": 14,
+  "difficulty": "advanced",
+  "tags": [
+    "architecture",
+    "microservices",
+    "messaging",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** When would you use event-driven communication between services?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use events when **multiple consumers care about something that happened** and **the producer shouldn't know or wait for them**: order placed → inventory reserves, email sends, analytics records, search index updates. Events decouple producers from consumers in time and topology — the producer publishes and moves on; consumers join, leave, and lag independently. Use **synchronous request/reply** when the caller needs the answer now (auth check, read-your-write, validation). The costs you accept with events: **eventual consistency**, **at-least-once delivery semantics** (so consumers must be idempotent), and **operational complexity** — brokers, schema evolution, replay, and monitoring become production infrastructure."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Events vs commands — the key distinction:**\n- An **event** is a fact in past tense ('OrderPlaced'): any number of interested consumers; the producer has no expectations\n- A **command** ('SendRefundEmail') has exactly one intended consumer and implies intent — closer to async RPC\n- Publishing domain events from the service layer keeps business language in the integration ('PaymentCaptured', 'SubscriptionUpgraded')\n\n**Patterns built on events:**\n- **Pub/sub fan-out**: one publish, N independent consumers — the core decoupling win\n- **CQRS**: events feed read-model projections; queries hit fast local stores\n- **Event-carried state transfer**: the event carries the data consumers need, so they avoid calling back to the producer ('shadow copy' of state)\n- **Saga choreography**: services react to each other's events without a central coordinator\n- **Stream processing**: events as a durable log enable replay, time-travel debugging, and new consumers added retroactively\n\n**Delivery semantics (know them cold):**\n- Brokers give **at-least-once** (Kafka, SQS standard) — duplicates happen (retries, rebalances); consumers must be idempotent (dedupe keys, natural idempotency)\n- **Exactly-once** is a processing property (Kafka transactions, idempotent producers), not a magic delivery mode — end-to-end exactly-once still requires idempotent side effects\n- **Ordering**: guaranteed per partition/key (Kafka) — design keys so related events share a partition; global order is essentially unobtainable\n\n**When NOT to use events:**\n- The caller needs an immediate authoritative answer (payments auth, permission checks)\n- Workflows where the user waits — async round trips make UX worse\n- Small teams without ops capacity for a broker — request/reply between two services is fine at first\n\n**Operational bill:** schema registry + backward/forward-compatible evolution, consumer lag monitoring, dead-letter queues, replay tooling, and tracing across async boundaries (correlation ids)."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Order flow: sync for the answer, events for the fallout",
+        "language": "text",
+        "code": "POST /orders  (user is waiting - synchronous where it matters)\\n  OrderService.PlaceOrder()\\n    - validate payment synchronously with PaymentService (need the answer NOW)\\n    - persist Order (status=Placed)\\n    - publish OrderPlaced event, commit, return 201\\n\\nEvent consumers (fire-and-forget fallout, each decoupled):\\n  InventoryService   -> reserve stock, publish StockReserved\\n  NotificationService-> confirmation email\\n  SearchService      -> index the product purchase history\\n  AnalyticsService   -> append to revenue stream\\n  LoyaltyService     -> award points\\n\\nAdding 'award points' later = adding a consumer. Zero changes to OrderService.\\nThat is the decoupling event-driven architecture buys.\\n\\nFailure handling in the flow:\\n  Inventory can't reserve -> publishes OrderRejected\\n  NotificationService reacts to OrderRejected -> apologetic email\\n  (choreographed compensation - see sagas lesson)\\n\\nIdempotent consumer sketch:\\n  on OrderPlaced(event):\\n    if processedEvents.contains(event.eventId): return  // dedupe\\n    reserve(event); processedEvents.add(event.eventId)"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Events trade consistency for independence",
+        "text": "After OrderPlaced, inventory, search, and analytics are each momentarily wrong until their consumers catch up. Design for that: show 'processing' states, tolerate stale reads, and never build user-visible flows that assume an event has already been consumed."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Publishing events consumers must have for the request to be correct — that's a sync call wearing a costume",
+          "Non-idempotent consumers with at-least-once delivery — duplicated emails and double charges",
+          "Events carrying no payload, forcing every consumer to call back to the producer",
+          "Ignoring consumer lag and DLQ monitoring — silent async failures",
+          "Global-order expectations — design partition keys instead",
+          "Choreography spaghetti: 12 consumers reacting to 12 events with no one able to explain the flow (consider orchestrated sagas)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you evolve an event schema without breaking existing consumers?",
+          "How does a consumer replay a backlog after a bugfix?",
+          "Choreography vs orchestration — when does each sag?",
+          "How do correlation ids stitch async traces together?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Events = facts with many interested consumers; commands = one intended consumer",
+          "Fan-out, CQRS projections, event-carried state, and sagas all build on events",
+          "At-least-once + idempotent consumers is the realistic contract",
+          "You pay with eventual consistency and broker operations — budget for both"
+        ],
+        "takeaway": "Publish events for the fallout of a business fact; call synchronously only when you genuinely need the answer before you can finish."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sagas-distributed-transactions",
+    "database-per-service",
+    "how-do-you-guarantee-an-operation-is-applied-only-once"
+  ],
+  "furtherReading": [
+    {
+      "title": "What do you mean by Event-Driven? — Martin Fowler",
+      "url": "https://martinfowler.com/articles/201701-event-driven.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "Event-driven architecture style — Microsoft",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Architecture",
+  "estimatedMinutes": 22
+}

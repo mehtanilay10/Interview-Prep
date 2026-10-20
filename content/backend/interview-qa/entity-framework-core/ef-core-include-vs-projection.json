@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-ef-include-vs-projection",
+  "slug": "ef-core-include-vs-projection",
+  "moduleSlug": "entity-framework-core",
+  "title": "When should you use Select projection instead of Include?",
+  "description": "DTO projections that fetch only what you need, cartesian explosion, and when full entities are actually right.",
+  "order": 10,
+  "difficulty": "intermediate",
+  "tags": [
+    "ef-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** When should you use Select projection instead of Include?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`Include` loads **entire entities** and their graphs — convenient when you intend to track and modify them. `Select` projection materializes only the columns your DTO needs — smaller payloads, no change tracking, often fewer joins. Prefer projection for **read-only** endpoints (lists, reports, API responses); prefer `Include` when the entities will be **modified and saved** through the same DbContext. Combining many `Include`s of collections causes **cartesian explosion** — split queries or project instead."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Include:**\n- `Include(b => b.Posts).ThenInclude(p => p.Comments)` — one entity graph, tracked by default\n- Required for EF to know the graph when you save navigation changes (adding a child to a loaded collection)\n- Every included collection multiplies rows in a single JOIN — three 100-row collections → 1,000,000 combined rows before EF dedupes client-side (**cartesian explosion**); `AsSplitQuery()` issues one query per root+collection instead, trading joins for round-trips\n- Full entities carry every column (including heavy ones you don't display) and pay tracking overhead\n\n**Projection:**\n- `.Select(b => new BlogCardDto(b.Id, b.Url, b.Posts.Count))` — SQL fetches exactly these columns/aggregates\n- Results are **not tracked** — reads are cheaper and the context stays lean (you can't accidentally SaveChanges a DTO)\n- Collections of primitives/DTOs are supported (`Select(b => new BlogDto { Tags = b.Posts.Select(...) })`) — no navigation graph at all\n- Aggregates, counts, and computed values happen **in SQL** instead of loading rows to count in memory\n- Can even project to types EF never mapped (`Select(p => new { p.Title, Recent = ... })`, tuples, existing DTOs)\n\n**Rule of thumb:**\n- Endpoint only displays data → projection (or `AsNoTracking` + Include when you truly need graph shape)\n- Endpoint edits and saves the same aggregate → `Include` (tracking is the point)\n- Report/analytics → projection with `AsNoTracking` even if 'graph-shaped'\n- Sorting/filtering on large sets → do it in SQL before projection; never filter client-side after loading"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Graph load vs tight projection",
+        "language": "csharp",
+        "code": "// READ endpoint — projection: 3 columns, no tracking, COUNT in SQL\nvar cards = await db.Blogs\n    .Where(b => b.IsPublic)\n    .Select(b => new BlogCard(\n        b.Id,\n        b.Url,\n        b.Posts.Count(p => p.PublishedAt != null)))\n    .ToListAsync();\n// SELECT b.Id, b.Url,\n//        (SELECT COUNT(*) FROM Posts p WHERE p.BlogId = b.Id AND p.PublishedAt IS NOT NULL)\n// FROM Blogs b WHERE b.IsPublic = 1\n\n// Heavy Include graph → cartesian explosion risk\nvar blogs = await db.Blogs\n    .Include(b => b.Posts)\n    .ThenInclude(p => p.Comments)\n    .Include(b => b.Authors)\n    .ToListAsync();   // Posts × Comments × Authors rows in one result set\n\n// Better when the graph is needed:\nvar blogs2 = await db.Blogs\n    .Include(b => b.Posts).ThenInclude(p => p.Comments)\n    .Include(b => b.Authors)\n    .AsSplitQuery()          // one query per collection — bounded row sets\n    .ToListAsync();\n\n// EDIT endpoint — Include is correct: tracking lets SaveChanges diff the graph\nvar blog = await db.Blogs\n    .Include(b => b.Posts)\n    .FirstAsync(b => b.Id == id);\nblog.Posts.Add(new Post { Title = \"New\" });  // tracked insert on save\nawait db.SaveChangesAsync();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing projection returns untracked DTOs and smaller SQL\n- Understanding cartesian explosion and the AsSplitQuery fix\n- The edit-vs-read distinction: Include exists for tracked graph mutations\n- Doing counts/filters/aggregates in SQL, not in memory"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Including five collections in one query — exponential row growth and huge memory spikes",
+          "Projecting, then expecting SaveChanges to persist navigation changes (results aren't tracked)",
+          "Loading full entities to compute counts/sums in memory",
+          "Client-side evaluation after ToList: filtering/sorting in C# because 'the LINQ was complex'",
+          "Selecting all columns (`Select(x => x)`) — that's just a more expensive Include",
+          "Forgetting indexes on columns used in the WHERE/ORDER BY of projections — the SQL still has to find rows"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you page a list efficiently while filtering on a related collection?",
+          "When would you choose AsNoTracking with Include over projection?",
+          "How do you project into an existing DTO that lives in another project?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Include = tracked full graph; Select = lean, untracked, SQL-shaped output",
+          "Many collection Includes → cartesian explosion → AsSplitQuery or project",
+          "Counts, filters, and sorting belong in SQL before materialization",
+          "Projection for reads; Include when the same graph will be saved"
+        ],
+        "takeaway": "Fetch exactly what the screen needs — projection by default, Include only when tracking a graph you're about to modify."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "lazy-eager-loading",
+    "change-tracking-and-savechanges"
+  ],
+  "furtherReading": [
+    {
+      "title": "Querying with related data (EF Core)",
+      "url": "https://learn.microsoft.com/ef/core/querying/single-split-queries",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Projections in EF Core",
+      "url": "https://learn.microsoft.com/ef/core/querying/projections",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 25
+}

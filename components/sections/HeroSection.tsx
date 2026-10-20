@@ -7,8 +7,8 @@ interface HeroSectionProps {
   totalCourses: number;
   /** Destination for the primary "Start Learning" call to action. */
   startHref?: string;
-  /** Destination for the "Interview Questions" call to action. */
-  interviewHref?: string;
+  /** Destination for the secondary "Browse questions" call to action. */
+  questionsHref?: string;
 }
 
 /** A compact, honest sample of what a lesson looks like — used as hero artwork. */
@@ -29,7 +29,7 @@ export function HeroSection({
   totalHours,
   totalCourses,
   startHref = '/',
-  interviewHref = '/backend/interview-questions',
+  questionsHref = '/backend/interview-questions',
 }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-canvas">
@@ -60,10 +60,11 @@ export function HeroSection({
           </span>
 
           <h1 className="text-balance text-4xl font-bold leading-[1.05] tracking-tight text-fg-default sm:text-5xl lg:text-6xl">
-            The interview rarely tests what you{' '}
-            <span className="text-fg-subtle line-through decoration-danger-fg/60">memorised</span>.
+            Anyone can{' '}
+            <span className="text-fg-subtle line-through decoration-danger-fg/60">memorise</span>{' '}
+            syntax and APIs.
             <br />
-            It tests how you{' '}
+            What compounds is how you{' '}
             <span className="relative whitespace-nowrap text-accent-fg">
               think
               <svg
@@ -79,9 +80,9 @@ export function HeroSection({
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">
-            Quotient is a structured learning workspace for technical interviews and the career
-            beyond them &mdash; worked solutions, realistic questions, cheat sheets, and diagrams
-            that explain the <em>why</em>, not just the answer.
+            Quotient is a structured learning workspace for software engineers &mdash; worked
+            solutions, practical questions, cheat sheets, and diagrams that explain the{' '}
+            <em>why</em>, not just the answer.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -97,10 +98,10 @@ export function HeroSection({
               />
             </Link>
             <Link
-              href={interviewHref}
+              href={questionsHref}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 font-medium text-fg-default transition-colors hover:bg-canvas-subtle"
             >
-              Browse interview questions
+              Browse questions
             </Link>
           </div>
 

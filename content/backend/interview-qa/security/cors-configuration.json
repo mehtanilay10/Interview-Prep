@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-cors-configuration",
+  "slug": "cors-configuration",
+  "moduleSlug": "security",
+  "title": "What is CORS and how do you configure it safely in ASP.NET Core?",
+  "description": "Preflight requests, allowed origins vs credentials, middleware order, and what CORS does not protect against.",
+  "order": 7,
+  "difficulty": "intermediate",
+  "tags": [
+    "security",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is CORS and how do you configure it safely in ASP.NET Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CORS (Cross-Origin Resource Sharing) is a **browser-enforced** protocol that lets a server declare which other origins may read its responses. Without it, the browser's same-origin policy blocks your SPA on `app.example.com` from calling `api.example.com`. The server responds with `Access-Control-Allow-*` headers; unsafe requests trigger a preflight `OPTIONS` check first. CORS constrains **browsers**, not other clients — a curl or Postman caller ignores it entirely, so authorization still has to be real."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How the flow works:**\n- Simple requests (GET/POST with safe headers) go out directly; the browser checks the response's `Access-Control-Allow-Origin`\n- Everything else (custom headers, PUT/DELETE, `application/json` in some cases) triggers a **preflight OPTIONS** request — the server must approve method, headers, and origin before the real request is sent\n- A missing or mismatched allow header surfaces as an opaque CORS error in the browser console — the request may have already reached the server\n\n**Safe configuration rules:**\n- List **explicit origins** — never `AllowAnyOrigin` for authenticated traffic\n- `AllowCredentials` (cookies) is incompatible with wildcard origins — ASP.NET Core throws at runtime if you combine them\n- Place `UseCors` before `UseAuthentication`/`UseAuthorization` so preflights resolve without challenging\n- Use a named policy per client (SPA, mobile BFF) rather than one global allow-all\n- CORS is not CSRF protection and not authentication: it does not verify *who* is calling\n- Non-browser clients are unaffected — secure every endpoint on its own merits"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Named CORS policy, safe defaults",
+        "language": "csharp",
+        "code": "// Program.cs\nconst string SpaCors = \"SpaOrigin\";\n\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(SpaCors, policy => policy\n        .WithOrigins(\"https://app.example.com\")   // explicit origins, not *\n        .WithMethods(\"GET\", \"POST\", \"PUT\", \"DELETE\")\n        .WithHeaders(\"Content-Type\", \"Authorization\")\n        .AllowCredentials()                        // cookies / antiforgery\n        .SetPreflightMaxAge(TimeSpan.FromMinutes(10)));\n});\n\nvar app = builder.Build();\napp.UseCors(SpaCors);            // BEFORE auth so OPTIONS never gets challenged\napp.UseAuthentication();\napp.UseAuthorization();\n\n// Per-endpoint override when one controller serves a different client\n[EnableCors(\"MobileBffOrigin\")]\n[ApiController]\n[Route(\"api/mobile\")]\npublic class MobileController : ControllerBase { }\n\n// ❌ These combinations fail or silently break:\n// .WithOrigins(\"*\").AllowCredentials()   → InvalidOperationException at startup\n// app.UseCors() with AllowAnyOrigin on authed APIs → anyone can read responses in-browser"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing CORS exists for the browser, not as an API security control\n- Understanding preflight vs simple requests\n- Practical rules: explicit origins, credentials+wildcard conflict, middleware order\n- Clear separation from CSRF (CORS decides who may *read*; CSRF tokens guard unsafe *writes*)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "AllowAnyOrigin on APIs with cookie or token auth — over-permissive by design",
+          "Putting UseCors after authentication, so preflight requests get 401 and the browser blocks everything",
+          "Thinking CORS stops attackers — curl, mobile apps, and server-side callers ignore it",
+          "Forgetting credentials: 'withOrigins but no AllowCredentials' means cookies are dropped and sessions break",
+          "Debugging CORS from the client only — the real answer is in the response headers the server sent"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What happens during a preflight and which headers does the server return?",
+          "How is CORS different from CSRF protection?",
+          "A teammate says 'CORS is failing' — how do you verify from the server side?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "CORS = browser-enforced origin allow-list with Access-Control-* headers",
+          "Unsafe requests are preceded by an OPTIONS preflight",
+          "Explicit origins + no wildcard with credentials; UseCors before auth",
+          "CORS constrains browsers only — authorization is still your job"
+        ],
+        "takeaway": "Configure CORS as a tight, per-client origin allow-list for your SPA — and never mistake it for authentication or attack protection."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "csrf-antiforgery",
+    "prevent-xss",
+    "rate-limiting"
+  ],
+  "furtherReading": [
+    {
+      "title": "Cross-Origin Resource Sharing (CORS) in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/security/cors",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "CORS — MDN Web Docs",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
+      "type": "article",
+      "author": "MDN"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Security",
+  "estimatedMinutes": 22
+}

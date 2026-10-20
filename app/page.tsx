@@ -23,9 +23,9 @@ import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
 export const metadata = buildMetadata({
-  title: 'Quotient | Interview Prep & Career-Long Learning',
+  title: 'Quotient | Structured Learning for Software Engineers',
   description:
-    'A structured learning workspace for interviews and career growth: courses, worked solutions, realistic questions, cheat sheets, and AI tooling. Build durable fundamentals and learn the why, not just the answer.',
+    'A structured learning workspace for software engineers: courses, worked solutions, practical questions, cheat sheets, and AI tooling. Build durable fundamentals and learn the why, not just the answer.',
   path: '/',
 });
 
@@ -47,22 +47,22 @@ export default function HomePage() {
 
   const [firstInterviewCategory] = getInterviewCategories();
 
-  // Distinct curriculum pillars — copy is specific to interview prep, not generic
-  // "we have courses" filler.
+  // Distinct curriculum pillars — copy is specific to real learning workflows,
+  // not generic "we have courses" filler.
   const pillars = [
     {
       icon: <Code2 className="h-5 w-5 text-accent-fg" aria-hidden="true" />,
       tag: 'Worked solutions',
       title: 'Problems with multiple approaches',
       description:
-        'Every coding problem ships with a naive solution, an optimal one, complexity analysis, and the trade-offs an interviewer actually probes.',
+        'Every coding problem ships with a naive solution, an optimal one, complexity analysis, and the trade-offs that decide which one belongs in production.',
     },
     {
       icon: <Terminal className="h-5 w-5 text-done-fg" aria-hidden="true" />,
       tag: 'Realistic questions',
       title: 'Q&A by technology and depth',
       description:
-        'Behavioural, system design, and language-specific questions grouped by difficulty — so you can drill the rounds you keep failing.',
+        'Conceptual, system design, and language-specific questions grouped by depth — so you always know what to study next.',
     },
     {
       icon: <Bug className="h-5 w-5 text-danger-fg" aria-hidden="true" />,
@@ -76,7 +76,7 @@ export default function HomePage() {
       tag: 'Reference',
       title: 'Cheat sheets you keep open',
       description:
-        'Dense, correct, copy-ready snippets for C#, SQL, React, and more — the one tab you leave pinned during interviews.',
+        'Dense, correct, copy-ready snippets for C#, SQL, React, and more — the one tab you leave pinned while you work.',
     },
   ];
 
@@ -120,7 +120,7 @@ export default function HomePage() {
         totalHours={stats.totalHours}
         totalCourses={courses.length}
         startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
-        interviewHref={
+        questionsHref={
           firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/search'
         }
       />
@@ -131,7 +131,7 @@ export default function HomePage() {
           <SectionHeader
             eyebrow="How it works"
             title="From blank stare to structured thinking"
-            description="No gamified streaks, no hollow progress bars. Just the loop that moves the needle - whether you are prepping for next week or growing for the next five years."
+            description="No gamified streaks, no hollow progress bars. Just the loop that moves the needle - whether you are picking up the basics or leveling up after years at work."
           />
           <ol className="grid gap-4 sm:grid-cols-3">
             {[
@@ -196,13 +196,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Career growth — the long-run story beyond interview week */}
+      {/* Career growth — the long-run story, week by week */}
       <section className="border-b border-border bg-canvas-subtle py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHeader
-            eyebrow="Beyond interview week"
-            title="Built for the career, not just the interview"
-            description="Interviews are a milestone, not the finish line. The same material that gets you through the loop is what keeps you growing as an engineer - and the progress tools keep you consistent between the big goals."
+            eyebrow="Long-term growth"
+            title="Built for the career, not just the course"
+            description="A course is a milestone, not the finish line. The same material that gets you through a tough code review is what keeps you growing as an engineer - and the progress tools keep you consistent between the big goals."
           />
           <div className="grid gap-4 sm:grid-cols-2">
             {careerPillars.map((pillar) => (
@@ -295,11 +295,12 @@ export default function HomePage() {
             />
             <div className="relative">
               <h2 className="text-balance text-2xl font-bold tracking-tight text-fg-default sm:text-3xl">
-                Walk in ready. Keep growing after.
+                Learn it deeply. Keep growing after.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-fg-muted">
-                Free, open, and no account required. Master the reasoning behind interviews,
-                AI tooling, and programming — then track your progress when you&apos;re ready.
+                Free, open, and no account required. Master the reasoning behind modern
+                software, AI tooling, and programming — then track your progress when you&apos;re
+                ready.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link

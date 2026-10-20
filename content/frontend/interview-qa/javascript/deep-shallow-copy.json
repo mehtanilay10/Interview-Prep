@@ -1,0 +1,149 @@
+{
+  "id": "lesson-iq-deep-shallow-copy",
+  "slug": "deep-shallow-copy",
+  "moduleSlug": "javascript",
+  "title": "What is the difference between a deep copy and a shallow copy?",
+  "description": "Reference semantics: spread, Object.assign, structuredClone, recursion pitfalls, and why copying matters for React state immutability.",
+  "order": 16,
+  "difficulty": "intermediate",
+  "tags": [
+    "javascript",
+    "immutability",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the difference between a deep copy and a shallow copy?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **shallow copy** duplicates only the top level: the new object/array is independent, but its nested values are still **shared references** to the originals — mutating `copy.a.b` changes `original.a.b`. A **deep copy** duplicates the whole tree, so nothing is shared. In JavaScript, `{ ...obj }`, `Object.assign({}, obj)`, `arr.slice()`, and `Array.from(arr)` are shallow. `structuredClone(obj)` is the built-in deep copy (recursively clones plain data, Dates, Maps, Sets, ArrayBuffers — fails on functions, DOM nodes, class prototypes, and cyclic-aware in ways that matter). JSON round-tripping (`JSON.parse(JSON.stringify(x))`) is a common hack that silently drops undefined, functions, Dates (→ strings), and blows up on circular references."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Why copies exist at all:** JavaScript assigns objects **by reference** — `const b = a` makes both names point to one object. Many patterns (React state, undo history, immutable stores) require 'a new object that differs by one field' without touching the old one.\n\n**Shallow copy tools:**\n- `{ ...obj }` / `Object.assign({}, obj)` — copies own enumerable props one level; nested objects, arrays inside are shared\n- `arr.slice()` / `[...arr]` / `Array.from(arr)` — new array, same element references\n- `Object.fromEntries(Object.entries(obj))` — same one-level semantics\n- Nested state update in React still needs manual spreads per level (`{ ...state, user: { ...state.user, name } }`) — that's shallow copying applied deliberately at every level you intend to change\n\n**Deep copy tools:**\n- `structuredClone(x)` — native, handles cycles, many built-ins; cannot clone functions/class instances (throws DataCloneError), DOM nodes, getters/setters (values are read, not copied)\n- Hand-written recursive clone for controlled shapes; libraries (`cloneDeep`) for complex graphs with special cases\n- JSON round-trip: fast to write, lossy — Date → string, undefined/function dropped, NaN → null, throws on cycles\n\n**When to deep vs shallow:**\n- Immutable state update → shallow copy each level along the changed path (cheap, preserves shared untouched subtrees — this is structural sharing, what Immutable.js/Immer optimize)\n- Full isolation (snapshot, worker postMessage, offline queue) → deep clone\n- Never deep-clone casually in hot paths — cost is O(tree size); clone once at the boundary\n\n**Subtleties:**\n- Spread ignores non-enumerable props and prototype chain — the copy is a plain object (loses class methods)\n- Maps/Sets: spread gives a new container with same references; structuredClone deep-copies contents\n- Symbols: spread copies symbol-keyed own enumerable props; JSON ignores them\n- Cyclic structures: spread is fine (shallow); structuredClone handles cycles; JSON.stringify throws"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Where shallow copies bite, and choosing the right tool",
+        "language": "javascript",
+        "code": "const original = {\\n  user: { name: 'Ada', tags: ['admin'] },\\n  meta: { createdAt: new Date() },\\n};\\n\\n// Shallow copy: new top object, SHARED user/tags\\nconst shallow = { ...original };\\nshallow.user.name = 'Lin';           // ⚠️ original.user.name is now 'Lin' too\\nshallow.meta = { ...shallow.meta };  // fix level by level when needed\\n\\n// Correct immutable update: spread every level you change\\nconst updated = {\\n  ...original,\\n  user: { ...original.user, name: 'Lin' },   // tags still shared — fine, unchanged\\n};\\n// original.user.name stays 'Ada' — structural sharing: untouched subtrees stay shared\\n\\n// Deep copy: nothing shared\\nconst deep = structuredClone(original);\\ndeep.user.name = 'Grace';            // original untouched\\ndeep.meta.createdAt;                 // real Date, independent\\n\\n// JSON round-trip: the lossy version\\nJSON.parse(JSON.stringify(original)).meta.createdAt;  // STRING, not Date\\n// functions dropped, undefined vanishes, cycles throw TypeError\\n\\n// structuredClone limitations:\\n// structuredClone({ fn: () => {} });      // DataCloneError\\n// structuredClone(new HTMLElement());     // DataCloneError\\n// structuredClone(new MyClass());         // loses prototype -> plain object\\n\\n// React flavor: forgetting the nested level is the classic immutability bug\\nfunction renameBad(state, name) {\\n  return { ...state, user: { name } };          // ⚠️ dropped other user fields? no — replaced entire user\\n}\\nfunction renameGood(state, name) {\\n  return { ...state, user: { ...state.user, name } };  // ✅\\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't deep-clone to 'fix' mutability bugs",
+        "text": "structuredClone everywhere hides the real issue — you pay O(tree) per update and still share nothing, destroying structural sharing benefits. For immutable state, do deliberate per-level shallow copies (or use Immer), and reserve deep cloning for true isolation boundaries: workers, snapshots, persisted queues."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Precise definitions and the reference-sharing consequence of shallow copies\n- Knowing the toolset: spread (shallow), structuredClone (deep, with limits), JSON (lossy hack)\n- The React connection: per-level spread, immutability bugs from shared nesting\n- Cost awareness: deep copying is O(tree); prefer structural sharing"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Spreading one level and mutating nested arrays/objects — still aliases the original",
+          "Using JSON.parse(JSON.stringify()) and losing Dates, undefined, functions, or crashing on cycles",
+          "Deep-cloning entire large state on every keystroke",
+          "Replacing a nested object wholesale instead of spreading it (dropping sibling fields)",
+          "Expecting spread to preserve class prototypes or copy getters",
+          "Mutating a shared subtree that another copy also references — the state desync bug"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does Immer produce immutable updates with mutable-looking code?",
+          "What is structural sharing and why do immutable libraries rely on it?",
+          "How would you deep-clone an object containing functions or a class instance?",
+          "What happens when you structuredClone an object with circular references?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Shallow copy: new top level, shared nested references",
+          "Spread/Object.assign/slice are shallow; structuredClone is the deep-copy standard",
+          "JSON round-trip is lossy — Dates, undefined, functions, cycles",
+          "Immutable updates: shallow-copy each changed level; deep-clone only at isolation boundaries"
+        ],
+        "takeaway": "Copies in JavaScript are about reference graphs: know exactly which edges are new and which still point to the original."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "js-b01",
+    "js-i05"
+  ],
+  "furtherReading": [
+    {
+      "title": "structuredClone() — MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/structuredClone",
+      "type": "article",
+      "author": "MDN Web Docs"
+    },
+    {
+      "title": "JavaScript.info: Object copying, prototypes",
+      "url": "https://javascript.info/object-copying",
+      "type": "article",
+      "author": "javascript.info"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "JavaScript",
+  "estimatedMinutes": 20
+}

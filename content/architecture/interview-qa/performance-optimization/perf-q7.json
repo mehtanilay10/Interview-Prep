@@ -1,0 +1,145 @@
+{
+  "id": "lesson-iq-perf-q7",
+  "slug": "perf-q7",
+  "moduleSlug": "performance-optimization",
+  "title": "How do you find and fix N+1 query patterns?",
+  "description": "The query-per-row trap in ORMs and hand-written code: spotting it in logs and traces, fixing with joins/projection/batching, and when N+1 is fine.",
+  "order": 7,
+  "difficulty": "intermediate",
+  "tags": [
+    "interview",
+    "performance",
+    "orm",
+    "database"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you find and fix N+1 query patterns?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An N+1 happens when you fetch a list (1 query) and then run **another query per row** (N queries) — usually a lazy-loaded navigation property or a per-item lookup in a loop. It's invisible in dev with 3 rows and catastrophic in prod with 500: latency becomes N round trips (~5ms each locally, 30–100ms over a network). **Find it**: count queries per request in logs/MiniProfiler/tracing spans — 200 queries for one page is the signature; enable EF Core's lazy-loading warnings and log every command in dev. **Fix it**: eager-load with `Include`/projection, batch the lookups into one `WHERE Id IN (...)`, or use a dataloader pattern to coalesce concurrent requests. Not every N+1 is wrong — small N with warm local DB may be simpler and just as fast; the sin is discovering it at 10× data volume."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Classic sources: lazy-loaded navigation in a loop (EF Core .Include missing), per-row permission lookups, per-row tax/shipping calls, serializers touching unloaded properties",
+          "Detection tools: MiniProfiler (query list per request), EF Core logging ('Executed DbCommand'), distributed tracing spans (one span per query), and simply logging query count per request",
+          "Fix 1 — Include/projection: one JOINed query; project to a DTO so you don't drag entity graphs",
+          "Fix 2 — batch: collect ids in the loop, one WHERE Id IN (...) or a VALUES-join for huge sets",
+          "Fix 3 — dataloader: coalesce concurrent per-key fetches (GraphQL dataloaders, or manual batching) — great for per-user lookups under parallel load",
+          "Watch the fix's shape: Include of a filtered collection (Where inside Include) can produce row multiplication — use filtered Include or projection",
+          "DTO projection beats Include for read paths: less data, no tracking overhead, no accidental lazy loads later",
+          "Not always bad: N ≤ ~10 on a local DB, or when queries hit different shards intentionally — measure, don't dogma"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "101 queries vs 1: the loop and its fixes",
+        "language": "csharp",
+        "code": "// ❌ N+1: 1 query for orders + 1 query PER order for its customer\\nvar orders = await _db.Orders.Take(100).ToListAsync();\\nforeach (var o in orders)\\n{\\n    var name = o.Customer.Name;              // lazy load -> 100 extra round trips\\n    Console.WriteLine($\"{o.Id} {name}\");\\n}\\n// MiniProfiler shows: 101 commands, 480ms total, 100 of them at ~4ms\\n\\n// ✅ Fix 1: projection in one query (usually the best answer)\\nvar rows = await _db.Orders\\n    .Take(100)\\n    .Select(o => new { o.Id, CustomerName = o.Customer.Name })\\n    .ToListAsync();\\n\\n// ✅ Fix 2: batch when the loop logic can't be one query\\nvar orders = await _db.Orders.Take(100).ToListAsync();\\nvar customerIds = orders.Select(o => o.CustomerId).Distinct().ToList();\\nvar customers = await _db.Customers\\n    .Where(c => customerIds.Contains(c.Id))\\n    .ToDictionaryAsync(c => c.Id);           // 2 queries total regardless of N\\n\\n// ✅ Fix 3 (dateloader-style) for parallel per-key fetches:\\n// coalesce all requests for key K arriving within a tick into ONE query\\n\\n// ⚠️ Include with collection filter pitfall:\\n// .Include(o => o.Lines.Where(l => l.IsActive))  -> row multiplication on joins;\\n// use .AsSplitQuery() or projection for multi-collection Includes"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Discovering N+1 only in production — log query counts per request from day one",
+          "Fixing with a bigger Include graph that drags unrelated collections — project to DTOs",
+          "Ignoring lazy-loading warnings in EF Core (this.context.ChangeTracker auto-detection)",
+          "Batching with WHERE IN over 10k ids without chunking — statement size/plan issues",
+          "Assuming Include of two filtered collections composes — it multiplies rows",
+          "Applying 'no N+1 ever' dogma to genuinely small, warm-path lookups"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does the dataloader pattern change the N+1 story under concurrency?",
+          "When is AsSplitQuery the right fix for Include multiplication?",
+          "How do you detect N+1s in EF Core without MiniProfiler?",
+          "What's the N+1 equivalent in REST clients calling other services?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "N+1 = 1 list query + one query per row; latency = N network round trips",
+          "Detect via query counts: MiniProfiler, EF logs, trace spans",
+          "Fix: project (one JOINed query), batch WHERE IN, or dataloader coalescing",
+          "Filtered Includes multiply rows — split or project instead"
+        ],
+        "takeaway": "The query log never lies: if one page issues a query count proportional to its row count, you've found the N+1 — fix it with one round trip, not cleverer loops."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "perf-q2",
+    "perf-q1"
+  ],
+  "furtherReading": [
+    {
+      "title": "EF Core: loading related data",
+      "url": "https://learn.microsoft.com/en-us/ef/core/querying/related-data",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "The N+1 SQL problem — VS Tips",
+      "url": "https://www.vsdatatips.com/n-1-sql-problem/",
+      "type": "article",
+      "author": "VS Data Tips"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Performance Optimization",
+  "estimatedMinutes": 18
+}

@@ -1,0 +1,140 @@
+{
+  "id": "lesson-iq-rate-limiting",
+  "slug": "rate-limiting",
+  "moduleSlug": "security",
+  "title": "How do you implement rate limiting in ASP.NET Core?",
+  "description": "Built-in RateLimiter middleware, window strategies, partitioning, and what to return to clients.",
+  "order": 8,
+  "difficulty": "intermediate",
+  "tags": [
+    "security",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you implement rate limiting in ASP.NET Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core ships built-in rate limiting middleware (`Microsoft.AspNetCore.RateLimiting`): you define named limiters (fixed window, sliding window, token bucket, concurrency) with a **partition function** per client, then apply them globally or per endpoint with `[EnableRateLimiting]`. Over-limit requests receive **429 Too Many Requests** with a `Retry-After` header. In distributed deployments, state must be shared (e.g. Redis-backed custom limiter) — the in-memory limiter counts per instance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Choosing a strategy:**\n- **Fixed window** — simple counting per window; allows bursts at window edges (2× limit across a boundary)\n- **Sliding window** — smooths the edge by rolling recent history; good default for APIs\n- **Token bucket** — allows controlled bursts up to bucket size, then refills at a steady rate; ideal for public APIs\n- **Concurrency limiter** — caps *in-flight* requests, protecting a slow dependency regardless of request rate\n\n**Design points:**\n- Partition by API key or user id when authenticated; fall back to remote IP for anonymous traffic\n- Behind a proxy/CDN, use the forwarded header (`ForwardedHeaders` / `UseForwardedHeaders`) or you rate-limit the proxy itself\n- Reject with 429 + `Retry-After` (seconds) so clients back off correctly; add `RateLimit` headers if useful\n- Rate limits complement — not replace — authentication, and stop credential-stuffing/abuse on expensive endpoints\n- Multi-instance apps: in-memory windows are per node; for global fairness use a shared store (Redis) or edge rate limiting (API gateway/CDN)"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Sliding-window limiter with per-user partitions",
+        "language": "csharp",
+        "code": "using System.RateLimiting;\nusing Microsoft.AspNetCore.RateLimiting;\n\nbuilder.Services.AddRateLimiter(options =>\n{\n    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;\n\n    options.AddSlidingWindowLimiter(\"api\", limiterOptions =>\n    {\n        limiterOptions.PermitLimit = 100;              // requests allowed\n        limiterOptions.Window = TimeSpan.FromMinutes(1);\n        limiterOptions.SegmentsPerWindow = 6;          // 10-second segments\n        limiterOptions.QueueLimit = 0;                 // no queueing — reject fast\n        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;\n    });\n\n    // Partition: authenticated user, else IP\n    options.OnRejected = async (context, cancellationToken) =>\n    {\n        context.HttpContext.Response.Headers.RetryAfter = \"30\";\n        await context.HttpContext.Response.WriteAsync(\n            \"{\\\"error\\\":\\\"rate_limit_exceeded\\\",\\\"retryAfter\\\":30}\",\n            cancellationToken);\n    };\n});\n\nvar app = builder.Build();\napp.UseRateLimiter();                 // after UseRouting, before endpoints\n\n// Global default, tighter bucket on the expensive endpoint\n[EnableRateLimiting(\"api\")]\n[HttpPost(\"reports/generate\")]\npublic IActionResult Generate() => Accepted();\n\n[DisableRateLimiting]                 // health checks should never 429\n[HttpGet(\"health\")]\npublic IActionResult Health() => Ok();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing which limiter fits which traffic shape (smooth vs bursty vs slow-dependency)\n- Partitioning: per user/key vs per IP, and the proxy pitfall\n- Correct client contract: 429 + Retry-After, idempotent retries\n- Scale awareness: per-instance memory vs shared/global limiting"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Limiting per IP behind a load balancer without forwarded headers — all users share one bucket",
+          "Choosing a fixed window and being surprised by double traffic at window boundaries",
+          "Blocking threads or queueing unboundedly while \"waiting\" for the slow endpoint",
+          "Returning 429 without Retry-After, so clients hammer faster",
+          "Applying rate limits only at the edge and leaving internal endpoints unlimited",
+          "Treating rate limiting as an anti-CSRF or anti-authentication control"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Fixed window vs sliding window vs token bucket — which would you pick for a public API and why?",
+          "How do you keep rate-limit counters correct across 10 instances?",
+          "How does a concurrency limiter differ from a request-rate limiter?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Built-in middleware: fixed, sliding, token bucket, and concurrency limiters",
+          "Partition by API key/user (fall back to IP, honoring forwarded headers)",
+          "Respond 429 + Retry-After; keep health checks exempt",
+          "In-memory limits are per instance — distributed traffic needs shared state"
+        ],
+        "takeaway": "Pick the limiter that matches your traffic shape, partition per client, and remember: a per-node counter is not a global limit."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "cors-configuration",
+    "secrets-management",
+    "authentication-vs-authorization"
+  ],
+  "furtherReading": [
+    {
+      "title": "Rate limiter middleware in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/performance/rate-limit",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "API Security Cheat Sheet — rate limiting",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/API_Security_Cheat_Sheet.html",
+      "type": "article",
+      "author": "OWASP"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Security",
+  "estimatedMinutes": 22
+}

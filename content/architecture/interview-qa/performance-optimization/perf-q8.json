@@ -1,0 +1,146 @@
+{
+  "id": "lesson-iq-perf-q8",
+  "slug": "perf-q8",
+  "moduleSlug": "performance-optimization",
+  "title": "How do you load-test a service and set capacity limits?",
+  "description": "From realistic workloads to saturation curves: choosing tools, finding the knee point, and turning results into limits, autoscaling rules, and SLOs.",
+  "order": 8,
+  "difficulty": "intermediate",
+  "tags": [
+    "interview",
+    "performance",
+    "capacity",
+    "devops"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you load-test a service and set capacity limits?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Model a **realistic workload** (mix of endpoints weighted by production traffic, realistic payloads and think-time, plus the auth/data paths), run it with a tool like **k6, NBomber (.NET), Gatling, or Locust**, and ramp load gradually while watching latency percentiles (p50/p95/p99), error rate, and resource saturation (CPU, DB connections, pool exhaustion). The goal is the **knee point**: the throughput level where p99 bends upward — that's your per-instance capacity. Set **limits below the knee with headroom** (e.g., ~60–70% of it): max RPS per instance, autoscaling thresholds, rate-limit quotas per client, and connection-pool sizes. Always soak-test for leaks (memory, connections) and spike-test for cold-start behavior; a single burst test lies about steady-state capacity."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Workload realism: weight endpoints by real traffic (usually a few hot GETs dominate), use production-like data volumes — testing against an empty DB measures nothing",
+          "Closed vs open models: closed (VUs think between requests) models interactive users; open (constant arrival rate) models the real world at overload — use open for capacity, closed for UX",
+          "Ramp stages: baseline → gradual ramp to find the knee → step beyond to see failure mode → soak at target → spike",
+          "Metrics triad: latency percentiles (never averages), error rate, saturation (CPU, thread-pool starvation, DB pool wait time, GC pressure)",
+          "The knee: throughput plateaus while p99 climbs — beyond it you're queueing, not serving; capacity = knee, not max",
+          "Limits from evidence: instance capacity × safety factor = autoscale target; DB pool = instances × per-instance concurrency cap — the classic hidden ceiling",
+          "NBomber/k6 specifics: NBomber runs in-process .NET with real HttpClient; k6 uses JS scenarios and has great metrics/stages; both feed Prometheus",
+          "Post-test: profile the bottleneck (dotTrace/MiniProfiler/DB plan), fix, re-run — capacity testing without a bottleneck story is just theater"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "k6 stages and turning the knee into limits",
+        "language": "javascript",
+        "code": "import http from 'k6/http';\\nimport { check, sleep } from 'k6';\\n\\nexport const options = {\\n  scenarios: {\\n    browse: {\\n      executor: 'ramping-arrival-rate',      // open model: real-world arrivals\\n      startRate: 10,\\n      timeUnit: '1s',\\n      stages: [\\n        { target: 50,  duration: '2m' },     // ramp: find the knee\\n        { target: 200, duration: '3m' },     // beyond: observe failure mode\\n        { target: 120, duration: '10m' },    // soak: leaks, pool exhaustion\\n        { target: 400, duration: '30s' },    // spike: cold-start / autoscale lag\\n      ],\\n    },\\n  },\\n  thresholds: {\\n    http_req_duration: ['p(95)<600', 'p(99)<1200'],\\n    http_req_failed: ['rate<0.01'],\\n  },\\n};\\n\\n// Results -> limits (example reading):\\n//   knee at ~120 RPS per instance (p99 bends 180ms -> 900ms)\\n//   autoscale target: 60-70% => ~80 RPS/instance, scale on p95 + queue depth\\n//   DB pool 100 connections / 5 instances = 20 per instance\\n//     -> cap per-instance concurrency so the pool is the last thing to starve\\n//   rate limiter: 600 rpm per authenticated user, 60 per anonymous (from traffic mix)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Testing against an empty dev database — data volume and index stats change everything",
+          "Using average latency — p99 hides the users you lose",
+          "One 5-minute burst and calling it capacity — no soak, so leaks and pool drift stay hidden",
+          "Load-testing auth with cached tokens or skipping login — the hottest path goes untested",
+          "Ignoring the load generator itself — a laptop can't drive 50k RPS; distribute generators",
+          "Setting autoscale on CPU only — saturation often appears in pool wait/queue depth first"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do open and closed workload models differ at overload?",
+          "How do you capacity-test a system with a third-party dependency in the loop?",
+          "What does thread-pool starvation look like in load-test metrics?",
+          "How often should capacity numbers be re-measured, and what invalidates them?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Realistic mix, production-like data, open-model arrival rates",
+          "The knee (p99 bend) is capacity — set limits and autoscale below it with headroom",
+          "Soak for leaks, spike for cold starts; watch percentiles, errors, saturation",
+          "Results drive concrete numbers: per-instance RPS, pool sizes, rate-limit quotas"
+        ],
+        "takeaway": "Capacity is a measured number, not a vibe: find the knee with a realistic ramp, then set every limit in the system deliberately below it."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "perf-q4",
+    "perf-q1",
+    "perf-q6"
+  ],
+  "furtherReading": [
+    {
+      "title": "k6 documentation — Scenarios & load testing types",
+      "url": "https://grafana.com/docs/k6/latest/using-k6/scenarios/",
+      "type": "article",
+      "author": "Grafana Labs"
+    },
+    {
+      "title": "NBomber — load testing for .NET",
+      "url": "https://nbomber.com/",
+      "type": "article",
+      "author": "NBomber"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Performance Optimization",
+  "estimatedMinutes": 18
+}

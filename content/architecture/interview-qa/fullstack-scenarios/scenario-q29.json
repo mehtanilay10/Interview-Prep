@@ -1,0 +1,137 @@
+{
+  "id": "lesson-iq-scenario-q29",
+  "slug": "scenario-q29",
+  "moduleSlug": "fullstack-scenarios",
+  "title": "How do you safely roll out a risky feature to users?",
+  "description": "Feature flags, progressive delivery, and experimentation: decoupling deploy from release, targeting rules, and cleanup discipline.",
+  "order": 29,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": [
+    "interview",
+    "full-stack",
+    "delivery",
+    "scenarios"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you safely roll out a risky feature to users?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use **feature flags** to decouple *deploying* code from *releasing* it: ship dark (flag off), then **progressive delivery** — enable for the team, then 1% of users by stable hash, then cohorts (internal → beta customers → region), watching error rate, latency, and business metrics per cohort against a control group. Flags give you **instant kill** without a redeploy — the actual safety mechanism. The engineering that makes this trustworthy: flags evaluated **server-side with client caching and streaming updates** (a kill switch that takes 5 minutes to propagate isn't a kill switch), **targeting by stable user hash** (so cohorts don't reshuffle), **metrics sliced by flag state** (you must be able to see 'flag-on users vs flag-off users'), and — critically — **flag cleanup discipline** (every flag gets an expiry date; stale flags are the technical debt that kills flag systems)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The rollout ladder:**\n1. Deploy dark: code merged, flag off — verifying deploy safety only\n2. Internal: employees/dogfood (with a bypass header for testing)\n3. Canary: 1% of real users, stable-hash assigned — watch for 24-48h\n4. Cohorts: beta customers, specific region/plan, then widening percentage\n5. GA: flag default-on for everyone; then **remove the flag code entirely** in a later cleanup PR\n\n**Flag system design:**\n- Evaluation rules: percentage by stable hash (user id), allowlists, plan/region attributes, and targeting percentages evaluated server-side\n- Propagation: config streamed to SDKs (seconds) rather than polled (minutes); kill switch must beat user patience\n- Consistency: same user → same variant across requests and devices (hash on canonical user id, not session)\n- Environments: dev/staging/prod flag configs separated; flag values are **configuration**, not code\n- Backend flags vs frontend flags: backend flags can kill instantly; frontend bundle flags can't un-ship JS — keep risky branches server-side\n\n**Experimentation upgrade:**\n- When rollout is an experiment, hold a control group and measure the metric delta with significance — don't 'eyeball the dashboard'\n- Guardrail metrics: an experiment can win conversion while losing latency; watch both\n\n**The discipline that keeps it sane:**\n- Every flag created with an owner and expiry date; a bot opens cleanup PRs when it passes\n- Flag proliferation is the failure mode: 500 stale flags = a combinatorial mess nobody can reason about — count them, budget them, delete aggressively\n- Migration flags (old/new path) differ from ops flags (kill switches) — label them differently"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Flag evaluation and a server-side kill switch",
+        "language": "csharp",
+        "code": "// Flag evaluation (server-side, streamed config - e.g. OpenFeature/LaunchDarkly-style)\npublic async Task<CheckoutResult> Checkout(CheckoutCommand cmd, CancellationToken ct)\n{\n    var useV2 = await _flags.IsEnabledAsync(\n        key: \"checkout-v2\",\n        user: UserTargeting.Of(cmd.UserId)      // stable hash per user\n            .With(\"plan\", cmd.Plan)\n            .With(\"region\", cmd.Region),\n        defaultValue: false,                    // safe default: old path\n        ct);\n\n    return useV2\n        ? await _checkoutV2.PlaceAsync(cmd, ct)\n        : await _checkoutV1.PlaceAsync(cmd, ct);\n}\n\n// Rollout sequence:\n//   day 0: flag off (deploy safety)\n//   day 0: internal allowlist\n//   day 1: 1% by stable user hash -> dashboards split by flag variant\n//   day 3: 10% -> 50% -> 100%, each step gated on metrics\n//   kill scenario: error rate spikes -> flag OFF globally, streamed in seconds,\n//                  no redeploy, v1 path serves immediately\n//   week 3: cleanup PR deletes the flag AND the v1 code path\n\n// Frontend: risky logic stays server-side; client flags gate only UI variants,\n// because you can't un-ship JavaScript from a user's cache."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "A kill switch you can't flip fast is decoration",
+        "text": "If turning the flag off takes minutes (polling intervals, CDN caches, config services on the critical path), then during an incident it won't be used — people will fear a redeploy more than the bug. Stream flag updates, cache locally with safe defaults, and drill 'kill the flag' like a fire alarm."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Percentage rollout by random per-request draw — users flip between variants, support tickets explode",
+          "No control group or metrics split by flag — 'it looks fine' isn't evidence",
+          "Flags that only exist in the frontend — risky logic can't be killed once shipped",
+          "Never deleting flags — the codebase becomes a maze of dead branches",
+          "Flag explosion without owners/expiry — nobody dares change anything",
+          "Coupling release to deploy for everything — no dark launch, no fast rollback"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you keep flag state consistent across devices for one user?",
+          "How does a flag system fail, and what's the safe default behavior?",
+          "How do you A/B test with guardrail metrics properly?",
+          "How do you handle flags in long-lived mobile app versions?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Deploy ≠ release: flags gate exposure; the kill switch is the safety mechanism",
+          "Progressive ladder: dark → internal → 1% → cohorts → GA, each step metric-gated",
+          "Stable-hash targeting, server-side evaluation, streamed updates",
+          "Flag hygiene: owners, expiry dates, aggressive cleanup"
+        ],
+        "takeaway": "The feature isn't safe because the tests passed — it's safe because you can watch real cohorts and turn it off in seconds without a deploy."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "scenario-q27",
+    "scenario-q26"
+  ],
+  "furtherReading": [
+    {
+      "title": "Feature flags — Martin Fowler",
+      "url": "https://martinfowler.com/articles/feature-toggles.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "Progressive exposure / canary — Microsoft",
+      "url": "https://learn.microsoft.com/en-us/devops/operate/progressive-exposure",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Full-Stack Scenarios"
+}

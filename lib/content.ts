@@ -625,7 +625,9 @@ export function getInterviewQuestions(technology: string, category?: string): Le
   return lessons
     .filter((l) => l.courseSlug === 'interview-qa' && l.moduleSlug === technology)
     .filter((l) => !category || getInterviewTechCategory(l.moduleSlug) === category)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => {
+      return (a.order || 0) - (b.order || 0);
+    });
 }
 
 export function getInterviewQuestionCount(technology: string, category?: string): number {

@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-oop-anemic-domain",
+  "slug": "anemic-domain-model",
+  "moduleSlug": "oop",
+  "title": "What is an anemic domain model and why is it criticized?",
+  "description": "The difference between data-holder entities and real domain objects, why anemic models push rules into services, and when a plain data model is perfectly fine.",
+  "order": 18,
+  "difficulty": "advanced",
+  "tags": [
+    "oop",
+    "ddd",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is an anemic domain model and why is it criticized?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An anemic domain model is an object model where entities are just data bags — public getters/setters with all business rules living in separate procedural service classes. It's criticized because it forfeits the main benefit of OOP: putting the data and the invariants that protect it in the same place. With an anemic model, any code can set `order.Status = Shipped` without payment, validation rules scatter across services, and the same rule gets reimplemented in several places. The counterpoint: not every project needs a rich domain model — for CRUD-shaped apps, anemic DTOs plus explicit service logic is simple and honest."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Anemic (procedural style):**\n- Entities: `{ get; set; }` properties only — no behavior\n- `OrderService.PlaceOrder()`, `OrderService.CancelOrder()`, `PaymentService.MarkPaid()` each open the entity, check rules, and mutate properties\n- Invariants (\"can't ship unpaid\", \"can't cancel a delivered order\") exist only as `if` statements scattered across services — nothing stops a new service from skipping them\n\n**Rich domain model (OOP style):**\n- `order.MarkPaid(paymentRef)` — only the object that owns the state can change it, and it validates its own invariants\n- Illegal states are unrepresentable: no public setter, so \"shipped but unpaid\" can't be constructed\n- Services orchestrate; entities decide. `OrderService` asks the order to do things; it doesn't do things *to* it\n\n**Why teams still end up anemic:** ORMs like EF Core map nicely onto property bags (that's a legitimate influence), time pressure pushes logic into \"just one more service class\", and developers trained on CRUD-centric patterns reach for services by reflex. The cost accumulates: rule duplication, invariant violations discovered in production, and tests that must set up ten service calls to exercise one rule.\n\n**The pragmatic line:**\n- **Rich model where rules are complex and valuable**: orders, payments, bookings, state machines — invariants here prevent real money/consistency problems\n- **Anemic is fine for**: DTOs, view models, config objects, simple CRUD with no cross-field rules, and data transfer across service boundaries (anemic is *correct* for a DTO — it's a packet, not a domain concept)\n- A good heuristic: if you write `if (x.Status == ...)` checks in more than one service, that logic belongs on `x` itself"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Anemic vs rich order model",
+        "language": "csharp",
+        "code": "// ❌ Anemic: rules scattered; invariants unenforceable.\npublic class Order {\n    public int Id { get; set; }\n    public decimal Total { get; set; }\n    public string Status { get; set; } = \"New\";   // any string, any setter\n}\n\npublic class OrderService {\n    public void Ship(int orderId) {\n        var o = _db.Orders.Find(orderId);\n        if (o.Status == \"Paid\") o.Status = \"Shipped\";   // rule #1 lives here\n    }\n}\npublic class ReportService {\n    public void Refund(int orderId) {\n        var o = _db.Orders.Find(orderId);\n        if (o.Status != \"Delivered\") o.Status = \"Refunded\"; // rule #2 reimplemented\n    }\n}\n// Meanwhile, somewhere else: order.Status = \"Shipped\" for an unpaid order. Compiles fine.\n\n// ✅ Rich: the object protects its own state.\npublic class Order {\n    public int Id { get; private set; }\n    public decimal Total { get; private set; }\n    public OrderStatus Status { get; private set; } = OrderStatus.New;\n\n    public void MarkPaid(string paymentRef) {\n        if (Status != OrderStatus.New)\n            throw new InvalidOperationException($\"Cannot pay order in {Status}\");\n        Status = OrderStatus.Paid;\n    }\n\n    public void Ship() {\n        if (Status != OrderStatus.Paid)\n            throw new InvalidOperationException(\"Cannot ship an unpaid order\");\n        Status = OrderStatus.Shipped;\n    }\n}\n// One place per rule; illegal transitions throw; services just orchestrate."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Don't swing to the opposite extreme",
+        "text": "A rich domain model doesn't mean every entity gets 40 methods, or that persistence and domain classes must be the same type. Many teams map an anemic persistence model to a rich domain model at the boundary — entities stay clean, ORM quirks stay in the repository layer. The point is where the *rules* live, not where the properties are."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to hear:\n- A clear definition: data bags + service-layer rules vs behavior-owning entities\n- The real cost: duplicated rules and unenforceable invariants\n- That you're not dogmatic — CRUD apps legitimately stay anemic; rich models pay off where rules are complex\n- A migration instinct: move each repeated status-check into the entity as a behavior"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Calling every DTO-based codebase 'wrong' — anemic is correct for data transfer objects",
+          "Creating a rich model but leaving public setters anyway, so invariants stay breakable",
+          "Putting persistence concerns (EF attributes, lazy-loading proxies) into domain behavior methods",
+          "Fat 'manager' classes that pretend to be the domain model but take 15 parameters",
+          "Throwing validation exceptions from constructors for state that ORM materialization requires"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you reconcile a rich domain model with EF Core's materialization requirements?",
+          "What is 'domain events' and how does it complement a rich model?",
+          "How do value objects reduce invalid states compared to primitive properties?",
+          "Where do you put cross-entity rules that no single entity can own?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Anemic model: entities are data bags, rules live in scattered services",
+          "Cost: duplicated rules, unenforceable invariants, easy illegal states",
+          "Rich model: objects own state changes and validate their own transitions",
+          "Not a universal rule — CRUD/DTOs legitimately stay anemic"
+        ],
+        "takeaway": "Put each business rule where its data lives: if three services re-check the same status, the status check belongs on the object itself."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "designing-for-testability",
+    "value-objects-and-immutability",
+    "oop-i01",
+    "coupling-and-cohesion"
+  ],
+  "furtherReading": [
+    {
+      "title": "AnemicDomainModel",
+      "url": "https://martinfowler.com/bliki/AnemicDomainModel.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "Getting started with domain-driven design",
+      "url": "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "OOP",
+  "estimatedMinutes": 20
+}

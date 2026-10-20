@@ -1,0 +1,140 @@
+{
+  "id": "lesson-iq-cancellation-token-propagation",
+  "slug": "cancellation-token-propagation",
+  "moduleSlug": "aspnet-core",
+  "title": "How does CancellationToken flow through an ASP.NET Core application?",
+  "description": "Request-aborted tokens end to end: EF Core, HTTP calls, task orchestration, and graceful shutdown.",
+  "order": 19,
+  "difficulty": "advanced",
+  "tags": [
+    "aspnet-core",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does CancellationToken flow through an ASP.NET Core application?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ASP.NET Core creates one token per request — `HttpContext.RequestAborted` — which fires when the client disconnects (or the server initiates shutdown). The framework injects `CancellationToken` parameters into actions and minimal-API delegates automatically. Your job is **cooperative propagation**: pass that token down through every `await` that accepts one — EF Core queries, `HttpClient` calls, `Task.WhenAll`, channels — so abandoned requests release connections and threads instead of burning resources for a client that is already gone. Tokens also compose: `CreateLinkedTokenSource` merges request cancellation with your own timeout."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Where it comes from:**\n- MVC/minimal APIs bind a `CancellationToken` parameter to `RequestAborted` automatically\n- Background jobs use the host's shutdown token instead — same pattern, different source\n- Filters and middleware can wrap/replace tokens (e.g. per-request timeout policies)\n\n**Propagation rules:**\n- Pass the token into **every API that accepts one**: `ToListAsync(ct)`, `SaveChangesAsync(ct)`, `GetFromJsonAsync(url, ct)`, `WaitAsync(ct)`, `channel.Reader.ReadAllAsync(ct)`\n- Propagate **deep**, not just one layer — a token stops at the first method that drops it\n- For multi-step work, link tokens: `using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestAborted); linked.CancelAfter(TimeSpan.FromSeconds(5));`\n- Cooperative means loops must observe it too: `while (!ct.IsCancellationRequested)` or `ct.ThrowIfCancellationRequested()` at safe checkpoints\n\n**Behavior & semantics:**\n- Cancellation is **cooperative**: nothing interrupts running code; the token only lets awaiting code throw `OperationCanceledException`/`TaskCanceledException`\n- On client disconnect, EF cancels the query server-side (Attention signal in SQL Server), `HttpClient` aborts the request — the work stops, resources return\n- Distinguish cancellation sources: `ct.IsCancellationRequested` (client gone / shutdown) vs a genuine timeout you created — log them differently. Client disconnects should not be 500s\n- Don't pass `RequestAborted` into **work that must complete once started** (writing to a durable queue, sending a message) — use `CancellationToken.None` or a shutdown-only token there; the client leaving doesn't undo the side effect\n- Wrappers: if you catch `OperationCanceledException`, rethrow when it matches your token — swallowing it fabricates success\n- `HttpClient` timeouts are `CancelAfter`-style cancellation internally — same exception family"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "End-to-end propagation with a linked timeout",
+        "language": "csharp",
+        "code": "// Minimal API — CancellationToken parameter is bound automatically\napp.MapGet(\"/reports/{id:int}\", async Task<Results<Ok<Report>, ProblemHttpResult>> (\n    int id,\n    ReportDb db,\n    IReportClient upstream,          // internal microservice client\n    CancellationToken requestAborted) // == HttpContext.RequestAborted\n{\n    // Link the client's cancellation with a hard 10s budget of our own\n    using var linked = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);\n    linked.CancelAfter(TimeSpan.FromSeconds(10));\n    var ct = linked.Token;\n\n    try\n    {\n        // Every layer observes the same token:\n        var meta = await db.Reports.AsNoTracking()\n            .FirstOrDefaultAsync(r => r.Id == id, ct);            // EF cancels the query\n\n        if (meta is null) return Results.NotFound();\n\n        var rows = await upstream.FetchRowsAsync(id, ct);          // HttpClient aborts on cancel\n\n        await db.Audit.AddAsync(new Audit(id, rows.Count), ct);\n        await db.SaveChangesAsync(ct);                             // must not half-commit: transactional anyway\n\n        return Results.Ok(new Report(rows));\n    }\n    catch (OperationCanceledException) when (requestAborted.IsCancellationRequested)\n    {\n        // Client hung up — expected, not a server error. Don't log as failure.\n        return Results.Problem(statusCode: 499, title: \"Client closed request\");\n    }\n    catch (OperationCanceledException)\n    {\n        // Our 10s budget expired — a real timeout worth reporting\n        return Results.Problem(statusCode: 504, title: \"Upstream report timed out\");\n    }\n});\n\n// Fan-out: propagate to every branch\n// var tasks = ids.Select(i => FetchAsync(i, ct));\n// var all = await Task.WhenAll(tasks);   // one cancel cancels the wait; children observe ct themselves\n\n// Background worker: host shutdown token instead of request token\n// while (await queue.DequeueAsync(ct)) { ... }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing cancellation is cooperative and only works if the token reaches the I/O\n- Automatic injection of CancellationToken in actions/delegates\n- Linked tokens for request-cancel + own-timeout composition\n- Nuance: side effects that must complete even if the client leaves"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Accepting a token and never passing it downstream — the first missing ct wastes all the work",
+          "Swallowing OperationCanceledException and returning a fabricated success",
+          "Logging client disconnects as server errors — noise that hides real incidents",
+          "Cancelling mid-side-effect: charging a card or publishing an event under RequestAborted",
+          "Creating unlinked timeouts — request aborted but the downstream HTTP call keeps running",
+          "Blocking on async work (`Task.Wait`) — the token can't interrupt a blocked thread"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What happens to an EF Core query already executing when the token fires?",
+          "Client disconnects after payment is charged — what should happen?",
+          "How do you test cancellation without really disconnecting the client?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "RequestAborted is injected into actions — pass it to every await that accepts one",
+          "Cancellation is cooperative: loops and I/O must observe the token",
+          "Link request cancellation with your own timeouts via CreateLinkedTokenSource",
+          "Don't cancel irreversible side effects — choose the token deliberately"
+        ],
+        "takeaway": "A token is only useful where it travels: thread it through every layer, distinguish disconnect from timeout, and protect work that must finish."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "model-binding-validation",
+    "hosted-services-background-tasks",
+    "exception-handling-problem-details"
+  ],
+  "furtherReading": [
+    {
+      "title": "CancellationToken in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Cancellation in the Task Parallel Library",
+      "url": "https://devblogs.microsoft.com/pfxteam/cancellation-in-tpl/",
+      "type": "article",
+      "author": "Stephen Toub, .NET Blog"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 27
+}

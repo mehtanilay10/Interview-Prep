@@ -35,9 +35,9 @@ export default async function UserLayout({
         </p>
       </header>
 
-      {/* Vertical tabs: sidebar on wide screens, stacked above the content on small ones. */}
+      {/* Vertical tabs: sidebar on wide screens only. Hidden on mobile as requested. */}
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <aside className="w-full shrink-0 lg:w-56 lg:border-r lg:border-border lg:pr-4">
+        <aside className="hidden w-full shrink-0 lg:block lg:w-56 lg:border-r lg:border-border lg:pr-4">
           <div className="lg:sticky lg:top-20">
             <UserNav />
           </div>

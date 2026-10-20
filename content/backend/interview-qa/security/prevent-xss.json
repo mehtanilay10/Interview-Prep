@@ -1,0 +1,141 @@
+{
+  "id": "lesson-iq-prevent-xss",
+  "slug": "prevent-xss",
+  "moduleSlug": "security",
+  "title": "How do you prevent cross-site scripting (XSS)?",
+  "description": "Contextual output encoding, safe rich-HTML handling, CSP headers, and what React/Razor do for you.",
+  "order": 5,
+  "difficulty": "intermediate",
+  "tags": [
+    "security",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you prevent cross-site scripting (XSS)?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "XSS happens when untrusted data reaches the page as **executable markup or script**. Prevent it by encoding output by default in the right context (HTML body, attribute, JavaScript, URL), sanitizing — with an allow-list — the rare fields that legitimately contain HTML, and adding a Content-Security-Policy header as a second layer. Frameworks like Razor and React already encode by default; vulnerabilities appear when you opt out (`@Html.Raw`, `dangerouslySetInnerHTML`, `innerHTML`)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The three flavors:**\n- **Stored** — the payload is saved (comment, profile bio) and served to every viewer; the most damaging\n- **Reflected** — the payload is echoed from the request (search box, error page) in the response\n- **DOM-based** — the server never sees it; client-side code moves data from `location.hash` or the DOM into `innerHTML`\n\n**Layered defenses:**\n- **Encode on output, in context** — HTML-encoding for markup, JavaScript escaping inside `<script>`, attribute encoding inside attributes, URL encoding in links. Encoding \"once on input\" can't know the context\n- **Razor encodes by default** — `@Model.Comment` renders `&lt;script&gt;`; `@Html.Raw` is the explicit opt-out and must never touch user data\n- **React encodes by default** — `{comment}` is safe; `dangerouslySetInnerHTML` is named that way for a reason\n- **Sanitize rich HTML** with an allow-list library (e.g. the `HtmlSanitizer` NuGet package) for markdown/editor output; block-list filters get bypassed\n- **Content-Security-Policy** — `script-src 'self'` blocks injected and inline scripts even if encoding is missed; start in `Content-Security-Policy-Report-Only` and watch reports\n- **HttpOnly + Secure + SameSite cookies** so injected script can't read session tokens"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Encoding by default, CSP as a backstop",
+        "language": "csharp",
+        "code": "// Razor view — encoding is the default\n<p>@Model.UserComment</p>            // &lt;script&gt;alert(1)&lt;/script&gt; → text, harmless\n<p>@Html.Raw(Model.UserComment)</p>  // DANGEROUS — renders live markup\n\n// Allow-listed sanitization for fields that legitimately contain HTML\nusing Ganss.Xss;\nvar sanitizer = new HtmlSanitizer();\nsanitizer.AllowedTags.Add(\"mark\");           // explicit allow-list\nvar safeHtml = sanitizer.Sanitize(untrustedComment);\n\n// Content-Security-Policy as defense in depth\napp.Use(async (context, next) =>\n{\n    context.Response.Headers.Append(\n        \"Content-Security-Policy\",\n        \"default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'\");\n    await next();\n});\n\n// React — default escaping vs opt-out\n// <div>{comment}</div>                                  // safe\n// <div dangerouslySetInnerHTML={{ __html: comment }} /> // only sanitized HTML\n// element.innerHTML = location.hash.slice(1)            // classic DOM XSS — never do this"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing XSS is about *context*, not about \"filtering bad tags\"\n- Familiarity with the framework's default encoding and its escape hatches\n- Layered thinking: encoding + sanitization + CSP + cookie flags\n- Awareness of DOM-based XSS, which server-side filters never see"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Stripping `<script>` tags but allowing event handlers (onerror, onload) — block-lists always miss something",
+          "Encoding on input instead of on output — the same value appears in HTML, attributes, and URLs",
+          "Escaping in the controller and rendering with @Html.Raw anyway",
+          "Assuming HTTPS or HttpOnly cookies prevent XSS — they limit damage, they don't stop execution",
+          "Ignoring DOM sinks: innerHTML, document.write, jQuery .html()",
+          "Deploying a hard CSP on day one without report-only — it silently breaks the app"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What is the difference between stored, reflected, and DOM-based XSS?",
+          "How does a Content-Security-Policy actually block an injected payload?",
+          "How do you safely render user markdown (not raw HTML) on the client?",
+          "What is JSON hijacking and how does correct Content-Type relate to XSS?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "XSS = untrusted data executed as markup/script; encode per output context",
+          "Razor and React encode by default — @Html.Raw and dangerouslySetInnerHTML opt out",
+          "Sanitize legitimate rich HTML with an allow-list, never a block-list",
+          "CSP, HttpOnly and SameSite cookies are backstops, not replacements"
+        ],
+        "takeaway": "Encode by default, allow-list the exceptions, and let a CSP header catch whatever slips through — no single layer is enough."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "prevent-sql-injection",
+    "csrf-antiforgery",
+    "cors-configuration"
+  ],
+  "furtherReading": [
+    {
+      "title": "Cross-site scripting (XSS) — OWASP Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+      "type": "article",
+      "author": "OWASP"
+    },
+    {
+      "title": "Content Security Policy in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/security/csp",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Security",
+  "estimatedMinutes": 25
+}

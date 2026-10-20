@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-suspense-lazy-loading",
+  "slug": "suspense-lazy-loading",
+  "moduleSlug": "react",
+  "title": "What is Suspense and how does it work with React.lazy?",
+  "description": "Declarative loading states for code splitting and data: fallbacks, boundaries, streaming SSR, and preloading to avoid pop-in.",
+  "order": 23,
+  "difficulty": "advanced",
+  "tags": [
+    "react",
+    "performance",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is Suspense and how does it work with React.lazy?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Suspense lets a component **suspend rendering** until something is ready, and renders a `fallback` in the meantime. The canonical client-side use is **code splitting**: `React.lazy(() => import('./Editor'))` returns a component that suspends while its chunk loads, so `<Suspense fallback={<Skeleton/>}><Editor/></Suspense>` shows the skeleton until the chunk arrives — no manual `isLoading` state for code loading. Suspense also works for data with libraries that support it (React Query, Next.js Server Components/streaming). Boundaries nest: the nearest Suspense above the suspending component handles it, which lets you keep a page shell visible while a route's chunk loads."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Mechanics:**\n- When a lazy component's chunk isn't loaded, it throws a Promise (a special internal signal) during render — React catches it and renders the nearest fallback\n- When the promise resolves, React re-renders the subtree with the real component\n- `lazy` takes a factory returning a promise of a module with a default export; the factory runs **once**\n- Fallback replaces the suspended subtree, not the whole page — place boundaries at the granularity you want loading UX\n\n**Patterns:**\n- **Route-level splitting**: each page is a lazy chunk; the shell (nav, layout) stays mounted while the fallback shows\n- **Widget-level splitting**: heavy rarely-opened UI (chart, editor, date picker) loads on first open\n- **Nested boundaries**: outer boundary for the section, inner for a specific panel — fallbacks can be fine-grained\n- **Preloading to kill pop-in**: hovering/clicking a tab can trigger the import early: `const Editor = lazy(() => import('./Editor')); const preload = () => Editor.preload?.()` — or simply import eagerly on pointer-enter via a shared promise\n- **Error + retry**: pair Suspense with an ErrorBoundary beside it — chunk load failures (stale deploy) throw; offer retry which re-attempts the import\n\n**Data fetching with Suspense:**\n- Frameworks/Server Components suspend while fetching on the server; streaming HTML sends fallback first, then the resolved part with inline scripts\n- Client libraries (React Query `<SuspenseQuery>`, use() in React 19) integrate the same boundary model\n- Rules: fetch-before-render with cache/read pattern; the suspending read must be wrapped in a resource that supports suspension\n\n**Trade-offs:**\n- Each lazy chunk is a network round trip — splitting a hot route into tiny chunks hurts LCP; split by usage frequency\n- Fallback flash: a chunk that loads in 80ms still shows a skeleton briefly; preloading or keeping small hot components eager avoids flicker\n- `lazy` doesn't work with named exports directly — export default or wrap the module lookup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Route splitting, preloading, and error recovery",
+        "language": "javascript",
+        "code": "import { lazy, Suspense, useState } from 'react';\\n\\n// Heavy, opened rarely -> split\\nconst AdminPanel = lazy(() => import('./AdminPanel'));\\nconst ChartEditor = lazy(() => import('./ChartEditor'));\\n\\nfunction App() {\\n  const [tab, setTab] = useState('home');\\n\\n  return (\\n    <Layout>\\n      {/* Shell renders immediately; only the active pane suspends */}\\n      <Tabs onChange={(t) => setTab(t)} onMouseEnter={preloadFor(t)} />\\n\\n      <ErrorBoundary fallback={(err, retry) => <ChunkError retry={retry} />}>\\n        <Suspense fallback={<PaneSkeleton />}>\\n          {tab === 'home' && <Home />}\\n          {tab === 'admin' && <AdminPanel />}\\n          {tab === 'charts' && <ChartEditor />}\\n        </Suspense>\\n      </ErrorBoundary>\\n    </Layout>\\n  );\\n}\\n\\n// Preload on hover: start the chunk download before the click\\nfunction preloadFor(tab) {\\n  if (tab === 'admin') import('./AdminPanel');       // same cached module promise\\n  if (tab === 'charts') import('./ChartEditor');\\n}\\n\\n// Retry after a failed chunk load (stale HTML referencing old chunks):\\n// bump a key on the lazy factory so React retries the import\\nconst loadChart = () => import('./ChartEditor');\\nfunction ChartWithRetry({ attempt }) {\\n  const LazyChart = useMemo(() => lazy(() => loadChart().catch((e) => {\\n    window.location.reload();                        // honest recovery for stale chunks\\n    throw e;\\n  })), [attempt]);\\n  return <Suspense fallback={<Skeleton />}><LazyChart /></Suspense>;// }\\n\\n// ❌ Over-splitting: lazy() on a logo or small card adds a round trip for nothing\\n// ❌ No fallback: Suspense requires a fallback prop — give it something meaningful"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "Suspense vs manual loading state",
+        "text": "For code loading, Suspense removes the useState+useEffect dance and keeps loading UI next to the component definition. For ordinary data you control, explicit loading/error states (or a data library's built-ins) are often clearer — Suspense shines when many components can suspend and you want one boundary to compose them."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- lazy + Suspense as the code-splitting combination, and how suspension works (throw-a-promise internally)\n- Boundary nesting and fallback granularity\n- Production concerns: preloading, chunk-load errors after deploys, over-splitting\n- Awareness of the data-fetching/streaming story and Server Components"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A single Suspense at the root — every lazy component shares one giant fallback and the shell disappears",
+          "Splitting everything, including small hot components — more round trips than one bundle",
+          "Ignoring chunk load errors after redeploys — stale clients need retry or reload",
+          "No preloading on hover/click — user always sees the skeleton once",
+          "Forgetting the fallback prop or giving it a heavy tree that defeats the purpose",
+          "Expecting Suspense to handle event-handler async work — it suspends renders, not clicks"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does streaming SSR deliver Suspense fallbacks and resolved content over time?",
+          "How do multiple sibling suspending components interact with one boundary?",
+          "What changes with React 19's use() hook for data?",
+          "How would you decide the right split granularity for a large app?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Suspense renders a fallback while a child suspends; React.lazy suspends on chunk load",
+          "Nest boundaries by UI region; the shell stays interactive",
+          "Preload on intent, and handle chunk-load errors from stale deploys",
+          "Split by usage: hot paths eager, heavy rarely-used features lazy"
+        ],
+        "takeaway": "Suspense turns loading into a layout concern — put boundaries where you want skeletons, split by real usage, and preload before the click."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "how-would-you-reduce-a-javascript-bundle-that-has-grown-too-large",
+    "error-boundaries",
+    "when-should-a-component-be-a-server-component-vs-client-component"
+  ],
+  "furtherReading": [
+    {
+      "title": "Suspense reference",
+      "url": "https://react.dev/reference/react/Suspense",
+      "type": "article",
+      "author": "React Team"
+    },
+    {
+      "title": "Code-Splitting (React docs)",
+      "url": "https://react.dev/learn/lazy-loading-react-components",
+      "type": "article",
+      "author": "React Team"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "React",
+  "estimatedMinutes": 25
+}

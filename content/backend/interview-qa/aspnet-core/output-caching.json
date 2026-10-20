@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-output-caching",
+  "slug": "output-caching",
+  "moduleSlug": "aspnet-core",
+  "title": "How does output caching work in ASP.NET Core and when do you use it?",
+  "description": "Caching responses vs caching data, tags for invalidation, and cache policy pitfalls.",
+  "order": 18,
+  "difficulty": "intermediate",
+  "tags": [
+    "aspnet-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does output caching work in ASP.NET Core and when do you use it?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Output caching (`[OutputCache]` / `MapOutputCache`) stores the **rendered response** keyed by method, URL, query, and headers, and replays it for matching requests without executing the action. Use it for expensive, **non-personalized, safely shareable** reads (public catalog pages, expensive reports) with explicit TTLs and **tags** for invalidation. It is not a substitute for data caching (cache the repository data when responses vary per user), not for `Cache-Control` alone, and dangerous for authenticated responses unless you vary by user and opt in carefully."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How it works:**\n- Middleware captures the response body + status/headers and stores it in the configured **output cache store** (default in-memory; distributed via `AddStackExchangeRedisOutputCache` for multi-instance)\n- Policy controls TTL (`DefaultDuration`), vary-by rules (`VaryByQueryStrings`, `VaryByHeaderNames`, `VaryByRouteValue`), scope (`NoVaryByUser` for public content — **responses are cached per user by default** when auth is present), and `CacheLocation` (anywhere = shared caches OK)\n- **Tags** (`CacheTagPrefix` + `OutputCacheTagHelper`/`IOutputCacheStore.EvictByTagAsync`) let you invalidate a group: product tag `product-42` when it changes — no waiting for TTL\n- For **non-cacheable verbs**, only GET/HEAD responses are stored; POST/PUT/DELETE are not — but they *can* evict tags if you wire it up\n- The distributed `IOutputCacheStore` (Redis) shares entries across instances — in-memory policies apply per node\n\n**Layering — output cache vs response cache vs data cache:**\n- **Output cache**: whole response, cheapest to replay, good for shared public pages; coarse invalidation\n- **Response caching middleware** (`[ResponseCache]`): HTTP semantics — `Cache-Control`, ETags, revalidation; for browser/CDN cooperation (prefer output cache in modern apps; ResponseCaching middleware is legacy)\n- **Data cache** (`IMemoryCache`/`IDistributedCache`/hybrid): cached entities/queries — needed when output varies by user, needs partial reuse, or feeds multiple response shapes. Invalidate by domain events\n- **CDN**: the same idea one hop closer to the user — coordinate with short TTLs + purge APIs\n\n**Pitfalls:**\n- Caching personalized/HTML-with-CSRF-token responses and serving them to others — vary by user or don't cache\n- 10-minute TTL for data that changes constantly — stale prices; use tags/events instead of hoping\n- Caching POSTs' side effects (never — also breaks HTTP semantics)\n- Session-dependent endpoints under `NoVaryByUser` — information leak\n- Not accounting for the store: in-memory policies don't travel across pods"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Tagged output caching with invalidation",
+        "language": "csharp",
+        "code": "// Program.cs — policy defaults + distributed store option\nbuilder.Services.AddOutputCache(options =>\n{\n    options.AddPolicy(\"catalog\", policy => policy\n        .Expire(TimeSpan.FromSeconds(30))\n        .StaleWhileRevalidate(TimeSpan.FromSeconds(60))\n        .SetVaryByQuery(\"page\", \"sort\")\n        .Cache();                       // public, shareable — no per-user variance\n\n    options.AddPolicy(\"account\", policy => policy\n        .Expire(TimeSpan.FromSeconds(10))\n        .Tag(\"account\"));\n});\n// builder.Services.AddStackExchangeRedisOutputCache(o => o.Configuration = redisConn); // multi-instance\n\nvar app = builder.Build();\napp.UseOutputCache();\n\n// Public, expensive read — cached response, tagged for eviction\napp.MapGet(\"/api/products/{id:int}\", async (int id, ProductDb db, CancellationToken ct) =>\n{\n    var dto = await db.Products.AsNoTracking()\n        .Where(p => p.Id == id)\n        .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n        .FirstOrDefaultAsync(ct);\n    return dto is null ? Results.NotFound() : Results.Ok(dto);\n})\n.WithName(\"GetProduct\")\n.RequireRateLimiting(\"read\")\n.Cache(policy => policy.Expire(TimeSpan.FromSeconds(60))\n                       .Tag($\"product-{id}\"));      // included below via route value\n\n// When a product (or price) changes — evict instantly, forget TTL:\n// await outputCache.EvictByTagAsync($\"product-{id}\", ct);\n\n// MVC tag helper in views:\n// <output-cache expires-after=\"@TimeSpan.FromSeconds(30)\" tag=\"product-@Model.Id\"> ... </output-cache>\n\n// HTTP semantics for browsers/CDNs on a response:\n// [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { \"page\" })]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing what is being cached (response vs data) and choosing the right layer\n- Invalidation by tags/events — 'cache invalidation is hard' answered concretely\n- Per-user variance defaults and the personalized-content trap\n- Distributed reality: in-memory caches don't span instances"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Caching authenticated/personalized responses without varying by user",
+          "Long TTLs as the only invalidation strategy on mutable data",
+          "Forgetting to call EvictByTag after writes — users see yesterday's price",
+          "Assuming per-instance in-memory caches behave like a shared cache in a 6-pod deployment",
+          "Caching POST/PUT/DELETE responses (they aren't, and side effects aren't undone)",
+          "Double-caching aggressively (CDN + output + data) with inconsistent TTLs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "A price changes — how do users see it immediately after a 10-minute cache?",
+          "Output cache vs data cache vs CDN — which layers would you combine for a product page?",
+          "How do you keep cached responses consistent across 8 instances?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Output cache replays whole responses; data cache stores entities/queries",
+          "Vary by user unless the content is explicitly public",
+          "Tags (or write-through events) beat long TTLs for invalidation",
+          "Use a distributed store when you run more than one instance"
+        ],
+        "takeaway": "Cache what's shareable, key it by everything that changes the response, and evict by tag the moment the data changes."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "aspnet-b02",
+    "rate-limiting"
+  ],
+  "furtherReading": [
+    {
+      "title": "Output caching in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/performance/caching/output",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Cache-aside pattern",
+      "url": "https://learn.microsoft.com/azure/architecture/patterns/cache-aside",
+      "type": "article",
+      "author": "Microsoft Azure Architecture"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 25
+}

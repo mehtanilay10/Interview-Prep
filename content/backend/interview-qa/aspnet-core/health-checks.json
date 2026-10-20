@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-health-checks",
+  "slug": "health-checks",
+  "moduleSlug": "aspnet-core",
+  "title": "How do you implement health checks in an ASP.NET Core service?",
+  "description": "Liveness vs readiness probes, checking dependencies safely, and what orchestrators do with them.",
+  "order": 17,
+  "difficulty": "intermediate",
+  "tags": [
+    "aspnet-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you implement health checks in an ASP.NET Core service?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add the health-checks middleware (`AddHealthChecks().AddCheck<T>()`, `MapHealthChecks(\"/health\")`) and expose **two endpoints with different meanings**: **liveness** answers 'is this process running and not deadlocked' (self-only, never checks dependencies — a failing database must not restart every pod), and **readiness** answers 'should this instance receive traffic' (checks DB, cache, broker, disk). Kubernetes/load balancers/orchestrators route on readiness and restart on liveness; failing checks return 503 with a minimal body."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The two (three) probes:**\n- **Liveness** — process health: no dependency checks. If it fails, restart helps (deadlock, stuck static state)\n- **Readiness** — traffic permission: DB reachable, config loaded, migration applied, broker connected. Fail → take out of rotation; recovery → put back in. Restart does *not* fix a down database, so never conflate the two\n- **Startup probe** — long grace period for slow warm-up (JIT, migrations) before liveness kicks in, so healthy-but-slow instances aren't restarted in a loop\n\n**Design points:**\n- Each check implements `IHealthCheck`: return `HealthCheckResult.Healthy/Degraded/Unhealthy` with data (e.g. latency, pending migrations)\n- Tag checks (`\"db\"`, `\"queue\"`) and expose tagged endpoints: `/health/ready?check=db` vs `/health/live`\n- Response writer: minimal body for orchestrators (`Results.Ok`/`ServiceUnavailable`) — don't leak exception details (a public `/health` is reconnaissance gold)\n- **Timeouts:** checks run with a per-check timeout (set it to a few seconds, not the 30s default); a hung dependency must flip to Unhealthy, not hang the probe\n- **Frequency & cost:** readiness may be polled every 5–10 s — checking a remote service each time multiplies load; use caching/`HealthCheckRegistration` intervals, and make checks cheap (SELECT 1, not a full query)\n- `Predicate` to exclude noisy checks from an endpoint\n- Degraded is a real state: report it (still serving, but lossy) and alert on it\n- Wire results to telemetry: log transitions + OpenTelemetry metrics on probe outcomes"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Separate liveness and readiness endpoints",
+        "language": "csharp",
+        "code": "// Program.cs\nbuilder.Services.AddHealthChecks()\n    .AddCheck<DbHealthCheck>(name: \"db\", failureStatus: HealthStatus.Unhealthy,\n        tags: new[] { \"ready\" })\n    .AddCheck(\"self\", () => HealthCheckResult.Healthy(), tags: new[] { \"live\" })\n    .AddCheck<BrokerHealthCheck>(name: \"broker\", tags: new[] { \"ready\" })\n    .AddCheck<DiskHealthCheck>(name: \"disk\", tags: new[] { \"ready\" },\n        timeout: TimeSpan.FromSeconds(3));\n\nvar app = builder.Build();\n\n// Liveness — process only. NO dependency checks.\napp.MapHealthChecks(\"/health/live\", new HealthCheckOptions\n{\n    Predicate = r => r.Tags.Contains(\"live\"),\n    ResponseWriter = WriteMinimalResponse\n});\n\n// Readiness — gate traffic on real dependencies.\napp.MapHealthChecks(\"/health/ready\", new HealthCheckOptions\n{\n    Predicate = r => r.Tags.Contains(\"ready\"),\n    ResponseWriter = WriteMinimalResponse\n});\n\nstatic Task WriteMinimalResponse(HttpContext ctx, HealthReport report)\n{\n    ctx.Response.ContentType = \"application/json\";\n    // Or orchestrator-friendly plain text: \"Healthy\" / \"Unhealthy\" + 200/503\n    var payload = JsonSerializer.Serialize(new\n    {\n        status = report.Status.ToString(),\n        checks = report.Entries.ToDictionary(\n            e => e.Key, e => e.Value.Status.ToString())\n    });\n    return ctx.Response.WriteAsync(payload);\n}\n\npublic class DbHealthCheck : IHealthCheck\n{\n    private readonly AppDbContext _db;\n    public DbHealthCheck(AppDbContext db) => _db = db;\n\n    public async Task<HealthCheckResult> CheckHealthAsync(\n        HealthCheckContext context, CancellationToken ct = default)\n    {\n        try\n        {\n            var canConnect = await _db.Database.CanConnectAsync(ct); // cheap, not a full query\n            return canConnect ? HealthCheckResult.Healthy(\"reachable\")\n                              : HealthCheckResult.Unhealthy(\"no connection\");\n        }\n        catch (Exception ex)\n        {\n            return HealthCheckResult.Unhealthy(\"connection failed\", ex);\n        }\n    }\n}\n\n// Kubernetes mapping:\n// livenessProbe.httpGet.path  = /health/live\n// readinessProbe.httpGet.path = /health/ready"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The liveness-vs-readiness distinction — the single most common follow-up\n- Knowing a failing dependency must fail readiness, not trigger restarts\n- Cost/timeout awareness: probes are frequent and must be cheap\n- Security: health responses shouldn't expose internals"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "One endpoint for both liveness and readiness — a database blip restarts every pod (thundering herd on recovery)",
+          "Health checks that run heavy queries every few seconds",
+          "No timeouts — a hung dependency makes probes hang and the orchestrator guesses",
+          "Exposing exception messages/SQL on a publicly reachable /health",
+          "Forgetting startup probes — slow migrations cause a restart loop",
+          "Marking readiness healthy while the migration step hasn't run yet"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Why shouldn't the liveness probe check the database?",
+          "How do you handle a dependency that's down for an hour — restart or shed traffic?",
+          "How would you add a custom check for 'all migrations applied'?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Liveness = restart-worthy process failure; readiness = traffic-worthy dependencies",
+          "Tag checks and map them to /health/live and /health/ready",
+          "Cheap checks, strict timeouts, minimal responses",
+          "Startup probe absorbs slow warm-up before liveness applies"
+        ],
+        "takeaway": "Separate the questions 'should we restart it?' from 'should we send it traffic?' — conflating them turns outages into restart storms."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "hosted-services-background-tasks",
+    "aspnet-b02"
+  ],
+  "furtherReading": [
+    {
+      "title": "Health checks in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/health-checks",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Kubernetes liveness/readiness/startup probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "type": "article",
+      "author": "Kubernetes"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 24
+}

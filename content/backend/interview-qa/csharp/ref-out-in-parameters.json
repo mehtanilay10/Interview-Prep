@@ -1,0 +1,142 @@
+{
+  "id": "lesson-iq-ref-out-in-parameters",
+  "slug": "ref-out-in-parameters",
+  "moduleSlug": "csharp",
+  "title": "When do you use ref, out, and in parameters in C#?",
+  "description": "Passing by reference safely: mutation, mandatory assignment, defensive copies, and modern ref-like alternatives.",
+  "order": 43,
+  "difficulty": "intermediate",
+  "tags": [
+    "C#",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** When do you use ref, out, and in parameters in C#?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "All three pass arguments by reference instead of copying: **ref** passes a mutable reference in and out (the caller must initialize it first), **out** passes a reference that the method must assign before returning (output-only contract), and **in** passes a read-only reference (the method cannot modify it). Use them to avoid copying large structs, to return multiple values without allocating, or to express 'this method only reads'. In modern C#, `Span<T>`/`ref struct` and tuples have replaced most everyday ref/out usage — they shine in performance-critical code and interop."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The three modifiers:**\n- **ref**: bidirectional. Caller initializes before the call; callee reads and may write. `ref` locals and `ref` returns exist too (`ref int x = ref arr[0]` aliases without copying).\n- **out**: output-only. Callee MUST assign before returning — the compiler enforces definite assignment. Caller doesn't initialize. Classic use: `TryParse`, `TryGetValue`, `DateTime.TryParse(s, out var dt)`.\n- **in**: read-only reference. Callee sees the value as immutable; assigning to an `in` parameter of a struct creates a **defensive copy** — surprising cost on big structs. `in` is the safe way to pass a large struct without copying it *into* the method.\n\n**Why they exist (value semantics of structs):**\n- A struct parameter is copied by default — a 2 KB struct copied per call adds up in hot loops\n- ref/in eliminate the copy; out lets a method fill a struct without a temp variable\n- They also enable **multiple return values** pre-tuples: `static bool TryDivide(int a, int b, out double result)`\n\n**Semantics and rules:**\n- Arguments must match exactly at the call site: `M(ref x)`, `M(out y)`, `M(in z)` — you can't silently pass by value where ref is required\n- `ref` and `out` don't participate in overloading (`M(ref int)` and `M(out int)` are the same signature)\n- ref-safe contexts (C# 12): `ref struct` types, `ref` fields in ref structs — advanced territory for stack-only types like `Span<T>`\n- `in` on a readonly field or with a literal creates a defensive copy — measure before using `in` on small structs (int, decimal)\n- Tuples (`return (count, total)`) replaced most 'out for multiple values' cases; keep out for Try-parse-style APIs\n\n**When NOT to use them:**\n- Small types (int, Guid, small records) — copy is cheaper than the ceremony\n- Async methods — **ref/out/in parameters are illegal in async methods** (the state machine can't hold them across awaits); use tuples or a result object instead\n- Public API design: ref parameters make APIs awkward and prevent async variants"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "ref, out, and in side by side",
+        "language": "csharp",
+        "code": "// out: Try-parse pattern — return value says success, out carries the result\npublic static bool TryParsePort(string text, out int port)\n{\n    port = 0;\n    return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out port)\n           && port is >= 1 and <= 65535;\n}\n\n// ref: in-and-out — the method mutates the caller's variable\npublic static void Increment(ref int counter)\n{\n    counter++;   // caller sees the change; no copy of the variable\n}\n\n// in: read-only reference to a large struct — no copy into the method\npublic static decimal Total(in Rect area, in Rect other)\n{\n    // area.Width = 10;  // ❌ compile error — in parameters are read-only\n    return area.Width * area.Height + other.Width * other.Height;\n}\n\n// Calling convention mirrors the declaration:\nvar ok = TryParsePort(\"8080\", out var port);  // out var — no pre-declaration needed\nIncrement(ref port);                          // ref needs an existing variable\nvar total = in Total(in bigRect, in otherRect); // 'in' at call site is optional\n\n// ref locals and ref returns — alias without copying\nstatic ref int Max(ref int a, ref int b) => ref (a > b ? ref a : ref b);\nref var winner = ref Max(ref xs[0], ref xs[1]);\nwinner = 99;   // writes into xs — the alias IS the storage\n\n// ❌ Not allowed: ref/out/in in async methods\n// async Task Bad(int x, out int y) { ... }   // compile error — use tuples:\n// async Task<(bool ok, int port)> GoodAsync(string s) { ... }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The definite-assignment contract of out and the read-only contract of in\n- Why structs motivate by-reference passing (copy cost)\n- Awareness of the async restriction and the tuple replacement\n- The defensive-copy gotcha with `in` on big structs"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Using out parameters for multiple returns in new code — prefer tuples for readability",
+          "Assuming `in` prevents all copying — assignment to an `in` struct parameter copies",
+          "Trying to use ref/out in async methods — the compiler forbids it",
+          "Returning ref to a stack-only local — ref returns must reference still-valid storage",
+          "Overusing ref for small types where the copy cost is zero and the intent gets muddier",
+          "Confusing ref and out at the call site — out means 'the method owes me a value'"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What is a defensive copy and when does `in` cause one?",
+          "What are ref structs and why can't they be boxed or used in async?",
+          "How do Span<T>/ReadOnlySpan<T> build on ref-like semantics?",
+          "Why can't ref parameters be used in iterator (yield) methods either?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "ref = in and out; out = callee must assign; in = read-only reference",
+          "By-reference passing avoids struct copies and expresses data flow",
+          "out/ Try-parse pattern is classic; tuples replaced most multi-return out usage",
+          "ref/out/in are banned in async and iterator methods",
+          "`in` can create defensive copies — measure on hot paths"
+        ],
+        "takeaway": "Use ref/in to avoid copying big values and out to return a computed value without an allocation — but reach for tuples and Span in everyday code first."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "beginner-q13",
+    "spant-what-does-it-improve-and-what-constraints-does-it-introduce",
+    "records-vs-classes"
+  ],
+  "furtherReading": [
+    {
+      "title": "ref, out, and in parameters (C# reference)",
+      "url": "https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/ref",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "ref struct and ref-like types",
+      "url": "https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/ref-struct",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "C#",
+  "estimatedMinutes": 24
+}

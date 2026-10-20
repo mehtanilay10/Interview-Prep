@@ -1,0 +1,140 @@
+{
+  "id": "lesson-iq-ef-relationships-cascade",
+  "slug": "ef-core-relationships-cascade",
+  "moduleSlug": "entity-framework-core",
+  "title": "How do you configure relationships and delete behavior in EF Core?",
+  "description": "Navigations and foreign keys, one-to-many/many-to-many, cascade vs restrict, and delete-cycle traps.",
+  "order": 8,
+  "difficulty": "intermediate",
+  "tags": [
+    "ef-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you configure relationships and delete behavior in EF Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core maps relationships from **navigations + foreign keys** — conventions discover most of them, and the fluent API (`HasOne/HasMany/WithOne/WithMany`, `HasForeignKey`, `OnDelete`) makes them explicit. Delete behavior is a design decision: **Cascade** removes dependents automatically (convenient, but dangerous with cycles or bulk deletes), **Restrict** blocks the delete (safe default for optional relations), and you choose per relationship — not globally."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Modeling:**\n- Required FK: nullable navigation ≠ null → `IsRequired()`; optional: nullable FK column\n- One-to-many: collection navigation on principal, reference on dependent; cascade is the default for **required** dependents\n- One-to-one: `HasOne(a => a.Passport).WithOne(p => p.Owner).HasForeignKey<Passport>(p => p.OwnerId)`\n- Many-to-many: skip navigations (`HasMany(p => p.Tags).WithMany(t => t.Posts)`) — EF creates the join table; add an entity for it when you need payload (rating, added-by, date)\n- Alternate keys: `HasAlternateKey` for logical unique constraints referenced by other tables\n\n**Delete behavior options:**\n- **Cascade** — DB-level `ON DELETE CASCADE` (or client-side for cyclic models): deleting a Blog deletes its Posts. Convenient; risky: accidental mass deletes, and SQL Server forbids cascade paths that *cycle* (two cascading paths to one table → migration error)\n- **Restrict** — FK violation if children exist; forces explicit cleanup. Preferred when children outlive parents (orders survive a deleted customer — actually then you'd **SetNull** or archive)\n- **SetNull** — FK to null on delete (optional relations only)\n- **ClientCascade** — EF performs the dependent deletes in the same transaction — needed when the database can't express the cascade (cycle), but you must **load the dependents** for it to work\n- **NoAction** — the database does nothing; a dependent row then dangles/fails FK validation on save\n\n**The traps:**\n- Required dependents with `NoAction` → FK violations at SaveChanges, not at insert of the parent\n- Cyclic relationships (A→B→A both required): SQL Server raises *multiple cascade paths* — model one side as Restrict/ClientCascade\n- Bulk deletes bypass tracked cascades: `ExecuteDelete` won't cascade client-side for cycles — do it in SQL explicitly\n- Deleting a principal with tracked dependents only works if they are loaded (client cascade) — otherwise FK errors"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Explicit relationship and delete behavior",
+        "language": "csharp",
+        "code": "protected override void OnModelCreating(ModelBuilder b)\n{\n    // One Blog — many Posts (required author): cascade by default\n    b.Entity<Post>()\n        .HasOne(p => p.Blog)\n        .WithMany(bl => bl.Posts)\n        .HasForeignKey(p => p.BlogId)\n        .OnDelete(DeleteBehavior.Cascade);\n\n    // Optional parent: deleting the Author nulls the FK\n    b.Entity<Post>()\n        .HasOne(p => p.Author)\n        .WithMany(a => a.Posts)\n        .HasForeignKey(p => p.AuthorId)\n        .OnDelete(DeleteBehavior.SetNull);\n\n    // One-to-one with dependent PK = FK\n    b.Entity<AuthorProfile>()\n        .HasOne(p => p.Author)\n        .WithOne(a => a.Profile)\n        .HasForeignKey<AuthorProfile>(p => p.AuthorId);\n\n    // Many-to-many with payload: explicit join entity\n    b.Entity<PostTag>(e =>\n    {\n        e.HasKey(t => new { t.PostId, t.TagId });          // composite key\n        e.HasOne(t => t.Post).WithMany(p => p.PostTags)\n            .HasForeignKey(t => t.PostId)\n            .OnDelete(DeleteBehavior.Cascade);\n        e.HasOne(t => t.Tag).WithMany(t => t.PostTags)\n            .HasForeignKey(t => t.TagId)\n            .OnDelete(DeleteBehavior.Restrict);           // don't delete tags with posts\n    });\n}\n\n// Deleting with client-side cascade (loaded dependents):\n// var blog = await db.Blogs.Include(bl => bl.Posts).FirstAsync(b => b.Id == id);\n// db.Blogs.Remove(blog);   // Posts removed in the same transaction\n// await db.SaveChangesAsync();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Fluent API fluency: HasOne/WithMany/HasForeignKey/OnDelete\n- Knowing each delete behavior and when to pick which\n- Awareness of SQL Server's cascade-path cycle restriction and client cascade\n- That many-to-many with payload means an explicit join entity"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Accepting the cascade default everywhere — deleting a parent silently wipes dependent history",
+          "Required FK + NoAction: FK errors appear only at SaveChanges",
+          "Hitting 'multiple cascade paths' errors and not understanding they're a SQL Server rule",
+          "Assuming ExecuteDelete/SQL DELETE triggers client-side cascades for cyclic models",
+          "Leaving dependents unloaded while relying on ClientCascade",
+          "Modeling many-to-many payload (votes, timestamps) without an explicit join entity"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Orders must survive customer deletion — how do you model that?",
+          "How do you handle two required entities referencing each other?",
+          "What's the difference between what EF does and what the database does on cascade delete?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Relationships = navigations + FK, made explicit with the fluent API",
+          "Cascade / Restrict / SetNull / ClientCascade / NoAction — choose per relation",
+          "Cyclic required relations break SQL Server cascades — split the behavior",
+          "Client cascades only delete what is loaded; bulk SQL bypasses them"
+        ],
+        "takeaway": "Deleting rows is a business rule: pick delete behavior deliberately so history, mass-deletes, and database limits all stay under control."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "lazy-eager-loading",
+    "global-query-filters",
+    "key-strategy"
+  ],
+  "furtherReading": [
+    {
+      "title": "Relationships in EF Core",
+      "url": "https://learn.microsoft.com/ef/core/modeling/relationships",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Delete behavior in EF Core",
+      "url": "https://learn.microsoft.com/ef/core/saving/delete-orphan",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 27
+}

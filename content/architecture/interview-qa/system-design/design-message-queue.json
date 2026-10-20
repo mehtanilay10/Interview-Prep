@@ -1,0 +1,215 @@
+{
+  "id": "lesson-sd-message-queue",
+  "slug": "design-message-queue",
+  "moduleSlug": "system-design",
+  "courseSlug": "interview-qa",
+  "title": "Design a distributed message queue.",
+  "description": "Durable log vs queue semantics: partitioning, consumer groups, delivery guarantees, backpressure, and exactly-once illusions.",
+  "order": 19,
+  "difficulty": "advanced",
+  "estimatedMinutes": 26,
+  "tags": [
+    "interview",
+    "system-design",
+    "messaging",
+    "distributed-systems"
+  ],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a distributed message queue like Kafka or SQS."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Producers publish; consumers subscribe — decoupled in time and scale",
+          "Durable: messages survive broker restarts and producer crashes",
+          "At-least-once delivery; per-partition ordering guarantee",
+          "Consumer groups: parallel consumption with offset tracking",
+          "Retention: replay from a point in time (hours/days)",
+          "Backpressure: slow consumers must not take down producers"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-queue-arch",
+        "caption": "Partitioned log brokers with replication and consumer-group offset tracking",
+        "definition": "graph TD\n    A[Producer] -->|append| B[Leader - Topic/Partition 0]\n    A -->|append| C[Leader - Topic/Partition 1]\n    B --> D[Follower Replica]\n    C --> E[Follower Replica]\n    F[Coordinator - group membership, offsets] --> G[Consumer Group: C1, C2]\n    G -->|fetch by offset| B\n    G -->|fetch by offset| C\n    H[(ZooKeeper/etcd - metadata)] --> F"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Two classic shapes: a **distributed log** (Kafka: ordered, replayable, partitioned; consumers read by offset) and a **smart broker** (SQS/Rabbit: broker tracks queues, deletes on ack). The log design wins for stream processing, replay, and many independent consumer groups; the queue design wins for simple task distribution where nobody needs history."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Partitioning is the parallelism unit: key by entity id for per-entity ordering (order events for one user land on one partition); partitions >> consumers is the healthy state",
+          "Ordering scope = one partition, not the topic — say this out loud in any design review",
+          "Durability: append to leader's log, replicate to followers (ISR - in-sync replicas), ack producer after min-ISR — fsync policy trades latency for loss window",
+          "Consumer groups: coordinator assigns partitions (rebalance on membership change); offsets committed periodically — crash between process and commit ⇒ redelivery ⇒ consumers must be idempotent",
+          "Delivery guarantees: at-least-once is the honest default; 'exactly-once' inside the broker (transactions/producer idempotence) still requires idempotent side effects end-to-end",
+          "Retention: time- or size-based per topic; offsets enable replay (buggy consumer fix = reset offset and reprocess)",
+          "Backpressure: slow consumer lags; alerts on consumer lag (the health metric of a queue system); slow-lane/DLQ for poison messages so one bad message doesn't block a partition forever",
+          "Fetch model: long-polling batch fetches (batch.size, linger) turn chatty RPCs into throughput; latency-sensitive topics use small batches",
+          "Metadata/coordination: partition leaders, group coordinators, and membership via etcd/ZooRaft-style store; leader failover promotes a caught-up follower",
+          "Priority/delayed queues: log designs fake these poorly (separate topics); SQS-style brokers model them natively — pick per use case"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Poison messages block partitions",
+        "text": "A message that crashes its consumer on every redelivery will, in a partition-committed-offset design, halt everything behind it. Every consumer needs a max-retry → DLQ path, and ops needs replay tooling for DLQ entries — otherwise one malformed payload becomes a multi-hour outage."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Entity",
+          "Key Fields",
+          "Description"
+        ],
+        "rows": [
+          [
+            "Topic",
+            "topic, partitions, retention_ms, min_isr",
+            "Named stream with policy"
+          ],
+          [
+            "Segment",
+            "topic, partition, base_offset, log file",
+            "Append-only on-disk log, immutable segments"
+          ],
+          [
+            "Offset",
+            "topic, partition, offset, timestamp",
+            "Position of a message in the partition"
+          ],
+          [
+            "GroupOffset",
+            "group, topic, partition, committed_offset",
+            "Where a consumer group is reading"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Edge Cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Rebalance storms: rolling deploys triggering partition churn — static group membership/cooperative rebalances limit the disruption",
+          "Producer ack lost after successful append — idempotent producer (sequence numbers per producer-partition) prevents duplicate appends",
+          "Follower lag beyond ISR — leader rejects writes (availability vs durability dial); alert before it happens",
+          "Consumer processes but crashes pre-commit — at-least-once delivers again; idempotency keys absorb it",
+          "Clock skew and timestamp semantics — event time vs broker time; downstream windows must use event time",
+          "Hot partition: one viral key gets 100% of traffic — salting or key redesign; partitions don't auto-fix skew"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Kafka log vs SQS queue — how do you choose?",
+            "answer": "Need replay, multiple independent consumer groups, or stream processing? Log. Need simple task distribution, per-message deletion, priority/delay? Queue. Many stacks end up with both, per workload."
+          },
+          {
+            "question": "How is consumer lag measured and governed?",
+            "answer": "Lag = latest committed offset − group offset, per partition. Alert on lag growth rate and absolute values vs processing SLA; scale consumers up to partition count (no further parallelism possible beyond partitions)."
+          },
+          {
+            "question": "Can you get true exactly-once?",
+            "answer": "Only as end-to-end semantics: idempotent producers + transactional broker writes + idempotent consumers (dedupe store). Remove any link and you have at-least-once. Design for idempotency; treat 'exactly-once' as 'effectively-once by dedupe'."
+          },
+          {
+            "question": "What does a DLQ pipeline look like?",
+            "answer": "Max retries → original message + error metadata → DLQ topic; dashboards and alerts on DLQ depth; ops tooling to inspect, fix, and replay to the source topic with the original key preserved."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Partition = ordering + parallelism unit; scale by partitioning on the right key",
+          "At-least-once + idempotent consumers is the realistic contract",
+          "Consumer lag is the health metric; DLQ + replay are mandatory ops paths",
+          "Log (Kafka) vs broker (SQS) shapes: replay/multi-consumer vs simple task semantics"
+        ],
+        "takeaway": "A queue system is a contract about failure: define your ordering scope, assume redelivery, and give poison messages somewhere to go but your pipeline."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "design-notification-system",
+    "design-distributed-cache",
+    "design-metrics-monitoring"
+  ],
+  "furtherReading": [
+    {
+      "title": "The Log: What every engineer should know — Jay Kreps",
+      "url": "https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying",
+      "type": "article",
+      "author": "LinkedIn Engineering"
+    },
+    {
+      "title": "Amazon Builders' Library: avoid backpressure & cascading failures",
+      "url": "https://aws.amazon.com/builders-library/avoiding-overload-in-distributed-systems/",
+      "type": "article",
+      "author": "Amazon Builders' Library"
+    }
+  ]
+}

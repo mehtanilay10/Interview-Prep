@@ -1,0 +1,148 @@
+{
+  "id": "lesson-iq-hosted-services-background-tasks",
+  "slug": "hosted-services-background-tasks",
+  "moduleSlug": "aspnet-core",
+  "title": "What is the difference between IHostedService and BackgroundService?",
+  "description": "Running long-lived background work in ASP.NET Core with cancellation, queues, and graceful shutdown.",
+  "order": 16,
+  "difficulty": "intermediate",
+  "tags": [
+    "aspnet-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the difference between IHostedService and BackgroundService?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`IHostedService` gives you `StartAsync`/`StopAsync` lifecycle hooks around the host — use it when the service *is* the start/stop operation (e.g. wiring a message-bus consumer). `BackgroundService` is a convenience base class over it: `StartAsync` returns immediately after launching `ExecuteAsync` on a background thread, and the real work runs until the host's `CancellationToken` fires on shutdown. In practice you subclass `BackgroundService` for loops/workers; both are singletons with **scoped dependencies resolved per unit of work**."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Lifecycle:**\n- Host starts registered services in order, awaits each `StartAsync`\n- `BackgroundService.StartAsync` starts `ExecuteAsync` and returns when the first `await` yields — so the HTTP server comes up while your worker keeps running\n- On shutdown (SIGTERM / Ctrl+C), the host cancels the token, then awaits `StopAsync`/`ExecuteAsync` completion within `HostOptions.ShutdownTimeout` (default **30 s**) — after that it kills the process mid-work\n- Startup ordering: `IHostedService`s start before Kestrel accepts requests in minimal hosting (they're awaited in `StartAsync` chain) — a slow `StartAsync` delays readiness; keep heavy work in `ExecuteAsync`\n\n**Practical rules:**\n- **Scoped per iteration:** a singleton service can't consume `DbContext` (scoped). Create a scope each loop pass: `using var scope = _sp.CreateScope()` and resolve services from it\n- **Respect the token:** pass `stoppingToken` to `await` calls; swallow `OperationCanceledException` on shutdown; treat 'cancel received' as 'finish current unit, then exit'\n- **Single instance:** by default one per process — multiple replicas of your app run N workers; coordinate work with a queue/lock if exactly-once processing matters\n- **Don't block StartAsync/StopAsync** with long synchronous work — you stall host startup/shutdown\n- **Error handling in ExecuteAsync:** an unhandled exception **crashes the host** (BackgroundServiceExceptionBehavior default). Wrap the loop: log, back off, continue — unless failing fast is correct\n- **Producer/consumer:** pair `System.Threading.Channels` — web requests `TryWrite` (fast, in-memory), worker `await foreach` drains with backpressure; cross-process work belongs in a real queue (Service Bus, RabbitMQ, SQS)\n- `IHostedService` when start/stop **is** the work: subscribe on start, unsubscribe/dispose on stop"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "BackgroundService with scoped DbContext and graceful stop",
+        "language": "csharp",
+        "code": "public class OrderSweepWorker : BackgroundService\n{\n    private readonly IServiceScopeFactory _scopes;\n    private readonly ILogger<OrderSweepWorker> _log;\n    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);\n\n    public OrderSweepWorker(IServiceScopeFactory scopes, ILogger<OrderSweepWorker> log)\n        => (_scopes, _log) = (scopes, log);\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        using var timer = new PeriodicTimer(Interval);\n        try\n        {\n            while (await timer.WaitForNextTickAsync(stoppingToken))\n            {\n                try\n                {\n                    using var scope = _scopes.CreateScope();      // fresh scope per pass\n                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n\n                    var expired = await db.Orders\n                        .Where(o => o.Status == OrderStatus.Pending && o.CreatedAt < DateTime.UtcNow.AddMinutes(-15))\n                        .ToListAsync(stoppingToken);\n\n                    foreach (var o in expired) o.Status = OrderStatus.Cancelled;\n                    await db.SaveChangesAsync(stoppingToken);\n                }\n                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)\n                {\n                    break;                       // normal shutdown\n                }\n                catch (Exception ex)\n                {\n                    _log.LogError(ex, \"Sweep pass failed — will retry next tick\");\n                    // do not rethrow: default host behavior would STOP the service\n                }\n            }\n        }\n        finally\n        {\n            _log.LogInformation(\"Order sweep worker stopped\");\n        }\n    }\n}\n\n// Program.cs\nbuilder.Services.AddHostedService<OrderSweepWorker>();\n// hostOptions.ShutdownTimeout = TimeSpan.FromSeconds(60);  // if drain needs longer\n\n// Channel pattern for in-process producer/consumer:\n// builder.Services.AddSingleton(_ => Channel.CreateBounded<Job>(1000));\n// web action: channel.Writer.TryWrite(job)  ·  worker: await foreach (var job in reader.ReadAllAsync(ct))"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-hosted-service-lifecycle",
+        "caption": "Host startup launches ExecuteAsync without awaiting it; shutdown cancels the token and awaits completion within the shutdown timeout.",
+        "definition": "graph LR\n    A[Host.StartAsync] --> B[BackgroundService.StartAsync]\n    B --> C[ExecuteAsync running]\n    A --> D[Kestrel accepts requests]\n    C --> E[SIGTERM / StopAsync]\n    E --> F[stoppingToken cancelled]\n    F --> G{Work finished before ShutdownTimeout?}\n    G -->|Yes| H[Clean stop]\n    G -->|No| I[Process killed mid-work]\n    style H fill:#e8f5e9,stroke:#2e7d32\n    style I fill:#ffebee,stroke:#c62828"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing the singleton-vs-scoped trap and the IServiceScopeFactory fix\n- Cooperative cancellation: passing the token, catching shutdown cancellation\n- Shutdown timeout awareness — in-flight work must finish in time\n- Error policy: unhandled ExecuteAsync exceptions stop the worker (host)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Resolving a scoped DbContext directly in the worker constructor — captive dependency, ObjectDisposed/stale issues",
+          "Ignoring stoppingToken — shutdown hangs until the timeout kills the process",
+          "try/catch-less loops — one bad message crashes the whole application",
+          "Assuming one app instance = one worker when replicas multiply",
+          "Doing slow synchronous work inside StartAsync — delays server startup and health",
+          "Using a BackgroundService as a job queue when requests must survive process restarts — use a durable queue"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you ensure background work doesn't run on every replica simultaneously?",
+          "What happens to in-flight work when the pod is terminated?",
+          "Channel vs external broker — when is in-memory enough?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "BackgroundService = IHostedService + fire-and-forget ExecuteAsync loop",
+          "Create a scope per unit of work — the worker itself is a singleton",
+          "Pass stoppingToken everywhere; finish within ShutdownTimeout",
+          "Catch exceptions in the loop; in-memory channels for in-process hand-off"
+        ],
+        "takeaway": "Background workers are long-lived singletons that must scope their dependencies, honor cancellation, and survive their own failures."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "aspnet-b02",
+    "beginner-q16",
+    "exception-handling-problem-details"
+  ],
+  "furtherReading": [
+    {
+      "title": "Background services in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "System.Threading.Channels",
+      "url": "https://learn.microsoft.com/dotnet/standard/threading/channels",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 27
+}

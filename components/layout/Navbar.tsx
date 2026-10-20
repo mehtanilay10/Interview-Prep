@@ -183,6 +183,7 @@ export function Navbar({ categories }: NavbarProps) {
                 <Settings2 className="h-4 w-4" aria-hidden="true" />
                 Personalization
               </Link>
+              <div className="my-1 border-t border-border" />
               <Link
                 href="/user/progress"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
@@ -215,20 +216,13 @@ export function Navbar({ categories }: NavbarProps) {
                 <CloudOff className="h-4 w-4" aria-hidden="true" />
                 Saved offline
               </Link>
-              <Link
-                href="/user/danger-zone"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-fg-default hover:bg-canvas-subtle"
-                onClick={() => setUserMenuOpen(false)}
-              >
-                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                Danger Zone
-              </Link>
+              <div className="my-1 border-t border-border" />
               <button
                 onClick={() => {
                   setUserMenuOpen(false);
                   handleSignOut();
                 }}
-                className="flex w-full items-center gap-2 border-t border-border px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-fg-muted hover:bg-canvas-subtle hover:text-fg-default"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
                 Sign out

@@ -1,0 +1,140 @@
+{
+  "id": "lesson-iq-model-binding-validation",
+  "slug": "model-binding-validation",
+  "moduleSlug": "aspnet-core",
+  "title": "How does model binding and validation work in ASP.NET Core?",
+  "description": "Where request data becomes action parameters, how validation runs, and how to extend both.",
+  "order": 13,
+  "difficulty": "intermediate",
+  "tags": [
+    "aspnet-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does model binding and validation work in ASP.NET Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Model **binding** maps incoming data (route, query, form, headers, body) onto action parameters in a defined source order, using type converters and `IModelBinder`s. Model **validation** runs after binding: `ValidationVisitor` checks each bound object against its metadata — DataAnnotations attributes, `IValidatableObject`, and registered `ValidationAttribute`s — accumulating errors into `ModelState`. If anything failed, `ApiController`-attributed controllers automatically return **400 ProblemDetails** before your action executes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Binding sources:**\n- Default order for simple types: route → query → form body; complex types bind from the body if `[FromBody]`, otherwise form/query\n- Attributes pin the source: `[FromRoute]`, `[FromQuery]`, `[FromForm]`, `[FromBody]`, `[FromHeader]`\n- Only **one** body source per action; form and body together are invalid\n- Custom binders (`IModelBinderProvider`, `TryParse`, `BindAsync`) handle enums-as-strings, `CancellationToken`, or custom value types\n- [ApiController] inference: complex → FromBody, primitives → FromQuery, unless overridden\n\n**Validation:**\n- Attributes on the model: `[Required]`, `[Range]`, `[StringLength]`, `[RegularExpression]`, `[EmailAddress]`\n- Cross-property rules: implement `IValidatableObject.Validate()` or a custom `ValidationAttribute`\n- Client-side validation mirrors DataAnnotations when the tag helpers + unobtrusive scripts are included — server validation remains the authority\n- For rule sets that don't fit attributes (uniqueness against a database), use a validator library (FluentValidation) wired as `IValidator<T>` and inject it in the action — don't lie to the framework with fake attributes\n- Reading `ModelState.IsValid` is unnecessary in `[ApiController]` actions — automatic 400 happens first\n\n**Gotchas:**\n- Value types are non-nullable: missing `int Page` binds to 0 — use `int?` or required validation to detect absence\n- Validation runs on the **bound** object; fields the binder didn't set keep their defaults\n- Collection binding: `?tags=a&tags=b` → string array; JSON body → model deserialization (System.Text.Json options matter: case sensitivity, dates, enums)\n- Never trust client-side validation alone; never put secrets in route/query (logged)"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bound sources and layered validation",
+        "language": "csharp",
+        "code": "// DTO with annotations — declarative, runs automatically under [ApiController]\npublic record CreateOrderRequest\n{\n    [Required, StringLength(64)]\n    public string CustomerId { get; init; } = \"\";\n\n    [Range(0.01, 1_000_000)]\n    public decimal Amount { get; init; }\n\n    [EmailAddress]\n    public string? ReceiptEmail { get; init; }\n}\n\n[ApiController]\n[Route(\"api/orders\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpPost]\n    public async Task<ActionResult<OrderDto>> Create(\n        [FromBody] CreateOrderRequest request,   // body source pinned\n        [FromQuery] bool dryRun = false,         // query source pinned\n        CancellationToken cancellationToken)     // framework-provided binder\n    {\n        // ModelState is already validated — invalid body => automatic 400 ProblemDetails\n\n        if (!await _rules.IsCustomerIdUniqueAsync(request.CustomerId, cancellationToken))\n            ModelState.AddModelError(nameof(request.CustomerId), \"Unknown customer\");\n\n        if (!ModelState.IsValid)\n            return ValidationProblem(ModelState);   // manual business-rule failures\n\n        return CreatedAtAction(nameof(Get), new { id = order.Id }, order);\n    }\n}\n\n// Custom binder for a value type the framework shouldn't guess about\npublic class CurrencyBinder : IModelBinder\n{\n    public Task BindModelAsync(ModelBindingContext ctx)\n    {\n        var value = ctx.ValueProvider.GetValue(ctx.ModelName).FirstValue;\n        ctx.Result = Currency.TryParse(value, out var c)\n            ? ModelBindingResult.Success(c)\n            : ModelBindingResult.Fail();\n        return Task.CompletedTask;\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing the binding source order and the role of the [From*] attributes\n- Understanding where automatic 400s come from ([ApiController] + ModelState)\n- Difference between annotation validation and business-rule validation\n- Awareness of value-type/nullability and JSON deserialization pitfalls"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Checking ModelState.IsValid in [ApiController] actions — the framework already rejected invalid bodies",
+          "Relying on client-side validation as a security control",
+          "Non-nullable value types silently defaulting when the parameter is missing",
+          "Database-dependent rules (uniqueness) crammed into custom ValidationAttributes",
+          "Binding the body twice or mixing [FromForm] with [FromBody]",
+          "Trusting route/query values that were never validated against allowed formats"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How would you validate a rule that needs a database lookup?",
+          "What happens when a JSON property name casing doesn't match the DTO?",
+          "How do you bind a custom value type like Money or a DateRange?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Binding maps route/query/form/header/body onto parameters; [From*] pins the source",
+          "ValidationVisitor applies DataAnnotations/IValidatableObject to bound models",
+          "[ApiController] turns invalid ModelState into 400 ProblemDetails automatically",
+          "Client-side mirroring is UX; server validation is the contract"
+        ],
+        "takeaway": "Binding answers 'where did this value come from' and validation answers 'is it acceptable' — keep framework validation for shape and services for business rules."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "aspnet-filters",
+    "exception-handling-problem-details",
+    "routing-minimal-apis"
+  ],
+  "furtherReading": [
+    {
+      "title": "Model binding in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/mvc/models/model-binding",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Model validation in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/mvc/models/validation",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "ASP.NET Core",
+  "estimatedMinutes": 26
+}

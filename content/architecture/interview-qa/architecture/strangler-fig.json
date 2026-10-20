@@ -1,0 +1,138 @@
+{
+  "id": "lesson-iq-strangler-fig",
+  "slug": "strangler-fig",
+  "moduleSlug": "architecture",
+  "title": "How do you migrate from a monolith to microservices incrementally?",
+  "description": "The strangler-fig pattern: routing traffic around seams, branch-by-abstraction, CDC data extraction, and knowing when to stop splitting.",
+  "order": 19,
+  "difficulty": "advanced",
+  "tags": [
+    "architecture",
+    "microservices",
+    "migration",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you migrate from a monolith to microservices incrementally?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With the **strangler-fig pattern**: put a routing facade (gateway/proxy) in front of the monolith, identify **seams** (bounded contexts with clear boundaries), and **extract one capability at a time** — new calls go to the new service while everything else still hits the monolith, gradually 'strangling' the old code. Data migration is the hard part: use **Change Data Capture** (dual-read/dual-write carefully, or CDC from the monolith's tables) so the new service owns its data without a big-bang cutover. Pair it with **branch-by-abstraction** inside the monolith (interface + toggle) when the seam isn't at the network boundary. The goal isn't microservices for their own sake — it's independent deployability of the parts that change most; **stopping when the remaining monolith is stable and cheap** is a valid, underused outcome."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The sequence that works:**\n1. **Facade first**: proxy/gateway routes /api/checkout → monolith, ready to redirect per-route\n2. **Pick the first extract by value**: a context that is (a) changing often, (b) scaling differently (search vs CRUD), (c) owned by a team that wants autonomy — *not* the easiest or the hardest piece\n3. **Define the seam**: explicit interface/events at the boundary; inside the monolith use branch-by-abstraction (interface + feature toggle) so both implementations can run\n4. **Data extraction — the real risk**:\n   - Phase 1: new service reads via monolith API or shared table (documented debt)\n   - Phase 2: CDC (Debezium/Outbox) streams monolith table changes into the service's store — no dual writes\n   - Phase 3: service owns writes; monolith redirected through the service's API; shared table dropped\n5. **Traffic shifting**: dark launch/canary → percentage rollout → full; compare responses (shadow traffic) before switching\n6. **Repeat per seam; re-evaluate annually whether more extraction pays for itself**\n\n**Why dual-write is a trap:** writing to both monolith DB and service DB can't be atomic; a crash between writes silently diverges — CDC from one source of truth, or transactional outbox, instead\n\n**Organizational truth:**\n- Conway's law cuts both ways — extract along team boundaries or your org chart will fight the architecture\\n- The monolith isn't the enemy: a well-modularized monolith (modules with boundaries, module-level DB schemas) often beats 50 microservices run by a 6-person team\\n- Stop condition: remaining monolith changes rarely and scales fine — leave it"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Extracting checkout: facade, CDC, and cutover",
+        "language": "text",
+        "code": "Before:\\n  Clients -> Monolith (checkout + catalog + users + recommendations in one deploy)\\n\\nPhase 1 - Facade + seam:\\n  Clients -> Gateway /api/checkout -> Monolith (unchanged)\\n  In-monolith: ICheckoutService interface, two impls behind a toggle\\n\\nPhase 2 - Extract service, read-shared data:\\n  Gateway /api/checkout -> CheckoutService (new)\\n  CheckoutService -> Monolith API for user/catalog reads (temporary)\\n  Monolith code path: toggle off for all traffic\\n\\nPhase 3 - Own the data via CDC:\\n  Monolith DB (Orders table) ==CDC==> CheckoutService store\\n  writes still in monolith during soak period\\n\\nPhase 4 - Own writes:\\n  CheckoutService owns Orders; publishes OrderPlaced events\\n  Monolith's recommendation module CONSUMES OrderPlaced (was a JOIN before)\\n  shared Orders table dropped from monolith schema\\n\\nPhase 5 - The strangler is done:\\n  /api/* routes: checkout -> service, everything else -> monolith\\n  catalog module extracted next quarter (repeat)\\n  remaining monolith: stable, low-churn - left alone deliberately\\n\\n❌ Big-bang rewrite: 18 months of freeze, 2x the bugs, no rollback story\\n❌ Dual-write during Phase 3/4: crash between writes = silent divergence"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "info",
+        "title": "The pattern's origin is a warning",
+        "text": "Strangler fig grows *around* the host until the host is gone — the point is that the old system keeps serving traffic the entire time. If your migration requires a freeze, a rewrite, or a single cutover weekend, it isn't strangling anything; it's a big-bang rewrite with extra steps."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Dual writes to monolith DB and service DB — divergence on crash, no atomicity",
+          "Extracting the easiest module first instead of the highest-value seam",
+          "No facade — clients hard-code monolith URLs, so every extraction is a coordinated client release",
+          "Extracting services a small team cannot operate — ops load multiplies per service",
+          "Leaving shared tables in place 'temporarily' for years",
+          "Microservices as the goal — the goal is independent change; a modular monolith can deliver it"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does transactional outbox avoid the dual-write problem?",
+          "How do you verify parity before flipping traffic (shadow/canary)?",
+          "What does branch-by-abstraction look like inside the monolith?",
+          "At what point is a modular monolith the right answer over extraction?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Facade routes per-capability; old system keeps serving throughout",
+          "Extract by value: frequently-changed, differently-scaling, team-owned seams",
+          "Data is the hard part: CDC/outbox, never dual-writes",
+          "Stop when the remainder is stable — microservices are a means, not the goal"
+        ],
+        "takeaway": "Strangle, don't rewrite: every phase must leave both systems runnable, with the monolith shrinking one seam at a time and traffic flowing the whole way."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "why-did-you-choose-microservices-instead-of-a-modular-monolith",
+    "microservices-basics",
+    "database-per-service"
+  ],
+  "furtherReading": [
+    {
+      "title": "StranglerFigApplication — Martin Fowler",
+      "url": "https://martinfowler.com/bliki/StranglerFigApplication.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "Decompose monolith — Microsoft",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/microservices/migrate-monolith",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Architecture",
+  "estimatedMinutes": 24
+}

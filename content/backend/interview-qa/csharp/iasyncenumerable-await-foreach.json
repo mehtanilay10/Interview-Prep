@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-iasyncenumerable-await-foreach",
+  "slug": "iasyncenumerable-await-foreach",
+  "moduleSlug": "csharp",
+  "title": "What is IAsyncEnumerable and when do you use await foreach?",
+  "description": "Streaming async sequences: pulling rows lazily with EF Core, implementing your own async iterators, and cancellation.",
+  "order": 45,
+  "difficulty": "advanced",
+  "tags": [
+    "C#",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is IAsyncEnumerable<T> and when do you use await foreach?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`IAsyncEnumerable<T>` is the async counterpart of `IEnumerable<T>`: a **lazy sequence where each item arrives asynchronously**. You consume it with `await foreach`, which awaits each `MoveNextAsync()` before yielding the next item. The canonical use case is streaming rows from a database (`AsAsyncEnumerable()` in EF Core) or paging an API **without materializing the whole result set** — memory stays bounded to one item, and backpressure follows the consumer's pace. Write your own with `async IAsyncEnumerable<T>` iterators, and always propagate `CancellationToken` via `[EnumeratorCancellation]`."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Why it exists:**\n- `ToListAsync()` on 10 million rows loads all 10 million — and you usually process one at a time\n- Sync `IEnumerable` + `Task` per item doesn't compose: no standard protocol, easy to accidentally buffer\n- IAsyncEnumerable gives the compiler a protocol (`GetAsyncEnumerator`, `MoveNextAsync`, `Current`) just like IEnumerable, but for `ValueTask<bool>` steps\n\n**Consumption:**\n- `await foreach (var row in query.AsAsyncEnumerable().WithCancellation(ct))` — one row in memory at a time\n- `await foreach (var batch in EnumerateBatches(db, 500))` — bounded batches for bulk ops\n- LINQ: async-aware operators live in `System.Linq.Async` (IAsyncEnumerable community/official package): `WhereAwait`, `SelectAwait`, `ToListAsync`, `FirstAwaitAsync`\n- Don't call sync LINQ directly on the async sequence — enumerate first or use the async operators\n\n**Writing an iterator:**\n- `static async IAsyncEnumerable<T> Fetch([EnumeratorCancellation] CancellationToken ct = default)` — the attribute wires `WithCancellation` to your token parameter\n- `yield return` works the same as in sync iterators; every `yield` may await\n- Exceptions surface at the await point of `MoveNextAsync` — the consumer's `await foreach` sees them\n\n**Operational considerations:**\n- **Streaming ≠ buffering**: if the consumer stops enumerating, the underlying command may still be open — dispose enumerators (`await foreach` disposes automatically)\n- Long-lived readers hold a connection and an open DataReader for the whole enumeration — keep consumers fast or batch with keyset pagination instead for very long streams\n- Cancellation: pass `[EnumeratorCancellation]` and honor it in your loops, or a hung consumer holds the connection forever\n- When to prefer explicit batching (keyset pages of 1,000) over one giant async stream: bounded memory AND bounded transaction/connection time, resumability across process restarts\n- Growable streams between services: IAsyncEnumerable is in-process — cross the wire with gRPC streaming, Channels, or message queues"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Streaming rows and writing your own async iterator",
+        "language": "csharp",
+        "code": "// 1) EF Core: stream instead of materializing\nawait foreach (var row in db.AuditEvents\n    .Where(e => e.At >= from && e.At < to)\n    .OrderBy(e => e.At)\n    .AsAsyncEnumerable()\n    .WithCancellation(ct))\n{\n    await sink.WriteAsync(row, ct);     // one row in memory at a time\n}\n\n// 2) Your own async iterator — e.g. paging an upstream API lazily\nstatic async IAsyncEnumerable<OrderDto> FetchAllOrders(\n    IOrdersApiClient api,\n    [EnumeratorCancellation] CancellationToken ct = default)   // wires WithCancellation\n{\n    string? cursor = null;\n    do\n    {\n        var page = await api.GetPageAsync(cursor, ct);         // awaited per page\n        foreach (var order in page.Items)\n            yield return order;                                // consumer pulls one by one\n\n        cursor = page.NextCursor;\n    } while (cursor is not null);\n    // consumer stopped early? disposal unwinds here — no further pages are fetched\n}\n\n// 3) Consumption — including early break and cancellation\nvar options = new EnumerationOptions { MaxCount = 5_000 };   // stop after 5k\nawait foreach (var order in FetchAllOrders(api, ct)\n    .WithCancellation(ct)\n    .Take(5_000))                                            // from System.Linq.Async\n{\n    await ProcessAsync(order, ct);\n}\n\n// 4) Bounded batches — often better than one giant stream\nstatic async IAsyncEnumerable<List<OrderDto>> BatchAsync(\n    IAsyncEnumerable<OrderDto> source, int size,\n    [EnumeratorCancellation] CancellationToken ct = default)\n{\n    var batch = new List<OrderDto>(size);\n    await foreach (var item in source.WithCancellation(ct))\n    {\n        batch.Add(item);\n        if (batch.Count == size)\n        {\n            yield return batch;\n            batch = new List<OrderDto>(size);\n        }\n    }\n    if (batch.Count > 0) yield return batch;\n}\n\n// ❌ Don't: .ToListAsync() on a huge stream, then loop the list\n// ❌ Don't: call blocking .Result inside the iterator — it stalls the reader"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-iasyncenumerable-pull-flow",
+        "caption": "Pull-based flow: the consumer's await each MoveNextAsync drives one unit of work upstream — one item in memory at a time, natural backpressure.",
+        "definition": "graph LR\n    A[await foreach] --> B[MoveNextAsync]\n    B --> C{More items?}\n    C -->|yes| D[Await next row/page from source]\n    D --> E[Receive one item]\n    E --> F[Process item]\n    F --> B\n    C -->|no| G[Dispose enumerator - connection released]\n    style E fill:#e8f5e9,stroke:#2e7d32"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The memory story: streaming vs materializing, and when each is right\n- Correct cancellation propagation with [EnumeratorCancellation]\n- Knowing the connection stays open for the whole enumeration\n- Distinguishing in-process async streams from cross-service streaming"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Enumerating a 5M-row stream slowly — the DataReader and connection stay open for the whole consumer lifetime",
+          "Forgetting [EnumeratorCancellation] — WithCancellation does nothing and shutdown hangs",
+          "Calling sync LINQ (Where/Select/Count) directly on IAsyncEnumerable — use System.Linq.Async operators",
+          "Buffering anyway: .ToListAsync() inside the first line of the loop defeats the purpose",
+          "Assuming early break cancels the database command — it stops pulling, but cancellation is what tears the command down promptly",
+          "Using IAsyncEnumerable across service boundaries — it's an in-process protocol; use gRPC streaming or queues over the wire"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does EF Core's AsAsyncEnumerable differ from ToListAsync under the hood?",
+          "When would you choose keyset-batched pagination over a single async stream?",
+          "How do you make an async iterator honor both a caller token and a timeout?",
+          "What happens to the underlying SQL command if the consumer stops enumerating without cancelling?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "IAsyncEnumerable = lazy async sequence; await foreach pulls one item at a time",
+          "Canonical use: streaming DB rows or API pages without materializing",
+          "Write iterators with async IAsyncEnumerable + [EnumeratorCancellation]",
+          "Streams hold a connection open — keep consumers fast or batch",
+          "Cross-process streaming needs gRPC/queues, not this interface"
+        ],
+        "takeaway": "Reach for await foreach when you process items one at a time and can't afford the full result set in memory — and always thread the cancellation token through."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "asyncawait-explain-it-then-explain-how-it-can-cause-thread-starvation",
+    "cancellation-token-propagation",
+    "valuetask-what-problem-does-it-solve-and-when-can-it-make-code-worse"
+  ],
+  "furtherReading": [
+    {
+      "title": "Asynchronous streams (C# docs)",
+      "url": "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/asyncstreams",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "System.Linq.Async — async LINQ operators",
+      "url": "https://learn.microsoft.com/dotnet/standard/linq/async-enumerable",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "C#",
+  "estimatedMinutes": 25
+}

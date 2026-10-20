@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-oop-lsp-practice",
+  "slug": "liskov-substitution-in-practice",
+  "moduleSlug": "oop",
+  "title": "What does a Liskov Substitution Principle violation look like in real code?",
+  "description": "Concrete LSP violations (Square/Rectangle, NotImplementedException subclasses, pre/postcondition breaks), why they cause runtime surprises, and how to fix them.",
+  "order": 17,
+  "difficulty": "intermediate",
+  "tags": [
+    "oop",
+    "solid",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What does a Liskov Substitution Principle violation look like in real code?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A violation happens when a subtype breaks a promise its base type made, so code written against the base misbehaves when given the subtype. Classic signs: a subclass that throws `NotSupportedException` for inherited members, narrows accepted inputs (preconditions get stricter), weakens guarantees (postconditions get weaker), or mutates state in ways the base contract forbids (the Square/Rectangle problem). The cost is real: callers must check runtime types (`is`/`switch`) to stay correct — which is exactly what polymorphism was supposed to eliminate."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The contract behind LSP:** subtyping preserves behavior, not just signatures. A subtype may not add preconditions the base didn't require, may not remove guarantees the base gave, and must preserve invariants (mutability expectations, ordering, idempotency).\n\n**Four recurring violation patterns:**\n1. **Unsupported operations** — `ReadOnlyCollection.Add()` throws. If it's behind an `ICollection<T>` that callers legitimately mutate, the subtype is lying about its capabilities\n2. **Strengthened preconditions** — base `Withdraw(amount)` handles any positive amount; `SavingsAccount.Withdraw` throws below a minimum balance. Any caller validated against the base contract can now crash\n3. **Weakened postconditions** — base promises `GetUser(id)` returns a user or throws `KeyNotFound`; a cached subclass returns `null`. Callers dereference and NPE\n4. **Broken invariants (Square/Rectangle)** — `Rectangle.SetWidth(w)` keeps area consistent; `Square : Rectangle` can't honor that when both Width and Height are set independently. One of the two setters must corrupt the object\n\n**Why the compiler doesn't save you:** signatures still match, so the substitution compiles — the bug appears in production logic that assumed base behavior.\n\n**Fixes, in order of preference:**\n- Extract a common interface (`IShape` with `Area()`) instead of inheriting implementation — siblings, not parent/child\n- Make the hierarchy sealed so no one can widen the contract\n- Push the optional operation down: split `ICollection<T>` usage into read-only contracts for readers\n- If the subtype can't honor the contract, it doesn't belong in the hierarchy — model it as a separate type"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Square/Rectangle and a production-style violation",
+        "language": "csharp",
+        "code": "// ❌ The textbook violation, in real shape:\npublic class Rectangle {\n    public virtual int Width { get; set; }\n    public virtual int Height { get; set; }\n    public int Area => Width * Height;\n}\n\npublic class Square : Rectangle {\n    private int _side;\n    public override int Width { get => _side; set { _side = value; Height = value; } }\n    public override int Height { get => _side; set { _side = value; Width = value; } }\n}\n\nvoid Grow(Rectangle r) {\n    r.Width  = 10;   // fine for Rectangle...\n    r.Height = 20;   // Square: silently resets Width to 20; area is 400, not 200\n}\n\n// ✅ Siblings behind a contract that makes no shape promises it can't keep:\npublic interface IShape { double Area { get; } }\npublic sealed record RectangleS(double Width, double Height) : IShape {\n    public double Area => Width * Height;\n}\npublic sealed record SquareS(double Side) : IShape {\n    public double Area => Side * Side;\n}\n\n// ❌ Unsupported-op violation:\npublic interface IMessageQueue { void Enqueue(string m); string Dequeue(); }\npublic sealed class AuditOnlyQueue : IMessageQueue {\n    public void Enqueue(string m) { /* log only */ }\n    public string Dequeue() => throw new NotSupportedException(\"audit queue is append-only\");\n}\n// Fix: give readers an IReadableQueue; don't pretend to be a full queue.\n// Any method receiving IMessageQueue can now crash — callers start type-checking."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "The smell to memorize",
+        "text": "A subtype that throws `NotSupportedException`/`InvalidOperationException` for members it inherited is almost always an LSP violation. The interface promised an capability the subtype doesn't have — split the interface or remove the subtype from the hierarchy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to hear:\n- 'Subtypes must be substitutable for their base types' with the pre/post-condition framing\n- At least one concrete example beyond Square/Rectangle (e.g., NotSupportedException subclasses)\n- That the failure mode is runtime logic errors, not compile errors\n- The fix: redesign the hierarchy, don't paper over with runtime type checks"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Only knowing the Square/Rectangle story without connecting it to real class designs",
+          "Fixing violations by adding `if (x is Foo)` checks in callers — that abandons polymorphism",
+          "Throwing NotImplementedException in abstract-ish interfaces instead of splitting the contract",
+          "Confusing LSP with DRY or with 'inheritance is bad'",
+          "Ignoring behavioral contracts (ordering, idempotency) and focusing only on exceptions"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does the Interface Segregation Principle prevent LSP violations?",
+          "What are Design by Contract and invariant preservation, and how do they formalize LSP?",
+          "Is covariance in return types (and contravariance in parameters) related to LSP?",
+          "How would you refactor a base class whose subclasses legitimately behave differently?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "LSP = subtypes honor the base type's behavioral contract, not just its signatures",
+          "Violations: unsupported inherited members, stricter preconditions, weaker postconditions, broken invariants",
+          "Symptoms: runtime type checks, NotSupportedException in subclasses, mysterious wrong answers",
+          "Fixes: extract common interfaces, seal hierarchies, split fat contracts"
+        ],
+        "takeaway": "If callers have to ask what type something really is, the hierarchy is lying — and that's a Liskov violation."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "beginner-q17",
+    "oop-i01",
+    "composition-over-inheritance",
+    "covariance-contravariance"
+  ],
+  "furtherReading": [
+    {
+      "title": "Liskov substitution principle",
+      "url": "https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+      "type": "article",
+      "author": "Wikipedia"
+    },
+    {
+      "title": "The Liskov Substitution Principle",
+      "url": "https://web.archive.org/web/20150315020410/http://www.objectmentor.com/resources/articles/lsp.pdf",
+      "type": "article",
+      "author": "Robert C. Martin"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "OOP",
+  "estimatedMinutes": 18
+}

@@ -1,0 +1,137 @@
+{
+  "id": "lesson-iq-distributed-tracing",
+  "slug": "distributed-tracing",
+  "moduleSlug": "architecture",
+  "title": "How do you trace a request across service boundaries?",
+  "description": "Correlation ids, spans, and OpenTelemetry: stitching sync calls, async events, and logs into one end-to-end view of a request.",
+  "order": 18,
+  "difficulty": "advanced",
+  "tags": [
+    "architecture",
+    "observability",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you trace a request across service boundaries?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With **distributed tracing**: the entry point generates a **trace id**, and every service hop creates **spans** (one timed operation each) that carry the trace context forward via headers (W3C `traceparent`) or event metadata. **OpenTelemetry** is the standard: SDK + API instrument once, export to a backend (Jaeger, Zipkin, Azure Monitor, Datadog, Tempo). The context must propagate across **HTTP calls, message queues, and background jobs** — the async boundaries are where traces normally break. Spans correlate with **structured logs** (trace id on every log line) and **metrics** (per-endpoint latency/error rates), forming the three pillars. In .NET: OpenTelemetry packages + `AddOpenTelemetry().WithTracing(...)` auto-instrument ASP.NET Core, HttpClient, and EF Core."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The model:**\n- **Trace**: the full journey of one request, identified by trace id\n- **Span**: one unit of work (an HTTP call, a DB query, a queue publish) with start/end, status, and attributes (route, user id, row counts)\n- **Parent-child links**: spans record their parent — the tree reconstructs causality, not just timing\n- **Context propagation** is the whole game: outbound calls must inject trace context into headers (W3C Trace Context standard: `traceparent: 00-<trace-id>-<span-id>-01`); inbound calls extract it; queue consumers attach the producer's context to a new child span\n\n**What good instrumentation captures:**\n- Every outbound dependency call as a span — that's what shows '4.2s total, 3.9s in the payments dependency'\n- Span attributes: http.route (not raw URLs — cardinality explosion), db.system, messaging.destination\n- Errors on the span with status + exception, sampled attributes for filtering\n- Baggage (key-value context) for cross-cutting values like tenant id\n\n**Async boundaries:**\n- Message producers: inject context into message headers/payload envelope\n- Consumers: extract, start a child span — the trace continues across the queue\n- Fire-and-forget/background jobs: start a new root span linked to the original (span links) — causality preserved even without a strict parent\n\n**Sampling & cost:**\n- Head-based sampling (decide at the root) controls volume; tail-based sampling (decide after, keep all errors/slows) gives better fidelity at higher cost\n- Always keep error and high-latency traces; sample the happy path\n\n**.NET concrete:** `builder.Services.AddOpenTelemetry().WithTracing(t => t.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddEntityFrameworkCoreInstrumentation())` + OTLP exporter; Serilog enrichers add TraceId/SpanId to every log line"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Instrumenting a .NET service and carrying context across a queue",
+        "language": "csharp",
+        "code": "// Program.cs - one-time setup\\nbuilder.Services.AddOpenTelemetry()\\n    .WithTracing(tracing => tracing\\n        .AddAspNetCoreInstrumentation()   // incoming requests\\n        .AddHttpClientInstrumentation()   // outgoing HttpClient calls\\n        .AddEntityFrameworkCoreInstrumentation()\\n        .AddSource(\"Orders.Workers\")\\n        .UseOtlpExporter());\\n\\n// Manual span around domain work\\nusing var activity = OrdersDiagnostics.ActivitySource.StartActivity(\"PlaceOrder\");\\nactivity?.SetTag(\"order.id\", orderId);\\nactivity?.SetTag(\"order.item_count\", items.Count);\\n\\n// Producer side: context flows through message headers automatically\\n// (OpenTelemetry messaging instrumentation injects traceparent)\\nawait bus.PublishAsync(new OrderPlaced(orderId), ct);\\n\\n// Consumer side: extract parent context, start child span\\nvar consumerActivity = OrdersDiagnostics.ActivitySource\\n    .StartActivity(\"OrderPlaced.Handle\", ActivityKind.Consumer);\\n// span is a child of the producer's span -> one trace across the queue\\n\\n// Logs stitched to the same trace (Serilog):\\n// Log.ForContext(\"OrderId\", orderId).Information(\"Reserved stock\");\\n// -> log entry carries TraceId/SpanId; clicking a span shows its logs\\n\\n// Reading it in the backend (Jaeger/Tempo/Azure):\\n// trace waterfall: POST /orders [410ms]\\n//   |- PlaceOrder [390ms]\\n//   |   |- EF: SELECT Products [12ms]\\n//   |   |- HTTP payments.charge [350ms]  <- the bottleneck, visible immediately\\n//   |   '- bus.publish OrderPlaced [3ms]"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Traces answer 'why', metrics answer 'is it broken'",
+        "text": "Metrics (p99 latency by endpoint, error rate) tell you something is wrong; the trace for one slow request tells you exactly which dependency, query, or lock caused it. Instrument both from day one — and put the trace id in your error pages/tickets so support can jump straight to the waterfall."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Tracing HTTP but not messaging — the trace dies at the queue, which is usually where the latency hides",
+          "High-cardinality attributes (raw URLs, user ids in metric names) — exploding backend costs",
+          "No sampling strategy — 100% of traces at full volume is a bill, not observability",
+          "Trace ids only in traces, not in logs — you can't pivot from an error log to the waterfall",
+          "Manual instrumentation everywhere when auto-instrumentation covers the framework stack",
+          "Forgetting background workers — they need ActivitySources too, or their latency is invisible"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does W3C traceparent propagation work across services?",
+          "Head vs tail sampling — trade-offs of each?",
+          "How do span links handle fan-out better than parent-child spans?",
+          "How do you trace across gRPC and HTTP mixed topologies?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Trace id at entry; every hop adds spans; headers/events carry the context",
+          "OpenTelemetry: instrument once, export anywhere; auto-instrument the framework stack",
+          "The hard part is propagation across queues and background jobs",
+          "Logs + metrics + traces stitched by ids = the full debugging story"
+        ],
+        "takeaway": "A request's story is only complete when context crosses every boundary you own — the queue, the job, the retry — or your traces will lie by omission."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "what-would-you-monitor-to-prove-your-architecture-is-healthy",
+    "event-driven-architecture",
+    "circuit-breaker-retry"
+  ],
+  "furtherReading": [
+    {
+      "title": "OpenTelemetry .NET documentation",
+      "url": "https://opentelemetry.io/docs/languages/net/",
+      "type": "article",
+      "author": "OpenTelemetry"
+    },
+    {
+      "title": "Distributed tracing — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/distributed-tracing",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Architecture",
+  "estimatedMinutes": 22
+}

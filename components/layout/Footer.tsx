@@ -58,7 +58,7 @@ export function Footer() {
               <span className="text-base">Quotient</span>
             </Link>
             <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-              Structured courses, worked coding problems, cheat sheets, and interview
+              Structured courses, worked coding problems, cheat sheets, and practical
               questions — open, free, and built for software engineers at every stage.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-fg-muted">

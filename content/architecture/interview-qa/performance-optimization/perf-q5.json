@@ -1,0 +1,145 @@
+{
+  "id": "lesson-iq-perf-q5",
+  "slug": "perf-q5",
+  "moduleSlug": "performance-optimization",
+  "title": "How do you find and fix memory leaks in a .NET service?",
+  "description": "Growing working set, GC diagnostics with dotMemory/PerfView, common leak sources (events, statics, caches), and disposal discipline.",
+  "order": 5,
+  "difficulty": "advanced",
+  "tags": [
+    "interview",
+    "performance",
+    "dotnet",
+    "memory"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you find and fix memory leaks in a .NET service?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Watch for a working set that only climbs (GC memory / #Bytes in all Heaps from dotnet-counters), then **diff heap snapshots** between two points in time in dotMemory or PerfView: objects that keep growing and shouldn't are your leak. The classic .NET culprits: **event handlers never unregistered**, **static collections caching per-request data**, **timers not disposed**, **closures/`async` state machines pinning large objects**, **CancellationTokenRegistrations held**, and **IDisposable never disposed** (HttpClient is the cliché — reuse via IHttpClientFactory). Fixes are usually mechanical once identified: unsubscribe on dispose, use `ConditionalWeakTable`/bounded `ConcurrentDictionary` with eviction for caches, `WeakReference`/`MemoryCache` with size limits, and `await using`/`IAsyncDisposable` for async resources."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "First signal: dotnet-counters watch — GC Heap Size grows linearly under constant load; Gen2 GC size climbs after every collection",
+          "dotMemory/PerfView: take snapshot A, run workload, snapshot B, diff — sort by retained size, look at who roots the survivors",
+          "Event-handler leaks: static/singleton subscribing to a scoped object's event — the singleton roots it forever; unsubscribe in Dispose or use WeakEventManager patterns",
+          "Static caches without eviction: ConcurrentDictionary keyed by request id — unbounded growth; bound it (size limit + TTL, or MemoryCache)",
+          "Timers: System.Timers.Timer/PeriodicTimer held by a disposed scope — dispose them; better, use IHostedService-owned timers",
+          "Async leaks: fire-and-forget tasks holding state machines; CancellationTokenSource.CancelRegistrations accumulating",
+          "Disposed-but-referenced: a disposed DbContext kept alive by a singleton keeps its change-tracked entities rooted",
+          "Finalizers are a symptom, not a fix — an object with a finalizer that leaks also blocks the finalizer thread"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Example"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Leak: static event subscription; Fix: unsubscribe on dispose",
+        "language": "csharp",
+        "code": "// ❌ Leak: every request-scoped hub is rooted by the static bus forever\\npublic class NotificationBus\\n{\\n    public static event EventHandler<Notification> Sent;   // static event\\n    public void Send(Notification n) => Sent?.Invoke(this, n);\\n}\\n\\npublic class AuditHub : IDisposable\\n{\\n    public AuditHub() => NotificationBus.Sent += OnSent;\\n    private void OnSent(object s, Notification n) { /* audit */ }\\n    public void Dispose() { }   // forgot: unsubscribe!\\n}\\n// Each transient AuditHub stays alive forever -> heap grows per request.\\n\\n// ✅ Fix: symmetric subscribe/unsubscribe\\npublic class AuditHub : IDisposable\\n{\\n    public AuditHub() => NotificationBus.Sent += OnSent;\\n    private void OnSent(object s, Notification n) { /* audit */ }\\n    public void Dispose() => NotificationBus.Sent -= OnSent;\\n}\\n\\n// ❌ Unbounded cache keyed by request:\\n// static ConcurrentDictionary<string, BigPayload> _cache = new();\\n\\n// ✅ Bounded, evicting cache:\\n// private static readonly MemoryCache _cache = new(\\n//     new MemoryCacheOptions { SizeLimit = 128 });\\n// _cache.Set(key, payload, new MemoryCacheEntryOptions { Size = 1, SlidingExpiration = TimeSpan.FromMinutes(5) });\\n\\n// Diagnose in production:\\n// dotnet-counters monitor --process-id <pid> --counters System.Runtime\\n//   GC Heap Size / Gen2 collection count climbing -> snapshot & diff (dotMemory)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "new HttpClient per request — socket exhaustion; use IHttpClientFactory",
+          "Static/singleton holding scoped/transient objects (events, caches, containers)",
+          "Diagnosing in Debug mode — Debug builds hide optimizations and distort the heap",
+          "Forgetting that 'it gets GC'd eventually' hides slow leaks — Gen2 climbs for days",
+          "Adding WeakReference everywhere instead of fixing the ownership model",
+          "Ignoring finalization queue growth in PerfView — objects awaiting finalizers pin memory too"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does PerfView's GCStats differentiate a leak from GC pressure?",
+          "When is ConditionalWeakTable the right cache?",
+          "How do you monitor heap growth in production without snapshots?",
+          "What memory leaks can a DI container itself cause (captive dependencies)?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Signal: GC heap only grows under steady load; confirm with counter + snapshot diff",
+          "Classic culprits: static roots, events, timers, unbounded caches, undisposed disposables",
+          "dotnet-counters for signal, dotMemory/PerfView for the culprit graph",
+          "Fix ownership, not symptoms: symmetric subscribe/unsubscribe, bounded caches, IHttpClientFactory"
+        ],
+        "takeaway": "A leak is a reference you didn't know you kept — snapshot the heap twice, diff the survivors, and ask what root is still holding them."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "perf-q1",
+    "perf-q4"
+  ],
+  "furtherReading": [
+    {
+      "title": "Debug a memory leak in .NET",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/analyze-memory-use",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "dotnet-counters overview",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-counters",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "Performance Optimization",
+  "estimatedMinutes": 20
+}

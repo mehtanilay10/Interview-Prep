@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-sql-window-functions",
+  "slug": "window-functions",
+  "moduleSlug": "sql-server",
+  "title": "What are window functions in SQL Server?",
+  "description": "ROW_NUMBER, RANK, DENSE_RANK, LAG/LEAD, and aggregates over partitions: what they do, how they differ from GROUP BY, and where they shine.",
+  "order": 13,
+  "difficulty": "intermediate",
+  "tags": [
+    "sql server",
+    "queries",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are window functions in SQL Server?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Window functions compute a value **per row over a defined subset ('window') of rows** — via `OVER (PARTITION BY ... ORDER BY ...)` — **without collapsing rows** the way GROUP BY does. The three families: **ranking** (ROW_NUMBER, RANK, DENSE_RANK — numbering within partitions, with different duplicate handling), **value/offset** (LAG/LEAD/LEAD — read a previous/next row's value; NTILE for buckets), and **aggregate windows** (SUM/AVG/COUNT over a partition or running range — running totals, moving averages, percent of total). They're the standard tool for 'top N per group', 'rank within category', and 'running balance' queries that would otherwise need correlated subqueries or cursors."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Syntax shape:** `func(...) OVER (PARTITION BY grp ORDER BY ord [rows/range frame])`\n- PARTITION BY splits rows into independent windows (optional — whole result set otherwise)\n- ORDER BY inside OVER defines ordering *within* the window (required for ranking/offset; optional for aggregates)\n- ROWS/RANGE frame narrows which rows an aggregate sees: `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` = 7-row moving average; `RANGE UNBOUNDED PRECEDING` = running total to date\n\n**Ranking differences (ties matter):**\n- ROW_NUMBER: 1,2,2,3 — unique, arbitrary among ties\n- RANK: 1,2,2,4 — same rank for ties, then skips\n- DENSE_RANK: 1,2,2,3 — same rank, no gaps\n- NTILE(n): distributes rows into n buckets by order\n\n**Offset functions:**\n- LAG(col, n, default)/LEAD(col, n, default): previous/next row's value — period-over-period deltas, session sequencing, gap detection without self-joins\n- FIRST_VALUE/LAST_VALUE: first/last value in the frame (LAST_VALUE needs frame care — default frame ends at current row)\n\n**Aggregate windows vs GROUP BY:**\n- GROUP BY collapses: 100k orders → per-customer rows, originals gone\n- Window aggregate keeps every row and adds the computed column: each order row also carries its customer's total — then you can filter with HAVING-like conditions via subquery/CTE, or compute percent-of-total: `SUM(total) OVER ()`\n- Running total: `SUM(amount) OVER (ORDER BY orderDate ROWS UNBOUNDED PRECEDING)`\n\n**Execution notes:** window functions evaluate after WHERE/GROUP BY, before ORDER BY/DISTINCT; ORDER BY inside OVER often uses a Top N Sort / Window Spool operator — index on (partition keys, order keys) helps; OFFSET-FETCH is for pagination, not windowing"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Top N per group, running totals, and period deltas",
+        "language": "sql",
+        "code": "-- Top 3 orders per customer (the classic GROUP BY can't do this)\\nSELECT * FROM (\\n    SELECT\\n        CustomerId, OrderId, Total,\\n        ROW_NUMBER() OVER (PARTITION BY CustomerId ORDER BY Total DESC) AS rn\\n    FROM Orders\\n) ranked\\nWHERE rn <= 3;\\n\\n-- Ranking with ties: ROW_NUMBER vs RANK vs DENSE_RANK\\nSELECT\\n    ProductId, SaleDate, Amount,\\n    ROW_NUMBER() OVER (ORDER BY Amount DESC) AS row_num,   -- 1,2,2,3\\n    RANK()       OVER (ORDER BY Amount DESC) AS rk,        -- 1,2,2,4\\n    DENSE_RANK() OVER (ORDER BY Amount DESC) AS dense_rk   -- 1,2,2,3\\nFROM Sales;\\n\\n-- Running total and percent of company revenue\\nSELECT\\n    OrderId, Total,\\n    SUM(Total) OVER (ORDER BY OrderId ROWS UNBOUNDED PRECEDING) AS running_total,\\n    100.0 * Total / SUM(Total) OVER () AS pct_of_all\\nFROM Orders;\\n\\n-- 7-day moving average of daily sales\\nSELECT\\n    SaleDate, Amount,\\n    AVG(Amount) OVER (\\n        ORDER BY SaleDate\\n        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\\n    ) AS moving_avg_7d\\nFROM DailySales;\\n\\n-- Period-over-period with LAG (no self-join)\\nSELECT\\n    ProductId, SaleMonth, Revenue,\\n    Revenue - LAG(Revenue, 1, 0) OVER (\\n        PARTITION BY ProductId ORDER BY SaleMonth\\n    ) AS revenue_delta\\nFROM MonthlyProductRevenue;\\n\\n-- Aggregate without collapsing rows: each row keeps its detail\\nSELECT\\n    OrderId, CustomerId, Total,\\n    SUM(Total) OVER (PARTITION BY CustomerId) AS customer_total\\nFROM Orders;   -- filter 'customers over 10k' via CTE + HAVING-style WHERE"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Window functions vs correlated subqueries",
+        "text": "'Latest order per customer' via correlated subquery often re-executes per row; ROW_NUMBER in a CTE scans/sorts once. When you see MAX(col) per group joined back to the detail table, that's a window function waiting to replace it — usually with better plans and clearer SQL."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The core distinction from GROUP BY: windows keep row detail\n- ROW_NUMBER vs RANK vs DENSE_RANK tie semantics\n- Practical fluency: top-N-per-group, running total, LAG deltas\n- Awareness of frame clauses (ROWS BETWEEN) for moving aggregates"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Using ROW_NUMBER for ties where RANK semantics are required (or vice versa) — decide deliberately",
+          "Forgetting PARTITION BY in top-N-per-group — you get global top N, not per group",
+          "LAST_VALUE without a frame clause — default frame ends at current row, so it returns the current row",
+          "Expecting window functions in WHERE — they run after WHERE; filter them in a subquery/CTE",
+          "Running totals without ROWS UNBOUNDED PRECEDING — RANGE semantics can include all peers",
+          "Deep-partition windows on huge tables with no supporting sort/index — watch the plan for Window Spool spills"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do ROWS and RANGE frames differ with duplicate ORDER BY keys?",
+          "Can window functions reference another window function's alias? Where must they be computed?",
+          "How would you compute a median with window functions?",
+          "What operators appear in execution plans for windowing, and how do you tune them?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Windows compute over a partition without collapsing rows (unlike GROUP BY)",
+          "ROW_NUMBER unique, RANK skips after ties, DENSE_RANK doesn't",
+          "LAG/LEAD replace self-joins for deltas; frame clauses build moving aggregates",
+          "Top-N-per-group and running totals are the signature use cases"
+        ],
+        "takeaway": "When the answer needs a per-group value on every detail row, think OVER (...) — it's usually simpler and faster than the self-join you were about to write."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sql-b02",
+    "sql-a01",
+    "sql-i01"
+  ],
+  "furtherReading": [
+    {
+      "title": "Window functions and window aggregates — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/queries/select-over-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Windows Functions (SQL Server 2022 ranking) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/functions/ranking-functions-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "interview-qa",
+  "technology": "SQL Server",
+  "estimatedMinutes": 24
+}
