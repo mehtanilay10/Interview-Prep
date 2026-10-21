@@ -8,7 +8,7 @@ Read this before making any changes.
 
 ## Project overview
 
-Quotient is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering interview preparation. It includes:
+Quotient is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering. It includes:
 - Structured courses (C#, SQL, React, ASP.NET Core, OOP, etc.)
 - Coding problems with multiple solutions (`content/<category>/problems/`)
 - Question answers organized by category and technology (`content/<category>/question-answers/`)
@@ -91,7 +91,7 @@ content/
     roadmaps/
       roadmap.json            # Curated learning path for the category (one per category)
   cheatsheet.json             # Cheatsheet section "Course" metadata (category: "cheatsheet")
-  question-answers.json       # Question-answers section "Course" metadata (isInterview: true)
+  question-answers.json       # Question-answers section "Course" metadata (isQuestionAnswer: true)
   ai/
     glossary/                 # AI glossary terms (glossary/<topic>/[term].json)
     prompts/                  # AI prompt templates (prompts/<topic>/[prompt].json)
@@ -106,7 +106,7 @@ content/
 > `content/lessons.ts`) are flat files at the root of `content/`, so the import
 > specifiers `@/content/courses`, `@/content/modules`, and `@/content/lessons` are unchanged.
 > `content/categories.ts` only contains small string maps (`COURSE_URL_CATEGORY`,
-> `PROBLEM_COURSE_SLUGS`, `INTERVIEW_TECH_CATEGORY`, `INTERVIEW_LESSON_TECH`),
+> `PROBLEM_COURSE_SLUGS`, `QUESTION_TECH_CATEGORY`, `QUESTION_LESSON_TECH`),
 > so it is safe to import from client components.
 
 ### Adding a course
@@ -146,7 +146,7 @@ course/module/lesson model with `courseSlug: "question-answers"`. Each **technol
 module (e.g. `content/backend/question-answers/csharp/`), and every question in it is a lesson
 whose `moduleSlug` is the technology slug. Question lessons also carry a `technology`
 string (e.g. `"C#"`, `"JavaScript"`) used for search and display. The technology is the
-module slug, so it is also the URL segment — use `getInterviewTechSlug()` in
+module slug, so it is also the URL segment — use `getQuestionTechSlug()` in
 `lib/content-hrefs.ts` when converting a display name to a slug (e.g. `C#` → `csharp`,
 `CI/CD Pipelines` → `cicd-pipelines`) instead of lowercasing/replacing spaces inline.
 They are served at `/[category]/question-answers`,
@@ -163,7 +163,7 @@ To add a question:
 **Roadmaps** live under `content/<category>/roadmaps/roadmap.json` and are served at
 `/[category]/roadmap`. There is exactly one roadmap per category, so a roadmap is a single
 JSON file (not a course/module/lesson tree) that lists ordered `stages`, and each stage lists
-`steps` referencing existing content by slug (`course`, `problems`, `cheatsheet`, `interview`)
+`steps` referencing existing content by slug (`course`, `problems`, `cheatsheet`, `questionAnswer`)
 or by explicit href (`link`, used for pages like `/ai/glossary`). Steps are resolved against
 the content graph at render time by `resolveRoadmapStep()` in `lib/content.ts`, so a roadmap
 never duplicates titles, descriptions, or links. Roadmaps are registered in the generated
@@ -255,7 +255,7 @@ hardcoded category lists:
 - `getNavigationCategories()` in `lib/content.ts` builds the nav-bar category
   dropdowns (desktop + mobile accordion) from the content directory structure.
   Each category lists the sections that actually exist (`Courses` / `Problems` /
-  `Cheat Sheets` / `Interview Questions`). The `AI` category additionally carries
+  `Cheat Sheets` / `Question Answers`). The `AI` category additionally carries
   two static sections — `Glossary` (`/ai/glossary`) and `Prompt Templates`
   (`/ai/prompts`) — appended inside `computeNavigationCategories()`.
 - New categories are picked up automatically; add display metadata to
@@ -291,12 +291,12 @@ Module order within a course is determined by the `order` field in each module's
 
 - Login is optional. Content browsing is public.
 - Progress, bookmarks, and last-visited path require login to persist to the server.
-- Logged-out users fall back to `localStorage` for these features.
+- Logged-out users fall back to `localStorage` for these features. The canonical `localStorage` / `sessionStorage` key names live in `lib/storageKeys.ts` (prefixed `quotient_*`) — import from there instead of inlining key strings.
 - When a logged-out user tries to bookmark or mark complete, show the inline `SignInPrompt` component — do not redirect automatically.
 - `useProgress()` and `useBookmarks()` are context-based hooks from `ProgressProvider` and `BookmarkProvider`. When logged in, they sync with Prisma-backed APIs; when logged out, they read/write `localStorage` only.
 - `ContinuePrompt` uses the DB for logged-in users and `localStorage` for logged-out users.
 - Auth is powered by **NextAuth v5** (`auth.ts`) with **Google OAuth** (`openid profile email` scopes, offline access, consent prompt) and the **Prisma Adapter**.
-- User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; migrations are in `prisma/migrations/`, and `scripts/schema.sql` is an idempotent SQL equivalent. The Auth.js adapter tables are `accounts`, `sessions`, `verification_tokens`, and `authenticators`.
+- User-specific data lives in **Neon PostgreSQL** through the singleton Prisma client in `lib/prisma.ts`. The source of truth is `prisma/schema.prisma`; migrations are in `prisma/migrations/`. The Auth.js adapter tables are `accounts`, `sessions`, `verification_tokens`, and `authenticators`.
 - API routes for user data:
   - `app/api/progress/route.ts` — GET/POST/DELETE progress
   - `app/api/bookmarks/route.ts` — GET/POST/DELETE bookmarks
@@ -319,7 +319,7 @@ Module order within a course is determined by the `order` field in each module's
 - Use the existing types from `types/index.ts` — extend them don't bypass them
 - Run `yarn typecheck` before finalizing any change
 - New utility functions go in `lib/utils.ts`; content helpers go in `lib/content.ts`
-- Content-free href/slug helpers (`getContentItemHref`, `getSearchResultHref`, `getCourseCategory`, `isProblemCourseSlug`, `getInterviewTechSlug`, `getInterviewTechName`, `getInterviewTechCategory`) live in `lib/content-hrefs.ts` (re-exported from `lib/content.ts`) so client components can build links without bundling lesson JSON. Category/URL filters (`isRegularCourse`) live in `lib/content.ts`.
+- Content-free href/slug helpers (`getContentItemHref`, `getSearchResultHref`, `getCourseCategory`, `isProblemCourseSlug`, `getQuestionTechSlug`, `getQuestionTechName`, `getQuestionTechCategory`) live in `lib/content-hrefs.ts` (re-exported from `lib/content.ts`) so client components can build links without bundling lesson JSON. Category/URL filters (`isRegularCourse`) live in `lib/content.ts`.
 - **`'use client'` components must never import `@/lib/content` directly.** That module pulls in every lesson JSON file (~19 MB), which bloats the client bundle for every page. Pass content data down as props from a server component, enrich it in an API route, or import the lightweight `@/lib/content-hrefs` / `@/content/categories` helpers instead
 - SEO metadata helpers (`buildMetadata`, `buildLessonMetadata`, `buildModuleMetadata`) live in `lib/seo.ts`
 - Auth helpers live in `lib/auth.ts`
@@ -425,7 +425,7 @@ Utility scripts in `scripts/` help keep content consistent:
 - This project uses **Yarn 1.22+**. Use `yarn <script>` for project commands and `yarn prisma ...` for Prisma CLI commands.
 - The `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, and `content/categories.ts` files are fully auto-generated by `scripts/generate-content-indices.ts`. They are regenerated automatically before `dev`/`build` via `predev`/`prebuild` scripts, or manually with `yarn generate:content`. Do not edit these files by hand.
 - The cheatsheet and question-answers "courses" (`content/cheatsheet.json`, `content/question-answers.json`) are imported directly; their modules/lessons are registered in `content/modules.ts` and `content/lessons.ts`.
-- Question answers use a `technology` field on lessons to group them. Each technology is a module under `content/<category>/question-answers/`, so the module slug is the technology slug. See `lib/content.ts` helpers like `getInterviewCategories()`, `getInterviewTechnologies()` and `getInterviewQuestions()`.
+- Question answers use a `technology` field on lessons to group them. Each technology is a module under `content/<category>/question-answers/`, so the module slug is the technology slug. See `lib/content.ts` helpers like `getQuestionCategories()`, `getQuestionTechnologies()` and `getQuestionAnswers()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
 - Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth and `PrismaAdapter`. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
 - The Prisma PostgreSQL connection is configured in `lib/prisma.ts` from `DATABASE_URL`. The schema is in `prisma/schema.prisma`, with migrations in `prisma/migrations/`; run `yarn vercel-build` or `yarn prisma migrate deploy` against your Neon database before using auth-dependent features.

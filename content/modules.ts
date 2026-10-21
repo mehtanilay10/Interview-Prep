@@ -315,7 +315,7 @@ import airbnbBookingHldModule from "./architecture/problems/hld/airbnb-booking-h
 import amazonEcommerceModule from "./architecture/problems/lld/amazon-ecommerce/content.json";
 import amazonEcommerceHldModule from "./architecture/problems/hld/amazon-ecommerce-hld/content.json";
 import animationModule from "./frontend/courses/yarn-npm-packages/animation/content.json";
-import apiDesignModule from "./architecture/courses/system-design-interviews/api-design/content.json";
+import apiDesignModule from "./architecture/courses/system-design-course/api-design/content.json";
 import apiDesignModule1 from "./backend/problems/api-design/content.json";
 import apiDocumentationSwaggerModule from "./backend/courses/dotnet-nuget-packages/api-documentation-swagger/content.json";
 import apiGatewayHldModule from "./architecture/problems/hld/api-gateway-hld/content.json";
@@ -352,8 +352,8 @@ import cacheInvalidationModule from "./architecture/courses/redis-caching-strate
 import cachingInAspnetCoreModule from "./architecture/courses/redis-caching-strategies/caching-in-aspnet-core/content.json";
 import cachingInNodejsModule from "./architecture/courses/redis-caching-strategies/caching-in-nodejs/content.json";
 import cachingPatternsModule from "./architecture/courses/redis-caching-strategies/caching-patterns/content.json";
-import cachingStrategiesModule from "./architecture/courses/system-design-interviews/caching-strategies/content.json";
-import capacityEstimationModule from "./architecture/courses/system-design-interviews/capacity-estimation/content.json";
+import cachingStrategiesModule from "./architecture/courses/system-design-course/caching-strategies/content.json";
+import capacityEstimationModule from "./architecture/courses/system-design-course/capacity-estimation/content.json";
 import chatSystemHldModule from "./architecture/problems/hld/chat-system-hld/content.json";
 import chatbotsInDepthModule from "./ai/courses/ai-basics/chatbots-in-depth/content.json";
 import ciCdSafeDeliveryModule from "./devops/courses/devops/ci-cd-safe-delivery/content.json";
@@ -366,10 +366,10 @@ import claudeForWritingModule from "./ai/courses/claude/claude-for-writing/conte
 import cleanCodeCsharpModule from "./architecture/courses/clean-code-csharp/content.json";
 import cloudIntegrationModule from "./backend/courses/dotnet-nuget-packages/cloud-integration/content.json";
 import codexModule from "./ai/courses/codex/content.json";
-import commonSystemDesignsModule from "./architecture/courses/system-design-interviews/common-system-designs/content.json";
+import commonSystemDesignsModule from "./architecture/courses/system-design-course/common-system-designs/content.json";
 import concurrencyProductionDatabaseProblemsModule from "./database/courses/sql-server/concurrency-production-database-problems/content.json";
 import configServiceHldModule from "./architecture/problems/hld/config-service-hld/content.json";
-import consistencyAvailabilityModule from "./architecture/courses/system-design-interviews/consistency-availability/content.json";
+import consistencyAvailabilityModule from "./architecture/courses/system-design-course/consistency-availability/content.json";
 import consistentHashingHldModule from "./architecture/problems/hld/consistent-hashing-hld/content.json";
 import constraintsModule from "./database/courses/postgresql/constraints/content.json";
 import csharpModule from "./backend/problems/csharp/content.json";
@@ -381,7 +381,7 @@ import dataManagementModule from "./architecture/courses/microservices-architect
 import dataModificationDmlModule from "./database/courses/postgresql/data-modification-dml/content.json";
 import dataStructuresDeepDiveModule from "./fundamentals/courses/programming-computer-web-foundations/data-structures-deep-dive/content.json";
 import dataTypesModule from "./database/courses/postgresql/data-types/content.json";
-import databaseDesignModule from "./architecture/courses/system-design-interviews/database-design/content.json";
+import databaseDesignModule from "./architecture/courses/system-design-course/database-design/content.json";
 import databaseDesignModule1 from "./database/problems/database-design/content.json";
 import databaseInternalsQueryOptimizationModule from "./database/courses/sql-server/database-internals-query-optimization/content.json";
 import databaseSchemaTableObjectsModule from "./database/courses/postgresql/database-schema-table-objects/content.json";
@@ -457,7 +457,7 @@ import linqModule from "./backend/courses/linq/content.json";
 import linqModule1 from "./backend/cheatsheet/linq/content.json";
 import linuxProductionTroubleshootingModule from "./devops/courses/git-linux-developer-workflow/linux-production-troubleshooting/content.json";
 import lldModule from "./architecture/problems/lld/content.json";
-import loadBalancingModule from "./architecture/courses/system-design-interviews/load-balancing/content.json";
+import loadBalancingModule from "./architecture/courses/system-design-course/load-balancing/content.json";
 import localVsCloudAiModule from "./ai/courses/ai-basics/local-vs-cloud-ai/content.json";
 import loggingMonitoringModule from "./backend/courses/dotnet-nuget-packages/logging-monitoring/content.json";
 import masteringClaudeModule from "./ai/courses/claude/mastering-claude/content.json";
@@ -528,13 +528,13 @@ import reactRouterModule from "./frontend/cheatsheet/react-router/content.json";
 import reactSystemDesignModule from "./architecture/problems/system-design/react-system-design/content.json";
 import reactTestingModule from "./frontend/courses/react-testing/content.json";
 import reactTestingModule1 from "./frontend/courses/yarn-npm-packages/react-testing/content.json";
-import realWorldCaseStudiesModule from "./architecture/courses/system-design-interviews/real-world-case-studies/content.json";
+import realWorldCaseStudiesModule from "./architecture/courses/system-design-course/real-world-case-studies/content.json";
 import redisCachingStrategiesModule from "./architecture/courses/redis-caching-strategies/content.json";
 import redisFundamentalsModule from "./architecture/courses/redis-caching-strategies/redis-fundamentals/content.json";
 import redisUseCasesModule from "./architecture/courses/redis-caching-strategies/redis-use-cases/content.json";
 import reduxModule from "./frontend/courses/redux/content.json";
 import reduxModule1 from "./frontend/cheatsheet/redux/content.json";
-import requirementClarificationModule from "./architecture/courses/system-design-interviews/requirement-clarification/content.json";
+import requirementClarificationModule from "./architecture/courses/system-design-course/requirement-clarification/content.json";
 import researchAndSearchToolsModule from "./ai/courses/ai-basics/research-and-search-tools/content.json";
 import resiliencePatternsModule from "./architecture/courses/microservices-architecture/resilience-patterns/content.json";
 import restApiDesignScenariosModule from "./backend/problems/api-design/rest-api-design-scenarios/content.json";
@@ -542,7 +542,7 @@ import rideSharingHldModule from "./architecture/problems/hld/ride-sharing-hld/c
 import routingModule from "./frontend/courses/yarn-npm-packages/routing/content.json";
 import runtimePerformanceModule from "./architecture/courses/frontend-performance-engineering/runtime-performance/content.json";
 import safetyAndLimitationsModule from "./ai/courses/ai-basics/safety-and-limitations/content.json";
-import scalabilityPatternsModule from "./architecture/courses/system-design-interviews/scalability-patterns/content.json";
+import scalabilityPatternsModule from "./architecture/courses/system-design-course/scalability-patterns/content.json";
 import schemaDesignScenariosModule from "./database/problems/database-design/schema-design-scenarios/content.json";
 import searchAutocompleteModule from "./architecture/problems/hld/search-autocomplete/content.json";
 import securityModule from "./backend/question-answers/security/content.json";
@@ -572,9 +572,9 @@ import stylingModule from "./frontend/courses/yarn-npm-packages/styling/content.
 import submodulesSubtreesModule from "./devops/courses/git-linux-developer-workflow/submodules-subtrees/content.json";
 import systemDesignModule from "./architecture/problems/system-design/content.json";
 import systemDesignModule1 from "./architecture/question-answers/system-design/content.json";
+import systemDesignCourseModule from "./architecture/courses/system-design-course/content.json";
 import systemDesignForSeniorsModule from "./fundamentals/courses/senior-software-engineering/system-design-for-seniors/content.json";
-import systemDesignFrameworkModule from "./architecture/courses/system-design-interviews/system-design-framework/content.json";
-import systemDesignInterviewsModule from "./architecture/courses/system-design-interviews/content.json";
+import systemDesignFrameworkModule from "./architecture/courses/system-design-course/system-design-framework/content.json";
 import taskSchedulerCronModule from "./architecture/problems/lld/task-scheduler-cron/content.json";
 import technicalDecisionMakingModule from "./fundamentals/courses/senior-software-engineering/technical-decision-making/content.json";
 import technicalLeadershipModule from "./fundamentals/courses/senior-software-engineering/technical-leadership/content.json";
@@ -1189,9 +1189,9 @@ const rawModulesPart2 = [
 	{ ...submodulesSubtreesModule, urlCategory: "devops" },
 	{ ...systemDesignModule, urlCategory: "architecture" },
 	{ ...systemDesignModule1, urlCategory: "architecture" },
+	{ ...systemDesignCourseModule, urlCategory: "architecture" },
 	{ ...systemDesignForSeniorsModule, urlCategory: "fundamentals" },
 	{ ...systemDesignFrameworkModule, urlCategory: "architecture" },
-	{ ...systemDesignInterviewsModule, urlCategory: "architecture" },
 	{ ...taskSchedulerCronModule, urlCategory: "architecture" },
 	{ ...technicalDecisionMakingModule, urlCategory: "fundamentals" },
 	{ ...technicalLeadershipModule, urlCategory: "fundamentals" },

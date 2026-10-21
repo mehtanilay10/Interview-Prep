@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { InterviewTechnologyCard } from '@/components/interview/InterviewTechnologyCard';
-import { getCategoryMeta, getInterviewCategories, getInterviewTechnologies } from '@/lib/content';
+import { QuestionTechnologyCard } from '@/components/question-answers/QuestionTechnologyCard';
+import { getCategoryMeta, getQuestionCategories, getQuestionTechnologies } from '@/lib/content';
 import { buildMetadata } from '@/lib/seo';
 
 interface Params {
@@ -10,13 +10,13 @@ interface Params {
 }
 
 export async function generateStaticParams() {
-  return getInterviewCategories().map((category) => ({ category }));
+  return getQuestionCategories().map((category) => ({ category }));
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { category } = await params;
   const meta = getCategoryMeta(category);
-  const technologies = getInterviewTechnologies(category);
+  const technologies = getQuestionTechnologies(category);
   if (technologies.length === 0) return {};
   return buildMetadata({
     title: `${meta.label} Question Answers`,
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function CategoryQuestionAnswersPage({ params }: Params) {
   const { category } = await params;
-  const technologies = getInterviewTechnologies(category);
+  const technologies = getQuestionTechnologies(category);
   if (technologies.length === 0) notFound();
 
   const meta = getCategoryMeta(category);
@@ -38,13 +38,13 @@ export default async function CategoryQuestionAnswersPage({ params }: Params) {
       <SectionHeader
         eyebrow={`${meta.icon} ${meta.label}`}
         title={`${meta.label} Question Answers`}
-        description={`${questionCount} questions across ${technologies.length} topics — answers written the way an interviewer expects them.`}
+        description={`${questionCount} questions across ${technologies.length} topics — answers written the way a hiring manager expects them.`}
         titleAs="h1"
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {technologies.map((tech) => (
-          <InterviewTechnologyCard
+          <QuestionTechnologyCard
             key={tech.slug}
             slug={tech.slug}
             title={tech.title}

@@ -172,7 +172,7 @@ export interface Course {
   category?: string;
   /** URL category derived from the content directory structure (e.g. "dotnet"). Stamped by the content generator. */
   urlCategory?: string;
-  isInterview?: boolean;
+  isQuestionAnswer?: boolean;
   moduleSlugs: string[]; // ordered list of module slugs belonging to this course
 }
 
@@ -346,7 +346,7 @@ export interface CourseProgress {
 export interface ProgressState {
   lessons: CourseProgress;
   problems: CourseProgress;
-  interviewQuestions: CourseProgress;
+  questionAnswers: CourseProgress;
 }
 
 export interface BookmarkState {
@@ -355,7 +355,7 @@ export interface BookmarkState {
 
 export interface BookmarkItem {
   id: string;
-  type: 'lesson' | 'problem' | 'interview' | 'cheatsheet';
+  type: 'lesson' | 'problem' | 'questionAnswer' | 'cheatsheet';
   slug: string;
   title: string;
   courseSlug: string;
@@ -368,14 +368,14 @@ export interface BookmarkItem {
 /**
  * What a roadmap step points at. Steps reference existing content by slug so
  * roadmap links always resolve to real courses / problems / cheat sheets /
- * interview technologies. `link` is for special pages (e.g. the AI glossary)
+ * question-answer technologies. `link` is for special pages (e.g. the AI glossary)
  * and carries its own title and href.
  */
-export type RoadmapStepKind = 'course' | 'problems' | 'cheatsheet' | 'interview' | 'link';
+export type RoadmapStepKind = 'course' | 'problems' | 'cheatsheet' | 'questionAnswer' | 'link';
 
 export interface RoadmapStep {
   kind: RoadmapStepKind;
-  /** Course/problem slug, cheatsheet or interview technology slug, or the href for `link`. */
+  /** Course/problem slug, cheatsheet or question-answer technology slug, or the href for `link`. */
   ref: string;
   /** Display title for `link` steps; other kinds resolve their title from content. */
   title?: string;

@@ -18,7 +18,7 @@ interface LessonActionsProps {
   };
   courseSlug: string;
   moduleSlug: string;
-  category?: 'lessons' | 'problems' | 'interviewQuestions';
+  category?: 'lessons' | 'problems' | 'questionAnswers';
   children?: React.ReactNode;
 }
 
@@ -50,7 +50,7 @@ export function LessonActions({
   };
 
   const categoryLabel = useMemo(() => {
-    if (category === 'interviewQuestions') return 'Question';
+    if (category === 'questionAnswers') return 'Question';
     return category.slice(0, -1);
   }, [category]);
 
@@ -75,7 +75,7 @@ export function LessonActions({
 
       <BookmarkButton
         item={{
-          type: category === 'interviewQuestions' ? 'interview' : category === 'problems' ? 'problem' : 'lesson',
+          type: category === 'questionAnswers' ? 'questionAnswer' : category === 'problems' ? 'problem' : 'lesson',
           slug: lesson.slug,
           title: lesson.title,
           courseSlug,
@@ -84,7 +84,7 @@ export function LessonActions({
       />
 
       <PdfDownloadButton
-        targetId={category === 'interviewQuestions' ? 'question-content' : category === 'problems' ? 'problem-content' : 'lesson-content'}
+        targetId={category === 'questionAnswers' ? 'question-content' : category === 'problems' ? 'problem-content' : 'lesson-content'}
         filename={`${lesson.slug}.pdf`}
         label="Download PDF"
       />

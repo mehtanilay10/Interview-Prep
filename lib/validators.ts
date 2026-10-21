@@ -6,7 +6,7 @@ const SlugSchema = z.string().min(1).max(200);
 const TitleSchema = z.string().min(1).max(300);
 
 export const ProgressEntrySchema = z.object({
-  category: z.enum(['lessons', 'problems', 'interviewQuestions']),
+  category: z.enum(['lessons', 'problems', 'questionAnswers']),
   lessonSlug: SlugSchema,
   moduleSlug: SlugSchema,
 });
@@ -16,7 +16,7 @@ export const ProgressPayloadSchema = z.object({
 });
 
 export const BookmarkEntrySchema = z.object({
-  type: z.enum(['lesson', 'problem', 'interview', 'cheatsheet']),
+  type: z.enum(['lesson', 'problem', 'questionAnswer', 'cheatsheet']),
   slug: SlugSchema,
   title: TitleSchema,
   courseSlug: SlugSchema,
@@ -29,7 +29,7 @@ export const BookmarkPayloadSchema = z.object({
 
 export const BookmarkDeleteSchema = z.object({
   slug: SlugSchema,
-  type: z.enum(['lesson', 'problem', 'interview', 'cheatsheet']),
+  type: z.enum(['lesson', 'problem', 'questionAnswer', 'cheatsheet']),
 });
 
 export const NotePayloadSchema = z.object({

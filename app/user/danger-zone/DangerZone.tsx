@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/apiFetch';
 type ResetTarget = 'progress' | 'bookmarks' | 'notes' | 'offline';
 
 const TARGETS: { id: ResetTarget; label: string; description: string }[] = [
-  { id: 'progress', label: 'Reset progress', description: 'Permanently removes every completed lesson, problem, and interview question.' },
+  { id: 'progress', label: 'Reset progress', description: 'Permanently removes every completed lesson, problem, and question answer.' },
   { id: 'bookmarks', label: 'Clear bookmarks', description: 'Removes all saved lessons, problems, and question answers.' },
   { id: 'notes', label: 'Delete notes', description: 'Removes every note you have written on a lesson.' },
   { id: 'offline', label: 'Clear offline queue', description: 'Removes lessons queued for offline reading.' },

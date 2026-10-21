@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories, getRoadmaps } from '@/lib/content';
+import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getQuestionTechnologies, getQuestionAnswers, getNavigationCategories, getRoadmaps } from '@/lib/content';
 import { getCourseCategory } from '@/lib/content-hrefs';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://quotient.dev';
@@ -21,7 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     toSitemapEntry(`${BASE_URL}/ai/prompts`, 0.8, 'weekly'),
   ];
 
-  const courses = getAllCourses().filter((c) => !c.isInterview);
+  const courses = getAllCourses().filter((c) => !c.isQuestionAnswer);
 
   // Category listing pages (/[category]/courses, /problems, /cheatsheets)
   for (const cat of getNavigationCategories()) {
@@ -51,12 +51,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  const technologies = getInterviewTechnologies();
+  const technologies = getQuestionTechnologies();
   for (const tech of technologies) {
     entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers`, 0.8, 'weekly'));
     entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers/${tech.slug}`));
 
-    const questions = getInterviewQuestions(tech.slug, tech.category);
+    const questions = getQuestionAnswers(tech.slug, tech.category);
     for (const q of questions) {
       entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers/${tech.slug}/${q.slug}`));
     }

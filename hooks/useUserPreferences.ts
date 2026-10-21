@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiFetch';
+import { PREFERENCES_STORAGE_KEY } from '@/lib/storageKeys';
 
-const STORAGE_KEY = 'interview_prep_preferences';
+const STORAGE_KEY = PREFERENCES_STORAGE_KEY;
 
 export type UserPreferences = {
   fontSize: string | null;

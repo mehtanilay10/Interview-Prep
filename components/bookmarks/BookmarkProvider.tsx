@@ -53,7 +53,7 @@ interface BookmarkContextValue {
     total: number;
     lessons: number;
     problems: number;
-    interview: number;
+    questions: number;
     cheatsheet: number;
   };
   mounted: boolean;
@@ -218,7 +218,7 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
       total: activeBookmarks.items.length,
       lessons: activeBookmarks.items.filter((b) => b.type === 'lesson').length,
       problems: activeBookmarks.items.filter((b) => b.type === 'problem').length,
-      interview: activeBookmarks.items.filter((b) => b.type === 'interview').length,
+      questions: activeBookmarks.items.filter((b) => b.type === 'questionAnswer').length,
       cheatsheet: activeBookmarks.items.filter((b) => b.type === 'cheatsheet').length,
     };
   }, [activeBookmarks]);

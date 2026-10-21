@@ -50,7 +50,7 @@ import seniorSoftwareEngineeringCourse from "./fundamentals/courses/senior-softw
 import sqlCourse from "./database/problems/sql/content.json";
 import sqlServerCourse from "./database/courses/sql-server/content.json";
 import systemDesignCourse from "./architecture/problems/system-design/content.json";
-import systemDesignInterviewsCourse from "./architecture/courses/system-design-interviews/content.json";
+import systemDesignCourseCourse from "./architecture/courses/system-design-course/content.json";
 import typescriptForReactCourse from "./frontend/courses/typescript-for-react/content.json";
 import unitTestingDotnetCourse from "./backend/courses/unit-testing-dotnet/content.json";
 import yarnNpmPackagesCourse from "./frontend/courses/yarn-npm-packages/content.json";
@@ -106,7 +106,7 @@ const rawCoursesPart1 = [
 	{ ...sqlCourse, urlCategory: "database" },
 	{ ...sqlServerCourse, urlCategory: "database" },
 	{ ...systemDesignCourse, urlCategory: "architecture" },
-	{ ...systemDesignInterviewsCourse, urlCategory: "architecture" },
+	{ ...systemDesignCourseCourse, urlCategory: "architecture" },
 	{ ...typescriptForReactCourse, urlCategory: "frontend" },
 	{ ...unitTestingDotnetCourse, urlCategory: "backend" },
 	{ ...yarnNpmPackagesCourse, urlCategory: "frontend" },

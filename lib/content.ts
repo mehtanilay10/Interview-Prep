@@ -16,8 +16,8 @@ import {
   isProblemCourseSlug,
   getContentItemHref,
   getSearchResultHref,
-  getInterviewTechCategory,
-  getInterviewTechName,
+  getQuestionTechCategory,
+  getQuestionTechName,
 } from '@/lib/content-hrefs';
 import type {
   Module,
@@ -41,7 +41,7 @@ export { modules, lessons, courses };
 // Href builders live in `lib/content-hrefs.ts` (content-free, safe to import
 // from client components) and are re-exported here so server code only ever
 // needs a single import.
-export { getCourseCategory, isProblemCourseSlug, getContentItemHref, getSearchResultHref, getInterviewTechCategory, getInterviewTechName };
+export { getCourseCategory, isProblemCourseSlug, getContentItemHref, getSearchResultHref, getQuestionTechCategory, getQuestionTechName };
 
 /** Difficulty levels in the order they are presented to learners. */
 const DIFFICULTY_ORDER: Difficulty[] = ['beginner', 'intermediate', 'advanced'];
@@ -90,7 +90,7 @@ export function getCourseBySlug(slug: string): Course | undefined {
  * Whether a course is served by the generic `/[category]/courses/[courseSlug]`
  * route tree.
  *
- * Problem sets, cheat sheets, and interview Q&A all reuse the course model but
+ * Problem sets, cheat sheets, and question answers all reuse the course model but
  * own dedicated route trees of their own, so they must not resolve on the
  * course routes. Note that a course's `category` field is **not** the URL
  * category — content JSON stamps values like `"category": "basics"` or
@@ -144,14 +144,14 @@ export function getCategoryMeta(category: string): CategoryMeta {
   return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), icon: '📚' };
 }
 
-const nonInterviewCoursesCache = memoizeNoArg(() => getAllCourses().filter((c) => !c.isInterview));
+const subjectCoursesCache = memoizeNoArg(() => getAllCourses().filter((c) => !c.isQuestionAnswer));
 
-export function getNonInterviewCourses(): Course[] {
-  return nonInterviewCoursesCache();
+export function getSubjectCourses(): Course[] {
+  return subjectCoursesCache();
 }
 
 export function getCoursesByCategory(category: string): Course[] {
-  return getNonInterviewCourses().filter((c) => getCourseCategory(c.slug) === category);
+  return getSubjectCourses().filter((c) => getCourseCategory(c.slug) === category);
 }
 
 export function getProblemCoursesByCategory(category: string): Course[] {
@@ -223,14 +223,14 @@ export function resolveRoadmapStep(step: RoadmapStep): ResolvedRoadmapStep | nul
     };
   }
 
-  if (step.kind === 'interview') {
-    const tech = getInterviewTechnologies().find((t) => t.slug === step.ref);
+  if (step.kind === 'questionAnswer') {
+    const tech = getQuestionTechnologies().find((t) => t.slug === step.ref);
     if (!tech) return null;
     return {
-      kind: 'interview',
+      kind: 'questionAnswer',
       title: tech.title,
       description: tech.description,
-      href: `/${getInterviewTechCategory(tech.slug)}/question-answers/${tech.slug}`,
+      href: `/${getQuestionTechCategory(tech.slug)}/question-answers/${tech.slug}`,
       icon: tech.icon,
       meta: `${tech.questionCount} question${tech.questionCount === 1 ? '' : 's'}`,
       note: step.note,
@@ -272,17 +272,17 @@ export interface NavCategory {
  * This drives the navigation bar on desktop and mobile.
  */
 function computeNavigationCategories(): NavCategory[] {
-  const courseList = getNonInterviewCourses();
+  const courseList = getSubjectCourses();
   const problemList = getProblemCourses();
   const cheatsheetList = getCheatsheetModules();
-  const interviewList = getInterviewTechnologies();
+  const questionList = getQuestionTechnologies();
   const roadmapMap = roadmapsByCategoryCache();
 
   const present = new Set<string>();
   for (const c of courseList) present.add(getCourseCategory(c.slug));
   for (const c of problemList) present.add(getCourseCategory(c.slug));
   for (const m of cheatsheetList) present.add(getCourseCategory(m.slug));
-  for (const t of interviewList) present.add(t.category);
+  for (const t of questionList) present.add(t.category);
 
   const ordered = [
     ...CATEGORY_ORDER.filter((key) => present.has(key)),
@@ -299,7 +299,7 @@ function computeNavigationCategories(): NavCategory[] {
       { label: 'Courses', href: `/${key}/courses`, count: courseList.filter((c) => getCourseCategory(c.slug) === key).length },
       { label: 'Problems', href: `/${key}/problems`, count: problemList.filter((c) => getCourseCategory(c.slug) === key).length },
       { label: 'Cheat Sheets', href: `/${key}/cheatsheets`, count: cheatsheetList.filter((m) => getCourseCategory(m.slug) === key).length },
-      { label: 'Question Answers', href: `/${key}/question-answers`, count: interviewList.filter((t) => t.category === key).length },
+      { label: 'Question Answers', href: `/${key}/question-answers`, count: questionList.filter((t) => t.category === key).length },
     ].filter((s) => s.count > 0);
 
     // Site-wide AI resources hang off the AI category so they show up in the
@@ -771,9 +771,9 @@ export function getCourseStats() {
   // `lessons` includes every content tree (courses, problems, cheatsheets,
   // question answers), so each headline count is scoped to its own tree rather
   // than reporting overlapping totals.
-  const courseLessons = getNonInterviewCourses().flatMap((c) => getLessonsForCourse(c.slug));
+  const courseLessons = getSubjectCourses().flatMap((c) => getLessonsForCourse(c.slug));
   const totalLessons = courseLessons.length;
-  const totalModules = getNonInterviewCourses().reduce((sum, c) => sum + getModulesForCourse(c.slug).length, 0);
+  const totalModules = getSubjectCourses().reduce((sum, c) => sum + getModulesForCourse(c.slug).length, 0);
   const totalMinutes = courseLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
   const totalProblems = getProblemCourses().reduce(
     (sum, c) => sum + getLessonsForCourse(c.slug).length,
@@ -800,7 +800,7 @@ export function getCourseStats() {
  * where each technology directory is a module of the single `question-answers`
  * pseudo-course (mirroring how cheat sheets are organised).
  */
-export interface InterviewTechnology {
+export interface QuestionTechnology {
   /** Module slug — identical to the URL technology segment. */
   slug: string;
   title: string;
@@ -814,7 +814,7 @@ export interface InterviewTechnology {
   questionCount: number;
 }
 
-const interviewModulesCache = memoizeNoArg(() =>
+const questionModulesCache = memoizeNoArg(() =>
   modules.filter((m) => m.courseSlug === 'question-answers')
 );
 
@@ -830,10 +830,10 @@ function categoryRank(category: string): number {
 }
 
 /** Every content category that hosts question answers. */
-export function getInterviewCategories(): string[] {
+export function getQuestionCategories(): string[] {
   const categories = new Set<string>();
-  for (const mod of interviewModulesCache()) {
-    const category = getInterviewTechCategory(mod.slug);
+  for (const mod of questionModulesCache()) {
+    const category = getQuestionTechCategory(mod.slug);
     if (category) categories.add(category);
   }
   return sortCategoryKeys([...categories]);
@@ -843,15 +843,15 @@ export function getInterviewCategories(): string[] {
  * Every question-answer technology, optionally narrowed to a single category.
  * Within a category the technologies are ordered by their module `order`.
  */
-export function getInterviewTechnologies(category?: string): InterviewTechnology[] {
-  const result = interviewModulesCache()
-    .filter((mod) => !category || getInterviewTechCategory(mod.slug) === category)
+export function getQuestionTechnologies(category?: string): QuestionTechnology[] {
+  const result = questionModulesCache()
+    .filter((mod) => !category || getQuestionTechCategory(mod.slug) === category)
     .map((mod) => ({
       slug: mod.slug,
       title: mod.title,
       description: mod.description,
       icon: mod.icon,
-      category: getInterviewTechCategory(mod.slug) ?? '',
+      category: getQuestionTechCategory(mod.slug) ?? '',
       difficulty: mod.difficulty,
       estimatedHours: mod.estimatedHours,
       order: mod.order,
@@ -866,26 +866,26 @@ export function getInterviewTechnologies(category?: string): InterviewTechnology
   );
 }
 
-/** Interview questions for a technology, ordered by difficulty then position. */
-export function getInterviewQuestions(technology: string, category?: string): Lesson[] {
+/** Question answers for a technology, ordered by difficulty then position. */
+export function getQuestionAnswers(technology: string, category?: string): Lesson[] {
   return lessons
     .filter((l) => l.courseSlug === 'question-answers' && l.moduleSlug === technology)
-    .filter((l) => !category || getInterviewTechCategory(l.moduleSlug) === category)
+    .filter((l) => !category || getQuestionTechCategory(l.moduleSlug) === category)
     .sort((a, b) => {
       return (a.order || 0) - (b.order || 0);
     });
 }
 
-export function getInterviewQuestionCount(technology: string, category?: string): number {
-  return getInterviewQuestions(technology, category).length;
+export function getQuestionAnswerCount(technology: string, category?: string): number {
+  return getQuestionAnswers(technology, category).length;
 }
 
-/** Interview questions of a technology grouped by difficulty level. */
-export function getInterviewQuestionsByDifficulty(
+/** Question answers of a technology grouped by difficulty level. */
+export function getQuestionAnswersByDifficulty(
   technology: string,
   category?: string
 ): { difficulty: Difficulty; questions: Lesson[] }[] {
-  const questions = getInterviewQuestions(technology, category);
+  const questions = getQuestionAnswers(technology, category);
   const groups: { difficulty: Difficulty; questions: Lesson[] }[] = [];
 
   for (const difficulty of DIFFICULTY_ORDER) {

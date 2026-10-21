@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://quotient.dev';
 const SITE_NAME = 'Quotient';
 const DEFAULT_DESCRIPTION =
-  'Structured courses, coding problems, cheat sheets, and interview questions with runnable examples across C#, SQL, React, ASP.NET Core, system design, and more.';
+  'Structured courses, coding problems, cheat sheets, and question answers with runnable examples across C#, SQL, React, ASP.NET Core, system design, and more.';
 
 export function buildMetadata({
   title,

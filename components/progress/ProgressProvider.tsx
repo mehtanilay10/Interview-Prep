@@ -11,7 +11,7 @@ import { apiFetch } from '@/lib/apiFetch';
 const DEFAULT_PROGRESS: ProgressState = {
   lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
   problems: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
-  interviewQuestions: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
+  questionAnswers: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
 };
 
 type Category = keyof ProgressState;
@@ -25,7 +25,7 @@ async function fetchProgressFromServer(): Promise<ProgressState | null> {
       const progress: ProgressState = {
         lessons: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
         problems: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
-        interviewQuestions: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
+        questionAnswers: { completedLessons: [], lastVisitedLesson: undefined, startedAt: undefined },
       };
       if (data.progress) {
         for (const [cat, items] of Object.entries(data.progress)) {
@@ -113,7 +113,7 @@ interface ProgressContextValue {
   stats: {
     lessons: { totalCompleted: number; lastVisited?: string; startedAt?: string };
     problems: { totalCompleted: number; lastVisited?: string; startedAt?: string };
-    interviewQuestions: { totalCompleted: number; lastVisited?: string; startedAt?: string };
+    questionAnswers: { totalCompleted: number; lastVisited?: string; startedAt?: string };
     totalCompleted: number;
   };
   mounted: boolean;
@@ -298,17 +298,17 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const stats = useMemo(() => {
     const lessons = activeProgress.lessons ?? DEFAULT_PROGRESS.lessons;
     const problems = activeProgress.problems ?? DEFAULT_PROGRESS.problems;
-    const interviewQuestions = activeProgress.interviewQuestions ?? DEFAULT_PROGRESS.interviewQuestions;
+    const questionAnswers = activeProgress.questionAnswers ?? DEFAULT_PROGRESS.questionAnswers;
 
     const lessonStats = { totalCompleted: lessons.completedLessons.length, lastVisited: lessons.lastVisitedLesson, startedAt: lessons.startedAt };
     const problemStats = { totalCompleted: problems.completedLessons.length, lastVisited: problems.lastVisitedLesson, startedAt: problems.startedAt };
-    const interviewStats = { totalCompleted: interviewQuestions.completedLessons.length, lastVisited: interviewQuestions.lastVisitedLesson, startedAt: interviewQuestions.startedAt };
+    const questionStats = { totalCompleted: questionAnswers.completedLessons.length, lastVisited: questionAnswers.lastVisitedLesson, startedAt: questionAnswers.startedAt };
 
     return {
       lessons: lessonStats,
       problems: problemStats,
-      interviewQuestions: interviewStats,
-      totalCompleted: lessonStats.totalCompleted + problemStats.totalCompleted + interviewStats.totalCompleted,
+      questionAnswers: questionStats,
+      totalCompleted: lessonStats.totalCompleted + problemStats.totalCompleted + questionStats.totalCompleted,
     };
   }, [activeProgress]);
 

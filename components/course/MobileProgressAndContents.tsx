@@ -16,7 +16,7 @@ interface MobileProgressAndContentsProps {
   allCourseLessonSlugs?: string[];
   modules: Module[];
   lessonsByModule: Record<string, LessonNavItem[]>;
-  category?: 'lessons' | 'problems' | 'interviewQuestions';
+  category?: 'lessons' | 'problems' | 'questionAnswers';
   className?: string;
 }
 

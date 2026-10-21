@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getCategoryMeta, getInterviewCategories } from '@/lib/content';
+import { getCategoryMeta, getQuestionCategories } from '@/lib/content';
 import { PersonalizationClient, type LandingPageOption } from './PersonalizationClient';
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default function PersonalizationPage() {
   // is offered as a landing destination.
   const landingPages: LandingPageOption[] = [
     { value: '/', label: 'Home' },
-    ...getInterviewCategories().map((category) => ({
+    ...getQuestionCategories().map((category) => ({
       value: `/${category}/question-answers`,
       label: `${getCategoryMeta(category).label} Question Answers`,
     })),

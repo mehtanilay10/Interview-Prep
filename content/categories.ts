@@ -61,7 +61,7 @@ export const COURSE_URL_CATEGORY: Record<string, string> = {
 	"sql-problems": "database",
 	"sql-server": "database",
 	"system-design": "architecture",
-	"system-design-interviews": "architecture",
+	"system-design-course": "architecture",
 	"typescript": "frontend",
 	"typescript-for-react": "frontend",
 	"unit-testing-dotnet": "backend",
@@ -81,8 +81,8 @@ export const PROBLEM_COURSE_SLUGS: string[] = [
 	"system-design",
 ];
 
-/** Interview technology (module) slug -> URL category. */
-export const INTERVIEW_TECH_CATEGORY: Record<string, string> = {
+/** Question-answer technology (module) slug -> URL category. */
+export const QUESTION_TECH_CATEGORY: Record<string, string> = {
 	"architecture": "architecture",
 	"aspnet-core": "backend",
 	"backend-database": "backend",
@@ -101,8 +101,8 @@ export const INTERVIEW_TECH_CATEGORY: Record<string, string> = {
 	"system-design": "architecture",
 };
 
-/** Interview question slug -> owning technology (module) slug. */
-export const INTERVIEW_LESSON_TECH: Record<string, string> = {
+/** Question-answer lesson slug -> owning technology (module) slug. */
+export const QUESTION_LESSON_TECH: Record<string, string> = {
 	"a-production-query-suddenly-became-slow-after-a-deployment-what-do-you-check": "backend-database",
 	"advanced-q1": "csharp",
 	"advanced-q2": "csharp",
@@ -307,7 +307,7 @@ export const INTERVIEW_LESSON_TECH: Record<string, string> = {
 	"repository-pattern": "architecture",
 	"role-vs-policy-authorization": "security",
 	"round-1-explain-your-architecture-for-a-production-net-react-application": "general",
-	"round-10-final-senior-level-system-design-with-interviewer-follow-ups": "general",
+	"round-10-final-senior-level-system-design-follow-ups": "general",
 	"round-2-diagnose-a-slow-api-with-database-and-infrastructure-symptoms": "general",
 	"round-3-design-a-scalable-order-processing-system": "general",
 	"round-4-debug-a-react-performance-regression": "general",

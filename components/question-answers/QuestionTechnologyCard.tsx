@@ -4,7 +4,7 @@ import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { cn, formatHours } from '@/lib/utils';
 import type { Difficulty } from '@/types';
 
-interface InterviewTechnologyCardProps {
+interface QuestionTechnologyCardProps {
   /** Module slug — identical to the URL technology segment. */
   slug: string;
   title: string;
@@ -17,7 +17,7 @@ interface InterviewTechnologyCardProps {
   className?: string;
 }
 
-export function InterviewTechnologyCard({
+export function QuestionTechnologyCard({
   slug,
   title,
   description,
@@ -27,7 +27,7 @@ export function InterviewTechnologyCard({
   estimatedHours,
   questionCount,
   className,
-}: InterviewTechnologyCardProps) {
+}: QuestionTechnologyCardProps) {
   return (
     <Link
       href={`/${category}/question-answers/${slug}`}

@@ -1,5 +1,5 @@
 /**
- * Href builders for content routes, plus interview-technology slug helpers.
+ * Href builders for content routes, plus technology-slug helpers.
  *
  * This module is deliberately *content-free*: it only reads the tiny generated
  * `content/categories.ts` lookup and static maps declared below. Client
@@ -12,7 +12,7 @@
  * importing these helpers from `@/lib/content`.
  */
 
-import { COURSE_URL_CATEGORY, PROBLEM_COURSE_SLUGS, INTERVIEW_TECH_CATEGORY, INTERVIEW_LESSON_TECH } from '@/content/categories';
+import { COURSE_URL_CATEGORY, PROBLEM_COURSE_SLUGS, QUESTION_TECH_CATEGORY, QUESTION_LESSON_TECH } from '@/content/categories';
 import type { SearchResult } from '@/types';
 
 // ── Course category / problem lookups ────────────────────────────────────────
@@ -66,7 +66,7 @@ const COURSE_CATEGORY_MAP: Record<string, string> = {
   'fullstack-security': 'architecture',
   'message-queues-event-streaming': 'architecture',
   'microservices-architecture': 'architecture',
-  'system-design-interviews': 'architecture',
+  'system-design-course': 'architecture',
   'frontend-performance-engineering': 'architecture',
   // Cheatsheets (module slugs)
   'csharp': 'backend',
@@ -117,8 +117,8 @@ export function getContentItemHref(
   lessonSlug?: string | null
 ): string {
   if (courseSlug === 'question-answers') {
-    const tech = getInterviewTechnologySlug(moduleSlug, lessonSlug);
-    const category = tech ? getInterviewTechCategory(tech) : undefined;
+    const tech = getQuestionTechnologySlug(moduleSlug, lessonSlug);
+    const category = tech ? getQuestionTechCategory(tech) : undefined;
     if (!tech || !category) return '/';
     return lessonSlug
       ? `/${category}/question-answers/${tech}/${lessonSlug}`
@@ -146,14 +146,14 @@ export function getContentItemHref(
   return `/${category}/${prefix}/${courseSlug}`;
 }
 
-// ── Interview technology slugs ───────────────────────────────────────────────
+// ── Question-answer technology slugs ─────────────────────────────────────────
 
 /**
  * Display name → URL slug for every question-answer technology.
  *
  * The technology slug is also the module slug, so the same value is used in the
  * content tree (`content/<category>/question-answers/<slug>/`) and in the URL
- * (`/<category>/question-answers/<slug>/`). The generated `INTERVIEW_LESSON_TECH`
+ * (`/<category>/question-answers/<slug>/`). The generated `QUESTION_LESSON_TECH`
  * map is authoritative for runtime lookups; this map only converts a lesson's
  * display name into a slug.
  *
@@ -189,7 +189,7 @@ function fallbackTechSlug(technology: string): string {
 }
 
 /** Converts a lesson `technology` value (e.g. "C#", "CI/CD Pipelines") to its URL slug. */
-export function getInterviewTechSlug(technology: string): string {
+export function getQuestionTechSlug(technology: string): string {
   const key = technology.trim().toLowerCase();
   return TECH_SLUG_MAP[key] ?? fallbackTechSlug(key);
 }
@@ -205,7 +205,7 @@ const TECH_NAME_BY_SLUG: Record<string, string> = Object.fromEntries(
  * `csharp` -> "C#", `aspnet-core` -> "ASP.NET Core". Falls back to a
  * title-cased version of the slug when the slug is not in the known map.
  */
-export function getInterviewTechName(slug: string): string {
+export function getQuestionTechName(slug: string): string {
   const known = TECH_NAME_BY_SLUG[slug];
   if (known) {
     // Restore conventional capitalisation for names stored lowercase.
@@ -224,24 +224,24 @@ export function getInterviewTechName(slug: string): string {
     .join(' ');
 }
 
-/** The content category an interview technology lives in (e.g. "backend"). */
-export function getInterviewTechCategory(technologySlug: string): string | undefined {
-  return INTERVIEW_TECH_CATEGORY[technologySlug];
+/** The content category a question-answer technology lives in (e.g. "backend"). */
+export function getQuestionTechCategory(technologySlug: string): string | undefined {
+  return QUESTION_TECH_CATEGORY[technologySlug];
 }
 
 /**
- * Resolves the technology that owns an interview question.
+ * Resolves the technology that owns a question answer.
  *
  * `moduleSlug` is the technology slug for records created after the
  * category-first restructure. Records created before it stored the old
  * level-based module slug, so the question slug is used as a fallback.
  */
-function getInterviewTechnologySlug(
+function getQuestionTechnologySlug(
   moduleSlug?: string | null,
   lessonSlug?: string | null
 ): string | undefined {
-  if (lessonSlug && INTERVIEW_LESSON_TECH[lessonSlug]) return INTERVIEW_LESSON_TECH[lessonSlug];
-  if (moduleSlug && INTERVIEW_TECH_CATEGORY[moduleSlug]) return moduleSlug;
+  if (lessonSlug && QUESTION_LESSON_TECH[lessonSlug]) return QUESTION_LESSON_TECH[lessonSlug];
+  if (moduleSlug && QUESTION_TECH_CATEGORY[moduleSlug]) return moduleSlug;
   return moduleSlug ?? undefined;
 }
 
@@ -255,9 +255,9 @@ export function getSearchResultHref(result: SearchResult): string {
     }
     if (result.courseSlug === 'question-answers') {
       const tech =
-        getInterviewTechnologySlug(result.moduleSlug, result.slug) ??
-        (result.technology ? getInterviewTechSlug(result.technology) : undefined);
-      const techCategory = tech ? getInterviewTechCategory(tech) : undefined;
+        getQuestionTechnologySlug(result.moduleSlug, result.slug) ??
+        (result.technology ? getQuestionTechSlug(result.technology) : undefined);
+      const techCategory = tech ? getQuestionTechCategory(tech) : undefined;
       if (tech && techCategory) {
         return `/${techCategory}/question-answers/${tech}/${result.slug}`;
       }
@@ -280,7 +280,7 @@ export function getSearchResultHref(result: SearchResult): string {
       return `/${category}/cheatsheets/${result.slug}`;
     }
     if (result.courseSlug === 'question-answers') {
-      const techCategory = getInterviewTechCategory(result.slug);
+      const techCategory = getQuestionTechCategory(result.slug);
       return techCategory ? `/${techCategory}/question-answers/${result.slug}` : '/';
     }
     if (isProblemCourseSlug(result.courseSlug)) {

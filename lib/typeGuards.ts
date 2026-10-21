@@ -73,7 +73,7 @@ export function isProgressState(value: unknown): value is ProgressState {
   return (
     typeof state.lessons === 'object' &&
     typeof state.problems === 'object' &&
-    typeof state.interviewQuestions === 'object'
+    typeof state.questionAnswers === 'object'
   );
 }
 

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ReadingTimeBadge } from '@/components/ui/ReadingTimeBadge';
-import { getCategoryMeta, getInterviewCategories, getInterviewQuestionsByDifficulty, getInterviewTechnologies } from '@/lib/content';
+import { getCategoryMeta, getQuestionCategories, getQuestionAnswersByDifficulty, getQuestionTechnologies } from '@/lib/content';
 import { buildMetadata } from '@/lib/seo';
 import { formatHours } from '@/lib/utils';
 
@@ -20,8 +20,8 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 export async function generateStaticParams() {
   const params: { category: string; technology: string }[] = [];
-  for (const category of getInterviewCategories()) {
-    for (const tech of getInterviewTechnologies(category)) {
+  for (const category of getQuestionCategories()) {
+    for (const tech of getQuestionTechnologies(category)) {
       params.push({ category, technology: tech.slug });
     }
   }
@@ -30,7 +30,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { category, technology } = await params;
-  const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
+  const tech = getQuestionTechnologies(category).find((t) => t.slug === technology);
   if (!tech) return {};
   const meta = getCategoryMeta(category);
   return buildMetadata({
@@ -42,10 +42,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function QuestionTechnologyPage({ params }: Params) {
   const { category, technology } = await params;
-  const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
+  const tech = getQuestionTechnologies(category).find((t) => t.slug === technology);
   if (!tech) notFound();
 
-  const groups = getInterviewQuestionsByDifficulty(tech.slug, category);
+  const groups = getQuestionAnswersByDifficulty(tech.slug, category);
   const totalCount = groups.reduce((sum, group) => sum + group.questions.length, 0);
   const totalMinutes = groups.reduce(
     (sum, group) =>

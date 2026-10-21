@@ -5,9 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { X, Play } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { apiFetch } from '@/lib/apiFetch';
+import { LAST_PATH_STORAGE_KEY, PROMPT_SHOWN_STORAGE_KEY } from '@/lib/storageKeys';
 
-const STORAGE_KEY = 'interview_prep_last_path';
-const PROMPT_SHOWN_KEY = 'interview_prep_prompt_shown';
+const STORAGE_KEY = LAST_PATH_STORAGE_KEY;
+const PROMPT_SHOWN_KEY = PROMPT_SHOWN_STORAGE_KEY;
 
 export function ContinuePrompt() {
   const pathname = usePathname();

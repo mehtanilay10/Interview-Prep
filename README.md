@@ -1,6 +1,6 @@
 # Quotient
 
-A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, question answers by technology, cheat sheets, SQL problem sets, an AI glossary, and prompt templates. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
+A production-ready educational web app for software engineering. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, question answers by technology, cheat sheets, SQL problem sets, an AI glossary, and prompt templates. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
 
 ---
 
@@ -108,11 +108,13 @@ quotient/
 │   │   ├── cheatsheets/
 │   │   │   ├── page.tsx                    # Category cheat sheet listing
 │   │   │   └── [technology]/page.tsx       # Individual cheat sheet
-│   │   └── question-answers/
-│   │       ├── page.tsx                    # Category question answer listing
-│   │       └── [technology]/
-│   │           ├── page.tsx                # Technology-specific questions
-│   │           └── [slug]/page.tsx         # Individual question
+│   │   ├── question-answers/
+│   │   │   ├── page.tsx                    # Category question answer listing
+│   │   │   └── [technology]/
+│   │   │       ├── page.tsx                # Technology-specific questions
+│   │   │       └── [slug]/page.tsx         # Individual question
+│   │   └── roadmap/
+│   │       └── page.tsx                    # Curated per-category learning roadmap
 │   ├── ai/
 │   │   ├── glossary/page.tsx               # AI glossary (searchable)
 │   │   └── prompts/page.tsx                # Prompt template library
@@ -199,6 +201,7 @@ quotient/
 │   │   └── CourseErrorBoundary.tsx         # Course-specific error boundary
 │   ├── content/
 │   │   ├── ContentBlockRenderer.tsx        # Main lesson block renderer
+│   │   ├── CustomCodeBlock.tsx             # Shared code block (line numbers + Shiki + copy)
 │   │   ├── MermaidRenderer.tsx             # Client-side Mermaid diagram
 │   │   ├── MermaidModal.tsx                # Full-screen Mermaid modal
 │   │   ├── ImageModal.tsx                  # Zoomable image modal
@@ -208,8 +211,8 @@ quotient/
 │   │   ├── ProjectCard.tsx                 # Project card (projects sections)
 │   │   ├── ProjectModal.tsx                # Project detail modal
 │   │   └── ToolComparisonCard.tsx          # Side-by-side tool comparison card
-│   ├── interview/
-│   │   └── InterviewTechnologyCard.tsx     # Technology card for question answers
+│   ├── question-answers/
+│   │   └── QuestionTechnologyCard.tsx      # Technology card for question answers
 │   ├── sections/
 │   │   ├── HeroSection.tsx                 # Home page hero
 │   │   └── SectionHeader.tsx               # Reusable eyebrow+title+description
@@ -241,7 +244,8 @@ quotient/
 │   │   ├── courses/                        # Structured courses
 │   │   ├── problems/                       # Coding problems
 │   │   ├── cheatsheet/                     # Cheat sheets by technology
-│   │   └── question-answers/               # Question answers by technology
+│   │   ├── question-answers/               # Question answers by technology
+│   │   └── roadmaps/                       # Curated per-category learning roadmap
 │   ├── ai/glossary/                        # AI glossary terms
 │   ├── ai/prompts/                         # AI prompt templates
 │   ├── cheatsheet.json                     # Cheatsheet section metadata
@@ -249,7 +253,8 @@ quotient/
 │   ├── courses.ts                          # Auto-generated course exports
 │   ├── modules.ts                          # Auto-generated module definitions
 │   ├── lessons.ts                          # Auto-generated lesson definitions
-│   └── categories.ts                       # Auto-generated slug → URL category map
+│   ├── categories.ts                       # Auto-generated slug → URL category map
+│   └── roadmaps.ts                         # Auto-generated roadmap exports
 │
 ├── hooks/
 │   ├── useProgress.ts                      # Hybrid progress tracking (localStorage + Neon DB)
@@ -262,11 +267,13 @@ quotient/
 │   ├── useLessonNotes.ts                   # Lesson notes hook
 │   ├── useDebouncedValue.ts                # Debounced value hook
 │   ├── useFocusTrap.ts                     # Focus trap for modals
+│   ├── useRecentSearches.ts                # Recent search queries (localStorage)
 │   └── useKeyboardShortcuts.tsx            # Global keyboard shortcuts
 │
 ├── lib/
 │   ├── content.ts                          # Content loading helpers + search
 │   ├── content-hrefs.ts                    # Client-safe href builders + technology slugs
+│   ├── storageKeys.ts                      # Canonical localStorage/sessionStorage key names
 │   ├── utils.ts                            # General utilities (cn, slugify, etc.)
 │   ├── seo.ts                              # Metadata builders for pages
 │   ├── prisma.ts                           # Singleton Prisma PostgreSQL client
@@ -291,7 +298,6 @@ quotient/
 │   └── migrations/                         # Versioned database migrations
 │
 ├── scripts/
-│   ├── schema.sql                          # Idempotent PostgreSQL schema equivalent
 │   ├── vercel-build.js                     # Vercel build entrypoint
 │   ├── generate-content-indices.ts         # Regenerate content index files
 │   └── test-content.ts                     # Content validation test suite (`yarn test:content`)
@@ -448,7 +454,7 @@ Or use `<MermaidRenderer>` directly in any client component.
 | `AUTH_SECRET` | *(required for auth)* | NextAuth secret for signing JWTs |
 | `AUTH_GOOGLE_ID` | *(required for auth)* | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | *(required for auth)* | Google OAuth client secret |
-| `AUTH_URL` | *(required for production)* | Canonical app URL, e.g. `https://interview.mnilay.com` |
+| `AUTH_URL` | *(required for production)* | Canonical app URL, e.g. `https://quotient.dev` |
 | `AUTH_TRUST_HOST` | `true` behind a proxy | Allows Auth.js to trust the request host |
 | `DATABASE_URL` | *(required for auth)* | Neon PostgreSQL connection string |
 

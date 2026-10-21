@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { SectionHeader } from '@/components/sections/SectionHeader';
-import { getCourseStats, getAllCourses, getCourseCategory, getInterviewCategories } from '@/lib/content';
+import { getCourseStats, getAllCourses, getCourseCategory, getQuestionCategories } from '@/lib/content';
 import { buildMetadata } from '@/lib/seo';
 import type { Course } from '@/types';
 
@@ -42,10 +42,10 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 export default function HomePage() {
   const stats = getCourseStats();
-  const courses = getAllCourses().filter((c) => !c.isInterview);
+  const courses = getAllCourses().filter((c) => !c.isQuestionAnswer);
   const firstCourse = courses[0];
 
-  const [firstInterviewCategory] = getInterviewCategories();
+  const [firstQuestionCategory] = getQuestionCategories();
 
   // Distinct curriculum pillars — copy is specific to real learning workflows,
   // not generic "we have courses" filler.
@@ -124,7 +124,7 @@ export default function HomePage() {
         totalCourses={courses.length}
         startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
         questionsHref={
-          firstInterviewCategory ? `/${firstInterviewCategory}/question-answers` : '/search'
+          firstQuestionCategory ? `/${firstQuestionCategory}/question-answers` : '/search'
         }
       />
 

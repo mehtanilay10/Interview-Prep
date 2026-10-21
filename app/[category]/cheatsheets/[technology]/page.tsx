@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { SectionHeader } from '@/components/sections/SectionHeader';
 import { ContentBlockRenderer } from '@/components/content/ContentBlockRenderer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { getCheatsheetModuleBySlug, getCheatsheetModules, getLessonsForModule, getCourseCategory, getCategoryMeta, getInterviewTechName } from '@/lib/content';
+import { getCheatsheetModuleBySlug, getCheatsheetModules, getLessonsForModule, getCourseCategory, getCategoryMeta, getQuestionTechName } from '@/lib/content';
 import { buildModuleMetadata } from '@/lib/seo';
 import { LessonActions } from '@/components/progress/LessonActions';
 import { LessonNotesButton } from '@/components/lesson/LessonNotesButton';
@@ -54,7 +54,7 @@ export default async function CheatsheetPage({ params }: { params: Promise<{ cat
   if (!lesson) notFound();
 
   const icon = mod.icon ?? '📝';
-  const techName = getInterviewTechName(technology);
+  const techName = getQuestionTechName(technology);
   const categoryMeta = getCategoryMeta(category);
 
   return (

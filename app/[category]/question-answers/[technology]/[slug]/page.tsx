@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import {
   getCategoryMeta,
-  getInterviewCategories,
-  getInterviewQuestions,
-  getInterviewTechnologies,
+  getQuestionCategories,
+  getQuestionAnswers,
+  getQuestionTechnologies,
   getLessonBySlug,
 } from '@/lib/content';
 import { buildLessonMetadata } from '@/lib/seo';
@@ -22,14 +22,14 @@ interface Params {
   params: Promise<{ category: string; technology: string; slug: string }>;
 }
 
-// Every interview question is prerendered to a static file at build time. This
+// Every question answer is prerendered to a static file at build time. This
 // is safe for Vercel's per-deployment route limit only because `cacheComponents`
 // is disabled in next.config.ts (see the course lesson page for details).
 export async function generateStaticParams() {
   const params: { category: string; technology: string; slug: string }[] = [];
-  for (const category of getInterviewCategories()) {
-    for (const tech of getInterviewTechnologies(category)) {
-      for (const question of getInterviewQuestions(tech.slug, category)) {
+  for (const category of getQuestionCategories()) {
+    for (const tech of getQuestionTechnologies(category)) {
+      for (const question of getQuestionAnswers(tech.slug, category)) {
         params.push({ category, technology: tech.slug, slug: question.slug });
       }
     }
@@ -39,7 +39,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { category, technology, slug } = await params;
-  const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
+  const tech = getQuestionTechnologies(category).find((t) => t.slug === technology);
   if (!tech) return {};
   // Scope by module (technology): a question slug could repeat across topics.
   const lesson = getLessonBySlug(slug, 'question-answers', technology);
@@ -56,13 +56,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function QuestionAnswerPage({ params }: Params) {
   const { category, technology, slug } = await params;
 
-  const tech = getInterviewTechnologies(category).find((t) => t.slug === technology);
+  const tech = getQuestionTechnologies(category).find((t) => t.slug === technology);
   if (!tech) notFound();
 
   const lesson = getLessonBySlug(slug, 'question-answers', technology);
   if (!lesson) notFound();
 
-  const allQuestions = getInterviewQuestions(technology, category);
+  const allQuestions = getQuestionAnswers(technology, category);
   const currentIdx = allQuestions.findIndex((q) => q.slug === slug);
   const prev = currentIdx > 0 ? allQuestions[currentIdx - 1] : null;
   const next = currentIdx < allQuestions.length - 1 ? allQuestions[currentIdx + 1] : null;
@@ -93,7 +93,7 @@ export default async function QuestionAnswerPage({ params }: Params) {
             }}
             courseSlug="question-answers"
             moduleSlug={technology}
-            category="interviewQuestions"
+            category="questionAnswers"
           >
             <LessonNotesButton courseSlug="question-answers" moduleSlug={technology} lessonSlug={lesson.slug} />
             <OfflineSaveButton courseSlug="question-answers" moduleSlug={technology} lessonSlug={lesson.slug} title={lesson.title} />

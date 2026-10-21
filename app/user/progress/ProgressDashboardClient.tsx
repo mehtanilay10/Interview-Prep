@@ -51,7 +51,7 @@ export interface ProgressModuleCourse {
 export interface ProgressCatalog {
   courses: ProgressCourseEntry[];
   moduleCourse: Record<string, ProgressModuleCourse>;
-  counts: { lessons: number; problems: number; interview: number };
+  counts: { lessons: number; problems: number; questions: number };
 }
 
 interface CategoryProgress {
@@ -195,17 +195,17 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
 
   const lessonsCompleted = progress.lessons?.completedLessons.length || 0;
   const problemsCompleted = progress.problems?.completedLessons.length || 0;
-  const interviewCompleted = progress.interviewQuestions?.completedLessons.length || 0;
+  const questionsCompleted = progress.questionAnswers?.completedLessons.length || 0;
 
   const totalLessonsCount = catalog.counts.lessons;
   const totalProblemsCount = catalog.counts.problems;
-  const totalInterviewCount = catalog.counts.interview;
+  const totalQuestionCount = catalog.counts.questions;
 
   const completionRate = useMemo(() => {
-    const total = totalLessonsCount + totalProblemsCount + totalInterviewCount;
+    const total = totalLessonsCount + totalProblemsCount + totalQuestionCount;
     if (total === 0) return 0;
-    return Math.round(((lessonsCompleted + problemsCompleted + interviewCompleted) / total) * 100);
-  }, [lessonsCompleted, problemsCompleted, interviewCompleted, totalLessonsCount, totalProblemsCount, totalInterviewCount]);
+    return Math.round(((lessonsCompleted + problemsCompleted + questionsCompleted) / total) * 100);
+  }, [lessonsCompleted, problemsCompleted, questionsCompleted, totalLessonsCount, totalProblemsCount, totalQuestionCount]);
 
   const { current: currentStreak, longest: longestStreak } = useMemo(
     () => computeStreak(allCompletions),
@@ -396,7 +396,7 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Lessons Completed" value={lessonsCompleted} icon={CheckCircle2} tone="success" />
             <StatCard label="Problems Solved" value={problemsCompleted} icon={Target} tone="accent" />
-            <StatCard label="Interviews Done" value={interviewCompleted} icon={TrendingUp} tone="attention" />
+            <StatCard label="Question Answers Done" value={questionsCompleted} icon={TrendingUp} tone="attention" />
             <StatCard label="Completion Rate" value={`${completionRate}%`} icon={Award} tone="accent" />
           </div>
 
@@ -471,13 +471,13 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
             />
           ) : (
             <div className="space-y-6">
-              {(['lessons', 'problems', 'interviewQuestions'] as const).map((cat) => {
+              {(['lessons', 'problems', 'questionAnswers'] as const).map((cat) => {
                 const catProgress = progress[cat];
                 if (!catProgress || catProgress.completedLessons.length === 0) return null;
                 return (
                   <div key={cat}>
                     <h3 className="mb-2 text-sm font-semibold text-fg-muted capitalize">
-                      {cat === 'interviewQuestions'
+                      {cat === 'questionAnswers'
                         ? 'Question answers'
                         : cat.replace(/([A-Z])/g, ' $1')}
                     </h3>

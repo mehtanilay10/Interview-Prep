@@ -5,8 +5,9 @@ import { useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiFetch';
+import { THEME_STORAGE_KEY } from '@/lib/storageKeys';
 
-const STORAGE_KEY = 'interview_prep_theme';
+const STORAGE_KEY = THEME_STORAGE_KEY;
 
 type Theme = 'light' | 'dark' | 'system';
 

@@ -1,10 +1,17 @@
 import { apiFetch } from '@/lib/apiFetch';
+import {
+  PROGRESS_STORAGE_KEY,
+  BOOKMARKS_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  PREFERENCES_STORAGE_KEY,
+  LAST_PATH_STORAGE_KEY,
+} from '@/lib/storageKeys';
 
-const PROGRESS_KEY = 'interview_prep_progress';
-const BOOKMARKS_KEY = 'interview_prep_bookmarks';
-const THEME_KEY = 'interview_prep_theme';
-const PREFERENCES_KEY = 'interview_prep_preferences';
-const LAST_PATH_KEY = 'interview_prep_last_path';
+const PROGRESS_KEY = PROGRESS_STORAGE_KEY;
+const BOOKMARKS_KEY = BOOKMARKS_STORAGE_KEY;
+const THEME_KEY = THEME_STORAGE_KEY;
+const PREFERENCES_KEY = PREFERENCES_STORAGE_KEY;
+const LAST_PATH_KEY = LAST_PATH_STORAGE_KEY;
 
 type Theme = 'light' | 'dark' | 'system';
 

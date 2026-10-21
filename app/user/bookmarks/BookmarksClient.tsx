@@ -21,7 +21,7 @@ interface BookmarkItem {
 }
 
 function bookmarkHref(item: BookmarkItem): string {
-  if (item.type === 'interview') {
+  if (item.type === 'questionAnswer') {
     return getContentItemHref('question-answers', item.moduleSlug, item.slug);
   }
   return getContentItemHref(item.courseSlug, item.moduleSlug, item.slug);
@@ -30,11 +30,11 @@ function bookmarkHref(item: BookmarkItem): string {
 const TYPE_LABELS: Record<string, string> = {
   lesson: 'Lesson',
   problem: 'Problem',
-  interview: 'Interview',
+  questionAnswer: 'Question Answer',
   cheatsheet: 'Cheat Sheet',
 };
 
-type FilterId = 'all' | 'lesson' | 'problem' | 'interview' | 'cheatsheet';
+type FilterId = 'all' | 'lesson' | 'problem' | 'questionAnswer' | 'cheatsheet';
 
 export function BookmarksClient() {
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
@@ -62,7 +62,7 @@ export function BookmarksClient() {
 
   const filters = useMemo(() => {
     const present = new Set(bookmarks.map((b) => b.type));
-    const ids: FilterId[] = ['all', 'lesson', 'problem', 'interview', 'cheatsheet'];
+    const ids: FilterId[] = ['all', 'lesson', 'problem', 'questionAnswer', 'cheatsheet'];
     return ids.filter((id) => id === 'all' || present.has(id));
   }, [bookmarks]);
 
@@ -128,7 +128,7 @@ export function BookmarksClient() {
         <StatCard label="Total Bookmarks" value={bookmarks.length} icon={Bookmark} tone="accent" />
         <StatCard label="Lessons" value={byType.lesson ?? 0} icon={Bookmark} tone="success" />
         <StatCard label="Problems" value={byType.problem ?? 0} icon={Bookmark} tone="done" />
-        <StatCard label="Interview Qs" value={byType.interview ?? 0} icon={Bookmark} tone="attention" />
+        <StatCard label="Question Answers" value={byType.questionAnswer ?? 0} icon={Bookmark} tone="attention" />
       </div>
 
       {filters.length > 2 && (

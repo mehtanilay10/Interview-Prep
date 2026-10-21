@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (courses.length === 0) return {};
   return buildMetadata({
     title: `${meta.label} Problems`,
-    description: `Practice ${meta.label} interview problems with guided solutions and explanations.`,
+    description: `Practice ${meta.label} problems with guided solutions and explanations.`,
     path: `/${category}/problems`,
   });
 }
@@ -40,7 +40,7 @@ export default async function CategoryProblemsPage({ params }: Params) {
       <SectionHeader
         eyebrow={`${meta.icon} ${meta.label}`}
         title={`${meta.label} Problems`}
-        description={`Practice sets for ${meta.label} interviews — problems, guided solutions, and deep dives.`}
+        description={`Practice sets for ${meta.label} — problems, guided solutions, and deep dives.`}
         titleAs="h1"
       />
 

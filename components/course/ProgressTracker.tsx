@@ -16,7 +16,7 @@ interface ProgressTrackerProps {
    * pull every lesson JSON into the browser bundle).
    */
   allCourseLessonSlugs?: string[];
-  category?: 'lessons' | 'problems' | 'interviewQuestions';
+  category?: 'lessons' | 'problems' | 'questionAnswers';
   className?: string;
 }
 

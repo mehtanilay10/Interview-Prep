@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export const CSRF_COOKIE = 'interview_prep_csrf';
+export const CSRF_COOKIE = 'quotient_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
 export function generateCsrfToken(): string {

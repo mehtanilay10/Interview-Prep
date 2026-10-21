@@ -53,7 +53,7 @@ function buildProgressCatalog(): ProgressCatalog {
   const counts = {
     lessons: lessons.filter((lesson) => lesson.courseSlug !== 'question-answers').length,
     problems: lessons.filter((lesson) => isProblemCourseSlug(lesson.courseSlug)).length,
-    interview: lessons.filter((lesson) => lesson.courseSlug === 'question-answers').length,
+    questions: lessons.filter((lesson) => lesson.courseSlug === 'question-answers').length,
   };
 
   return { courses: courseEntries, moduleCourse, counts };

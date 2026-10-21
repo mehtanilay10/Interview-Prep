@@ -313,10 +313,10 @@ interface CategoryInfo {
   categoryBySlug: Map<string, string>;
   /** Slugs of every course that lives under a `problems/` directory. */
   problemCourseSlugs: string[];
-  /** Interview technology slug → URL category. */
-  interviewTechCategory: Map<string, string>;
-  /** Interview question slug → owning technology slug. */
-  interviewLessonTech: Map<string, string>;
+  /** Question-answer technology slug → URL category. */
+  questionTechCategory: Map<string, string>;
+  /** Question-answer lesson slug → owning technology slug. */
+  questionLessonTech: Map<string, string>;
 }
 
 /**
@@ -328,8 +328,8 @@ interface CategoryInfo {
 function scanCategories(): CategoryInfo {
   const categoryBySlug = new Map<string, string>();
   const problemCourseSlugs: string[] = [];
-  const interviewTechCategory = new Map<string, string>();
-  const interviewLessonTech = new Map<string, string>();
+  const questionTechCategory = new Map<string, string>();
+  const questionLessonTech = new Map<string, string>();
 
   // A course's `content.json` slug can differ from its directory name (e.g.
   // `problems/csharp/content.json` has slug `csharp-problems`), and runtime
@@ -367,17 +367,17 @@ function scanCategories(): CategoryInfo {
     // Question answers are one technology module per directory. The module
     // slug *is* the technology slug, so it resolves both the category and the
     // owning technology of every question inside it.
-    const interviewDir = path.join(CONTENT_DIR, category, 'question-answers');
-    for (const entry of listDirs(interviewDir)) {
-      const moduleJsonPath = path.join(interviewDir, entry, 'content.json');
+    const questionDir = path.join(CONTENT_DIR, category, 'question-answers');
+    for (const entry of listDirs(questionDir)) {
+      const moduleJsonPath = path.join(questionDir, entry, 'content.json');
       if (!fs.existsSync(moduleJsonPath)) continue;
       const slug = readCourseSlug(moduleJsonPath, entry);
-      interviewTechCategory.set(slug, category);
+      questionTechCategory.set(slug, category);
       try {
         const parsed = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf8')) as { lessonSlugs?: unknown };
         if (Array.isArray(parsed.lessonSlugs)) {
           for (const lessonSlug of parsed.lessonSlugs) {
-            if (typeof lessonSlug === 'string') interviewLessonTech.set(lessonSlug, slug);
+            if (typeof lessonSlug === 'string') questionLessonTech.set(lessonSlug, slug);
           }
         }
       } catch {
@@ -389,27 +389,27 @@ function scanCategories(): CategoryInfo {
   return {
     categoryBySlug,
     problemCourseSlugs: problemCourseSlugs.sort(),
-    interviewTechCategory,
-    interviewLessonTech,
+    questionTechCategory,
+    questionLessonTech,
   };
 }
 
 function generateCategoriesIndex({
   categoryBySlug,
   problemCourseSlugs,
-  interviewTechCategory,
-  interviewLessonTech,
+  questionTechCategory,
+  questionLessonTech,
 }: CategoryInfo): string {
   const categoryEntries = Array.from(categoryBySlug.entries()).sort(([a], [b]) => a.localeCompare(b));
   const categoryLines = categoryEntries
     .map(([slug, category]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(category)},`)
     .join('\n');
   const problemLines = problemCourseSlugs.map((slug) => `\t${JSON.stringify(slug)},`).join('\n');
-  const interviewTechLines = Array.from(interviewTechCategory.entries())
+  const questionTechLines = Array.from(questionTechCategory.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([slug, category]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(category)},`)
     .join('\n');
-  const interviewLessonLines = Array.from(interviewLessonTech.entries())
+  const questionLessonLines = Array.from(questionLessonTech.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([slug, tech]) => `\t${JSON.stringify(slug)}: ${JSON.stringify(tech)},`)
     .join('\n');
@@ -430,14 +430,14 @@ export const PROBLEM_COURSE_SLUGS: string[] = [
 ${problemLines}
 ];
 
-/** Interview technology (module) slug -> URL category. */
-export const INTERVIEW_TECH_CATEGORY: Record<string, string> = {
-${interviewTechLines}
+/** Question-answer technology (module) slug -> URL category. */
+export const QUESTION_TECH_CATEGORY: Record<string, string> = {
+${questionTechLines}
 };
 
-/** Interview question slug -> owning technology (module) slug. */
-export const INTERVIEW_LESSON_TECH: Record<string, string> = {
-${interviewLessonLines}
+/** Question-answer lesson slug -> owning technology (module) slug. */
+export const QUESTION_LESSON_TECH: Record<string, string> = {
+${questionLessonLines}
 };
 `;
 }

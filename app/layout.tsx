@@ -21,12 +21,12 @@ const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: {
-    default: 'Quotient — Interview Preparation',
+    default: 'Quotient — Learn Software Engineering',
     template: '%s | Quotient',
   },
   description:
-    'Interview preparation course. Learn the skills, techniques, and strategies to succeed in technical interviews.',
-  keywords: ['interview prep', 'interview skills', 'interview preparation', 'career'],
+    'Structured courses, coding problems, cheat sheets, and question answers for software engineers — with runnable examples and worked solutions.',
+  keywords: ['software engineering', 'programming courses', 'coding problems', 'career'],
   authors: [{ name: 'Quotient' }],
   robots: { index: true, follow: true },
   manifest: '/manifest.json',
