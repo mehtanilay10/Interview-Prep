@@ -1,0 +1,133 @@
+{
+  "id": "lesson-iq-ef-optimistic-concurrency",
+  "slug": "optimistic-concurrency",
+  "moduleSlug": "entity-framework-core",
+  "title": "How do you handle concurrency conflicts in EF Core?",
+  "description": "RowVersion tokens, DbUpdateConcurrencyException handling, and optimistic vs pessimistic locking.",
+  "order": 5,
+  "difficulty": "advanced",
+  "tags": [
+    "ef-core",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you handle concurrency conflicts in EF Core?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "EF Core uses **optimistic concurrency** by default: it never locks rows for you. You mark a property as a **concurrency token** — typically a SQL Server `rowversion` column via `IsRowVersion()` — and EF adds `WHERE Id = @id AND RowVersion = @original` to every UPDATE/DELETE. If zero rows are affected, someone else changed the record first: EF throws `DbUpdateConcurrencyException`, and you resolve it (reload, merge, or tell the user). Pessimistic locking (held locks) exists at the database level but is not EF's model."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Setting it up:**\n- Fluent API: `entity.Property(o => o.RowVersion).IsRowVersion();` (SQL Server auto-generates `rowversion`)\n- Any property can be a token: `IsConcurrencyToken()` — e.g. a `UpdatedAt` timestamp or a `Counter` you expect to change only by your write\n- Client-side original values come from the snapshot EF took when the entity was loaded — another reason load-modify-save wants a tracked entity\n\n**What happens on conflict:**\n- UPDATE/DELETE matches nothing → `DbUpdateConcurrencyException`\n- `exception.Entries` gives you the entities involved; each entry holds **current** (your) and **original** (database) values\n- Resolution strategies:\n  - **Reload & inform:** `entry.GetDatabaseValuesAsync()` — compare, show the other user's version, let them re-apply\n  - **Last-write-wins:** set `entry.OriginalValues` to current and retry — acceptable for coarse fields, dangerous for money/inventory\n  - **Field-level merge:** reapply only your changed fields onto fresh database values\n  - **Custom:** record an audit entry of both versions\n\n**Optimistic vs pessimistic:**\n- Optimistic: no locks, high read throughput, conflicts are rare and handled in code — the default for web apps\n- Pessimistic (`SELECT ... WITH (UPDLOCK)` / `sp_getapplock` / `pg_advisory_lock`): needed when conflicts are frequent or the operation can't be retried (seat reservation, counter increments, non-idempotent external calls)\n- For simple increments, a single set-based statement (`UPDATE ... SET Qty = Qty - 1`) sidesteps read-modify-write entirely"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "RowVersion token and conflict resolution",
+        "language": "csharp",
+        "code": "// Model — SQL Server rowversion, managed by the database\npublic class Order\n{\n    public int Id { get; set; }\n    public decimal Total { get; set; }\n    public byte[] RowVersion { get; set; } = null!;\n}\n\nprotected override void OnModelCreating(ModelBuilder b)\n{\n    b.Entity<Order>().Property(o => o.RowVersion).IsRowVersion();\n}\n\n// Save with conflict handling\npublic async Task<UpdateResult> UpdateTotalAsync(int id, decimal newTotal)\n{\n    var order = await _db.Orders.FindAsync(id);   // RowVersion captured as original\n    order.Total = newTotal;\n\n    try\n    {\n        await _db.SaveChangesAsync();\n        return UpdateResult.Ok;\n    }\n    catch (DbUpdateConcurrencyException ex)\n    {\n        var entry = ex.Entries.Single();\n        var databaseValues = await entry.GetDatabaseValuesAsync();\n\n        if (databaseValues is null)               // row deleted underneath us\n            return UpdateResult.DeletedBySomeoneElse;\n\n        // Option A: show the user the competing version and abort\n        var theirs = (byte[])databaseValues[\"RowVersion\"]!;\n        return UpdateResult.Conflict(currentVersion: theirs);\n\n        // Option B: last-write-wins\n        // entry.OriginalValues.SetValues(databaseValues);\n        // await _db.SaveChangesAsync();\n    }\n}\n\n// Non-rowversion token (portable across databases):\n// b.Entity<Order>().Property(o => o.UpdatedAt).IsConcurrencyToken();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing EF does **not** lock — and what optimistic concurrency means in practice\n- Hands-on familiarity with IsRowVersion and DbUpdateConcurrencyException\n- Conscious conflict-resolution choices (reload/merge vs last-write-wins), not swallowed exceptions\n- When to drop to pessimistic/set-based approaches instead"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Catching DbUpdateConcurrencyException and just retrying blindly — the same conflict returns, and blind retries hide data loss",
+          "Attaching a modified entity with stale original values (Update on a detached POCO) — the WHERE clause uses wrong originals",
+          "Using last-write-wins on inventory, prices, or balances",
+          "Thinking optimistic concurrency prevents deadlocks — it doesn't; it converts lost updates into exceptions",
+          "Marking every property as a concurrency token — conflicts on fields nobody contends for",
+          "Forgetting deletes: DELETE carries the token too and can throw the same exception"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How would you implement a seat reservation where double-booking is unacceptable?",
+          "What concurrency strategy would you use across two services writing to the same table?",
+          "Is a timestamp column as good as rowversion? What are the pitfalls?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "EF is optimistic by default: the token rides in the UPDATE/DELETE WHERE clause",
+          "IsRowVersion() on SQL Server; IsConcurrencyToken() for app-managed tokens",
+          "DbUpdateConcurrencyException → reload, merge, or last-write-wins — by choice",
+          "Use pessimistic or set-based writes when conflicts are frequent or non-retryable"
+        ],
+        "takeaway": "Concurrency conflicts are a design decision: detect them with a token, then resolve them deliberately — never by swallowing the exception."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "change-tracking-and-savechanges",
+    "migrations-in-production"
+  ],
+  "furtherReading": [
+    {
+      "title": "EF Core optimistic concurrency",
+      "url": "https://learn.microsoft.com/ef/core/saving/concurrency",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 26
+}

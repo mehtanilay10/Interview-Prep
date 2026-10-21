@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-sql-union-vs-union-all",
+  "slug": "union-vs-union-all",
+  "moduleSlug": "sql-server",
+  "title": "What is the difference between UNION and UNION ALL?",
+  "description": "Duplicate removal vs raw concatenation, the sort-based cost of DISTINCT, EXCEPT/INTERSECT, and column-matching rules.",
+  "order": 15,
+  "difficulty": "beginner",
+  "tags": [
+    "sql server",
+    "queries",
+    "beginner"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the difference between UNION and UNION ALL?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`UNION` combines result sets **and removes duplicate rows** across the whole combined result; `UNION ALL` simply **concatenates** them, duplicates included. The deduplication makes UNION meaningfully slower on large sets — it requires a sort or hash of every row to identify duplicates. If you know the inputs can't overlap (different sources, partitioned periods, already-distinct keys), UNION ALL is the correct, faster default. Related operators: `EXCEPT` returns rows in the first set not in the second; `INTERSECT` returns rows present in both — both also deduplicate."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Rules that apply to both:**\n- Same number of columns in each SELECT\n- Matching (or implicitly convertible) data types, compared by position — column names come from the first SELECT\n- ORDER BY / TOP apply to the **final combined result**, not individual arms (wrap an arm in a subquery if you must order it)\n- Parenthesized arms can carry their own TOP/WHERE; FOR XML/JSON restrictions apply per platform version\n\n**Cost difference:**\n- UNION ALL: plan = concatenate (Concatenation operator) — near-zero overhead\n- UNION: concatenate + deduplicate (Stream Aggregate on sorted input, or Hash Match aggregate) — sorts/hashes everything; on millions of rows this dominates the query cost\n- Both arms may also benefit from indexes separately — the dedup pass happens after\n\n**EXCEPT / INTERSECT:**\n- `A EXCEPT B` — anti-semi-join semantics: distinct rows in A that aren't in B (NULLs are considered equal for this comparison — unlike joins)\n- `A INTERSECT B` — rows in both (distinct)\n- Both deduplicate; both compare all columns positionally\n- Typical uses: finding missing rows (referential checks between systems), config drift between environments, overlapping date ranges\n\n**When UNION is genuinely required:**\n- Merging overlapping feeds (same users from two systems) where duplicates are real and must collapse\n- Otherwise prefer: UNION ALL + dedupe logic only where needed (GROUP BY on a key, EXISTS filter) — targeted dedup beats global dedup"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Concatenate vs dedupe, and set-difference flavors",
+        "language": "sql",
+        "code": "-- UNION ALL: raw concatenation — the fast default\\nSELECT Id, Email FROM Users_Seattle\\nUNION ALL\\nSELECT Id, Email FROM Users_Portland;\\n-- If a user could appear in both tables, they appear twice here\\n\\n-- UNION: same query, but duplicates removed across the WHOLE result\\nSELECT Id, Email FROM Users_Seattle\\nUNION\\nSELECT Id, Email FROM Users_Portland;\\n-- Requires sort/hash over every row -> noticeably slower on big sets\\n\\n-- Period merge where dedup is provably unnecessary (disjoint months)\\nSELECT Id, Total, OrderDate FROM Orders_2026_01\\nUNION ALL\\nSELECT Id, Total, OrderDate FROM Orders_2026_02;\\n-- Ranges can't overlap -> UNION would waste work for zero benefit\\n\\n-- EXCEPT: rows in prod config missing from staging (drift check)\\nSELECT SettingKey, Value FROM dbo.Config_Prod\\nEXCEPT\\nSELECT SettingKey, Value FROM dbo.Config_Staging;\\n\\n-- INTERSECT: settings that exist in both with identical values\\nSELECT SettingKey, Value FROM dbo.Config_Prod\\nINTERSECT\\nSELECT SettingKey, Value FROM dbo.Config_Staging;\\n\\n-- ❌ ORDER BY inside a UNION arm (invalid without TOP/OFFSET):\\n-- SELECT ... FROM A ORDER BY x\\n-- UNION ALL\\n-- SELECT ... FROM B\\n-- ✅ Wrap the arm:\\n-- SELECT * FROM (SELECT TOP 10 ... FROM A ORDER BY x) a\\n-- UNION ALL\\n-- SELECT * FROM B\\n\\n-- Targeted dedup instead of global UNION:\\n-- SELECT UserId FROM (\\n--   SELECT UserId FROM Seattle\\n--   UNION ALL\\n--   SELECT UserId FROM Portland\\n-- ) u\\n-- GROUP BY UserId HAVING COUNT(*) > 1   -- find only the duplicates, cheaply"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "The one-word perf review",
+        "text": "When reviewing SQL, a `UNION` where inputs are provably disjoint is a free optimization: swap to `UNION ALL` and remove a global sort/hash from the plan. Conversely, don't 'optimize' to UNION ALL when duplicates are possible — the bug shows up as mysterious double-counts weeks later."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- UNION deduplicates; UNION ALL concatenates — and the performance consequence\n- Column/type matching rules and the whole-result scoping of ORDER BY\n- Knowledge of EXCEPT and INTERSECT as set-difference/intersection tools\n- Judgment: when dedup is provably unnecessary vs when it's load-bearing"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Defaulting to UNION where UNION ALL is provably correct — paying for an unnecessary sort",
+          "Switching to UNION ALL when inputs overlap — silent double counting in aggregates",
+          "Mismatched column counts/types between arms",
+          "Trying to ORDER BY an individual arm without TOP/OFFSET — invalid syntax",
+          "Assuming EXCEPT/INTERSECT keep duplicates — they don't",
+          "Comparing with NULLs via NOT IN/NOT EXISTS vs EXCEPT without knowing NULL semantics differ"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What operators in the execution plan distinguish UNION from UNION ALL?",
+          "How do EXCEPT and NOT IN differ when NULLs are present?",
+          "Can INTERSECT be replaced by INNER JOIN? What changes with duplicates?",
+          "How would you merge monthly partition tables safely with UNION ALL?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "UNION removes duplicates (sort/hash cost); UNION ALL just concatenates",
+          "Column count and positional type compatibility required; ORDER BY applies to the whole result",
+          "EXCEPT/INTERSECT = set difference/intersection, also deduplicating",
+          "Default to UNION ALL when inputs are provably disjoint"
+        ],
+        "takeaway": "UNION ALL is the engine-friendly default; earn your deduplication — use UNION only when duplicates are possible and unwanted."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sql-b02",
+    "sql-a01",
+    "delete-truncate-drop"
+  ],
+  "furtherReading": [
+    {
+      "title": "UNION (Transact-SQL) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-union-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "EXCEPT and INTERSECT — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "SQL Server",
+  "estimatedMinutes": 16
+}

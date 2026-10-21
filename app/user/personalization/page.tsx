@@ -8,13 +8,13 @@ export const metadata: Metadata = {
 };
 
 export default function PersonalizationPage() {
-  // Interview questions are category-first, so every category that hosts them
+  // Question answers are category-first, so every category that hosts them
   // is offered as a landing destination.
   const landingPages: LandingPageOption[] = [
     { value: '/', label: 'Home' },
     ...getInterviewCategories().map((category) => ({
-      value: `/${category}/interview-questions`,
-      label: `${getCategoryMeta(category).label} Interview Questions`,
+      value: `/${category}/question-answers`,
+      label: `${getCategoryMeta(category).label} Question Answers`,
     })),
   ];
 

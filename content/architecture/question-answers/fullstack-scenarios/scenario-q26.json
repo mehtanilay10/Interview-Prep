@@ -1,0 +1,137 @@
+{
+  "id": "lesson-iq-scenario-q26",
+  "slug": "scenario-q26",
+  "moduleSlug": "fullstack-scenarios",
+  "title": "A feature works locally but fails only in production. How do you debug it?",
+  "description": "A systematic hunt through environment, configuration, data, scale, and infrastructure differences — turning 'works on my machine' into a bisectable checklist.",
+  "order": 26,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 18,
+  "tags": [
+    "interview",
+    "full-stack",
+    "debugging",
+    "scenarios"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** A feature works locally but fails only in production. How do you debug it?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Treat it as a **difference hunt**: local and prod differ in exactly six dimensions — **configuration/secrets, data, scale/concurrency, timing/network topology, infrastructure versions, and human/browser factors**. Systematically eliminate each: reproduce with production-like data in a staging environment, check the logs/traces for the failing component first (not the symptom you see in the browser), and bisect the deploy history if it's recent. The answer is almost always in one of: an env var or feature flag, a data shape prod has and dev doesn't (empty-table bias), a race that only exists at real concurrency, or an infrastructure path (proxy headers, DNS, TLS, caching layers). Fix it, then encode the difference into CI so it can't recur."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The difference checklist, in probability order:**\n1. **Configuration**: env vars, connection strings, feature flags, CORS origins, base URLs, culture/timezone settings. Diff prod vs staging config loudly — most 'prod-only' bugs end here\n2. **Data**: dev DB is empty and clean; prod has NULLs, unicode, long strings, duplicates, ten-year-old rows. Ask 'what does prod data have that mine doesn't?' and fetch a redacted sample\n3. **Scale and concurrency**: local = 1 user; prod = 1000 racing. Look for races, connection-pool exhaustion, unbounded queries, timeouts that only appear under load\n4. **Network path**: prod goes through a load balancer, reverse proxy, CDN, WAF — proxy headers (X-Forwarded-For), request size limits, TLS handshake timeouts, keep-alive differences\n5. **Build/runtime differences**: Release vs Debug, trimmed/published output, different .NET/Node/DB versions, globalization-invariant mode, case-sensitive file systems in Linux containers vs Windows dev\n6. **The human path**: only certain users affected → permissions/roles, browser extensions, cached bundles, service workers holding stale assets\n\n**Methodical execution:**\n- Start from evidence, not hypotheses: server logs + distributed traces of the actual failing request — which hop fails, with what error\n- Bisect deploys: if it regressed recently, git bisect or feature-flag toggle beats theorizing\n- Reproduce for real: copy a sanitized prod dataset into staging; if you can't reproduce there, staging isn't representative — make it so\n- Change one variable at a time while comparing staging against a known-good baseline\n\n**Close the loop:** every resolved instance should add a test, a config validation at startup, or a CI environment-matrix check — the same class of bug should not ship twice."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A worked example: 500s in prod, fine locally",
+        "language": "text",
+        "code": "Symptom: POST /api/orders returns 500 in prod; identical request works locally.\\n\\n1. Read the prod stack trace (App Insights/logs) first:\\n   JsonException: The input does not contain any JSON tokens...\\n   at OrderPayloadDeserializer.Deserialize\\n\\n2. Hypotheses from the trace, checked against differences:\\n   - config? Checked base URL + flags: no diff\\n   - proxy? X-Forwarded-* headers differ, but body? Hmm...\\n   - data? The failing requests come only from the iOS app (older version!)\\n\\n3. Root cause: prod traffic includes iOS v3.2 sending form-encoded bodies;\\n   the API expects JSON since v4.0. Local testing used the current web client only.\\n\\n4. Fixes:\\n   - immediate: accept form-encoded on that endpoint (compat shim)\\n   - durable: contract test that replays old client payload fixtures in CI\\n   - process: staging now runs one node on the OLDEST supported client build\\n\\nCommon real answers from this checklist:\\n   - 'Connection string points to the dev DB in prod' (config)\\n   - NULL email in a 2019 row crashes string.ToUpper (data)\\n   - 200ms local query serializes 50k rows under real concurrency (scale)\\n   - nginx default 1MB body limit truncates large payloads (network path)\\n   - case-sensitive path: 'assets/Logo.png' worked on Windows, 404s on Linux (build/runtime)"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "'Works on my machine' is a data problem",
+        "text": "The most common underlying cause isn't environment magic — it's that your local dataset is a toy. Pulling a sanitized copy of production data into staging converts a class of mysterious bugs into obvious ones you can reproduce in minutes. Make that pipeline boring and automatic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Debugging from the browser console instead of server-side traces of the failing request",
+          "Changing multiple things at once while comparing prod and local",
+          "Skipping the deploy-bisect because 'nothing big changed' — small changes are still changes",
+          "Fixing the incident without adding the reproduction to CI — the bug returns in months",
+          "Treating staging as representative when it has empty data and one user",
+          "Assuming it's infrastructure when the stack trace clearly points at your serializer"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you sanitize production data for staging without leaking PII?",
+          "How would you debug an issue that appears only under load?",
+          "What belongs in startup config validation to prevent this class entirely?",
+          "How do you debug a bug that only one customer's browser reports?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Six difference dimensions: config, data, scale, network path, runtime, human path",
+          "Start from server traces of the failing request, not browser symptoms",
+          "Reproduce with real-shaped data in staging; bisect deploys when it's recent",
+          "Encode every resolved difference into CI or startup validation"
+        ],
+        "takeaway": "'Prod-only' bugs are difference bugs: enumerate what differs, eliminate each dimension in order of likelihood, and leave the next team a test instead of a memory."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "scenario-q21",
+    "scenario-q24"
+  ],
+  "furtherReading": [
+    {
+      "title": "Debugging production — Google SRE book",
+      "url": "https://sre.google/sre-book/debugging-production/",
+      "type": "article",
+      "author": "Google"
+    },
+    {
+      "title": "Effective debugging strategies",
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/debug-overview",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Full-Stack Scenarios"
+}

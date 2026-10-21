@@ -1,0 +1,142 @@
+{
+  "id": "lesson-iq-this-binding",
+  "slug": "this-binding",
+  "moduleSlug": "javascript",
+  "title": "How does `this` work in JavaScript?",
+  "description": "The four binding rules — default, implicit, explicit, and new — plus arrow functions and why this behaves differently from other languages.",
+  "order": 13,
+  "difficulty": "intermediate",
+  "tags": [
+    "javascript",
+    "functions",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does `this` work in JavaScript?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`this` is determined **at call time, not definition time**, by four rules applied in order: (1) **explicit** — `call`/`apply`/`bind` set it directly; (2) **new** — a constructor call creates a fresh object and binds `this` to it; (3) **implicit** — `obj.method()` binds `this` to `obj`; (4) **default** — otherwise, in sloppy mode `this` is the global object (undefined in strict mode/modules). Arrow functions have **no own `this`** — they capture `this` lexically from the surrounding function, which is why they're ideal for callbacks that must see the enclosing context. That call-time binding is why React class methods detach (`onClick={this.handleClick}` loses `this`) and why `bind` exists."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The four rules in detail:**\n- **Explicit**: `fn.call(thisArg, a, b)`, `fn.apply(thisArg, [a, b])`, `const bound = fn.bind(thisArg)` — bind returns a permanently new function with `this` fixed forever; call/apply invoke immediately\n- **new**: `new Foo()` → creates object, its `[[Prototype]]` is Foo.prototype, `this` inside Foo is that object, and unless the constructor returns an object, that object is the result\n- **Implicit**: `person.greet()` → `this === person`; the object left of the dot is the receiver — and destructuring or reassigning loses it: `const greet = person.greet; greet()` → this is no longer person\n- **Default**: bare `fn()` → globalThis in sloppy mode, `undefined` in strict mode (all ES modules are strict)\n\n**Arrow functions:**\n- Lexical this: captured from the enclosing function scope at definition — they cannot be bound (`bind`/`call` on arrows has no effect), can't be constructors\n- Perfect for callbacks inside methods: `setTimeout(() => this.tick(), 100)` keeps the method's this; `setTimeout(this.tick.bind(this))` is the equivalent non-arrow fix\n\n**Common real-world manifestations:**\n- React class components: `this.setState` in callbacks — hence constructor binding, class fields with arrows (`handleClick = () => {}`), or just use function components with hooks\n- Detached method references in general: `const log = console.log; log('x')` — usually fine for console, disastrous for methods that use this\n- Passing `obj.method` to forEach/map: `items.forEach(obj.process)` — obj is lost; wrap: `(x) => obj.process(x)`\n- Strict mode/module surprises: `this` is undefined, so `this.x = 1` at top level throws\n\n**Precedence note:** explicit bind beats implicit object; there's no rule conflict once you check in that order. ES2023's `Function.prototype.prototype` and explicit-resource methods aside, the four rules cover everything."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Each rule, and the classic losses of `this`",
+        "language": "javascript",
+        "code": "'use strict';\\n\\nconst owner = {\\n  name: 'Ada',\\n  greet(other) {\\n    return this.name + ' greets ' + other;\\n  },\\n  delayed() {\\n    // ❌ plain function loses this:\\n    setTimeout(function () { console.log(this?.name); }, 0);   // undefined\\n    // ✅ arrow captures this lexically:\\n    setTimeout(() => console.log(this.name), 0);              // 'Ada'\\n  },\\n};\\n\\n// Implicit: the dot call\\nowner.greet('Bob');            // 'Ada greets Bob'\\n\\n// Loss of implicit binding:\\nconst detached = owner.greet;\\ndetached('Bob');               // TypeError: Cannot read properties of undefined\\n\\n// Explicit: call / apply / bind\\nowner.greet.call({ name: 'Lin' }, 'Bob');   // 'Lin greets Bob'\\nowner.greet.apply({ name: 'Lin' }, ['Bob']);\\nconst boundGreet = owner.greet.bind({ name: 'Lin' });\\nboundGreet('Bob');             // permanently 'Lin' — bind wins forever\\n\\n// new: this is the fresh instance\\nfunction User(name) { this.name = name; }\\nconst u = new User('Grace');   // this === u inside constructor\\n\\n// Default: bare call in strict mode\\nfunction loose() { return this; }\\nloose() === undefined;         // true in strict mode / modules\\n\\n// Arrow: no own this, bind/call are no-ops\\nconst arrow = () => this;\\narrow.call({ name: 'x' });     // still the outer this\\n\\n// React flavor:\\n// class Foo extends React.Component {\\n//   render() {\\n//     return <button onClick={() => this.handleClick()}>Go</button>;  // ✅ arrow\\n//     // or: handleClick = () => {} (class field)\\n//     // not: onClick={this.handleClick} — unbound, this === undefined\\n//   }\\n// }"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The four-rule model and that binding happens at call time\n- Arrow functions have lexical this and ignore bind/call\n- Real failure modes: detached methods, callbacks in class components\n- Knowing when explicit binding (bind in constructor, class fields) is needed vs when it isn't"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Assuming this works like Java/C# static scoping — it's call-site dependent",
+          "Passing a method as a bare callback and losing the receiver",
+          "Using regular functions in setTimeout inside methods, then wondering why this is undefined",
+          "Calling bind on an arrow function and expecting it to rebind",
+          "Forgetting modules are strict — top-level this is undefined, not globalThis",
+          "Re-binding on every render in React (bind in JSX) — use class fields or arrows instead"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does super() affect this in derived constructors?",
+          "What does 'this' mean in an object literal method vs a standalone function?",
+          "Why do class fields with arrow functions avoid the binding problem?",
+          "How does bind compare with the latest-ref pattern in React hooks?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "this is set at call time: explicit (call/apply/bind) > new > implicit (dot) > default",
+          "Arrow functions inherit this lexically and cannot be rebound",
+          "Detached methods lose their receiver — the classic callback bug",
+          "Modules run in strict mode: bare calls give this === undefined"
+        ],
+        "takeaway": "Ask 'what's left of the dot at the call site?' — that one question answers where this points in every JavaScript scenario."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "js-i04",
+    "js-a02",
+    "js-i01"
+  ],
+  "furtherReading": [
+    {
+      "title": "this — MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this",
+      "type": "article",
+      "author": "MDN Web Docs"
+    },
+    {
+      "title": "JavaScript.info: Object methods and this",
+      "url": "https://javascript.info/object-methods",
+      "type": "article",
+      "author": "javascript.info"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "JavaScript",
+  "estimatedMinutes": 24
+}

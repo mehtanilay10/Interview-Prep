@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-strict-mode",
+  "slug": "strict-mode",
+  "moduleSlug": "react",
+  "title": "What does React StrictMode do?",
+  "description": "Development-only checks: double-invoked effects, double rendering, immutable-data warnings, and why StrictMode bugs are real bugs.",
+  "order": 22,
+  "difficulty": "intermediate",
+  "tags": [
+    "react",
+    "developer-experience",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What does React StrictMode do?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`<StrictMode>` is a **development-only** wrapper that activates extra checks and warnings to surface unsafe code. It double-invokes component bodies (render runs twice), runs effects mount → cleanup → mount again, and warns about: mutating state/props during render, outdated lifecycle usage, unsafe side effects in render, and legacy APIs. None of it ships in production builds — it costs nothing at runtime for users. Its signature feature is the **intentional effect double-invocation**, which simulates React 18's remounting behavior (e.g. reusing state on navigation) to expose effects that don't fully clean up. Code that breaks under StrictMode is genuinely buggy — it just happened to survive in a world without remounts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**What it checks and how:**\n- **Double rendering**: component function runs twice in dev — exposes side effects during render (fetch calls, subscriptions, mutations of module state). If render isn't pure, you'll see doubled log lines or doubled requests\n- **Double-invoked effects**: dev lifecycle runs setup → cleanup → setup. Catches: missing cleanup (two subscriptions leak), non-idempotent setup (pushing to a module-level array twice), effects that assume they run once\n- **Warnings**: mutating state directly (array.push on state), accessing context via old APIs, string refs, `findDOMNode`, legacy lifecycle methods, and impure renders\n- **Pure-render enforcement**: if you mutate a prop or state object during render, StrictMode warns immediately\n\n**The remounting model behind it:** React 18+ can discard and recreate state when you navigate away and back (e.g., in some router/framework scenarios). StrictMode's mount-unmount-mount in dev simulates this so you find bugs before production does.\n\n**What it does NOT do:**\n- Not a linter replacement — ESLint's react-hooks plugin catches rules-of-hooks and exhaustive-deps; StrictMode catches runtime impurity\n- Not enabled in production builds — stripping it has zero user-facing effect; enabling it in prod *would* double-render and waste CPU\n- Doesn't catch async mistakes — an uncancelled fetch still completes; it just runs setup twice so you might notice duplicated calls\n\n**Practical advice:** keep `<StrictMode>` at the root forever. When an effect misbehaves only in dev, treat it as a gift: the cleanup is wrong. Common fixes: return cleanup that undoes everything, make setup idempotent, and never assume an effect runs exactly once."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "What StrictMode exposes (and the fix)",
+        "language": "javascript",
+        "code": "// ❌ Breaks under StrictMode: subscription leaks and doubled state\\nconst store = new EventStore();   // module-level mutable state\\n\\nfunction Buggy() {\\n  const [events, setEvents] = useState([]);\\n\\n  useEffect(() => {\\n    store.on('event', handler);                    // setup\\n    // NO cleanup -> StrictMode's remount subscribes TWICE\\n    setEvents((e) => [...e, 'mounted']);           // runs twice -> two entries\\n  }, []);\\n\\n  return <ul>{events.map((e, i) => <li key={i}>{e}</li>)}</ul>;// }\\n\\n// ✅ Fixed: cleanup reverses setup; setup is idempotent\\nfunction Fixed() {\\n  const [events, setEvents] = useState([]);\\n\\n  useEffect(() => {\\n    const handler = (payload) => setEvents((e) => [...e, payload]);\\n    store.on('event', handler);\\n    setEvents((e) => [...e, 'mounted']);\\n\\n    return () => store.off('event', handler);      // undo subscription\\n  }, []);\\n\\n  return <ul>{events.map((e, i) => <li key={i}>{e}</li>)}</ul>;// }\\n\\n// Setup/cleanup symmetric — double-invocation is now harmless.\\n\\n// Root setup:\\n// root.render(\\n//   <React.StrictMode>\\n//     <App />\\n//   </React.StrictMode>\\n// );\\n\\n// ❌ Never strip StrictMode 'for performance' — it's dev-only anyway;\\n// production builds ignore it completely."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "A dev-only bug is still a bug",
+        "text": "Effects that only run once today may run twice tomorrow — React's remounting behavior evolves, route transitions can remount subtrees, and Hot Module Replacement already remounts components. An effect that isn't cleanup-complete is a time bomb; StrictMode just detonates it early."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing it's development-only and free in production\n- The effect double-invocation pattern and what class of bug it reveals (missing cleanup)\n- That double-render demands render purity\n- Treating StrictMode warnings as actionable bug reports, not noise"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Removing StrictMode because 'things run twice in dev' — the doubling is the point",
+          "Effects without cleanup that only manifest as doubled side effects",
+          "Doing side effects in the component body (fetch, subscribe) — double render means doubled work",
+          "Assuming StrictMode replaces linting — exhaustive-deps is ESLint's job",
+          "Expecting StrictMode to catch async races or unhandled rejections — it doesn't",
+          "Adding business logic that counts on exactly-one execution inside effects"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Why can't React simply 'skip' the second effect run in dev?",
+          "How does effect double-invocation relate to route-change state restoration in React 18?",
+          "What other dev-only React features exist (Profiler, why-did-you-render)?",
+          "How do you write an idempotent effect?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "StrictMode: dev-only double rendering, effect double-invocation, impurity warnings",
+          "Its remount simulation exposes missing effect cleanup",
+          "Render must be pure; effects must be cleanup-complete",
+          "Zero production cost — keep it at the root always"
+        ],
+        "takeaway": "StrictMode is React running your component in the hardest possible dev conditions so that production's easier conditions never surprise you."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "react-i02",
+    "custom-hooks",
+    "what-causes-hydration-mismatches"
+  ],
+  "furtherReading": [
+    {
+      "title": "StrictMode reference",
+      "url": "https://react.dev/reference/react/StrictMode",
+      "type": "article",
+      "author": "React Team"
+    },
+    {
+      "title": "You Might Not Need an Effect",
+      "url": "https://react.dev/learn/you-might-not-need-an-effect",
+      "type": "article",
+      "author": "React Team"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "React",
+  "estimatedMinutes": 20
+}

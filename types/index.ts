@@ -363,7 +363,75 @@ export interface BookmarkItem {
   addedAt: string;
 }
 
+// ── Roadmaps ─────────────────────────────────────────────────────────────────
+
+/**
+ * What a roadmap step points at. Steps reference existing content by slug so
+ * roadmap links always resolve to real courses / problems / cheat sheets /
+ * interview technologies. `link` is for special pages (e.g. the AI glossary)
+ * and carries its own title and href.
+ */
+export type RoadmapStepKind = 'course' | 'problems' | 'cheatsheet' | 'interview' | 'link';
+
+export interface RoadmapStep {
+  kind: RoadmapStepKind;
+  /** Course/problem slug, cheatsheet or interview technology slug, or the href for `link`. */
+  ref: string;
+  /** Display title for `link` steps; other kinds resolve their title from content. */
+  title?: string;
+  /** Short guidance shown under the step, e.g. why or how to work through it. */
+  note?: string;
+}
+
+export interface RoadmapStage {
+  id: string;
+  title: string;
+  description: string;
+  level: Difficulty;
+  /** Rough time budget for the stage, e.g. "3–4 weeks". */
+  duration?: string;
+  /** What the learner should be able to do after finishing the stage. */
+  milestone?: string;
+  steps: RoadmapStep[];
+}
+
+/**
+ * A curated, ordered learning path for one category. Lives at
+ * `content/<category>/roadmaps/roadmap.json` and is served at
+ * `/<category>/roadmap`.
+ */
+export interface Roadmap {
+  id: string;
+  slug: string; // "roadmap"
+  category: string;
+  title: string;
+  description: string;
+  icon: string;
+  /** Who this roadmap is for. */
+  audience?: string;
+  /** Rough total time estimate, e.g. "4–6 months". */
+  estimatedTotal?: string;
+  /** Short intro paragraph shown under the header. */
+  intro?: string;
+  stages: RoadmapStage[];
+}
+
+/** A roadmap step resolved against the content graph (title, href, counts). */
+export interface ResolvedRoadmapStep {
+  kind: RoadmapStepKind;
+  title: string;
+  description: string;
+  href: string;
+  icon: string;
+  /** e.g. "24 lessons", "12 problems", "36 questions". */
+  meta?: string;
+  note?: string;
+}
+
 // ── Search ───────────────────────────────────────────────────────────────────
+
+/** Where a query term matched, used to explain and rank results. */
+export type SearchMatchField = 'title' | 'description' | 'tag';
 
 export interface SearchResult {
   type: 'lesson' | 'module' | 'course' | 'cheatsheet';
@@ -375,6 +443,12 @@ export interface SearchResult {
   difficulty?: Difficulty;
   tags?: string[];
   technology?: string;
+  /** Relevance score (higher is better). Populated by `searchAll`. */
+  score?: number;
+  /** The strongest field the query matched, e.g. `title`. */
+  matchField?: SearchMatchField;
+  /** Description excerpt around the match, for snippet highlighting. */
+  snippet?: string;
 }
 
 // ── Glossary ─────────────────────────────────────────────────────────────────

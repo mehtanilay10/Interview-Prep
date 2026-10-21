@@ -1,0 +1,148 @@
+{
+  "id": "lesson-iq-covariance-contravariance",
+  "slug": "covariance-contravariance",
+  "moduleSlug": "csharp",
+  "title": "What are covariance and contravariance in C# generics?",
+  "description": "in/out variance annotations, safe upcasts through generic interfaces, and why delegates flip the direction.",
+  "order": 46,
+  "difficulty": "advanced",
+  "tags": [
+    "C#",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are covariance and contravariance in C# generics?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Variance lets a generic type built from a **more derived** type be used where a **less derived** type is expected — safely. **Covariant** (`out T`) allows the type parameter only in output positions: `IEnumerable<Derived>` converts to `IEnumerable<Base>` (you read Derived objects as Base). **Contravariant** (`in T`) allows it only in input positions: `Action<Base>` converts to `Action<Derived>` (something that can handle any Base can certainly handle a Derived). The `out`/`in` annotations on the interface/delegate definition are the compiler's safety contract — misusing the parameter in the wrong position is a compile error."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Covariance (out) — 'produces T':**\n- `IEnumerable<out T>`, `IReadOnlyList<out T>`, `Task<out T>`, `Func<..., out TResult>`\n- Reading only: `IEnumerable<Dog>` IS-A `IEnumerable<Animal>` — every dog is an animal, so a stream of dogs can be consumed as a stream of animals\n- Enabled since C# 4 for interfaces/delegates; arrays have always been covariant (unsafely — see the trap)\n- The type argument appears only in return positions; putting it in an input position breaks the guarantee\n\n**Contravariance (in) — 'consumes T':**\n- `IComparer<in T>`, `Action<in T>`, `in T` parameters of delegate types, `IEqualityComparer<in T>`\n- Writing only: `Action<Animal>` IS-A `Action<Dog>` — a handler that accepts any animal can be handed a dog\n- Direction feels inverted because the relationship of the *container* flips relative to T\n\n**The safety rule:**\n- `out` = write-only to the outside (produce); `in` = read-only from the outside (consume) — from the *variable's* perspective\n- The compiler enforces it: adding `in T` as a return type of an `out T` interface is a compile error — that's what makes the conversions sound\n\n**The classic traps:**\n- Arrays: `Dog[] dogs = ...; Animal[] animals = dogs; animals[0] = new Cat();` — compiles, throws ArrayTypeMismatchException at runtime. Generic interfaces don't have this hole — that's why `IList<T>` is invariant\n- `List<Dog>` is NOT `List<Animal>` (List is invariant — it both produces and consumes T)\n- `IEnumerable<Derived>` → `IEnumerable<Base>` works, but casting back and inserting a non-Dog fails (or is impossible through the interface)"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Covariance and contravariance in real code",
+        "language": "csharp",
+        "code": "// Covariance: a producer of Dog can be consumed as a producer of Animal\nIEnumerable<Dog> dogs = new List<Dog> { new() };\nIEnumerable<Animal> animals = dogs;          // legal — out T\nforeach (var a in animals) Console.WriteLine(a.Name);  // reading only — safe\n\nFunc<Animal> nextAnimal = () => new Dog();  // Func's TResult is covariant\nFunc<Dog> nextDog = nextAnimal;             // Func<Animal> IS-A Func<Dog>\n\n// Contravariance: a consumer of Animal can be used as a consumer of Dog\nAction<Animal> logAnimal = a => Console.WriteLine(a.Name);\nAction<Dog> logDog = logAnimal;             // legal — in T\nlogDog(new Dog());                          // passing a Dog where Animal is handled — safe\n\nIComparer<Animal> byName = Comparer<Animal>.Create((x, y) => string.Compare(x.Name, y.Name));\nIComparer<Dog> dogByName = byName;          // a Dog sorter is just a special Animal sorter\nList<Dog> sorted = dogs.OrderBy(d => d, dogByName).ToList();\n\n// ❌ Invariance: List both produces AND consumes T, so no conversion\nList<Dog> dogList = new();\n// List<Animal> animalList = dogList;       // compile error — List<T> is invariant\n\n// ❌ The array covariance trap (why generics are better)\nDog[] dogArray = { new Dog() };\nAnimal[] animalArray = dogArray;            // arrays are covariant — unchecked!\ntry { animalArray[0] = new Cat(); }         // runtime ArrayTypeMismatchException\ncatch (ArrayTypeMismatchException) { /* the hole generics closed */ }\n\n// Generic method variance is decided by the caller, not the method definition:\n// static void Handle<T>(T item) where T : Animal — Handle<Dog>(dog) infers naturally"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-variance-directions",
+        "caption": "Covariant types flow up the inheritance chain (Derived → Base); contravariant types flow down (Base → Derived) — both are safe because of the in/out position rules.",
+        "definition": "graph TD\n    subgraph cov [Covariant out T - producers]\n        A1[IEnumerable Dog] -->|upcast| A2[IEnumerable Animal]\n        B1[Func Dog] -->|upcast| B2[Func Animal]\n    end\n    subgraph contr [Contravariant in T - consumers]\n        C1[Action Animal] -->|downcast| C2[Action Dog]\n        D1[IComparer Animal] -->|downcast| D2[IComparer Dog]\n    end\n    style A2 fill:#e8f5e9,stroke:#2e7d32\n    style C2 fill:#e8f5e9,stroke:#2e7d32"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The out-produces / in-consumes mnemonic and which common interfaces are which\n- Why List<T> is invariant while IEnumerable<T> is covariant\n- The array covariance trap and why generics closed it\n- Correct direction reasoning under pressure (Action<Base> as Action<Derived> — not the reverse)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Reversing the direction: Action<Base> converts to Action<Derived>, not the other way around",
+          "Expecting List<Derived> to convert to List<Base> — invariant because it both reads and writes T",
+          "Using array covariance in new code — it's a 1.x compatibility feature that fails at runtime",
+          "Confusing variance with inheritance of the generic type itself — IEnumerable<Dog> doesn't inherit from IEnumerable<Animal>",
+          "Forgetting that variance only applies to interfaces and delegates, not classes you define (annotate with in/out only on those)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Why can't your own class declarations use the in/out annotations?",
+          "Which is covariant, IComparer<T> or IEnumerable<T> — and how do you remember?",
+          "How does variance interact with generic constraints (where T : IFoo)?",
+          "Why is IReadOnlyList<out T> covariant but IList<T> not?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "out T (covariant): T only in output positions — IEnumerable<Dog> → IEnumerable<Animal>",
+          "in T (contravariant): T only in input positions — Action<Animal> → Action<Dog>",
+          "Interfaces and delegates only; the annotations are the compiler's safety proof",
+          "List<T> is invariant; arrays are unsoundly covariant — prefer generic interfaces"
+        ],
+        "takeaway": "Producers are covariant and consumers are contravariant — once that clicks, every in/out annotation and conversion question becomes a direction check."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "generics-csharp",
+    "beginner-q13",
+    "records-vs-classes"
+  ],
+  "furtherReading": [
+    {
+      "title": "Covariance and contravariance (C# docs)",
+      "url": "https://learn.microsoft.com/dotnet/csharp/programming-guide/generics/covariance-contravariance",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Variance in generic interfaces (in/out keywords)",
+      "url": "https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/out-generic-modifier",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "C#",
+  "estimatedMinutes": 25
+}

@@ -1,0 +1,151 @@
+{
+  "id": "lesson-iq-sql-merge-pitfalls",
+  "slug": "merge-pitfalls",
+  "moduleSlug": "sql-server",
+  "title": "What is the MERGE statement and why can it be dangerous?",
+  "description": "Upserts in one statement: syntax shape, the concurrency race Microsoft documented, and safer upsert patterns for production.",
+  "order": 18,
+  "difficulty": "advanced",
+  "tags": [
+    "sql server",
+    "upsert",
+    "concurrency",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the MERGE statement and why can it be dangerous?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "`MERGE` (upsert) atomically **inserts, updates, or deletes** target rows based on matching a source against a `WHEN MATCHED` / `WHEN NOT MATCHED` / `WHEN NOT MATCHED BY TARGET` structure — the standard tool for synchronizing staging tables into live tables in one statement. It's 'dangerous' for real reasons: under **concurrency**, two simultaneous MERGEs matching nothing can both try to insert the same key (one succeeds, one gets a duplicate-key error — the race documented in KB2470992); it has surprising semantics (multiple MATCHED actions allowed since 2022, target-locking behavior, trigger-ordering rules); and long MERGEs hold bigger lock footprints than the equivalent explicit statements. Production guidance: treat MERGE as useful for **controlled, single-writer ETL**, and prefer an **explicit UPDATE-then-INSERT pattern** (or INSERT with a unique constraint + catch) for concurrent OLTP upserts."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Syntax shape:**\n- `MERGE [TOP(n)] INTO target USING source ON <join condition>`\n- `WHEN MATCHED [AND <cond>] THEN UPDATE SET ...` (optionally DELETE since 2022)\n- `WHEN NOT MATCHED [BY TARGET] [AND <cond>] THEN INSERT (cols) VALUES (...)`\n- `WHEN NOT MATCHED BY SOURCE [AND <cond>] THEN DELETE/UPDATE` — target rows with no source\n- `OUTPUT $action, inserted.*, deleted.*;` — audit what happened\n- Must end with a semicolon — a MERGE without one can attach the following statement's INTO and fail confusingly\n\n**The concurrency race (the main 'why dangerous'):**\n- Two sessions both run MERGE for key 42; neither finds it (MATCHED = false for both)\n- Both take the not-matched path and insert — one wins, the other raises 2601/2627 duplicate key\n- Worse pre-fix versions had broader plan bugs; KB2470992 recommends a HOLDLOCK hint (`MERGE INTO t WITH (HOLDLOCK)`) or the explicit two-step pattern to serialize\n- Correct OLTP pattern: `UPDATE ...; IF @@ROWCOUNT = 0 BEGIN TRY INSERT ... END TRY BEGIN CATCH IF error_number() IN (2601, 2627) UPDATE ... END CATCH` — or simply attempt INSERT first, fall back to UPDATE on duplicate key\n\n**Other sharp edges:**\n- **Locking**: MERGE can lock more of the target than the minimal two-step path — throughput impact on hot tables\n- **Triggers**: MERGE fires triggers per row with special semantics; DML triggers on target see combined effects — historically buggy area\n- **Multiple WHEN MATCHED clauses** (SQL 2022+): conditions evaluated in order — clever but easy to misread\n- **NOT MATCHED BY SOURCE** deleting rows the source merely didn't include — a full-table sync wiping filtered-out rows is a classic incident\n- **Semi-hot targeting**: hints, snapshot isolation, and replaying failed batches all behave subtly with MERGE\n\n**When MERGE is fine:**\n- Single-threaded ETL staging → fact loads, where the source is the complete truth and one process owns the job\n- Bulk synchronization where statement-level atomicity and one round trip matter more than row-level contention"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "A staging sync with MERGE — and the safe OLTP alternative",
+        "language": "sql",
+        "code": "-- ETL pattern: sync staging into dim table (single writer)\\nMERGE dbo.ProductDim AS target\\nUSING dbo.ProductStaging AS source\\n    ON target.Sku = source.Sku\\nWHEN MATCHED AND (target.Price <> source.Price\\n                  OR target.Name <> source.Name) THEN\\n    UPDATE SET Name = source.Name, Price = source.Price,\\n               ModifiedAt = SYSDATETIME()\\nWHEN NOT MATCHED BY TARGET THEN\\n    INSERT (Sku, Name, Price, CreatedAt)\\n    VALUES (source.Sku, source.Name, source.Price, SYSDATETIME());\\n-- Note the terminating semicolon (required)\\nOUTPUT $action, inserted.Sku, deleted.Price AS OldPrice;\\n-- ⚠️ No NOT MATCHED BY SOURCE clause here on purpose:\\n--   adding THEN DELETE would wipe dim rows absent from staging.\\n\\n-- ❌ Concurrent OLTP upsert with MERGE: two sessions, key 42 missing in both\\n--    -> both insert -> duplicate key error 2627 for one session.\\n\\n-- ✅ Safer OLTP upsert: update first, insert on miss (unique key enforces truth)\\nUPDATE dbo.Cart SET Qty = @qty, UpdatedAt = SYSDATETIME()\\nWHERE SessionId = @sid AND ProductId = @pid;\\n\\nIF @@ROWCOUNT = 0\\nBEGIN\\n    BEGIN TRY\\n        INSERT INTO dbo.Cart (SessionId, ProductId, Qty)\\n        VALUES (@sid, @pid, @qty);\\n    END TRY\\n    BEGIN CATCH\\n        IF ERROR_NUMBER() IN (2601, 2627)   -- lost the insert race\\n        BEGIN\\n            UPDATE dbo.Cart SET Qty = @qty, UpdatedAt = SYSDATETIME()\\n            WHERE SessionId = @sid AND ProductId = @pid;\\n        END\\n        ELSE THROW;\\n    END CATCH\\nEND\\n-- Or: MERGE WITH (HOLDLOCK) if you must keep one statement under concurrency."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The clause people add by reflex",
+        "text": "WHEN NOT MATCHED BY SOURCE THEN DELETE turns a 'sync what's in staging' into 'delete everything that isn't' — on a dim table fed by a partial extract, that silently deletes history. Make deletions explicit and conditional (a status column), never a default clause."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing MERGE's three-way structure and $action auditing\n- Awareness of the documented concurrency race and its mitigation (HOLDLOCK / two-step)\n- The NOT MATCHED BY SOURCE deletion hazard\n- Judgment: MERGE for single-writer ETL, explicit upserts for concurrent OLTP"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Using MERGE for high-concurrency upserts without HOLDLOCK — duplicate-key races",
+          "Adding NOT MATCHED BY SOURCE THEN DELETE with a partial source — mass unintended deletes",
+          "Forgetting the terminating semicolon",
+          "MERGE on hot OLTP tables where its lock footprint exceeds the two-step alternative",
+          "Not using OUTPUT $action to audit what the sync actually did",
+          "Assuming trigger behavior on MERGE is identical to plain INSERT/UPDATE"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Walk through the double-insert race under default isolation",
+          "How does the 2022 multi-clause WHEN MATCHED change the semantics?",
+          "How would you make a partial sync safe for a slowly-changing dimension?",
+          "When is INSERT...ON DUPLICATE-style logic (via catch) genuinely better than MERGE?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "MERGE: one statement for insert/update/delete-by-match, with $action output",
+          "Concurrency race: two sessions both not-matched → duplicate insert; mitigate or avoid",
+          "NOT MATCHED BY SOURCE deletes are the classic sync disaster",
+          "Fine for single-writer ETL; prefer explicit UPDATE/INSERT upserts under contention"
+        ],
+        "takeaway": "MERGE is a power tool: excellent in one writer's hands on a staging load, and the source of some of the most famous production incidents in concurrent OLTP."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sql-a02",
+    "sql-i03",
+    "identity-vs-sequence"
+  ],
+  "furtherReading": [
+    {
+      "title": "MERGE (Transact-SQL) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/statements/merge-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Bug: Concurrent MERGE statements can cause duplicate key violations (KB2470992)",
+      "url": "https://learn.microsoft.com/en-us/troubleshoot/sql-server/database-engine/consolidate-merge-upsert-operations",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "SQL Server",
+  "estimatedMinutes": 24
+}

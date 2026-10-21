@@ -162,7 +162,7 @@ export function Navbar({ categories }: NavbarProps) {
             <span className="hidden text-sm font-medium sm:block">{session.user.name}</span>
           </button>
           {userMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas shadow-lg py-1">
+            <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-canvas-overlay shadow-lg py-1">
               <div className="border-b border-border px-4 py-2">
                 <p className="truncate text-sm font-medium text-fg-default">{session.user.name}</p>
                 <p className="truncate text-xs text-fg-muted">{session.user.email}</p>
@@ -308,7 +308,7 @@ export function Navbar({ categories }: NavbarProps) {
                     />
                   </button>
                   {isOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-60 rounded-lg border border-border bg-canvas shadow-lg py-1 z-50">
+                    <div className="absolute left-0 top-full mt-2 w-60 rounded-lg border border-border bg-canvas-overlay shadow-lg py-1 z-50">
                       {cat.sections.map((section) => (
                         <Link
                           key={section.href}

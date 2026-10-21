@@ -1,0 +1,138 @@
+{
+  "id": "lesson-iq-scenario-q28",
+  "slug": "scenario-q28",
+  "moduleSlug": "fullstack-scenarios",
+  "title": "Your app needs real-time updates (live dashboard or collaboration). How do you add them?",
+  "description": "Choosing between polling, SSE, and WebSockets: connection topology, fan-out, reconnection semantics, and fallbacks for real-world networks.",
+  "order": 28,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": [
+    "interview",
+    "full-stack",
+    "real-time",
+    "scenarios"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Your app needs real-time updates (a live dashboard or collaborative editing). How do you add them?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Pick the lightest transport that meets the freshness need: **polling** (simplest, seconds of staleness, fine for most dashboards), **Server-Sent Events** (one-directional server→client stream over HTTP — perfect for live feeds and notifications, auto-reconnects natively), or **WebSockets** (bidirectional, sub-second, needed for collaboration, chat, live cursors). Then solve the real problems, which are the same for all three: **connection management** (thousands of long-lived connections, heartbeat/liveness), **fan-out topology** (the app server can't hold every connection — use a pub/sub layer: Redis/NATS/Kafka feeding connection nodes), **reconnection with recovery** (missed messages during a disconnect must be replayed via a sequence id or refetch-on-reconnect), and **degradation** (corporate proxies kill WebSockets — fall back to SSE, then polling; show honest staleness states)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Transport decision matrix:**\n- Polling every N seconds: trivial ops, works everywhere, latency = N, load = requests × clients; smart polling (ETag/delta) reduces cost\n- SSE: server→client only, plain HTTP (proxies/TLS friendly), built-in Last-Event-ID resume, browsers reconnect automatically; use for feeds, notifications, live metrics\n- WebSockets: full duplex, lowest latency; needs sticky sessions or a shared pub/sub, heartbeat/ping-pong, and careful load-balancer config; required for collaborative editing (CRDT/OT ops flow both ways)\n\n**Server-side architecture:**\n- Connection layer: stateless **realtime nodes** hold sockets; each connection subscribes to topics (dashboard id, user id, room id)\n- Fan-out: business services publish domain events to Redis pub/sub, NATS, or Kafka; realtime nodes consume and push to subscribed connections — app servers never talk to sockets directly\n- Scale math: a node holds thousands of connections; scale horizontally; connection migration on deploy (drain: stop accepting, send reconnect signal, wait)\n- Heartbeats every 30–60s detect dead connections (half-open TCP, sleeping phones); reap them promptly or connection tables rot\n\n**Recovery semantics — the part everyone forgets:**\n- A client disconnected for 40s missed events; options: (a) sequence numbers per topic and replay from last seen id; (b) refetch snapshot on reconnect and swap to live tail; (c) versioned state where the snapshot IS the source of truth\n- Client side: exponential backoff reconnect, refetch-on-reconnect as baseline, visible 'live / reconnecting / delayed' indicator — honesty beats pretending\n\n**Browser realities:**\n- Mobile background tabs freeze timers and throttle sockets — design for suspend/resume (refetch on visibilitychange)\n- Proxies (corporate, some carriers) drop or block WebSockets — detect connect failure and downgrade to SSE/polling\n- Auth the connection at upgrade time (cookie/token in handshake), and authorize every topic subscription server-side"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SSE feed with replay, and the WebSocket fallback chain",
+        "language": "javascript",
+        "code": "// Client: SSE with native reconnect + snapshot-on-reconnect baseline\\nfunction connectFeed(topicId, onEvent) {\\n  let lastSeq = loadSeq(topicId);              // persisted per topic\\n\\n  // 1) Baseline: refetch current snapshot after any (re)connect\\n  const snap = await fetch(`/api/topics/${topicId}/snapshot`).then((r) => r.json());\\n  onEvent({ type: 'snapshot', data: snap });\\n  lastSeq = snap.seq;\\n\\n  const es = new EventSource(`/api/topics/${topicId}/stream?since=${lastSeq}`);\\n  es.onmessage = (e) => {\\n    const msg = JSON.parse(e.data);\\n    if (msg.seq <= lastSeq) return;            // dedupe replayed events\\n    lastSeq = msg.seq;\\n    saveSeq(topicId, lastSeq);\\n    onEvent(msg);\\n  };\\n  es.onerror = () => setStatus('reconnecting'); // EventSource retries natively\\n  es.onopen = () => setStatus('live');\\n  return es;                                    // .close() on unmount\\n}\\n\\n// Server side (fan-out topology):\\n// BusinessService --domain event--> Redis pub/sub --> Realtime nodes --> SSE/WS clients\\n// Heartbeat every 30s; authorize topic subscription on connect;\\n// keep per-topic ring buffer (last ~1000 seqs) for `since` replay.\\n\\n// Degradation chain: WebSocket -> SSE -> smart polling (ETag deltas)\\n// UI honesty: 'Live' | 'Reconnecting…' | 'Delayed up to 30s' badges"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Reconnect is the normal case, not the exception",
+        "text": "Phone tunnels, laptop sleep, deploys, and proxy timeouts mean clients WILL disconnect regularly. If your design only works on a perfectly stable socket, it doesn't work. Every real-time feature needs a defined recovery story — snapshot, replay, or version check — and a UI state that tells the truth about freshness."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Business services writing directly to sockets — fan-out must go through pub/sub or it doesn't scale",
+          "No heartbeat — dead half-open connections accumulate until the node OOMs",
+          "Forgetting replay: a reconnecting client silently misses events forever",
+          "Choosing WebSockets for a read-only dashboard — SSE or polling is simpler and proxy-proof",
+          "Authorizing the handshake but not topic subscriptions — IDOR across channels",
+          "Deploying realtime nodes without drain/rolling connection migration — every release is a global disconnect with no recovery"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you handle thousands of connections on one node — and what's the real limit?",
+          "How does collaborative editing change the requirements (CRDT/OT)?",
+          "How do you test reconnection behavior deterministically?",
+          "How do you secure topic authorization at scale?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Polling → SSE → WebSockets: pick by direction and latency need",
+          "Realtime nodes hold connections; pub/sub (Redis/NATS/Kafka) fans out events",
+          "Recovery is mandatory: snapshot baseline + sequence replay + honest UI states",
+          "Heartbeats, drain-on-deploy, and transport fallbacks keep it alive in the wild"
+        ],
+        "takeaway": "Real-time isn't the socket — it's the reconnect: design the recovery path first, and the transport choice becomes almost easy."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "scenario-q26",
+    "scenario-q22",
+    "scenario-q21"
+  ],
+  "furtherReading": [
+    {
+      "title": "Server-Sent Events — MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events",
+      "type": "article",
+      "author": "MDN Web Docs"
+    },
+    {
+      "title": "Scaling WebSocket connections — AWS",
+      "url": "https://aws.amazon.com/builders-library/scaling-websocket-connections/",
+      "type": "article",
+      "author": "Amazon Builders' Library"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Full-Stack Scenarios"
+}

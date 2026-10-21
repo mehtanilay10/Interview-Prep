@@ -1,0 +1,214 @@
+{
+  "id": "lesson-sd-ticket-booking",
+  "slug": "design-ticket-booking",
+  "moduleSlug": "system-design",
+  "courseSlug": "question-answers",
+  "title": "Design a ticket-booking system (like BookMyShow).",
+  "description": "Seat inventory under contention: holds, idempotent checkout, overbooking prevention, and fair access during on-sale storms.",
+  "order": 17,
+  "difficulty": "advanced",
+  "estimatedMinutes": 26,
+  "tags": [
+    "interview",
+    "system-design",
+    "concurrency",
+    "payments"
+  ],
+  "technology": "System Design",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** Design a ticket-booking system where users browse shows and book specific seats under heavy on-sale load."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Browse cinemas/showtimes; view a seat map with live availability",
+          "Select specific seats and hold them during a short payment window",
+          "Never sell the same seat twice (no overbooking)",
+          "Booking is idempotent: retried payments don't double-book",
+          "Fair access at on-sale time: queue/rate-limit rather than melt",
+          "Cancellation/refunds release inventory correctly"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "sd-booking-arch",
+        "caption": "Booking flow: holds in Redis, authoritative seat state in SQL, async payment confirmation",
+        "definition": "graph TD\n    A[Client] --> B[API Gateway - auth, rate limit]\n    B --> C[Showtime/Seat Service]\n    C --> D[(Seat Inventory - SQL, row-locked)]\n    C --> E[(Redis: active holds, TTL)]\n    F[Payment Webhook] --> G[Booking Service]\n    G --> D\n    G --> E\n    H[Hold Expiry Worker] --> D\n    I[Queue at on-sale] --> J[Token Gate]\n    J --> B"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The design tension: seat state must be **authoritative and transactional** (SQL row locks), but the on-sale moment brings traffic a database can't absorb directly. The standard resolution is a **two-layer model**: a fast Redis layer for short-lived holds (TTL = payment window) and SQL as the source of truth, with the hold→confirm transition as a single locked transaction."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Seat row model: (showtime_id, seat_id) unique row with status (available/held/sold) — SELECT ... FOR UPDATE on hold creation is the correctness backbone",
+          "Hold with TTL: Redis SET NX EX (seat:user, 600s); expiry worker (or lazy expiry) returns lapsed holds to available — Redis is an accelerator, SQL decides truth",
+          "Idempotency keys: client generates a booking id; payment webhook + client retries converge on one confirmation (unique constraint on booking id)",
+          "Overbooking defense: the confirm transaction re-verifies sold_count vs capacity inside the lock; allocation counters per showtime pre-partition contention",
+          "On-sale storm: virtual waiting room — a queue issues short-lived tokens; gateways admit token-holders only; per-user rate limits on hold attempts",
+          "Contention sharding: partition by showtime; a blockbuster show is one hot key — mitigate with per-section counters (rows A-J vs K-T) so locks don't serialize globally",
+          "Read path: seat maps are read-heavy — cache aggressively (CDN 5-10s), serve 'last known' with a staleness banner near on-sale time",
+          "Payment: authorize during hold, capture on confirm; on webhook timeout, GET the payment status instead of trusting either side's memory",
+          "Cancellation: refund via saga — payment refund step, then seat release; both idempotent, compensation logged"
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "danger",
+        "title": "The double-booking bug lives in the gap",
+        "text": "Classic failure: hold in Redis succeeds for two requests racing the same seat, both proceed to payment, both capture — then one confirm transaction fails and you owe a refund plus a customer's ruined evening. The confirm must re-check seat state under a row lock, and holds must be exclusive (atomic SET NX) — every step between must assume it can be retried."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Data Model"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Entity",
+          "Key Fields",
+          "Description"
+        ],
+        "rows": [
+          [
+            "Showtime",
+            "showtime_id, movie_id, hall_id, starts_at, status",
+            "A specific screening"
+          ],
+          [
+            "SeatInventory",
+            "showtime_id, seat_id, status, booking_id",
+            "One row per seat per show; locked on hold/confirm"
+          ],
+          [
+            "Booking",
+            "booking_id (idempotency key), user_id, status, payment_ref",
+            "Lifecycle: pending → paid → cancelled/refunded"
+          ],
+          [
+            "Hold",
+            "seat_key, booking_id, expires_at (Redis TTL)",
+            "Short-lived exclusive reservation"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Edge Cases"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Redis loses the hold state — SQL remains authoritative; reconcile from bookings, not Redis",
+          "Payment captured but confirm crashed — idempotent confirm replays from the webhook",
+          "User abandons checkout — TTL expiry frees the seat; expiry worker must be exactly-once-ish (idempotent release)",
+          "Concurrent cancellations + expiry — double release guarded by status transitions (only HELD→AVAILABLE once)",
+          "Dynamic pricing mid-hold — price locked at hold creation, honored at confirm",
+          "Accessibility/companion seats requiring pairs — hold must be multi-seat atomic or reject"
+        ]
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "title": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "Why not pure Redis for seat state?",
+            "answer": "Payments and inventory need durable, transactional truth with auditing. Redis accelerates holds; SQL row locks guarantee the invariant. On Redis loss, the system rebuilds holds from bookings — losing speed, never correctness."
+          },
+          {
+            "question": "How does the virtual waiting room work?",
+            "answer": "At on-sale, all clients hit a queue service that issues position tokens; only token-holders reach the booking API at a controlled rate. Turns a thundering herd into a shaped stream; requires a fair, restartable queue and honest wait-position UX."
+          },
+          {
+            "question": "How do you prevent bots from eating the best seats?",
+            "answer": "Rate limits per user/account/device, verified identity at high-demand on-sales, CAPTCHA at the gate, and purchase limits. A pure-technical defense loses to determined scalpers without identity signals."
+          },
+          {
+            "question": "What happens under a showtime data-center partition?",
+            "answer": "Single-writer per showtime region; cross-region failover promotes the replica and reconciles in-flight bookings via the payment provider's authoritative status — idempotency keys make replay safe."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "SQL row locks are the overbooking defense; Redis holds are a TTL accelerator",
+          "Idempotency keys make payment retries and webhook replays converge",
+          "Virtual waiting room + rate limits turn on-sale herds into shaped traffic",
+          "Every transition (hold/confirm/release) must be idempotent and status-guarded"
+        ],
+        "takeaway": "Booking systems live or die on one invariant — a seat is sold exactly once — so put that invariant behind a row lock and make everything around it safely repeatable."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "design-payment-system",
+    "design-rate-limiter",
+    "design-distributed-cache"
+  ],
+  "furtherReading": [
+    {
+      "title": "How we built seat selection for high-demand events",
+      "url": "https://engineering.woot.com/",
+      "type": "article",
+      "author": "Engineering blogs"
+    },
+    {
+      "title": "The Art of Scalability book site",
+      "url": "https://www.artofscalability.com/",
+      "type": "article",
+      "author": "Abbott & Fisher"
+    }
+  ]
+}

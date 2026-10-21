@@ -313,7 +313,7 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `interview-prep-data-${dayKey(new Date().toISOString())}.json`;
+      a.download = `quotient-data-${dayKey(new Date().toISOString())}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -467,7 +467,7 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
             <EmptyState
               icon={<ClipboardList className="h-10 w-10" aria-hidden="true" />}
               title="Nothing completed yet"
-              description="Your completed lessons, problems, and interview questions will be listed here."
+              description="Your completed lessons, problems, and question answers will be listed here."
             />
           ) : (
             <div className="space-y-6">
@@ -476,7 +476,11 @@ export function ProgressDashboardClient({ catalog }: { catalog: ProgressCatalog 
                 if (!catProgress || catProgress.completedLessons.length === 0) return null;
                 return (
                   <div key={cat}>
-                    <h3 className="mb-2 text-sm font-semibold text-fg-muted capitalize">{cat.replace(/([A-Z])/g, ' $1')}</h3>
+                    <h3 className="mb-2 text-sm font-semibold text-fg-muted capitalize">
+                      {cat === 'interviewQuestions'
+                        ? 'Question answers'
+                        : cat.replace(/([A-Z])/g, ' $1')}
+                    </h3>
                     <ul className="space-y-2">
                       {catProgress.completedLessons
                         .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())

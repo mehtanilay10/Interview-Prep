@@ -30,7 +30,7 @@ export function InterviewTechnologyCard({
 }: InterviewTechnologyCardProps) {
   return (
     <Link
-      href={`/${category}/interview-questions/${slug}`}
+      href={`/${category}/question-answers/${slug}`}
       className={cn(
         'group flex flex-col rounded-xl border border-border bg-canvas p-5',
         'transition-all hover:border-accent-fg hover:shadow-md dark:bg-canvas-subtle',

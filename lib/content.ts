@@ -7,6 +7,7 @@
 import { modules, getModulesByCourse } from '@/content/modules';
 import { lessons, getLessonsByModule } from '@/content/lessons';
 import { courses } from '@/content/courses';
+import { roadmaps } from '@/content/roadmaps';
 import { glossaryTerms } from '@/content/ai/glossary';
 import { promptTemplates } from '@/content/ai/prompts';
 import { computeHeadingAnchors } from '@/lib/utils';
@@ -29,6 +30,9 @@ import type {
   GlossaryTerm,
   PromptTemplate,
   LessonNavItem,
+  Roadmap,
+  RoadmapStep,
+  ResolvedRoadmapStep,
 } from '@/types';
 
 // ── Re-exports for convenience ────────────────────────────────────────────────
@@ -67,10 +71,10 @@ function memoizeNoArg<R>(compute: () => R): () => R {
 
 const allCoursesCache = memoizeNoArg(() =>
   [...courses]
-    // `problems`, `cheatsheet`, and `interview-qa` are pseudo-courses that
+    // `problems`, `cheatsheet`, and `question-answers` are pseudo-courses that
     // reuse the course model but have their own dedicated route trees.
     // Including them here would generate duplicate `/courses/...` pages.
-    .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet' && c.category !== 'interview-qa')
+    .filter((c) => c.category !== 'problems' && c.category !== 'cheatsheet' && c.category !== 'question-answers')
     .sort((a, b) => a.order - b.order)
 );
 
@@ -91,13 +95,13 @@ export function getCourseBySlug(slug: string): Course | undefined {
  * course routes. Note that a course's `category` field is **not** the URL
  * category — content JSON stamps values like `"category": "basics"` or
  * `"category": "backend"` — so this compares against the pseudo-course values
- * only (`'problems' | 'cheatsheet' | 'interview-qa'`), never the URL segment.
+ * only (`'problems' | 'cheatsheet' | 'question-answers'`), never the URL segment.
  */
 export function isRegularCourse(course: Course): boolean {
   return (
     course.category !== 'problems' &&
     course.category !== 'cheatsheet' &&
-    course.category !== 'interview-qa'
+    course.category !== 'question-answers'
   );
 }
 
@@ -171,6 +175,84 @@ export function getCheatsheetModulesByCategory(category: string): Module[] {
   return getCheatsheetModules().filter((m) => getCourseCategory(m.slug) === category);
 }
 
+// ── Roadmap helpers ──────────────────────────────────────────────────────────
+
+const roadmapsByCategoryCache = memoizeNoArg(() => {
+  const map = new Map<string, Roadmap>();
+  for (const roadmap of roadmaps) map.set(roadmap.category, roadmap);
+  return map;
+});
+
+/** The curated roadmap for a category, if one exists. */
+export function getRoadmapByCategory(category: string): Roadmap | undefined {
+  return roadmapsByCategoryCache().get(category);
+}
+
+/** Every roadmap, ordered by the canonical category order. */
+export function getRoadmaps(): Roadmap[] {
+  return [...roadmaps].sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
+}
+
+/**
+ * Resolves one roadmap step against the content graph so the roadmap page can
+ * render the target's real title, description, icon, and lesson/question count.
+ * Returns `null` when the referenced content no longer exists.
+ */
+export function resolveRoadmapStep(step: RoadmapStep): ResolvedRoadmapStep | null {
+  if (step.kind === 'link') {
+    return {
+      kind: 'link',
+      title: step.title ?? step.ref,
+      description: '',
+      href: step.ref,
+      icon: '🔗',
+      note: step.note,
+    };
+  }
+
+  if (step.kind === 'cheatsheet') {
+    const mod = modules.find((m) => m.slug === step.ref && m.courseSlug === 'cheatsheet');
+    if (!mod) return null;
+    return {
+      kind: 'cheatsheet',
+      title: mod.title,
+      description: mod.description,
+      href: `/${getCourseCategory(mod.slug)}/cheatsheets/${mod.slug}`,
+      icon: mod.icon,
+      note: step.note,
+    };
+  }
+
+  if (step.kind === 'interview') {
+    const tech = getInterviewTechnologies().find((t) => t.slug === step.ref);
+    if (!tech) return null;
+    return {
+      kind: 'interview',
+      title: tech.title,
+      description: tech.description,
+      href: `/${getInterviewTechCategory(tech.slug)}/question-answers/${tech.slug}`,
+      icon: tech.icon,
+      meta: `${tech.questionCount} question${tech.questionCount === 1 ? '' : 's'}`,
+      note: step.note,
+    };
+  }
+
+  // 'course' and 'problems' both resolve against the course graph — a problem
+  // set is a course that lives under a `problems/` directory.
+  const course = courses.find((c) => c.slug === step.ref);
+  if (!course) return null;
+  const lessonCount = getLessonsForCourse(step.ref).length;
+  return {
+    kind: step.kind,
+    title: course.title,
+    description: course.description,
+    href: getContentItemHref(step.ref),
+    icon: course.icon,
+    meta: `${lessonCount} lesson${lessonCount === 1 ? '' : 's'}`,
+    note: step.note,
+  };
+}
+
 export interface NavSection {
   label: string;
   href: string;
@@ -194,6 +276,7 @@ function computeNavigationCategories(): NavCategory[] {
   const problemList = getProblemCourses();
   const cheatsheetList = getCheatsheetModules();
   const interviewList = getInterviewTechnologies();
+  const roadmapMap = roadmapsByCategoryCache();
 
   const present = new Set<string>();
   for (const c of courseList) present.add(getCourseCategory(c.slug));
@@ -208,11 +291,15 @@ function computeNavigationCategories(): NavCategory[] {
 
   return ordered.map((key) => {
     const meta = getCategoryMeta(key);
+    const roadmap = roadmapMap.get(key);
     const sections: NavSection[] = [
+      ...(roadmap
+        ? [{ label: 'Roadmap', href: `/${key}/roadmap`, count: roadmap.stages.length } as NavSection]
+        : []),
       { label: 'Courses', href: `/${key}/courses`, count: courseList.filter((c) => getCourseCategory(c.slug) === key).length },
       { label: 'Problems', href: `/${key}/problems`, count: problemList.filter((c) => getCourseCategory(c.slug) === key).length },
       { label: 'Cheat Sheets', href: `/${key}/cheatsheets`, count: cheatsheetList.filter((m) => getCourseCategory(m.slug) === key).length },
-      { label: 'Interview Questions', href: `/${key}/interview-questions`, count: interviewList.filter((t) => t.category === key).length },
+      { label: 'Question Answers', href: `/${key}/question-answers`, count: interviewList.filter((t) => t.category === key).length },
     ].filter((s) => s.count > 0);
 
     // Site-wide AI resources hang off the AI category so they show up in the
@@ -275,7 +362,7 @@ export function getAllModules(): Module[] {
 
 export function getModuleBySlug(slug: string, courseSlug?: string): Module | undefined {
   // Module slugs are only unique within a course (e.g. `csharp` exists as both
-  // a cheat-sheet module and an interview-qa module), so an optional
+  // a cheat-sheet module and a question-answers module), so an optional
   // `courseSlug` disambiguates. Without it, the first match is returned.
   if (courseSlug) {
     return modules.find((m) => m.slug === slug && m.courseSlug === courseSlug);
@@ -438,16 +525,141 @@ export function extractTOC(blocks: ContentBlock[]): TocEntry[] {
 
 // ── Full-text search ──────────────────────────────────────────────────────────
 
-function scoreText(text: string, tokens: string[]): number {
+/**
+ * Bounded Levenshtein edit distance.
+ *
+ * Search is run over ~2,800 lessons on every keystroke, so the distance matrix
+ * is capped at a small radius: anything longer than `max` is reported as
+ * `max + 1` and the DP loop exits early. That keeps typo tolerance ("sring" →
+ * "string") cheap enough to run inline without an index.
+ */
+function levenshtein(a: string, b: string, max: number): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  // Only two rows are ever needed, so memory stays O(min(a, b)).
+  let prev = new Array<number>(b.length + 1);
+  let curr = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    let rowMin = curr[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1, // deletion
+        curr[j - 1] + 1, // insertion
+        prev[j - 1] + cost // substitution
+      );
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    // Every remaining cell in this row already exceeds the budget.
+    if (rowMin > max) return max + 1;
+    [prev, curr] = [curr, prev];
+  }
+
+  return prev[b.length];
+}
+
+/** Maximum edits allowed for a token to still count as a fuzzy match. */
+function fuzzyTolerance(token: string): number {
+  // Short tokens ("c#", "sql") would match far too much if we tolerated
+  // edits, so only 4+ character tokens get fuzzy matching at all.
+  if (token.length <= 3) return 0;
+  if (token.length <= 5) return 1;
+  return 2;
+}
+
+/** Whether `text` contains `token` as a whole word (cheaper than a regex). */
+function containsWord(text: string, token: string): boolean {
+  const idx = text.indexOf(token);
+  if (idx === -1) return false;
+  const before = idx === 0 ? '' : text[idx - 1];
+  const after = idx + token.length >= text.length ? '' : text[idx + token.length];
+  const isWordChar = (c: string) => /[a-z0-9]/.test(c);
+  return !isWordChar(before) && !isWordChar(after);
+}
+
+/**
+ * Scores one field against the query tokens.
+ *
+ * Ranking intent (highest first):
+ *   exact field match > field starts with token > whole-word match >
+ *   substring match > tag match > fuzzy (typo) match.
+ * `fieldWeight` lets title matches outrank description/tag matches.
+ */
+function scoreField(
+  text: string,
+  tokens: string[],
+  fieldWeight: number
+): { score: number; matched: boolean } {
   const lower = text.toLowerCase();
   let score = 0;
+  let matched = false;
+
   for (const token of tokens) {
-    if (!lower.includes(token)) continue;
-    if (lower === token) score += 10;
-    else if (lower.startsWith(token)) score += 5;
-    else score += 1;
+    let tokenScore = 0;
+    if (lower === token) tokenScore = 10;
+    else if (lower.startsWith(token)) tokenScore = 6;
+    else if (containsWord(lower, token)) tokenScore = 4;
+    else if (lower.includes(token)) tokenScore = 2;
+
+    if (tokenScore === 0) {
+      // Fall back to typo tolerance against individual words.
+      const tol = fuzzyTolerance(token);
+      if (tol > 0) {
+        for (const word of lower.split(/[^a-z0-9+#.]+/)) {
+          if (!word) continue;
+          if (levenshtein(word, token, tol) <= tol) {
+            tokenScore = 1;
+            break;
+          }
+        }
+      }
+    }
+
+    if (tokenScore > 0) {
+      matched = true;
+      score += tokenScore * fieldWeight;
+    }
   }
-  return score;
+
+  return { score, matched };
+}
+
+/**
+ * Builds a short excerpt of `description` centred on the first query token that
+ * appears in it, so the UI can highlight the match without shipping the whole
+ * description.
+ */
+function buildSnippet(description: string, tokens: string[]): string | undefined {
+  if (!description) return undefined;
+  const lower = description.toLowerCase();
+  let matchIndex = -1;
+  let matchLength = 0;
+
+  for (const token of tokens) {
+    const idx = lower.indexOf(token);
+    if (idx !== -1) {
+      matchIndex = idx;
+      matchLength = token.length;
+      break;
+    }
+  }
+
+  if (matchIndex <= 40 && description.length <= 160) return description;
+
+  const start = Math.max(0, matchIndex === -1 ? 0 : matchIndex - 40);
+  const end = Math.min(description.length, start + 140);
+  const snippet = description.slice(start, end).trim();
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < description.length ? '…' : '';
+  // Guard against `matchLength` being unused when there is no match.
+  void matchLength;
+  return `${prefix}${snippet}${suffix}`;
 }
 
 export function searchAll(query: string): SearchResult[] {
@@ -455,74 +667,95 @@ export function searchAll(query: string): SearchResult[] {
   // `["react", "hooks"]` instead of requiring the literal substring.
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return [];
+
   const scored: { result: SearchResult; score: number }[] = [];
 
-  // Search lessons
-  for (const lesson of lessons) {
-    const titleScore = scoreText(lesson.title, tokens) * 3;
-    const descScore = scoreText(lesson.description, tokens);
-    const tagScore = (lesson.tags ?? []).reduce((sum, t) => sum + scoreText(t, tokens) * 2, 0);
+  const push = (
+    result: SearchResult,
+    titleScore: number,
+    descScore: number,
+    tagScore: number
+  ) => {
+    const score = titleScore + descScore + tagScore;
+    if (score <= 0) return;
+    // Title matches always outrank description/tag-only matches.
+    const matchField: SearchResult['matchField'] =
+      titleScore > 0 ? 'title' : tagScore > 0 ? 'tag' : 'description';
+    scored.push({
+      result: {
+        ...result,
+        score,
+        matchField,
+        snippet: matchField === 'description' ? buildSnippet(result.description, tokens) : undefined,
+      },
+      score,
+    });
+  };
 
-    if (titleScore > 0 || descScore > 0 || tagScore > 0) {
-      scored.push({
-        result: {
-          type: 'lesson',
-          slug: lesson.slug,
-          title: lesson.title,
-          description: lesson.description,
-          courseSlug: lesson.courseSlug,
-          moduleSlug: lesson.moduleSlug,
-          difficulty: lesson.difficulty,
-          tags: lesson.tags,
-          technology: lesson.technology,
-        },
-        score: titleScore + descScore + tagScore,
-      });
-    }
+  // Search lessons (weight 3 for titles so lessons surface above modules on a
+  // title hit, then type bonuses below break ties).
+  for (const lesson of lessons) {
+    const title = scoreField(lesson.title, tokens, 3);
+    const desc = scoreField(lesson.description, tokens, 1);
+    const tag = scoreField((lesson.tags ?? []).join(' '), tokens, 2);
+    push(
+      {
+        type: 'lesson',
+        slug: lesson.slug,
+        title: lesson.title,
+        description: lesson.description,
+        courseSlug: lesson.courseSlug,
+        moduleSlug: lesson.moduleSlug,
+        difficulty: lesson.difficulty,
+        tags: lesson.tags,
+        technology: lesson.technology,
+      },
+      title.score,
+      desc.score,
+      tag.score
+    );
   }
 
   // Search modules
   for (const mod of modules) {
-    const titleScore = scoreText(mod.title, tokens) * 3;
-    const descScore = scoreText(mod.description, tokens);
-    const tagScore = (mod.tags ?? []).reduce((sum, t) => sum + scoreText(t, tokens) * 2, 0);
-
-    if (titleScore > 0 || descScore > 0 || tagScore > 0) {
-      scored.push({
-        result: {
-          type: 'module',
-          slug: mod.slug,
-          title: mod.title,
-          description: mod.description,
-          courseSlug: mod.courseSlug,
-          difficulty: mod.difficulty,
-          tags: mod.tags,
-        },
-        score: titleScore + descScore + tagScore,
-      });
-    }
+    const title = scoreField(mod.title, tokens, 3);
+    const desc = scoreField(mod.description, tokens, 1);
+    const tag = scoreField((mod.tags ?? []).join(' '), tokens, 2);
+    push(
+      {
+        type: 'module',
+        slug: mod.slug,
+        title: mod.title,
+        description: mod.description,
+        courseSlug: mod.courseSlug,
+        difficulty: mod.difficulty,
+        tags: mod.tags,
+      },
+      title.score,
+      desc.score,
+      tag.score
+    );
   }
 
   // Search courses
   for (const course of courses) {
-    // The cheatsheet and interview-qa "courses" have no cross-category landing
-    // page; their individual cheat sheets and question topics are surfaced as
-    // module results instead.
-    if (course.slug === 'cheatsheet' || course.slug === 'interview-qa') continue;
-    const titleScore = scoreText(course.title, tokens) * 3;
-    const descScore = scoreText(course.description, tokens);
-
-    if (titleScore > 0 || descScore > 0) {
-      scored.push({
-        result: {
-          type: 'course',
-          slug: course.slug,
-          title: course.title,
-          description: course.description,
-        },
-        score: titleScore + descScore,
-      });
-    }
+    // The cheatsheet and question-answers "courses" have no cross-category
+    // landing page; their individual cheat sheets and question topics are
+    // surfaced as module results instead.
+    if (course.slug === 'cheatsheet' || course.slug === 'question-answers') continue;
+    const title = scoreField(course.title, tokens, 3);
+    const desc = scoreField(course.description, tokens, 1);
+    push(
+      {
+        type: 'course',
+        slug: course.slug,
+        title: course.title,
+        description: course.description,
+      },
+      title.score,
+      desc.score,
+      0
+    );
   }
 
   scored.sort((a, b) => b.score - a.score);
@@ -535,23 +768,36 @@ export function searchAll(query: string): SearchResult[] {
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 export function getCourseStats() {
-  const totalLessons = lessons.length;
-  const totalModules = modules.length;
-  const totalMinutes = lessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
+  // `lessons` includes every content tree (courses, problems, cheatsheets,
+  // question answers), so each headline count is scoped to its own tree rather
+  // than reporting overlapping totals.
+  const courseLessons = getNonInterviewCourses().flatMap((c) => getLessonsForCourse(c.slug));
+  const totalLessons = courseLessons.length;
+  const totalModules = getNonInterviewCourses().reduce((sum, c) => sum + getModulesForCourse(c.slug).length, 0);
+  const totalMinutes = courseLessons.reduce((sum, l) => sum + l.estimatedMinutes, 0);
+  const totalProblems = getProblemCourses().reduce(
+    (sum, c) => sum + getLessonsForCourse(c.slug).length,
+    0
+  );
+  const totalQuestions = lessons.filter((l) => l.courseSlug === 'question-answers').length;
+  const totalCheatsheets = getCheatsheetModules().length;
 
   return {
     totalLessons,
     totalModules,
     totalMinutes,
     totalHours: Math.round(totalMinutes / 60),
+    totalProblems,
+    totalQuestions,
+    totalCheatsheets,
   };
 }
 
-// ── Interview question helpers ────────────────────────────────────────────────
+// ── Question answer helpers ───────────────────────────────────────────────────
 
 /**
- * Interview questions live in `content/<category>/interview-qa/<technology>/`,
- * where each technology directory is a module of the single `interview-qa`
+ * Question answers live in `content/<category>/question-answers/<technology>/`,
+ * where each technology directory is a module of the single `question-answers`
  * pseudo-course (mirroring how cheat sheets are organised).
  */
 export interface InterviewTechnology {
@@ -569,7 +815,7 @@ export interface InterviewTechnology {
 }
 
 const interviewModulesCache = memoizeNoArg(() =>
-  modules.filter((m) => m.courseSlug === 'interview-qa')
+  modules.filter((m) => m.courseSlug === 'question-answers')
 );
 
 /** Sorts category keys by the canonical category order, then alphabetically. */
@@ -583,7 +829,7 @@ function categoryRank(category: string): number {
   return idx === -1 ? 99 : idx;
 }
 
-/** Every content category that hosts interview questions. */
+/** Every content category that hosts question answers. */
 export function getInterviewCategories(): string[] {
   const categories = new Set<string>();
   for (const mod of interviewModulesCache()) {
@@ -594,7 +840,7 @@ export function getInterviewCategories(): string[] {
 }
 
 /**
- * Every interview technology, optionally narrowed to a single category.
+ * Every question-answer technology, optionally narrowed to a single category.
  * Within a category the technologies are ordered by their module `order`.
  */
 export function getInterviewTechnologies(category?: string): InterviewTechnology[] {
@@ -609,7 +855,7 @@ export function getInterviewTechnologies(category?: string): InterviewTechnology
       difficulty: mod.difficulty,
       estimatedHours: mod.estimatedHours,
       order: mod.order,
-      questionCount: getLessonsForModule(mod.slug, 'interview-qa').length,
+      questionCount: getLessonsForModule(mod.slug, 'question-answers').length,
     }));
 
   if (category) {
@@ -623,7 +869,7 @@ export function getInterviewTechnologies(category?: string): InterviewTechnology
 /** Interview questions for a technology, ordered by difficulty then position. */
 export function getInterviewQuestions(technology: string, category?: string): Lesson[] {
   return lessons
-    .filter((l) => l.courseSlug === 'interview-qa' && l.moduleSlug === technology)
+    .filter((l) => l.courseSlug === 'question-answers' && l.moduleSlug === technology)
     .filter((l) => !category || getInterviewTechCategory(l.moduleSlug) === category)
     .sort((a, b) => {
       return (a.order || 0) - (b.order || 0);

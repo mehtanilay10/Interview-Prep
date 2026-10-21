@@ -66,9 +66,9 @@ function getCourseSlugFromPath(filePath: string): string | null {
     return 'cheatsheet';
   }
 
-  // Every interview question belongs to the single virtual "interview-qa" course.
-  if (parts.length >= 2 && parts[1] === 'interview-qa') {
-    return 'interview-qa';
+  // Every question answer belongs to the single virtual "question-answers" course.
+  if (parts.length >= 2 && parts[1] === 'question-answers') {
+    return 'question-answers';
   }
 
   return null;
@@ -87,14 +87,14 @@ interface RawContentJson {
  * (or cheatsheet / interview technology) and its lesson files:
  *   [category]/courses|[problems]/[courseSlug]/[moduleSlug]/content.json
  *   [category]/cheatsheet/[technology]/content.json
- *   [category]/interview-qa/[technology]/content.json
+ *   [category]/question-answers/[technology]/content.json
  *
  * Course metadata files live one level higher and are not field-checked.
  */
 function isModuleContentFile(parts: string[], data: RawContentJson): boolean {
   const structuralModule =
     (parts.length === 5 && (parts[1] === 'courses' || parts[1] === 'problems')) ||
-    (parts.length === 4 && (parts[1] === 'cheatsheet' || parts[1] === 'interview-qa'));
+    (parts.length === 4 && (parts[1] === 'cheatsheet' || parts[1] === 'question-answers'));
 
   // Some content nests a whole course inside a course directory. Those files
   // declare `moduleSlugs`, so they are course metadata rather than module
@@ -140,11 +140,11 @@ function findCheatsheetDirectories(): string[] {
   return dirs;
 }
 
-/** All [category]/interview-qa directories. Each technology inside is a module. */
+/** All [category]/question-answers directories. Each technology inside is a module. */
 function findInterviewDirectories(): string[] {
   const dirs: string[] = [];
   for (const categoryPath of listDirectories(contentDir)) {
-    const interviewPath = path.join(categoryPath, 'interview-qa');
+    const interviewPath = path.join(categoryPath, 'question-answers');
     if (fs.existsSync(interviewPath) && fs.statSync(interviewPath).isDirectory()) {
       dirs.push(interviewPath);
     }
@@ -194,7 +194,7 @@ function validateContentFiles() {
     scanContentSection(cheatsheetDir, 'cheatsheet');
   }
   for (const interviewDir of interviewDirectories) {
-    scanContentSection(interviewDir, 'interview-qa');
+    scanContentSection(interviewDir, 'question-answers');
   }
 
   let moduleSchemaErrors = 0;
@@ -374,7 +374,7 @@ assert(interviewSearch.length > 0, 'searchAll finds C# interview questions');
 
 // ── Interview question structure ──────────────────────────────────────────────
 // Interview questions are organised category-first:
-//   content/<category>/interview-qa/<technology>/<question>.json
+//   content/<category>/question-answers/<technology>/<question>.json
 
 const interviewCategories = getInterviewCategories();
 assert(interviewCategories.length > 0, 'getInterviewCategories returns at least one category');
@@ -382,8 +382,8 @@ assert(interviewCategories.length > 0, 'getInterviewCategories returns at least 
 const interviewTechnologies = getInterviewTechnologies();
 assert(interviewTechnologies.length > 0, 'getInterviewTechnologies returns at least one technology');
 
-const interviewQuestions = getAllLessons().filter((l) => l.courseSlug === 'interview-qa');
-assert(interviewQuestions.length > 0, 'interview-qa lessons exist');
+const interviewQuestions = getAllLessons().filter((l) => l.courseSlug === 'question-answers');
+assert(interviewQuestions.length > 0, 'question-answers lessons exist');
 
 const questionsWithoutTechnology = interviewQuestions.filter((l) => !l.technology);
 assert(
@@ -412,15 +412,15 @@ assert(
 );
 
 const sampleQuestion = interviewQuestions[0];
-const sampleHref = getContentItemHref('interview-qa', sampleQuestion.moduleSlug, sampleQuestion.slug);
+const sampleHref = getContentItemHref('question-answers', sampleQuestion.moduleSlug, sampleQuestion.slug);
 assert(
-  /^\/(backend|frontend|database|architecture|devops|fundamentals|ai)\/interview-questions\/[^/]+\/[^/]+$/.test(sampleHref),
-  `getContentItemHref builds category-prefixed interview URLs (got: ${sampleHref})`
+  /^\/(backend|frontend|database|architecture|devops|fundamentals|ai)\/question-answers\/[^/]+\/[^/]+$/.test(sampleHref),
+  `getContentItemHref builds category-prefixed question-answer URLs (got: ${sampleHref})`
 );
 
 const sampleTech = interviewTechnologies[0];
 assert(
-  getContentItemHref('interview-qa', sampleTech.slug).endsWith(`/interview-questions/${sampleTech.slug}`),
+  getContentItemHref('question-answers', sampleTech.slug).endsWith(`/question-answers/${sampleTech.slug}`),
   'getContentItemHref builds interview technology URLs'
 );
 

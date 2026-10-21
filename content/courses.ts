@@ -30,7 +30,6 @@ import fullstackSecurityCourse from "./architecture/courses/fullstack-security/c
 import gitLinuxDeveloperWorkflowCourse from "./devops/courses/git-linux-developer-workflow/content.json";
 import graphqlDotnetCourse from "./backend/courses/graphql-dotnet/content.json";
 import hldCourse from "./architecture/problems/hld/content.json";
-import interviewQaCourse from "./interview-qa.json";
 import linqCourse from "./backend/courses/linq/content.json";
 import lldCourse from "./architecture/problems/lld/content.json";
 import messageQueuesEventStreamingCourse from "./architecture/courses/message-queues-event-streaming/content.json";
@@ -40,6 +39,7 @@ import oopsConceptsCourse from "./fundamentals/courses/oops-concepts/content.jso
 import postgresqlCourse from "./database/courses/postgresql/content.json";
 import prismaCourse from "./frontend/courses/prisma/content.json";
 import programmingComputerWebFoundationsCourse from "./fundamentals/courses/programming-computer-web-foundations/content.json";
+import questionAnswersCourse from "./question-answers.json";
 import reactAdvancedPatternsCourse from "./frontend/courses/react-advanced-patterns/content.json";
 import reactFundamentalsCourse from "./frontend/courses/react-fundamentals/content.json";
 import reactQueryCourse from "./frontend/courses/react-query/content.json";
@@ -86,7 +86,6 @@ const rawCoursesPart1 = [
 	{ ...gitLinuxDeveloperWorkflowCourse, urlCategory: "devops" },
 	{ ...graphqlDotnetCourse, urlCategory: "backend" },
 	{ ...hldCourse, urlCategory: "architecture" },
-	{ ...interviewQaCourse, urlCategory: "interview-qa" },
 	{ ...linqCourse, urlCategory: "backend" },
 	{ ...lldCourse, urlCategory: "architecture" },
 	{ ...messageQueuesEventStreamingCourse, urlCategory: "architecture" },
@@ -96,6 +95,7 @@ const rawCoursesPart1 = [
 	{ ...postgresqlCourse, urlCategory: "database" },
 	{ ...prismaCourse, urlCategory: "frontend" },
 	{ ...programmingComputerWebFoundationsCourse, urlCategory: "fundamentals" },
+	{ ...questionAnswersCourse, urlCategory: "question-answers" },
 	{ ...reactAdvancedPatternsCourse, urlCategory: "frontend" },
 	{ ...reactFundamentalsCourse, urlCategory: "frontend" },
 	{ ...reactQueryCourse, urlCategory: "frontend" },

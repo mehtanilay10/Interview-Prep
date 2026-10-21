@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-usememo-usecallback-memo",
+  "slug": "usememo-usecallback-memo",
+  "moduleSlug": "react",
+  "title": "When do you use useMemo, useCallback, and React.memo?",
+  "description": "Reference stability vs value caching: memoization tools, their real costs, and profiling before memoizing.",
+  "order": 18,
+  "difficulty": "intermediate",
+  "tags": [
+    "react",
+    "performance",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** When do you use useMemo, useCallback, and React.memo?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "They solve two related but different problems. **useMemo caches a computed value** between renders (expensive calculation, derived data). **useCallback caches a function reference** so it stays referentially stable across renders. **React.memo wraps a component** so it skips re-rendering when its props are shallow-equal to the previous props — but it only pays off when the *child* is expensive AND the props it receives are stable, which usually means the *parent* used useCallback/useMemo on those props. Memoization is a profile-driven optimization: every memo has a comparison cost and a memory cost, and memoizing cheap work is slower than just doing the work."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How each works:**\n- `useMemo(() => compute(a, b), [a, b])` — re-runs only when deps change; returns the cached value. `a`/`b` are captured per render (stale-closure risk if you forget a dep)\n- `useCallback(fn, deps)` — literally `useMemo(() => fn, deps)`; the identity of `fn` is what's cached. Matters for: effect dependencies, memoized children, context values\n- `React.memo(Component, areEqual?)` — shallow-compares props (or your custom comparator) and bails out of re-render otherwise. The component's own state updates still re-render it\n\n**When each actually helps:**\n- useMemo: calculation is genuinely expensive (sorting thousands of rows, chart data) OR the value feeds a dependency array that must be stable (useEffect, useMemo chain)\n- useCallback: the function is passed to a memoized child, registered in an effect with deps, or placed in context — identity stability is the point, not speed\n- React.memo: heavy child (big list, chart, editor) fed from a parent that re-renders often, with primitives or memo-stable references as props\n\n**The honest math:**\n- Without memoized children, memoizing the *parent's* function does nothing — the child re-rendered anyway because the parent re-rendered and React renders children by default\n- Inline objects/arrays/functions defeat React.memo: `<Row data={{...}} />` creates a fresh reference every render, so the shallow compare always fails\n- Each memo adds a deps array to maintain — forgotten deps cause stale-data bugs that are worse than the perf you gained\n- Profile first (React DevTools Profiler, `React.Profiler` API): memoize what the flame graph shows is hot\n- Server Components have no hooks — none of this applies on the server side of the boundary"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "The three tools working together (and failing together)",
+        "language": "javascript",
+        "code": "// ✅ Correct: expensive child, stable props all the way down\nconst ProductList = React.memo(function ProductList({ products, onSelect }) {\n  // heavy child — worth skipping renders\n  return products.map((p) => (\n    <ProductRow key={p.id} product={p} onSelect={onSelect} />\n  ));\n});\n\nfunction ProductPage() {\n  const [category, setCategory] = useState('all');\n  const [sort, setSort] = useState('newest');\n\n  // useCallback: stable identity -> ProductList's props compare equal -> skip re-render\n  const onSelect = useCallback((id) => navigate(`/products/${id}`), []);\n\n  // useMemo: expensive filtering/sorting only re-runs when inputs change\n  const visible = useMemo(\n    () => filterAndSort(allProducts, category, sort),\n    [category, sort]\n  );\n\n  return <ProductList products={visible} onSelect={onSelect} />;\n}\n\n// ❌ Useless memoization: inline object/array breaks the shallow compare\n// <ProductList products={filterAndSort(items, category)} onSelect={(id) => ...} />\n//   -> new array AND new function every parent render -> React.memo never bails out\n\n// ❌ Over-memoization: a tiny computation wrapped for 'performance'\n// const price = useMemo(() => item.qty * item.unitPrice, [item.qty, item.unitPrice]);\n// The memo check costs more than the multiplication. Profile, don't guess.\n\n// useMemo is also legitimate for referential stability, not just speed:\n// const options = useMemo(() => ({ locale: 'en-IN', currency: 'INR' }), []);\n// -> feeds a [options] dependency without retriggering every render"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-memoization-decision-flow",
+        "caption": "Decision flow: only memoize expensive work or unstable references, and only after profiling shows it matters.",
+        "definition": "graph TD\n    A[Component re-renders too often] --> B{Is the work actually expensive?}\n    B -->|Yes| C[useMemo the computation]\n    B -->|No| D{Is a reference breaking a dep array or React.memo?}\n    D -->|Function identity| E[useCallback]\n    D -->|Object/array identity| F[useMemo the value]\n    C --> G{Is the child heavy?}\n    E --> G\n    F --> G\n    G -->|Yes| H[React.memo the child + stable props]\n    G -->|No| I[Leave it alone]\n    style I fill:#e8f5e9,stroke:#2e7d32\n    style H fill:#fff3e0,stroke:#e65100"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing the difference: value caching (useMemo) vs reference stability (useCallback) vs render skipping (React.memo)\n- The chain insight: memoized children only work if props are stable, which often requires memoizing in the parent too\n- Awareness that inline objects/arrays defeat React.memo\n- Discipline: profile first; every memo is a deps array to maintain"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Memoizing everything 'for performance' — the comparison overhead exceeds the saved work on cheap functions",
+          "Wrapping a child in React.memo while passing inline arrow functions and object literals as props",
+          "Forgetting dependencies in useMemo/useCallback — stale values that silently break behavior",
+          "Expecting useMemo to prevent child re-renders — it caches values, not renders",
+          "Memoizing in a component that re-renders once per keystroke with tiny data — the wrong layer for the problem",
+          "Not knowing that React.memo's default shallow compare ignores your custom equality needs (pass areEqual)"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Why does useCallback usually require the parent to also memoize for the child to benefit?",
+          "How do you verify with React DevTools that memoization is actually helping?",
+          "What stale-closure bugs can a missing dependency in useMemo cause?",
+          "How does this story change with React Compiler's automatic memoization?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "useMemo caches values; useCallback caches function identity; React.memo skips child re-renders",
+          "Memoized children need stable props — objects, arrays, and inline functions break them",
+          "Every memo adds a deps array to maintain; forgotten deps cause stale-data bugs",
+          "Profile with the Profiler before memoizing; memoize only what's hot"
+        ],
+        "takeaway": "Memoization is a precision tool: cache expensive work and unstable references, verify with the profiler, and never let 'maybe faster' trade for correctness."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "why-is-this-react-component-re-rendering-and-how-would-you-prove-the-cause",
+    "react-i01",
+    "react-i02"
+  ],
+  "furtherReading": [
+    {
+      "title": "React useMemo reference",
+      "url": "https://react.dev/reference/react/useMemo",
+      "type": "article",
+      "author": "React Team"
+    },
+    {
+      "title": "React.memo reference",
+      "url": "https://react.dev/reference/react/memo",
+      "type": "article",
+      "author": "React Team"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "React",
+  "estimatedMinutes": 25
+}

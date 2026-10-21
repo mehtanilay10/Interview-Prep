@@ -1,13 +1,17 @@
 import Link from 'next/link';
-import { ArrowRight, BookOpen, Clock, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen, Clock, FileQuestion, ListChecks, MessagesSquare, Zap } from 'lucide-react';
+import { CustomCodeBlock } from '@/components/content/CustomCodeBlock';
 
 interface HeroSectionProps {
   totalLessons: number;
+  totalProblems: number;
+  totalQuestions: number;
+  totalCheatsheets: number;
   totalHours: number;
   totalCourses: number;
   /** Destination for the primary "Start Learning" call to action. */
   startHref?: string;
-  /** Destination for the secondary "Browse questions" call to action. */
+  /** Destination for the secondary "Question Answers" call to action. */
   questionsHref?: string;
 }
 
@@ -26,10 +30,13 @@ int[] TwoSum(int[] nums, int target) {
 
 export function HeroSection({
   totalLessons,
+  totalProblems,
+  totalQuestions,
+  totalCheatsheets,
   totalHours,
   totalCourses,
   startHref = '/',
-  questionsHref = '/backend/interview-questions',
+  questionsHref = '/backend/question-answers',
 }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-canvas">
@@ -54,19 +61,14 @@ export function HeroSection({
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:py-24">
         {/* Left: message */}
         <div className="max-w-2xl">
-          <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-accent-muted bg-accent-subtle px-3 py-1 text-xs font-medium text-accent-fg">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            {totalCourses} courses &middot; {totalLessons}+ problems &amp; lessons
-          </span>
-
           <h1 className="text-balance text-4xl font-bold leading-[1.05] tracking-tight text-fg-default sm:text-5xl lg:text-6xl">
-            Anyone can{' '}
-            <span className="text-fg-subtle line-through decoration-danger-fg/60">memorise</span>{' '}
-            syntax and APIs.
+            The best developers aren&apos;t those who{' '}
+            <span className="text-fg-subtle line-through decoration-danger-fg/60">know</span>{' '}
+            everything.
             <br />
-            What compounds is how you{' '}
+            They&apos;re the ones who{' '}
             <span className="relative whitespace-nowrap text-accent-fg">
-              think
+              never stop learning
               <svg
                 className="absolute -bottom-1 left-0 h-2 w-full text-accent-fg/40"
                 viewBox="0 0 100 8"
@@ -76,7 +78,7 @@ export function HeroSection({
                 <path d="M0 6 Q 50 0 100 6" stroke="currentColor" strokeWidth="2.5" fill="none" />
               </svg>
             </span>
-            , and the rest of your career rewards it.
+            .
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">
@@ -101,7 +103,7 @@ export function HeroSection({
               href={questionsHref}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 font-medium text-fg-default transition-colors hover:bg-canvas-subtle"
             >
-              Browse questions
+              Browse question answers
             </Link>
           </div>
 
@@ -109,14 +111,41 @@ export function HeroSection({
           <dl className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-border pt-6">
             <div>
               <dt className="text-xs uppercase tracking-widest text-fg-subtle">Courses</dt>
-              <dd className="mt-0.5 text-2xl font-bold text-fg-default">{totalCourses}</dd>
+              <dd className="mt-0.5 flex items-center gap-1.5 text-2xl font-bold text-fg-default">
+                <BookOpen className="h-4 w-4 text-accent-fg" aria-hidden="true" />
+                {totalCourses}
+              </dd>
             </div>
             <div className="h-8 w-px bg-border" aria-hidden="true" />
             <div>
-              <dt className="text-xs uppercase tracking-widest text-fg-subtle">Lessons &amp; problems</dt>
+              <dt className="text-xs uppercase tracking-widest text-fg-subtle">Lessons</dt>
               <dd className="mt-0.5 flex items-center gap-1.5 text-2xl font-bold text-fg-default">
-                <BookOpen className="h-4 w-4 text-accent-fg" aria-hidden="true" />
-                {totalLessons}+
+                <ListChecks className="h-4 w-4 text-accent-fg" aria-hidden="true" />
+                {totalLessons}
+              </dd>
+            </div>
+            <div className="h-8 w-px bg-border" aria-hidden="true" />
+            <div>
+              <dt className="text-xs uppercase tracking-widest text-fg-subtle">Problems</dt>
+              <dd className="mt-0.5 flex items-center gap-1.5 text-2xl font-bold text-fg-default">
+                <Zap className="h-4 w-4 text-attention-fg" aria-hidden="true" />
+                {totalProblems}
+              </dd>
+            </div>
+            <div className="h-8 w-px bg-border" aria-hidden="true" />
+            <div>
+              <dt className="text-xs uppercase tracking-widest text-fg-subtle">Question answers</dt>
+              <dd className="mt-0.5 flex items-center gap-1.5 text-2xl font-bold text-fg-default">
+                <MessagesSquare className="h-4 w-4 text-done-fg" aria-hidden="true" />
+                {totalQuestions}
+              </dd>
+            </div>
+            <div className="h-8 w-px bg-border" aria-hidden="true" />
+            <div>
+              <dt className="text-xs uppercase tracking-widest text-fg-subtle">Cheat sheets</dt>
+              <dd className="mt-0.5 flex items-center gap-1.5 text-2xl font-bold text-fg-default">
+                <FileQuestion className="h-4 w-4 text-danger-fg" aria-hidden="true" />
+                {totalCheatsheets}
               </dd>
             </div>
             <div className="h-8 w-px bg-border" aria-hidden="true" />
@@ -150,10 +179,10 @@ export function HeroSection({
               </span>
               <p className="text-xs leading-relaxed text-fg-muted">{SAMPLE_PROMPT}</p>
             </div>
-            {/* Code */}
-            <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed">
-              <code className="font-mono text-fg-default">{SAMPLE_CODE}</code>
-            </pre>
+            {/* Code — same highlighter + line numbers as lesson content */}
+            <div className="border-0 [&>div]:rounded-none [&>div]:border-0 [&>div]:shadow-none">
+              <CustomCodeBlock code={SAMPLE_CODE} language="csharp" />
+            </div>
           </div>
         </div>
       </div>

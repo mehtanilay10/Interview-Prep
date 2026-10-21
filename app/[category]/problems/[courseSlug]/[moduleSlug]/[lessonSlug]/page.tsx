@@ -204,6 +204,7 @@ export default async function ProblemDetailPage({ params }: Params) {
             {prev ? (
               <Link
                 href={`/${category}/problems/${courseSlug}/${prev.moduleSlug}/${prev.slug}`}
+                data-lesson-nav="prev"
                 className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:border-accent-fg hover:text-accent-fg max-w-[45%]"
               >
                 <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -215,6 +216,7 @@ export default async function ProblemDetailPage({ params }: Params) {
             {next && (
               <Link
                 href={`/${category}/problems/${courseSlug}/${next.moduleSlug}/${next.slug}`}
+                data-lesson-nav="next"
                 className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:border-accent-fg hover:text-accent-fg max-w-[45%]"
               >
                 <span className="line-clamp-1">{next.title}</span>

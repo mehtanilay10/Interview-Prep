@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolvedParams = await params;
   const { category, courseSlug } = resolvedParams;
   const course = getCourseBySlug(courseSlug);
-  // Only genuine courses render here; problems/cheatsheets/interview-qa have
+  // Only genuine courses render here; problems/cheatsheets/question-answers have
   // their own route trees.
   if (!course || !isRegularCourse(course)) return {};
   if (category !== getCourseCategory(courseSlug)) return {};
@@ -41,7 +41,7 @@ export default async function CourseDetailPage({ params }: Params) {
     notFound();
   }
   const course = getCourseBySlug(courseSlug);
-  // Only genuine courses render here; problems/cheatsheets/interview-qa have
+  // Only genuine courses render here; problems/cheatsheets/question-answers have
   // their own route trees.
   if (!course || !isRegularCourse(course)) notFound();
 

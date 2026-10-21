@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useId } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, X, ArrowRight } from 'lucide-react';
+import { Search, X, ArrowRight, Clock, Trash2 } from 'lucide-react';
 import { getSearchResultHref } from '@/lib/content-hrefs';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
 import type { SearchResult } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,29 @@ const TYPE_LABEL: Record<string, string> = {
   cheatsheet: 'Cheatsheet',
 };
 
+/**
+ * Wraps every case-insensitive occurrence of each query token in `<mark>` so
+ * the matched part of a title/description is visually obvious. All regex
+ * metacharacters are escaped so a query like "c#" or "(sql)" is treated
+ * literally rather than as a pattern.
+ */
+function highlightText(text: string, query: string): React.ReactNode {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return text;
+  const escaped = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark key={i} className="rounded bg-accent-subtle px-0.5 text-fg-default">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSuggestionsProps>(
   function SearchSuggestions(
     {
@@ -46,6 +69,8 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const { recent, addRecent, clearRecent } = useRecentSearches();
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +95,10 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
     useImperativeHandle(ref, () => ({
       focus: () => inputRef.current?.focus(),
     }));
+
+    // Show recent searches when the box is focused but empty. Kept separate
+    // from the suggestions effect so opening the box never triggers a fetch.
+    const showRecent = focused && !value.trim() && recent.length > 0;
 
     useEffect(() => {
       if (!value.trim()) {
@@ -132,12 +161,30 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
     const navigateToResult = useCallback(
       (result: SearchResult) => {
         const href = getSearchResultHref(result);
+        // Navigating to a result is still a "search", so the current query is
+        // worth remembering even though it is then cleared.
+        addRecent(value);
         onChange('');
         setIsOpen(false);
         setSelectedIndex(-1);
         router.push(href);
       },
-      [onChange, router]
+      [onChange, router, addRecent, value]
+    );
+
+    // Records the query and hands it to the search page. Shared by the Enter
+    // path and the "View all results" row.
+    const submitQuery = useCallback(
+      (query: string) => {
+        const trimmed = query.trim();
+        if (!trimmed) return;
+        addRecent(trimmed);
+        onChange('');
+        setIsOpen(false);
+        setSelectedIndex(-1);
+        onSearch?.(trimmed);
+      },
+      [addRecent, onChange, onSearch]
     );
 
     const handleKeyDown = useCallback(
@@ -145,9 +192,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
         if (!isOpen || suggestions.length === 0) {
           if (e.key === 'Enter') {
             e.preventDefault();
-            if (value.trim() && onSearch) {
-              onSearch(value.trim());
-            }
+            submitQuery(value);
           }
           return;
         }
@@ -166,11 +211,8 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
           e.preventDefault();
           if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
             navigateToResult(suggestions[selectedIndex]);
-          } else if (value.trim() && onSearch) {
-            onChange('');
-            setIsOpen(false);
-            setSelectedIndex(-1);
-            onSearch(value.trim());
+          } else {
+            submitQuery(value);
           }
         } else if (e.key === 'Escape') {
           setIsOpen(false);
@@ -178,7 +220,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
           inputRef.current?.blur();
         }
       },
-      [isOpen, suggestions, selectedIndex, value, onSearch, navigateToResult, loading, onChange]
+      [isOpen, suggestions, selectedIndex, value, submitQuery, navigateToResult, loading]
     );
 
     const handleClear = useCallback(() => {
@@ -204,9 +246,11 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => {
+              setFocused(true);
               if (suggestions.length > 0) setIsOpen(true);
             }}
             onBlur={() => {
+              setFocused(false);
               if (blurTimerRef.current !== null) window.clearTimeout(blurTimerRef.current);
               blurTimerRef.current = window.setTimeout(() => setIsOpen(false), 150);
             }}
@@ -244,12 +288,14 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
             ref={listRef}
             id={listId}
             role="listbox"
-            className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-border bg-canvas shadow-lg"
+            className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-border bg-canvas-overlay shadow-lg"
           >
             {suggestions.map((result, index) => {
-              const href = getSearchResultHref(result);
               const label = TYPE_LABEL[result.type] || result.type;
               const isSelected = index === selectedIndex;
+              // Prefer the pre-trimmed snippet so highlight keywords stay in
+              // view; fall back to the full description.
+              const secondary = result.snippet ?? result.description;
 
               return (
                 <li
@@ -275,9 +321,13 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
                     {label}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium text-fg-default">{result.title}</p>
-                    {result.description && (
-                      <p className="truncate text-xs text-fg-muted">{result.description}</p>
+                    <p className="truncate text-sm font-medium text-fg-default">
+                      {highlightText(result.title, value)}
+                    </p>
+                    {secondary && (
+                      <p className="truncate text-xs text-fg-muted">
+                        {highlightText(secondary, value)}
+                      </p>
                     )}
                   </div>
                   <ArrowRight className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden="true" />
@@ -294,11 +344,7 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
                 )}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  if (onSearch) {
-                    onChange('');
-                    setIsOpen(false);
-                    onSearch(value.trim());
-                  }
+                  submitQuery(value);
                 }}
                 onMouseEnter={() => setSelectedIndex(suggestions.length)}
               >
@@ -307,6 +353,41 @@ export const SearchSuggestions = forwardRef<SearchSuggestionsHandle, SearchSugge
               </li>
             )}
           </ul>
+        )}
+
+        {showRecent && (
+          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-canvas-overlay shadow-lg">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                Recent searches
+              </span>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={clearRecent}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-subtle transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                Clear
+              </button>
+            </div>
+            <ul>
+              {recent.map((term) => (
+                <li key={term}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => submitQuery(term)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg-muted transition-colors hover:bg-canvas-subtle hover:text-fg-default"
+                  >
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden="true" />
+                    <span className="truncate">{term}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     );

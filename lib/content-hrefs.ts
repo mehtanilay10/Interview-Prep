@@ -116,13 +116,13 @@ export function getContentItemHref(
   moduleSlug?: string | null,
   lessonSlug?: string | null
 ): string {
-  if (courseSlug === 'interview-qa') {
+  if (courseSlug === 'question-answers') {
     const tech = getInterviewTechnologySlug(moduleSlug, lessonSlug);
     const category = tech ? getInterviewTechCategory(tech) : undefined;
     if (!tech || !category) return '/';
     return lessonSlug
-      ? `/${category}/interview-questions/${tech}/${lessonSlug}`
-      : `/${category}/interview-questions/${tech}`;
+      ? `/${category}/question-answers/${tech}/${lessonSlug}`
+      : `/${category}/question-answers/${tech}`;
   }
 
   // Cheatsheets: one lesson per technology module; the category is derived
@@ -149,17 +149,17 @@ export function getContentItemHref(
 // ── Interview technology slugs ───────────────────────────────────────────────
 
 /**
- * Display name → URL slug for every interview technology.
+ * Display name → URL slug for every question-answer technology.
  *
- * The interview technology slug is also the module slug, so the same value is
- * used in the content tree (`content/<category>/interview-qa/<slug>/`) and in
- * the URL (`/<category>/interview-questions/<slug>/`). The generated
- * `INTERVIEW_LESSON_TECH` map is authoritative for runtime lookups; this map
- * only converts a lesson's display name into a slug.
+ * The technology slug is also the module slug, so the same value is used in the
+ * content tree (`content/<category>/question-answers/<slug>/`) and in the URL
+ * (`/<category>/question-answers/<slug>/`). The generated `INTERVIEW_LESSON_TECH`
+ * map is authoritative for runtime lookups; this map only converts a lesson's
+ * display name into a slug.
  *
- * Maintenance rule: when adding a new interview question technology, update
- * this map alongside the lesson JSON `technology` field. Slugs that need no
- * special casing may be omitted — they fall back to a generic slugify.
+ * Maintenance rule: when adding a new question-answer technology, update this
+ * map alongside the lesson JSON `technology` field. Slugs that need no special
+ * casing may be omitted — they fall back to a generic slugify.
  */
 const TECH_SLUG_MAP: Record<string, string> = {
   'c#': 'csharp',
@@ -253,13 +253,13 @@ export function getSearchResultHref(result: SearchResult): string {
     if (isProblemCourseSlug(result.courseSlug)) {
       return `/${category}/problems/${result.courseSlug}/${result.moduleSlug}/${result.slug}`;
     }
-    if (result.courseSlug === 'interview-qa') {
+    if (result.courseSlug === 'question-answers') {
       const tech =
         getInterviewTechnologySlug(result.moduleSlug, result.slug) ??
         (result.technology ? getInterviewTechSlug(result.technology) : undefined);
       const techCategory = tech ? getInterviewTechCategory(tech) : undefined;
       if (tech && techCategory) {
-        return `/${techCategory}/interview-questions/${tech}/${result.slug}`;
+        return `/${techCategory}/question-answers/${tech}/${result.slug}`;
       }
       return '/';
     }
@@ -279,9 +279,9 @@ export function getSearchResultHref(result: SearchResult): string {
     if (result.courseSlug === 'cheatsheet') {
       return `/${category}/cheatsheets/${result.slug}`;
     }
-    if (result.courseSlug === 'interview-qa') {
+    if (result.courseSlug === 'question-answers') {
       const techCategory = getInterviewTechCategory(result.slug);
-      return techCategory ? `/${techCategory}/interview-questions/${result.slug}` : '/';
+      return techCategory ? `/${techCategory}/question-answers/${result.slug}` : '/';
     }
     if (isProblemCourseSlug(result.courseSlug)) {
       return `/${category}/problems/${result.courseSlug}/${result.slug}`;
@@ -290,9 +290,9 @@ export function getSearchResultHref(result: SearchResult): string {
   }
 
   if (result.type === 'course') {
-    // The interview-qa pseudo-course has no landing page of its own — its
+    // The question-answers pseudo-course has no landing page of its own — its
     // questions are listed per category.
-    if (result.slug === 'interview-qa') {
+    if (result.slug === 'question-answers') {
       return '/';
     }
     const category = getCourseCategory(result.slug);

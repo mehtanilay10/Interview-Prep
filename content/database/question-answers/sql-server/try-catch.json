@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-sql-try-catch",
+  "slug": "try-catch",
+  "moduleSlug": "sql-server",
+  "title": "How does error handling work with TRY/CATCH in T-SQL?",
+  "description": "XACT_ABORT, transaction rollback semantics inside CATCH blocks, error functions, and rethrowing patterns for stored procedures.",
+  "order": 20,
+  "difficulty": "intermediate",
+  "tags": [
+    "sql server",
+    "error-handling",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How does error handling work with TRY/CATCH in T-SQL?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "T-SQL `TRY ... BEGIN CATCH ... END CATCH` works like other languages for **statement-terminating errors of severity 11+**: the batch jumps to CATCH, where error functions (`ERROR_NUMBER()`, `ERROR_MESSAGE()`, `ERROR_LINE()`, `XACT_STATE()`) describe the failure. The critical SQL-specific rules: **transactions are NOT auto-rolled-back** on every error — in CATCH you must check `XACT_STATE()` (1 = committable, -1 = doomed/uncommittable, 0 = no transaction) and ROLLBACK appropriately; `SET XACT_ABORT ON` makes most errors doom the transaction automatically (recommended for production procs); and a doomed transaction (XACT_STATE = -1) can only be rolled back — no COMMIT, even in a seemingly safe path. To propagate errors to the caller, **rethrow** with `THROW;` (or the older `RAISERROR` for custom messages)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**What TRY/CATCH catches and misses:**\n- Catches: constraint violations (PK/FK/CHECK), most runtime errors, RAISERROR with severity >= 11, some compile errors are NOT caught (compile-time errors skip the whole batch; statements after a compile error never run)\n- Misses: severity 10 and below (informational), some XTP/memory-optimized edge cases, connection drops (no CATCH — the client sees it)\n- Errors inside the CATCH block itself propagate to the enclosing TRY (nestable)\n\n**Transaction semantics in CATCH — the part everyone gets wrong:**\n- `XACT_STATE() = 1`: transaction is active and committable — you may choose COMMIT (rare) or ROLLBACK\n- `XACT_STATE() = -1`: transaction is **doomed** — a statement failed inside an XACT_ABORT or a doomed-eligible error; only ROLLBACK works; attempting COMMIT throws 3930\n- `XACT_STATE() = 0`: no transaction in scope (implicit or none) — nothing to roll back\n- **Nested transactions**: ROLLBACK in CATCH rolls back the **whole** outer transaction too — @@TRANCOUNT after rollback is 0, not decremented; adjust the caller's counter or structure code so callers know\n\n**XACT_ABORT:**\n- `SET XACT_ABORT ON` — any run-time error rolls back the transaction and dooms it (XACT_STATE = -1); CATCH still runs for cleanup/logging, then ROLLBACK is the only option\n- The most reliable production setting: guarantees no half-committable states, no 'error but transaction still alive' ambiguity\n- Note: some errors still commit-able paths (batch-abort errors) — knowing XACT_STATE covers you regardless\n\n**Patterns:**\n- **Standard proc shell**: XACT_ABORT ON, BEGIN TRAN, TRY { work; COMMIT } CATCH { IF XACT_STATE() <> 0 ROLLBACK; log; THROW; }\n- **Rethrow**: `THROW;` (must be the statement, needs a semicolon before) preserves original error number/message to the caller; RAISERROR can't rethrow the original — it fabricates a new message and loses severity/number fidelity\n- **Error logging**: catch → write to an ErrorLog table (with ERROR_NUMBER/MESSAGE/PROCEDURE/LINE) → rethrow so the app still sees the failure\n- **Savepoints** for partial rollback: SAVE TRAN inside larger transactions — CATCH rolls to savepoint, outer transaction continues (careful with doomed states)"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "The production stored-procedure shell",
+        "language": "sql",
+        "code": "CREATE OR ALTER PROCEDURE dbo.TransferFunds\\n    @FromAccount INT, @ToAccount INT, @Amount DECIMAL(12,2)\\nAS\\nBEGIN\\n    SET NOCOUNT ON;\\n    SET XACT_ABORT ON;          -- any runtime error dooms the transaction\\n\\n    BEGIN TRY\\n        BEGIN TRANSACTION;\\n\\n            UPDATE Accounts SET Balance = Balance - @Amount WHERE Id = @FromAccount;\\n            IF @@ROWCOUNT <> 0 THROW 50001, 'Source account not found or no rows updated.', 1;\\n\\n            UPDATE Accounts SET Balance = Balance + @Amount WHERE Id = @ToAccount;\\n            IF @@ROWCOUNT <> 0 THROW 50002, 'Target account not found.', 1;\\n\\n        COMMIT TRANSACTION;\\n    END TRY\\n    BEGIN CATCH\\n        -- Transaction may be doomed: only rollback is guaranteed to work\\n        IF XACT_STATE() <> 0\\n            ROLLBACK TRANSACTION;          -- rolls back everything, even outer nesting\\n\\n        -- Log with full context, then rethrow so the caller sees the original error\\n        INSERT INTO dbo.ErrorLog (ErrorNumber, ErrorSeverity, ErrorProcedure, ErrorLine, ErrorMessage)\\n        VALUES (ERROR_NUMBER(), ERROR_SEVERITY(), ERROR_PROCEDURE(), ERROR_LINE(), ERROR_MESSAGE());\\n\\n        THROW;                             -- rethrows the original error (keep the semicolon)\\n    END CATCH\\nEND\\n\\n-- Caller sees: error number, message, severity — as if nothing caught it.\\n-- ❌ Common bug: CATCH does INSERT + no rethrow -> caller thinks the transfer succeeded\\n-- ❌ COMMIT in CATCH when XACT_STATE() = -1 -> error 3930 on top of the original failure\\n-- ❌ RAISERROR to 'rethrow' — it fabricates a new message; use THROW"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "important",
+        "title": "Catch without rethrow swallows failures",
+        "text": "If a CATCH block handles the error and returns normally, every caller — application code, job steps, upstream procs — believes the statement succeeded. Either rethrow after cleanup/logging, or return an explicit error code the caller checks. Silent catches are how data corruption travels."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- TRY/CATCH basics plus the SQL-specific transaction rules (XACT_STATE values)\n- XACT_ABORT ON as the production default and what 'doomed transaction' means\n- THROW vs RAISERROR rethrow fidelity\n- The log-and-rethrow pattern instead of swallowing errors"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Assuming CATCH auto-rolls-back — it doesn't; check XACT_STATE",
+          "COMMITting in CATCH when the transaction is doomed (XACT_STATE = -1)",
+          "Catching, logging, and returning without rethrow — callers see success",
+          "Using RAISERROR to rethrow — loses the original number/severity; use THROW",
+          "Forgetting that ROLLBACK in a nested CATCH kills the outer transaction too",
+          "Expecting compile-time errors to hit the CATCH block — the batch fails before TRY runs"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "What do the three XACT_STATE() values mean and which commits are possible for each?",
+          "How do savepoints let a CATCH block do partial rollback?",
+          "Why does THROW beat RAISERROR for rethrowing?",
+          "How would you design batch error logging that survives the rollback?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "TRY/CATCH catches severity 11+; transactions do NOT auto-rollback",
+          "XACT_STATE: 1 committable, -1 doomed (rollback only), 0 none",
+          "XACT_ABORT ON in production procs removes the ambiguity",
+          "Log with ERROR_* functions, then THROW — never swallow"
+        ],
+        "takeaway": "The CATCH block is where you clean up and tell the truth: roll back what XACT_STATE allows, log the context, and rethrow so the caller can't mistake failure for success."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sql-i03",
+    "sql-a02",
+    "deadlocks"
+  ],
+  "furtherReading": [
+    {
+      "title": "TRY...CATCH (Transact-SQL) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "THROW (Transact-SQL) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/throw-transact-sql?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "SQL Server",
+  "estimatedMinutes": 22
+}

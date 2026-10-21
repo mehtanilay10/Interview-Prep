@@ -11,7 +11,7 @@ Read this before making any changes.
 Quotient is a **Next.js 16 + React 19 + TypeScript** educational web app for teaching software engineering interview preparation. It includes:
 - Structured courses (C#, SQL, React, ASP.NET Core, OOP, etc.)
 - Coding problems with multiple solutions (`content/<category>/problems/`)
-- Interview Q&A organized by category and technology (`content/<category>/interview-qa/`)
+- Question answers organized by category and technology (`content/<category>/question-answers/`)
 - Cheat sheets for quick reference (`content/<category>/cheatsheet/`)
 - User authentication via **NextAuth v5** with **Google OAuth**
 - Per-user progress and bookmarks stored in **Neon PostgreSQL**
@@ -84,19 +84,22 @@ content/
       [technology]/
         content.json          # Module metadata (one module per technology)
         cheatsheet.json       # Lesson file (slug: "cheatsheet"), code-only examples
-    interview-qa/             # Interview questions (courseSlug: "interview-qa")
+    question-answers/         # Question answers (courseSlug: "question-answers")
       [technology]/
         content.json          # Module metadata (one module per technology)
         [questionSlug].json   # Lesson; the module slug is the technology slug
+    roadmaps/
+      roadmap.json            # Curated learning path for the category (one per category)
   cheatsheet.json             # Cheatsheet section "Course" metadata (category: "cheatsheet")
-  interview-qa.json           # Interview-qa section "Course" metadata (isInterview: true)
+  question-answers.json       # Question-answers section "Course" metadata (isInterview: true)
   ai/
     glossary/                 # AI glossary terms (glossary/<topic>/[term].json)
     prompts/                  # AI prompt templates (prompts/<topic>/[prompt].json)
   courses.ts                  # Auto-generated exports all courses
-  modules.ts                  # Auto-generated exports all modules (courses + problems + cheatsheet + interview-qa)
-  lessons.ts                  # Auto-generated exports all lessons (courses + problems + cheatsheet + interview-qa)
+  modules.ts                  # Auto-generated exports all modules (courses + problems + cheatsheet + question-answers)
+  lessons.ts                  # Auto-generated exports all lessons (courses + problems + cheatsheet + question-answers)
   categories.ts               # Auto-generated slug -> URL category maps (lightweight, client-safe)
+  roadmaps.ts                 # Auto-generated exports all category roadmaps
 ```
 
 > The generated aggregator files (`content/courses.ts`, `content/modules.ts`,
@@ -138,24 +141,35 @@ with `courseSlug: "cheatsheet"`. Each technology is one module whose lesson file
 single lesson are registered in `content/modules.ts` and `content/lessons.ts`.
 They are served at `/[category]/cheatsheets` and `/[category]/cheatsheets/[technology]`.
 
-**Interview questions** live under `content/[category]/interview-qa/` and reuse the
-course/module/lesson model with `courseSlug: "interview-qa"`. Each **technology** is one
-module (e.g. `content/backend/interview-qa/csharp/`), and every question in it is a lesson
+**Question answers** live under `content/[category]/question-answers/` and reuse the
+course/module/lesson model with `courseSlug: "question-answers"`. Each **technology** is one
+module (e.g. `content/backend/question-answers/csharp/`), and every question in it is a lesson
 whose `moduleSlug` is the technology slug. Question lessons also carry a `technology`
 string (e.g. `"C#"`, `"JavaScript"`) used for search and display. The technology is the
 module slug, so it is also the URL segment — use `getInterviewTechSlug()` in
 `lib/content-hrefs.ts` when converting a display name to a slug (e.g. `C#` → `csharp`,
 `CI/CD Pipelines` → `cicd-pipelines`) instead of lowercasing/replacing spaces inline.
-They are served at `/[category]/interview-questions`,
-`/[category]/interview-questions/[technology]` and
-`/[category]/interview-questions/[technology]/[questionSlug]`.
+They are served at `/[category]/question-answers`,
+`/[category]/question-answers/[technology]` and
+`/[category]/question-answers/[technology]/[questionSlug]`.
 
 To add a question:
-1. Create `content/[category]/interview-qa/[technology]/[questionSlug].json` with
-   `courseSlug: "interview-qa"`, `moduleSlug: "<technology>"` and a `technology` display name
+1. Create `content/[category]/question-answers/[technology]/[questionSlug].json` with
+   `courseSlug: "question-answers"`, `moduleSlug: "<technology>"` and a `technology` display name
 2. Add the question slug to the module's `lessonSlugs` array in the technology's `content.json`
-3. Add the technology slug to `moduleSlugs` in `content/interview-qa.json`
+3. Add the technology slug to `moduleSlugs` in `content/question-answers.json`
 4. Run `yarn generate:content` to regenerate index files
+
+**Roadmaps** live under `content/<category>/roadmaps/roadmap.json` and are served at
+`/[category]/roadmap`. There is exactly one roadmap per category, so a roadmap is a single
+JSON file (not a course/module/lesson tree) that lists ordered `stages`, and each stage lists
+`steps` referencing existing content by slug (`course`, `problems`, `cheatsheet`, `interview`)
+or by explicit href (`link`, used for pages like `/ai/glossary`). Steps are resolved against
+the content graph at render time by `resolveRoadmapStep()` in `lib/content.ts`, so a roadmap
+never duplicates titles, descriptions, or links. Roadmaps are registered in the generated
+`content/roadmaps.ts` (`getRoadmapByCategory()`), which `computeNavigationCategories()` reads
+to add a `Roadmap` section to that category's nav dropdown. To add or replace a roadmap, edit
+`content/<category>/roadmaps/roadmap.json` and run `yarn generate:content`.
 
 ### Lesson JSON structure
 ```json
@@ -171,7 +185,7 @@ To add a question:
   "estimatedMinutes": 10,
   "tags": [],
   "blocks": [],
-  "technology": "C#",              // optional; on interview-qa lessons to group by topic
+  "technology": "C#",              // optional; on question-answers lessons to group by topic
   "relatedLessons": [],             // optional; lesson slugs for "next steps" links
   "relatedGlossaryTerms": [],       // optional; glossary term slugs shown as related links
   "furtherReading": []              // optional; FurtherReadingItem[] (article/video/course/tool)
@@ -203,9 +217,10 @@ See `types/index.ts` for the full list. Current types:
 - `/[category]/problems/[courseSlug]/[moduleSlug]/[lessonSlug]` — Problem lesson page
 - `/[category]/cheatsheets` — Category cheat sheet listing
 - `/[category]/cheatsheets/[technology]` — Individual cheat sheet
-- `/[category]/interview-questions` — Category interview question listing
-- `/[category]/interview-questions/[technology]` — Technology-specific questions
-- `/[category]/interview-questions/[technology]/[slug]` — Individual question
+- `/[category]/question-answers` — Category question answer listing
+- `/[category]/question-answers/[technology]` — Technology-specific questions
+- `/[category]/question-answers/[technology]/[slug]` — Individual question
+- `/[category]/roadmap` — Curated per-category learning roadmap
 - `/ai/glossary` — AI glossary
 - `/ai/prompts` — Prompt templates
 - `/search` — Search page
@@ -229,7 +244,7 @@ menu. Add new account pages there rather than at
 `app/<page>` so they inherit the shell and the login gate.
 
 There are no longer top-level `/courses`, `/problems`, `/cheatsheet`, or
-`/interview-questions` pages — those listings live under each category
+`/question-answers` pages — those listings live under each category
 (`/[category]/…`).
 
 ## Navigation and indexing
@@ -384,7 +399,7 @@ Utility scripts in `scripts/` help keep content consistent:
 - `yarn db:studio` — opens Prisma Studio
 - `yarn db:migrate` — creates/applies Prisma migrations during development
 - `yarn vercel-build` — generates Prisma Client, deploys pending migrations, and builds Next.js
-- `yarn generate:content` — regenerates `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, and `content/categories.ts`
+- `yarn generate:content` — regenerates `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, `content/categories.ts`, and `content/roadmaps.ts`
 - `yarn test:content` — runs content validation tests
 - `node scripts/vercel-build.js` — Vercel build entrypoint
 
@@ -397,7 +412,7 @@ Utility scripts in `scripts/` help keep content consistent:
 - **`next/link` vs `<a>`**: Use `next/link` for internal links; `<a target="_blank" rel="noopener noreferrer">` for external
 - **Image optimization**: Content `image` blocks render with a plain `<img>` element (with an `@next/next/no-img-element` eslint-disable comment) because the `src` comes from lesson content and is opened in a modal; follow the existing `ImageBlock`/`ImageModal` pattern in `ContentBlockRenderer.tsx` rather than introducing new image handling.
 - **Generate static params**: When adding a new dynamic route, implement `generateStaticParams()` for build-time generation
-- **Content indexing**: When adding lessons/modules, always run `yarn generate:content` to update the generated aggregator files (`content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, `content/categories.ts`). The build will not automatically discover new content files without running the generator.
+- **Content indexing**: When adding lessons/modules/roadmaps, always run `yarn generate:content` to update the generated aggregator files (`content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, `content/categories.ts`, `content/roadmaps.ts`). The build will not automatically discover new content files without running the generator.
 - **Auth-aware hooks**: `useProgress` and `useBookmarks` are context-based hooks provided by `ProgressProvider` and `BookmarkProvider`. When logged in, they fetch from and write to `/api/progress` and `/api/bookmarks`. When logged out, they read/write `localStorage` only. Do not bypass these hooks with direct DB calls in client components.
 - **Sign-in gating**: Do not redirect unauthenticated users away from the app. Show the inline `SignInPrompt` component when they try to use bookmark/progress features.
 - **Error boundaries**: Wrap risky client-side rendering in `ErrorBoundaryWrapper` (`components/app/ErrorBoundaryWrapper.tsx`) to show a friendly fallback instead of crashing the whole page.
@@ -409,8 +424,8 @@ Utility scripts in `scripts/` help keep content consistent:
 
 - This project uses **Yarn 1.22+**. Use `yarn <script>` for project commands and `yarn prisma ...` for Prisma CLI commands.
 - The `content/courses.ts`, `content/modules.ts`, `content/lessons.ts`, and `content/categories.ts` files are fully auto-generated by `scripts/generate-content-indices.ts`. They are regenerated automatically before `dev`/`build` via `predev`/`prebuild` scripts, or manually with `yarn generate:content`. Do not edit these files by hand.
-- The cheatsheet and interview-qa "courses" (`content/cheatsheet.json`, `content/interview-qa.json`) are imported directly; their modules/lessons are registered in `content/modules.ts` and `content/lessons.ts`.
-- Interview questions use a `technology` field on lessons to group them. Each technology is a module under `content/<category>/interview-qa/`, so the module slug is the technology slug. See `lib/content.ts` helpers like `getInterviewCategories()`, `getInterviewTechnologies()` and `getInterviewQuestions()`.
+- The cheatsheet and question-answers "courses" (`content/cheatsheet.json`, `content/question-answers.json`) are imported directly; their modules/lessons are registered in `content/modules.ts` and `content/lessons.ts`.
+- Question answers use a `technology` field on lessons to group them. Each technology is a module under `content/<category>/question-answers/`, so the module slug is the technology slug. See `lib/content.ts` helpers like `getInterviewCategories()`, `getInterviewTechnologies()` and `getInterviewQuestions()`.
 - The `getLessonsForCourse()` function filters by both `moduleSlug` and `courseSlug` to prevent cross-course leakage.
 - Auth is configured in `auth.ts` using NextAuth v5 with Google OAuth and `PrismaAdapter`. The API route is `app/api/auth/[...nextauth]/route.ts`. The `SessionProvider` wraps the app in `app/layout.tsx` via `AuthProvider`.
 - The Prisma PostgreSQL connection is configured in `lib/prisma.ts` from `DATABASE_URL`. The schema is in `prisma/schema.prisma`, with migrations in `prisma/migrations/`; run `yarn vercel-build` or `yarn prisma migrate deploy` against your Neon database before using auth-dependent features.

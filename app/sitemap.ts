@@ -1,8 +1,8 @@
 import { MetadataRoute } from 'next';
-import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories } from '@/lib/content';
+import { getAllCourses, getProblemCourses, getModulesForCourse, getLessonsForCourse, getInterviewTechnologies, getInterviewQuestions, getNavigationCategories, getRoadmaps } from '@/lib/content';
 import { getCourseCategory } from '@/lib/content-hrefs';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://interview-prep.dev';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://quotient.dev';
 
 function toSitemapEntry(url: string, priority = 0.8, changeFrequency: MetadataRoute.Sitemap[0]['changeFrequency'] = 'monthly', lastModified?: Date): MetadataRoute.Sitemap[0] {
   return {
@@ -30,6 +30,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
+  // Curated category roadmap pages (/[category]/roadmap).
+  for (const roadmap of getRoadmaps()) {
+    entries.push(toSitemapEntry(`${BASE_URL}/${roadmap.category}/roadmap`, 0.8, 'weekly'));
+  }
+
   for (const course of courses) {
     const category = getCourseCategory(course.slug);
     entries.push(toSitemapEntry(`${BASE_URL}/${category}/courses/${course.slug}`));
@@ -48,12 +53,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const technologies = getInterviewTechnologies();
   for (const tech of technologies) {
-    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions`, 0.8, 'weekly'));
-    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions/${tech.slug}`));
+    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers`, 0.8, 'weekly'));
+    entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers/${tech.slug}`));
 
     const questions = getInterviewQuestions(tech.slug, tech.category);
     for (const q of questions) {
-      entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/interview-questions/${tech.slug}/${q.slug}`));
+      entries.push(toSitemapEntry(`${BASE_URL}/${tech.category}/question-answers/${tech.slug}/${q.slug}`));
     }
   }
 

@@ -1,0 +1,141 @@
+{
+  "id": "lesson-iq-debounce-throttle",
+  "slug": "debounce-throttle",
+  "moduleSlug": "javascript",
+  "title": "What is the difference between debounce and throttle?",
+  "description": "Two rate-limiting strategies for high-frequency events: trailing vs leading edges, cancellation, and choosing correctly for search, resize, and scroll.",
+  "order": 15,
+  "difficulty": "intermediate",
+  "tags": [
+    "javascript",
+    "performance",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the difference between debounce and throttle?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Both limit how often an expensive function runs in response to a burst of events, but with different contracts. **Debounce** collapses a burst into **one call at the end**: each new event resets the timer, so the function runs only after events stop for N milliseconds — ideal for *search-as-you-type* (run the query once, with the final text) and autosave. **Throttle** guarantees the function runs **at most once per N ms during** the burst (leading and/or trailing edge) — ideal for *scroll, resize, mousemove, drag*, where you want continuous sampling rather than one call at the end. Debounce waits for silence; throttle samples during the noise."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Semantics in detail:**\n- Debounce (trailing): events at t=0, 50, 100 with 200ms → runs once at t=300 with the last arguments\n- Debounce (leading): runs immediately on the first event, then ignores until quiet — good for 'act fast once, then wait'\n- Throttle (leading): fires on first event, then at most once per window — typical for buttons that must feel instant\n- Throttle (trailing): also fires at window end if events occurred — no 'gap' right before stopping\n- Both must preserve the **latest arguments** and correct **this** binding\n\n**Implementation sketch:** both are closures over a timer id: debounce clears-and-sets on every call; throttle tracks `lastCallTime` and schedules the remainder of the window\n\n**Cancellation matters in production:**\n- Both should return a `cancel()` (and often `flush()`) so components can drop pending work on unmount — a pending debounce firing after navigation is a classic memory-leak/stale-state bug\n- React: wrap in useCallback and cancel in effect cleanup; or use a library (lodash.debounce) with .cancel()\n\n**Choosing:**\n- Search input, autosave, validation → debounce (only the final value matters)\n- Scroll analytics, resize relayout, infinite-scroll checks, hover tooltips, drag → throttle (need periodic samples)\n- Fetch on every keystroke → debounce the input, then fetch; also abort stale requests (debounce doesn't cancel in-flight HTTP)\n- Sizing: debounce delay ≈ typing patience (200–400ms); throttle ≈ visual budget (100–165ms ≈ 6–10 fps sampling)\n\n**Pitfalls:**\n- Debouncing a resize handler that must keep the layout correct → UI breaks between calls; throttle instead\n- Assuming debounce cancels work already started — it only delays scheduling\n- Different libraries disagree on leading/trailing defaults — read the docs"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Minimal implementations and the React cleanup trap",
+        "language": "javascript",
+        "code": "// Debounce: run once, after the burst ends\\nfunction debounce(fn, wait) {\\n  let timer = null;\\n  const debounced = (...args) => {\\n    clearTimeout(timer);\\n    timer = setTimeout(() => fn(...args), wait);\\n  };\\n  debounced.cancel = () => clearTimeout(timer);\\n  return debounced;\\n}\\n\\n// Throttle: run at most once per window (leading + trailing)\\nfunction throttle(fn, wait) {\\n  let last = 0, timer = null;\\n  const throttled = (...args) => {\\n    const now = Date.now();\\n    const remaining = wait - (now - last);\\n    if (remaining <= 0) {\\n      if (timer) { clearTimeout(timer); timer = null; }\\n      fn(...args);\\n      last = now;\\n    } else if (!timer) {\\n      timer = setTimeout(() => { fn(...args); last = Date.now(); timer = null; }, remaining);\\n    }\\n  };\\n  throttled.cancel = () => { clearTimeout(timer); timer = null; };\\n  return throttled;\\n}\\n\\n// Usage:\\nconst onSearch = debounce((q) => fetchResults(q), 300);\\nconst onScroll = throttle(() => updateParallax(), 100);\\n\\n// ❌ React without cleanup: pending call fires after unmount\\nuseEffect(() => {\\n  window.addEventListener('scroll', onScroll);\\n  return () => {\\n    window.removeEventListener('scroll', onScroll);\\n    onScroll.cancel();                    // ✅ drop pending trailing call\\n  };\\n}, [onScroll]);\\n\\n// Debounce does NOT cancel in-flight requests:\\n// onSearch = debounce(async (q) => {\\n//   const results = await search(q);      // still running when the next keystroke comes\\n//   setResults(results);                  // may overwrite newer results\\n// }, 300);\\n// Pair with AbortController or a request-id guard."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The crisp distinction: debounce = settle at the end; throttle = steady sampling\n- Correct scenario matching (search → debounce; scroll/resize → throttle)\n- Production awareness: cancel/flush, cleanup on unmount, in-flight requests not cancelled\n- Ability to sketch a simple implementation"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Debouncing resize handlers that must keep the UI correct continuously",
+          "Never calling cancel on unmount — stale calls into dead component state",
+          "Assuming debounce cancels the HTTP request it scheduled — abort separately",
+          "Leading-edge debounce firing with the first (least relevant) keystroke for search",
+          "Recreating the debounced function every render, defeating the whole purpose",
+          "Using throttle for search — user sees results flicker at interval boundaries"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Implement debounce with leading-edge and flush() semantics",
+          "How do you combine debounce with AbortController for search?",
+          "What replaces debounce for server-driven streaming inputs?",
+          "How do requestAnimationFrame loops compare with throttle for drag/scroll?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Debounce: one call after the burst ends — search, autosave",
+          "Throttle: at most one call per window — scroll, resize, drag",
+          "Always support cancel()/flush() and cancel pending work on unmount",
+          "Neither cancels started async work — pair with AbortController"
+        ],
+        "takeaway": "Debounce for 'only the final state matters', throttle for 'I need a steady pulse' — and always clean up the pending timer."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "async-await",
+    "js-i05"
+  ],
+  "furtherReading": [
+    {
+      "title": "Debouncing and Throttling Explained",
+      "url": "https://css-tricks.com/debouncing-throttling-explained-examples/",
+      "type": "article",
+      "author": "CSS-Tricks"
+    },
+    {
+      "title": "lodash debounce documentation",
+      "url": "https://lodash.com/docs/#debounce",
+      "type": "article",
+      "author": "lodash"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "JavaScript",
+  "estimatedMinutes": 20
+}

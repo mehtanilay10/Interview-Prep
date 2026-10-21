@@ -1,0 +1,139 @@
+{
+  "id": "lesson-iq-ef-inmemory-test-pitfalls",
+  "slug": "ef-inmemory-test-pitfalls",
+  "moduleSlug": "entity-framework-core",
+  "title": "What are the pitfalls of the EF Core InMemory provider for tests?",
+  "description": "Why green InMemory tests lie: no real SQL, no transactions, and what to use instead.",
+  "order": 9,
+  "difficulty": "intermediate",
+  "tags": [
+    "ef-core",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are the pitfalls of the EF Core InMemory provider for testing?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The InMemory provider stores objects **in process memory** — it does not run SQL, does not enforce schema or constraints, ignores most migrations, and gives different semantics (client-side evaluation, no row locking, no transactions per SaveChanges). Tests pass against it and then fail in production against real SQL Server/PostgreSQL. It is fine for quick unit tests of *change-tracking-dependent* logic; for anything that touches **query translation, constraints, transactions, or concurrency**, use SQLite in `Mode=Memory` (with `Cache=Shared`) or a real containerized database."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**What InMemory skips:**\n- **No SQL translation** — complex LINQ that SQL Server would reject (or evaluate differently) runs in .NET; T-SQL-specific raw SQL (`FromSql`) doesn't work at all\n- **No constraints** — unique indexes are not enforced (soft-delete email collisions pass!), `NOT NULL` isn't real, FK violations behave differently\n- **No real transactions** — each SaveChanges is 'committed' immediately in memory; rollback and isolation-level bugs stay invisible\n- **No schema/migrations fidelity** — `EnsureCreated` just builds the model; migration-generated SQL is never exercised\n- **No concurrency semantics** — RowVersion tokens aren't database-checked; `DbUpdateConcurrencyException` paths go untested\n- **Different query evaluation** — some queries fall back to client evaluation with warnings that become errors elsewhere\n- **Collations, case sensitivity, date/time, decimal rounding** all follow .NET rules, not the database's — the classic 'works in test, wrong in prod' source\n\n**Choosing a test double:**\n- Pure unit test of repository/consumer logic with a fake `DbContext`-shaped model and no query complexity → InMemory is acceptable\n- Any test asserting **what SQL results** (ordering, grouping, filters, constraints, transactions) → **SQLite in-memory** (`UseSqlite(\"DataSource=:memory:\")`, keep one open connection so the DB survives) — real relational engine, cheap and ephemeral\n- Highest fidelity (specific SQL dialect, isolation, concurrency, full migrations) → **Testcontainers** running the real database; runs in CI, closest to production\n- Never point integration tests at a shared dev database"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "InMemory vs SQLite in-memory vs Testcontainers",
+        "language": "csharp",
+        "code": "// ❌ Lies to you for anything SQL-shaped\nvar options = new DbContextOptionsBuilder<AppDbContext>()\n    .UseInMemoryDatabase(\"tests\")\n    .Options;\n\n// ✅ Real relational semantics, still ephemeral (EF Core Sqlite package)\nawait using var connection = new SqliteConnection(\"DataSource=:memory:\");\nawait connection.OpenAsync();                 // must stay open — closing drops the DB\n\nvar options = new DbContextOptionsBuilder<AppDbContext>()\n    .UseSqlite(connection)\n    .Options;\n\nawait using var db = new AppDbContext(options);\nawait db.Database.EnsureCreatedAsync();       // real schema, real constraints\n\n// Unique index violations, FK enforcement, GROUP BY, transactions now behave like prod.\n\n// ✅ Highest fidelity: the real engine in CI\n// var postgres = new PostgreSqlBuilder()\n//     .WithImage(\"postgres:16\").Build();\n// await postgres.StartAsync();\n// options.UseNpgsql(postgres.GetConnectionString());\n\n// When InMemory is still fine:\n// - testing SaveChangesAsync state transitions on a hand-built model\n// - smoke-testing a service that does trivial CRUD with no special queries"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing exactly what the InMemory provider is (an object store) and isn't (a database)\n- Concrete examples of tests it can pass that production would fail\n- A testing pyramid opinion: unit fakes vs SQLite vs Testcontainers\n- Awareness that constraint and concurrency paths need a real engine to be exercised"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Running all integration tests on InMemory and assuming CI proves production behavior",
+          "Testing unique-index/soft-delete re-registration on InMemory — no index is enforced",
+          "Forgetting the open-connection requirement for SQLite in-memory (DB vanishes on close)",
+          "Never exercising migrations in tests: EnsureCreated != migrate",
+          "Asserting string SQL like 'ORDER BY' through InMemory — orderings come from .NET semantics",
+          "Leaving concurrency-conflict tests unrunnable because the provider can't fail that way"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Your LINQ works in tests but throws 'could not be translated' in production — why?",
+          "How would you test a migration that backfills data?",
+          "How do you keep database tests fast while using a real engine?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "InMemory = in-process object store; no SQL, constraints, or transactions",
+          "Green InMemory tests hide translation, index, and concurrency bugs",
+          "SQLite in-memory for cheap real relational semantics; Testcontainers for fidelity",
+          "Match the double to what the test claims to prove"
+        ],
+        "takeaway": "Use the cheapest test double that still exercises the behavior under test — InMemory for model logic, a real engine whenever SQL semantics matter."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "change-tracking-and-savechanges",
+    "migrations-in-production"
+  ],
+  "furtherReading": [
+    {
+      "title": "Testing with EF Core (in-memory vs SQLite)",
+      "url": "https://learn.microsoft.com/ef/core/testing/",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Testcontainers for .NET",
+      "url": "https://dotnet.testcontainers.org/",
+      "type": "article",
+      "author": "Testcontainers"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 24
+}

@@ -5,7 +5,7 @@ import { SearchClient } from './SearchClient';
 
 export const metadata: Metadata = buildMetadata({
   title: 'Search',
-  description: 'Search across all courses, problems, cheat sheets, and interview questions.',
+  description: 'Search across all courses, problems, cheat sheets, and question answers.',
   path: '/search',
 });
 

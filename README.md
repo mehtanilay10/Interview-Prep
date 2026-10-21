@@ -1,6 +1,6 @@
 # Quotient
 
-A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, interview Q&A by technology, cheat sheets, SQL problem sets, an AI glossary, and prompt templates. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
+A production-ready educational web app for software engineering interview preparation. Includes structured courses (C#, SQL, React, ASP.NET Core, OOP), coding problems with multiple solutions, question answers by technology, cheat sheets, SQL problem sets, an AI glossary, and prompt templates. Built with Next.js 16, React 19, TypeScript, and Tailwind CSS.
 
 ---
 
@@ -85,7 +85,7 @@ yarn test:content
 ## Project Structure
 
 ```
-interview-prep/
+quotient/
 ├── app/                                    # Next.js App Router pages
 │   ├── layout.tsx                          # Root layout (AuthProvider, ThemeProvider, Navbar, Footer)
 │   ├── page.tsx                            # Home page
@@ -108,8 +108,8 @@ interview-prep/
 │   │   ├── cheatsheets/
 │   │   │   ├── page.tsx                    # Category cheat sheet listing
 │   │   │   └── [technology]/page.tsx       # Individual cheat sheet
-│   │   └── interview-questions/
-│   │       ├── page.tsx                    # Category interview question listing
+│   │   └── question-answers/
+│   │       ├── page.tsx                    # Category question answer listing
 │   │       └── [technology]/
 │   │           ├── page.tsx                # Technology-specific questions
 │   │           └── [slug]/page.tsx         # Individual question
@@ -209,7 +209,7 @@ interview-prep/
 │   │   ├── ProjectModal.tsx                # Project detail modal
 │   │   └── ToolComparisonCard.tsx          # Side-by-side tool comparison card
 │   ├── interview/
-│   │   └── InterviewTechnologyCard.tsx     # Interview technology card
+│   │   └── InterviewTechnologyCard.tsx     # Technology card for question answers
 │   ├── sections/
 │   │   ├── HeroSection.tsx                 # Home page hero
 │   │   └── SectionHeader.tsx               # Reusable eyebrow+title+description
@@ -241,11 +241,11 @@ interview-prep/
 │   │   ├── courses/                        # Structured courses
 │   │   ├── problems/                       # Coding problems
 │   │   ├── cheatsheet/                     # Cheat sheets by technology
-│   │   └── interview-qa/                   # Interview Q&A by technology
+│   │   └── question-answers/               # Question answers by technology
 │   ├── ai/glossary/                        # AI glossary terms
 │   ├── ai/prompts/                         # AI prompt templates
 │   ├── cheatsheet.json                     # Cheatsheet section metadata
-│   ├── interview-qa.json                   # Interview-qa section metadata
+│   ├── question-answers.json               # Question-answers section metadata
 │   ├── courses.ts                          # Auto-generated course exports
 │   ├── modules.ts                          # Auto-generated module definitions
 │   ├── lessons.ts                          # Auto-generated lesson definitions
@@ -266,7 +266,7 @@ interview-prep/
 │
 ├── lib/
 │   ├── content.ts                          # Content loading helpers + search
-│   ├── content-hrefs.ts                    # Client-safe href builders + interview tech slugs
+│   ├── content-hrefs.ts                    # Client-safe href builders + technology slugs
 │   ├── utils.ts                            # General utilities (cn, slugify, etc.)
 │   ├── seo.ts                              # Metadata builders for pages
 │   ├── prisma.ts                           # Singleton Prisma PostgreSQL client
@@ -332,7 +332,7 @@ All content is stored in JSON/TypeScript files under `/content/`. This gives you
 |---|---|---|
 | Courses | `content/[category]/courses/` | Structured learning modules |
 | Problems | `content/[category]/problems/` | Coding problems with multiple solutions |
-| Interview Q&A | `content/[category]/interview-qa/` | Technology-grouped interview questions |
+| Question answers | `content/[category]/question-answers/` | Technology-grouped questions and answers |
 | Cheat sheets | `content/[category]/cheatsheet/` | Quick-reference code examples |
 | AI glossary | `content/ai/glossary/` | Glossary terms served at `/ai/glossary` |
 | Prompt templates | `content/ai/prompts/` | Prompt library served at `/ai/prompts` |
@@ -444,7 +444,7 @@ Or use `<MermaidRenderer>` directly in any client component.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | `https://interview-prep.dev` | Used for SEO metadata and sitemap |
+| `NEXT_PUBLIC_SITE_URL` | `https://quotient.dev` | Used for SEO metadata and sitemap |
 | `AUTH_SECRET` | *(required for auth)* | NextAuth secret for signing JWTs |
 | `AUTH_GOOGLE_ID` | *(required for auth)* | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | *(required for auth)* | Google OAuth client secret |

@@ -22,7 +22,7 @@ interface BookmarkItem {
 
 function bookmarkHref(item: BookmarkItem): string {
   if (item.type === 'interview') {
-    return getContentItemHref('interview-qa', item.moduleSlug, item.slug);
+    return getContentItemHref('question-answers', item.moduleSlug, item.slug);
   }
   return getContentItemHref(item.courseSlug, item.moduleSlug, item.slug);
 }
@@ -112,7 +112,7 @@ export function BookmarksClient() {
       <EmptyState
         icon={<Bookmark className="h-10 w-10" aria-hidden="true" />}
         title="No bookmarks yet"
-        description="Save lessons, problems, and interview questions to find them again quickly."
+        description="Save lessons, problems, and question answers to find them again quickly."
         action={
           <Link href="/" className="rounded-lg bg-accent-emphasis px-4 py-2 text-sm font-medium text-accent-fg">
             Browse content

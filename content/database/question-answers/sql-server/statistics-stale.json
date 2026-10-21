@@ -1,0 +1,151 @@
+{
+  "id": "lesson-iq-sql-statistics-stale",
+  "slug": "statistics-stale",
+  "moduleSlug": "sql-server",
+  "title": "What are statistics and why do execution plans go stale?",
+  "description": "How the optimizer estimates cardinality from histograms, the auto-update thresholds, and the operations that leave stats behind your data.",
+  "order": 19,
+  "difficulty": "advanced",
+  "tags": [
+    "sql server",
+    "performance",
+    "tuning",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are statistics and why do execution plans go stale?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Statistics are **sampled histograms of data distributions** (plus row/page counts) that the optimizer uses to **estimate how many rows a predicate will match** — and those estimates decide join order, join type, and index choice. They go stale because data changes underneath them: after enough row modifications (roughly **20% of the table + 500 rows** for large tables since SQL 2016's threshold change), auto-update triggers a resample — but big updates, ETL loads, or filtered data can blow past good estimates long before the threshold, and **parameter sniffing** can pin a plan built for atypical data. Symptoms: a previously fast query suddenly scans instead of seeks, join order flips, spills to tempdb. Fixes: `UPDATE STATISTICS` (or `sp_updatestats`), recompilation hints (`OPTION (RECOMPILE)`), plan guides, or Query Store forcing a known-good plan — after confirming the estimates, not before."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**What the optimizer actually uses:**\n- **Index statistics**: auto-created with indexes; histogram with up to 200 steps + density info for leading columns\n- **Column statistics**: auto-created on filtered predicates (AUTO_CREATE_STATISTICS), or manual for complex expressions\n- STATSTREAM/histogram: EQ_ROWS, RANGE_ROWS, AVG_RANGE_SIZE — the optimizer interpolates between steps\n- Estimates are **per predicate**, then combined with multi-column assumptions (independence or containment) — misestimates compound through joins\n\n**When stats go stale — the common stories:**\n- **Bulk loads**: ETL inserts 5M rows into a 10M-row table — stats sample says small until auto-update fires, and even then sampling may miss skew\n- **Mass updates changing correlation**: `UPDATE ... SET Region = 'X' WHERE ...` reshapes the distribution; the histogram re-samples only after threshold\n- **Filtered/ascending-key columns**: the classic 'January rows' problem — stats on OrderDate span last year; today's new month is extrapolated badly\n- **Temporary tables and table variables**: temp tables get stats (2016+ auto), table variables don't (until 2022+ with legacy features off) — cardinality 1 estimates poison plans\n- **Parameter sniffing**: first execution's parameter builds the cached plan; if that value was atypical ('2025-01-01' vs '2026-10-01'), the plan is wrong for everyone else\n\n**Detection:**\n- Actual vs estimated rows in the plan XML (huge gaps = bad stats)\n- `DBCC SHOW_STATISTICS (table, index_or_column)` — read the histogram yourself\n- Query Store: plan regression history after data changes; `sys.dm_db_stats_properties` shows last updated + modification counter\n\n**Remediation ladder:**\n1. `UPDATE STATISTICS t idx WITH FULLSCAN` on the offending index (precise, brief cost)\n2. Scheduled maintenance: `sp_updatestats` post-ETL (SQL 2016+ is usually fine with auto-update; big loads still deserve a manual pass)\n3. Query-level: `OPTION (RECOMPILE)` for parameter-sniffing cases; plan forcing in Query Store when a stable good plan exists\n4. Structural: ascending-key patterns want filtered stats (SQL 2022 auto-stats on ascending keys helps), or plan-affecting hints as a last resort"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Diagnosing and fixing a stale-stats regression",
+        "language": "sql",
+        "code": "-- Symptom: OrdersByDate suddenly scans instead of seeks\\nSELECT * FROM Orders\\nWHERE OrderDate >= '2026-10-01';\\n\\n-- 1) Check the stats: when updated, how many modifications since?\\nSELECT s.name AS stats_name,\\n       sp.last_updated, sp.rows_sampled, sp.modification_counter\\nFROM sys.stats s\\nCROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp\\nWHERE s.object_id = OBJECT_ID('dbo.Orders');\\n-- modification_counter in the millions -> stale relative to the table\\n\\n-- 2) Read the histogram yourself\\nDBCC SHOW_STATISTICS ('dbo.Orders', IX_Orders_OrderDate)\\nWITH STATHEAD;   -- steps, density; then full histogram for detail\\n\\n-- 3) Compare plan estimates to reality\\n--    (plan XML: <RelOp ... EstimateRows=... ActualRows=...>)\\n--    40,000 estimated vs 1,900,000 actual = histogram far off\\n\\n-- 4) Fix: refresh the skewed index's stats\\nUPDATE STATISTICS dbo.Orders IX_Orders_OrderDate WITH FULLSCAN;\\n-- or for the whole database after a big load:\\n-- EXEC sp_updatestats;\\n\\n-- Parameter sniffing variant: fast for one parameter, slow for others\\n-- @date typical: good plan; @date = end of month (rare): different selectivity\\nCREATE OR ALTER PROCEDURE dbo.OrdersByDate @date DATE AS\\nBEGIN\\n    SELECT * FROM Orders WHERE OrderDate >= @date\\n    OPTION (RECOMPILE);   -- plan per call, no stale sniffed plan\\nEND\\n\\n-- Proactive: after nightly ETL, refresh stats on touched tables\\n-- UPDATE STATISTICS dbo.FactSales WITH FULLSCAN;  -- small dedicated cost, stable plans"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Estimates vs actuals is the health check",
+      "text": "Every plan regression worth investigating shows up as a gap between estimated and actual rows at some operator. Find the first operator where the gap explodes, look at which statistic backs its predicate, and you've located the stale stats (or the bad estimation assumption) causing the whole plan to go wrong."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Statistics as distribution histograms driving cardinality estimates\n- The ~20% + 500 modification auto-update threshold (2016+) and why bulk loads outrun it\n- Concrete diagnosis: estimates-vs-actuals, dm_db_stats_properties, SHOW_STATISTICS\n- The remediation ladder and the parameter-sniffing cousin of staleness"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Assuming auto-update keeps stats current through heavy ETL — threshold and sampling both lag",
+          "Rebuilding indexes 'for performance' when the actual problem is stale column stats",
+          "Ignoring parameter sniffing — refreshing stats won't fix a sniffed atypical plan",
+          "Trusting table-variable cardinality estimates (pre-2022) — 1-row assumptions wreck joins",
+          "Running FULLSCAN updates on every table nightly — huge unnecessary cost; target the hot ones",
+          "Not using Query Store to see whether the regression is a new plan vs new data volume"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does ascending-key skew ('the January problem') break histogram extrapolation?",
+          "When is OPTION (RECOMPILE) better than plan forcing?",
+          "How do filtered statistics help ascending-key queries?",
+          "What's the difference between auto-update kicking in and fullscan-refreshed stats?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Stats = histograms the optimizer uses for cardinality estimates",
+          "Auto-update waits for ~20% + 500 modifications; bulk loads outrun it",
+          "Diagnose: estimated vs actual rows, dm_db_stats_properties, SHOW_STATISTICS",
+          "Fix: targeted UPDATE STATISTICS; RECOMPILE/plan forcing for sniffing"
+        ],
+        "takeaway": "Plans don't rot at random — they rot when the distribution moved and the histogram didn't; the estimate-vs-actual gap tells you exactly where."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "sql-a01",
+    "sql-i01",
+    "covering-index"
+  ],
+  "furtherReading": [
+    {
+      "title": "Statistics (SQL Server) — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/statistics/statistics?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "Query Store — Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/query-store-for-sql-server?view=sql-server-ver16",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "SQL Server",
+  "estimatedMinutes": 26
+}

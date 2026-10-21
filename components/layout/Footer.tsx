@@ -18,7 +18,7 @@ interface FooterLink {
  */
 const EXTERNAL_LINKS: FooterLink[] = [
   {
-    href: 'https://github.com/mehtanilay10/Interview-Prep/',
+    href: 'https://github.com/mehtanilay10/quotient/',
     label: 'GitHub',
     hint: 'Source code',
     icon: <GitFork className="h-4 w-4" aria-hidden="true" />,

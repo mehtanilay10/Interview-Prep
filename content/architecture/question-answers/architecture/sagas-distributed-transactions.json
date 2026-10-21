@@ -1,0 +1,138 @@
+{
+  "id": "lesson-iq-sagas-distributed-transactions",
+  "slug": "sagas-distributed-transactions",
+  "moduleSlug": "architecture",
+  "title": "How do you manage transactions that span multiple services?",
+  "description": "Sagas: local transactions with compensating actions, choreography vs orchestration, and why two-phase commit usually loses.",
+  "order": 15,
+  "difficulty": "advanced",
+  "tags": [
+    "architecture",
+    "microservices",
+    "transactions",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you manage transactions that span multiple services?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "With **sagas**: a sequence of **local transactions**, each publishing events/commands that trigger the next step, where each completed step has a **compensating action** that undoes it if a later step fails (refund after charge, release stock after reserve). There is no shared lock or global rollback — the saga achieves atomicity *over time* by compensating, so intermediate states are visible and must be handled (order 'in progress'). Two-phase commit technically exists across services but is avoided in practice: a blocking coordinator, a single point of failure, and resource locks held across the whole flow. Design requirements for any saga: **idempotent steps**, explicit **timeout/retry** policy, a **saga log** for audit/recovery, and clear **user-facing states** for the in-flight window."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Why not 2PC:**\n- The coordinator is a availability bottleneck — if it dies mid-transaction, participants are locked/unresolved\n- Holding locks across a distributed flow (seconds to minutes) murders throughput\n- Doesn't cross every technology boundary cleanly (queues, legacy systems, SaaS)\n- Cloud-scale systems (e-commerce, travel, payments) all use sagas instead\n\n**Two saga styles:**\n- **Choreography**: each service reacts to others' events — no central brain. Simple to start; the flow lives implicitly in event handlers. Breaks down when flows get long: nobody can answer 'where is my order?'\n- **Orchestration**: a central saga orchestrator issues commands to services and tracks state — the flow is explicit and auditable; adds a component that must itself be highly available\n- Rule of thumb: 2–3 steps → choreography is fine; longer, branching, or business-critical flows → orchestration\n\n**Compensating actions — the subtleties:**\n- Compensation is **not rollback**: 'refund' ≠ 'the charge never happened'; the log shows both\n- Some steps are **not compensatable** (an SMS was sent) — design steps so irreversible actions happen last\n- Compensation can itself fail → retries, DLQ, and human-operated runbooks for stuck sagas\n- **Semantic locks**: mark records 'pending' at the start, settle later — keeps concurrent sagas honest\n\n**Engineering checklist:**\n- Every step idempotent (dedupe keys) — steps will be retried\n- Timeout per step; the saga must have a defined terminal failure state\n- Saga state persisted (the log) — process restarts must resume, not restart\n- Observability: one correlation id per saga; trace every step; alert on sagas open beyond SLA\n- UI honesty: expose 'processing/refund pending' states instead of pretending atomicity"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Checkout saga: forward steps and compensations",
+        "language": "text",
+        "code": "Saga: PlaceOrder (orchestrated)\\n\\n1. OrderService.Create(orderId, PENDING)           local tx\\n2. PaymentService.Charge(orderId, card)           local tx\\n   compensation: Refund(orderId)\\n3. InventoryService.Reserve(orderId, items)        local tx\\n   compensation: Release(orderId)\\n4. ShippingService.Schedule(orderId, address)      local tx\\n   compensation: CancelShipment(orderId)\\n5. OrderService.Confirm(orderId)                   local tx - terminal success\\n\\nFailure at step 3 (stock gone):\\n  run compensations in reverse: Refund(orderId)\\n  OrderService marks order CANCELLED_OUT_OF_STOCK\\n  compensation already sent -> no more steps\\n\\nRules that make this survivable:\\n  - every Charge/Reserve/Schedule is idempotent on orderId (retries safe)\\n  - orchestrator persists step state; if it restarts, it resumes from the log\\n  - step timeout (e.g., 30s) -> retry x3 -> saga FAILED, alert, refund-in-progress UI\\n  - UI shows 'Payment taken, reserving items...' then 'Confirmed' or 'Refunded'\\n\\nChoreography variant: same flow as events\\n  OrderPlaced -> PaymentService charges -> PaymentCaptured -> Inventory reserves\\n  -> StockReserved -> Shipping schedules -> OrderConfirmed\\n  failure events trigger compensation handlers at each step"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Sagas expose intermediate states — design them",
+        "text": "Between charge and confirmation, money moved but the order isn't final. Users and downstream systems see these states. 'Paid but unshipped' views, refund-pending banners, and reconciliation jobs aren't nice-to-haves — they're part of the saga's correctness story."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Non-idempotent saga steps — a retried command double-charges",
+          "Irreversible actions early in the saga (email/SMS before payment settles)",
+          "Compensation that can fail with no runbook — stuck 'paid, not shipped' states forever",
+          "Choosing choreography for a 7-step flow nobody can trace",
+          "No saga log — recovery after a crash becomes guesswork",
+          "UI pretending atomicity: hiding the in-flight window instead of showing progress states"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does a semantic lock (PENDING status) prevent double-booking?",
+          "When does orchestration beat choreography, concretely?",
+          "How do you reconcile a saga stuck for hours?",
+          "How do sagas interact with exactly-once processing claims?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Sagas: local transactions + compensating actions, no global lock",
+          "Choreography for short flows; orchestration for long, auditable ones",
+          "Compensation is business undo, not rollback — intermediate states are visible",
+          "Idempotent steps, persisted saga log, timeouts, and honest UI states"
+        ],
+        "takeaway": "Distributed atomicity is faked forward (compensate on failure) rather than enforced globally — design every step so the undo is as reliable as the do."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "event-driven-architecture",
+    "how-do-you-guarantee-an-operation-is-applied-only-once",
+    "database-per-service"
+  ],
+  "furtherReading": [
+    {
+      "title": "Saga — Microsoft Patterns",
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/saga/saga",
+      "type": "article",
+      "author": "Microsoft"
+    },
+    {
+      "title": "CQRS Documents — Martin Fowler",
+      "url": "https://martinfowler.com/bliki/CQRS.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Architecture",
+  "estimatedMinutes": 24
+}

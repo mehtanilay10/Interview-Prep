@@ -7,14 +7,16 @@
  *   - content/modules.ts
  *   - content/lessons.ts
  *   - content/categories.ts
+ *   - content/roadmaps.ts
  *
  * Layout:
  *   content/<category>/courses/<courseSlug>/...
  *   content/<category>/problems/<courseSlug>/...
  *   content/<category>/cheatsheet/<technology>/...
- *   content/<category>/interview-qa/<technology>/...
+ *   content/<category>/question-answers/<technology>/...
+ *   content/<category>/roadmaps/roadmap.json   (curated learning path)
  *   content/cheatsheet.json             (cheatsheet section metadata)
- *   content/interview-qa.json           (interview-qa section metadata)
+ *   content/question-answers.json       (question-answers section metadata)
  *
  * Run automatically before dev/build so new JSON files are picked up without manual edits.
  */
@@ -29,9 +31,10 @@ const COURSES_INDEX = path.join(CONTENT_DIR, 'courses.ts');
 const MODULES_INDEX = path.join(CONTENT_DIR, 'modules.ts');
 const LESSONS_INDEX = path.join(CONTENT_DIR, 'lessons.ts');
 const CATEGORIES_INDEX = path.join(CONTENT_DIR, 'categories.ts');
+const ROADMAPS_INDEX = path.join(CONTENT_DIR, 'roadmaps.ts');
 
 /** Section directories that make a top-level directory a content category. */
-const SECTION_DIRS = ['courses', 'problems', 'cheatsheet', 'interview-qa'] as const;
+const SECTION_DIRS = ['courses', 'problems', 'cheatsheet', 'question-answers'] as const;
 
 interface CourseInfo {
   importPath: string;
@@ -134,8 +137,8 @@ function scanCourses(): CourseInfo[] {
   if (fs.existsSync(path.join(CONTENT_DIR, 'cheatsheet.json'))) {
     addCourse('cheatsheet', 'cheatsheet', './cheatsheet.json');
   }
-  if (fs.existsSync(path.join(CONTENT_DIR, 'interview-qa.json'))) {
-    addCourse('interview-qa', 'interview-qa', './interview-qa.json');
+  if (fs.existsSync(path.join(CONTENT_DIR, 'question-answers.json'))) {
+    addCourse('question-answers', 'question-answers', './question-answers.json');
   }
 
   return courses.sort((a, b) => a.slug.localeCompare(b.slug));
@@ -361,10 +364,10 @@ function scanCategories(): CategoryInfo {
       if (!categoryBySlug.has(entry)) categoryBySlug.set(entry, category);
     }
 
-    // Interview questions are one technology module per directory. The module
+    // Question answers are one technology module per directory. The module
     // slug *is* the technology slug, so it resolves both the category and the
     // owning technology of every question inside it.
-    const interviewDir = path.join(CONTENT_DIR, category, 'interview-qa');
+    const interviewDir = path.join(CONTENT_DIR, category, 'question-answers');
     for (const entry of listDirs(interviewDir)) {
       const moduleJsonPath = path.join(interviewDir, entry, 'content.json');
       if (!fs.existsSync(moduleJsonPath)) continue;
@@ -472,7 +475,57 @@ export function getLessonBySlug(slug: string): Lesson | undefined {
 }
 
 export function getLessonsByModule(moduleSlug: string, courseSlug?: string): Lesson[] {
-\treturn lessons.filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug));
+\treturn lessons
+\t\t.filter((l) => l.moduleSlug === moduleSlug && (!courseSlug || l.courseSlug === courseSlug))
+\t\t.sort((a, b) => a.order - b.order);
+}
+`;
+}
+
+// ── Roadmap index ─────────────────────────────────────────────────────────────
+
+interface RoadmapInfo {
+  importPath: string;
+  variableName: string;
+  category: string;
+}
+
+/**
+ * Roadmaps live at `content/<category>/roadmaps/roadmap.json` — one curated
+ * learning path per category, served at `/<category>/roadmap`.
+ */
+function scanRoadmaps(): RoadmapInfo[] {
+  const roadmaps: RoadmapInfo[] = [];
+  const usedNames = new Set<string>();
+
+  for (const category of findCategories()) {
+    const roadmapPath = path.join(CONTENT_DIR, category, 'roadmaps', 'roadmap.json');
+    if (!fs.existsSync(roadmapPath)) continue;
+    roadmaps.push({
+      importPath: `./${category}/roadmaps/roadmap.json`,
+      variableName: uniqueVariableName(`${toVariableName(category, '')}Roadmap`, 'roadmap', usedNames),
+      category,
+    });
+  }
+
+  return roadmaps.sort((a, b) => a.category.localeCompare(b.category));
+}
+
+function generateRoadmapsIndex(roadmaps: RoadmapInfo[]): string {
+  const imports = roadmaps.map((r) => `import ${r.variableName} from "${r.importPath}";`).join('\n');
+
+  const exports = roadmaps.map((r) => `\t{ ...${r.variableName}, category: "${r.category}", slug: "roadmap" },`).join('\n');
+
+  return `import type { Roadmap } from "@/types";
+
+${imports}
+
+export const roadmaps: Roadmap[] = [
+${exports}
+] as unknown as Roadmap[];
+
+export function getRoadmapByCategory(category: string): Roadmap | undefined {
+\treturn roadmaps.find((r) => r.category === category);
 }
 `;
 }
@@ -500,15 +553,17 @@ function main() {
   const modules = scanModules();
   const lessons = scanLessons();
   const categories = scanCategories();
+  const roadmaps = scanRoadmaps();
 
-  console.log(`Found ${courses.length} courses, ${modules.length} modules, ${lessons.length} lessons`);
+  console.log(`Found ${courses.length} courses, ${modules.length} modules, ${lessons.length} lessons, ${roadmaps.length} roadmaps`);
 
   writeIfChanged(COURSES_INDEX, generateCoursesIndex(courses));
   writeIfChanged(MODULES_INDEX, generateModulesIndex(modules));
   writeIfChanged(LESSONS_INDEX, generateLessonsIndex(lessons));
   writeIfChanged(CATEGORIES_INDEX, generateCategoriesIndex(categories));
+  writeIfChanged(ROADMAPS_INDEX, generateRoadmapsIndex(roadmaps));
 
-  console.log('Updated content/courses.ts, content/modules.ts, content/lessons.ts, content/categories.ts');
+  console.log('Updated content/courses.ts, content/modules.ts, content/lessons.ts, content/categories.ts, content/roadmaps.ts');
 }
 
 main();

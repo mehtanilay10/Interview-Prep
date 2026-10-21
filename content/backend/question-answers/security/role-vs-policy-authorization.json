@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-role-vs-policy-authorization",
+  "slug": "role-vs-policy-authorization",
+  "moduleSlug": "security",
+  "title": "What is the difference between role-based and policy-based authorization?",
+  "description": "When roles are enough, when you need policies, and how to write a custom authorization handler.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "tags": [
+    "security",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What is the difference between role-based and policy-based authorization?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Role-based authorization checks a single claim value: *is the user in role X?* Policy-based authorization evaluates a **named set of requirements** through pluggable handlers — a policy can combine roles, claims, and custom business rules (tenure, MFA, resource ownership). Roles are a special case of policies; anything a role check can do, a policy can do, plus everything roles cannot express."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Role-based:**\n- `[Authorize(Roles = \"Admin,Manager\")]` — string comparison against role claims\n- Simple, readable, fine for coarse groups (Admin, User, Moderator)\n- Degrades badly as rules grow: role explosion (\"Admin-US-Readonly\"), business rules that are not roles, and role strings scattered through the codebase"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Policy-based:**\n- A policy is a named collection of **requirements**; each requirement has one or more **handlers** that call `context.Succeed(...)`\n- Built-in requirements: role, claim (with value matchers), authentication scheme\n- Custom requirements carry any rule you model — years of tenure, verified email, region\n- Handlers are registered in DI, are unit-testable in isolation, and keep rules out of controllers\n- `[Authorize(Policy = \"CanEditDocument\")]` reads as intent, not mechanism"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Choosing between them:**\n- Coarse, stable groups → roles (or a simple built-in policy wrapping a role)\n- Combinations, conditionals, or data-dependent rules → custom policies\n- Per-record decisions (\"may this user edit THIS document\") → resource-based authorization: pass the resource to `[Authorize(Policy, Resource = doc)]` or call `IAuthorizationService.AuthorizeAsync` — do not mint a policy per record"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Custom requirement and handler",
+        "language": "csharp",
+        "code": "// Requirement — the rule, no logic\npublic record MinimumTenureRequirement(int Years) : IAuthorizationRequirement;\n\n// Handler — the logic, resolved from DI\npublic class MinimumTenureHandler\n    : AuthorizationHandler<MinimumTenureRequirement>\n{\n    protected override Task HandleRequirementAsync(\n        AuthorizationHandlerContext context,\n        MinimumTenureRequirement requirement)\n    {\n        var since = context.User.FindFirst(\"member_since\")?.Value;\n        if (since is not null &&\n            DateTime.UtcNow.Year - int.Parse(since) >= requirement.Years)\n        {\n            context.Succeed(requirement);\n        }\n        // Note: no context.Fail() — failing one handler must not\n        // block other requirements' handlers from succeeding.\n    }\n}\n\n// Program.cs\nbuilder.Services.AddSingleton<IAuthorizationHandler, MinimumTenureHandler>();\nbuilder.Services.AddAuthorization(options =>\n{\n    options.AddPolicy(\"TenuredEmployee\", policy =>\n        policy.RequireRole(\"Employee\")\n              .Requirements.Add(new MinimumTenureRequirement(2)));\n\n    // Requests without an identity must satisfy this policy by default\n    options.FallbackPolicy = new AuthorizationPolicyBuilder()\n        .RequireAuthenticatedUser()\n        .Build();\n});\n\n// Usage\n[Authorize(Policy = \"TenuredEmployee\")]\n[HttpGet(\"payroll\")]\npublic IActionResult Payroll() => Ok();"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Knowing roles are just claims, and policies generalize them\n- Practical experience: when a simple role check stopped being enough\n- Understanding of requirements/handlers and where they live (DI, not controllers)\n- Awareness of resource-based authorization for ownership checks"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Scattering `if (user.IsInRole(\"Admin\"))` through controllers instead of declaring intent once",
+          "Creating one policy per user or per record — policies are named application rules, not queries",
+          "Forgetting to register the handler: the policy compiles but authorization throws or always denies",
+          "Failing the whole policy from one handler instead of letting each requirement succeed independently",
+          "Trusting role claims that originated from the client without validating them at authentication time"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How does resource-based authorization differ from a global policy?",
+          "What is a fallback policy and when would you set one?",
+          "How would you unit test an authorization handler?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Roles check one claim; policies evaluate named, composable requirements",
+          "Custom requirements + handlers keep rules out of controllers and are testable",
+          "Use resource-based authorization for per-record ownership checks",
+          "Register handlers in DI and consider a fallback policy for unauthenticated requests"
+        ],
+        "takeaway": "Model authorization as named policies with requirements and handlers — roles stay as one requirement among many instead of the whole system."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "authentication-vs-authorization",
+    "oauth-jwt"
+  ],
+  "furtherReading": [
+    {
+      "title": "Policy-based authorization in ASP.NET Core",
+      "url": "https://learn.microsoft.com/aspnet/core/security/authorization/policies",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Resource-based authorization",
+      "url": "https://learn.microsoft.com/aspnet/core/security/authorization/resourcebased",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Security",
+  "estimatedMinutes": 25
+}

@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-oop-value-objects",
+  "slug": "value-objects-and-immutability",
+  "moduleSlug": "oop",
+  "title": "What are value objects and why does immutability matter?",
+  "description": "Entity vs value semantics, replacing primitive obsession with self-validating immutable types, and how immutability removes whole bug classes.",
+  "order": 19,
+  "difficulty": "intermediate",
+  "tags": [
+    "oop",
+    "ddd",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are value objects and why does immutability matter?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Entities** are identified by a stable id (`Order #1042` is the same order after its address changes). **Value objects** are identified by their value alone — `Money(50, USD)`, `Email(\"a@b.com\")`, `DateRange(from, to)` — and are naturally immutable: you don't change a value, you create a new one. Value objects kill primitive obsession: instead of `decimal amount, string currency` traveling together, a `Money` type carries its own validation (no negative amounts, currency always present) and behavior (`Add`, `ApplyPercentage`). Immutability removes race conditions, makes objects safe to share and cache, and turns bugs into compile errors instead of runtime surprises."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**How to recognize a value object:**\n- Two instances with the same components are interchangeable — no identity beyond the values\n- It answers \"what/ how much / which\" — amount, color, address (in some models), coordinate, percentage\n- It's small, self-contained, and shared freely\n\n**Signs you need one (primitive obsession symptoms):**\n- Validation scattered: `if (amount < 0)` re-checked in five services because the type is just `decimal`\n- Parameter twins: methods taking `(string street, string city, string zip, string country)` that always travel together\n- Conversion bugs: passing a `decimal` price where a `decimal` percentage was expected — both compile\n- Formatting leaking everywhere: every call site re-formats an email/phone/currency its own way\n\n**Why immutable:**\n- **No aliasing surprises** — a cached object can't be mutated by whoever holds a reference\n- **Thread safety by construction** — no locks needed for shared read-only values\n- **Predictable state** — an object's fields can't change between two lines of your method\n- **Cheap copies** — copy-on-write and \"modified request\" patterns become natural\n\n**C# mechanics:** `readonly struct` or `record`/`record struct` gives value equality for free; `init`-only setters allow construction-time validation without mutability; `with` expressions create modified copies. Keep validation in the constructor/factory so an invalid value object cannot exist."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Primitive obsession vs a Money value object",
+        "language": "csharp",
+        "code": "// ❌ Primitive obsession: invariants live at every call site.\nvoid Charge(decimal amount, string currency) {\n    if (amount < 0) throw ...;              // check #3 this week\n    if (currency != \"USD\" && currency != \"EUR\") throw ...;\n    // and elsewhere: Charge(refundAmount, \"usd\") — compiles, breaks at runtime\n}\n\n// ✅ Self-validating, immutable value object.\npublic readonly record struct Money {\n    public decimal Amount { get; }\n    public Currency Currency { get; }\n\n    public Money(decimal amount, Currency currency) {\n        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));\n        Amount = amount; Currency = currency;\n    }\n\n    public Money Add(Money other) {\n        if (other.Currency != Currency)\n            throw new InvalidOperationException(\"Currency mismatch\");\n        return new Money(Amount + other.Amount, Currency);\n    }\n\n    public Money ApplyPercent(decimal percent)\n        => new(Amount * (1 - percent), Currency);\n\n    public override string ToString() => $\"{Amount:0.00} {Currency}\";\n}\n\n// Invalid states are unrepresentable: no negative Money, no bare amount.\nvar fee = new Money(10m, Currency.USD).ApplyPercent(0.2m);  // 8.00 USD\n// fee.Amount = 5;  // compile error — immutable, as intended."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Where value objects don't belong",
+        "text": "Don't wrap everything. ORM entity keys, simple internal flags, and data-transfer DTOs usually stay primitives — value objects add ceremony with no payoff when there are no invariants or behavior to protect. Reach for one when the same primitive keeps needing the same validation, or when bugs have come from mixing up twin parameters."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to hear:\n- Identity vs value semantics as the defining difference from entities\n- Concrete benefits: validation in one place, no aliasing bugs, thread-safe sharing\n- C# specifics: records, `init`, `with`, readonly structs, value equality for free\n- Judgment: knowing when NOT to introduce one"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Making a 'value object' with a public setter — mutability breaks the whole premise",
+          "Wrapping every string and int in a type for its own sake ( ceremony inflation)",
+          "Putting mutable collections inside a record and assuming it's still a value",
+          "Using a class with reference equality and then wondering why comparisons fail",
+          "Skipping currency/units in the value, so mismatched arithmetic still compiles"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do value objects interact with EF Core mapping?",
+          "What's the difference between a record and a struct for value objects in .NET?",
+          "How do value objects make illegal states unrepresentable?",
+          "What is 'primitive obsession' and why is it called a code smell?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Entities have identity; values have equivalence — same components = same value",
+          "Value objects are immutable, self-validating, and carry their own behavior",
+          "They eliminate primitive obsession: twin params, scattered validation, mix-up bugs",
+          "C#: records + init-only setters + `with` expressions; don't wrap what has no invariants"
+        ],
+        "takeaway": "If you validate the same primitive in five places, that validation and the data belong together in a value object."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "anemic-domain-model",
+    "records-vs-classes",
+    "beginner-q13",
+    "designing-for-testability"
+  ],
+  "furtherReading": [
+    {
+      "title": "Value Object",
+      "url": "https://martinfowler.com/bliki/ValueObject.html",
+      "type": "article",
+      "author": "Martin Fowler"
+    },
+    {
+      "title": "Records in C#",
+      "url": "https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/types/records",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "OOP",
+  "estimatedMinutes": 18
+}

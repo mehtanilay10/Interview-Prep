@@ -50,7 +50,7 @@ export function LessonActions({
   };
 
   const categoryLabel = useMemo(() => {
-    if (category === 'interviewQuestions') return 'Interview';
+    if (category === 'interviewQuestions') return 'Question';
     return category.slice(0, -1);
   }, [category]);
 

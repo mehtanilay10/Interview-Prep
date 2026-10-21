@@ -1,0 +1,150 @@
+{
+  "id": "lesson-iq-event-delegation",
+  "slug": "event-delegation",
+  "moduleSlug": "javascript",
+  "title": "What are event bubbling, capturing, and delegation?",
+  "description": "How events propagate through the DOM tree, phase control with addEventListener options, and delegation for dynamic content and fewer listeners.",
+  "order": 14,
+  "difficulty": "intermediate",
+  "tags": [
+    "javascript",
+    "dom",
+    "performance",
+    "intermediate"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** What are event bubbling, capturing, and delegation?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "When you click a nested element, the DOM delivers the event in three phases: **capture** (root → target), **target**, then **bubble** (target → root). By default listeners fire in the bubble phase, which is what makes **event delegation** possible: instead of attaching a listener to every item, attach **one** listener to a common ancestor and use `event.target.closest(selector)` to identify which item fired. This cuts memory and setup cost on large lists, and it keeps working for elements **added later** — the listener was never on them in the first place."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Propagation mechanics:**\n- **Capture phase**: event travels window → document → … → parent of target. `addEventListener(type, fn, true)` or `{ capture: true }` subscribes here\n- **Target phase**: the event reaches the target; both capture and bubble listeners at the target fire in registration order\n- **Bubble phase**: event travels back up; default listeners (`{}` options) fire here. Not all events bubble (focus/blur don't — use focusin/focusout; mouseenter/leave don't bubble — but delegation still works because their non-bubbling siblings or capture do)\n- `event.stopPropagation()` halts further propagation (up or down); `stopImmediatePropagation()` also stops other listeners on the same element\n\n**Delegation pattern:**\n- Listener on the container; `event.target` is the deepest element that fired; `event.target.closest('.row')` finds the ancestor row even if you clicked an icon inside it\n- Works for content rendered after page load — lists, tables, nested widgets\n- One listener vs thousands: noticeable for 10k-row tables and repeated re-renders\n- Enables automatic handling of dynamic content without re-attaching handlers\n\n**Trade-offs and pitfalls:**\n- Memory per listener is small, but setup cost and retained closures aren't — delegation wins at scale\n- `closest` from target can escape the delegated container if markup nests unexpectedly — check `container.contains(el)`\n- Stopping propagation must be deliberate: a child that calls stopPropagation silently disables ancestor delegation\n- Some behaviors need per-element listeners (drag sources with DataTransfer state, hover CSS-driven UI) — delegate what bubbles, don't force it\n- Frameworks already delegate: React attaches at the root and simulates bubbling through its synthetic event system — knowing the DOM mechanism explains React's event quirks"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Per-row listeners vs one delegated listener",
+        "language": "javascript",
+        "code": "// ❌ 10,000 listeners, re-attached on every re-render\\nfunction renderRowsBad(rows) {\\n  list.innerHTML = '';\\n  for (const row of rows) {\\n    const el = document.createElement('div');\\n    el.className = 'row';\\n    el.textContent = row.title;\\n    el.addEventListener('click', () => select(row.id));   // one closure per row\\n    list.appendChild(el);\\n  }\\n}\\n\\n// ✅ One listener, works for rows added tomorrow\\nlist.addEventListener('click', (event) => {\\n  const row = event.target.closest('.row');       // survives clicks on inner spans/icons\\n  if (!row || !list.contains(row)) return;        // ignore clicks outside our rows\\n  select(row.dataset.id);\\n});\\n\\nfunction renderRows(rows) {\\n  list.innerHTML = rows\\n    .map((r) => '<div class=\\\"row\\\" data-id=\\\"' + r.id + '\\\">' + r.title + '</div>')\\n    .join('');\\n  // no listeners to re-attach — the container handler already covers everything\\n}\\n\\n// Capture phase: intercept before descendants (e.g., analytics, preventing a handler)\\nmodal.addEventListener(\\n  'keydown',\\n  (e) => {\\n    if (e.key === 'Escape') close();\\n    if (trap.has(e.key)) e.stopPropagation();     // stop inner handlers seeing it\\n  },\\n  { capture: true }\\n);\\n\\n// Non-bubbling events: use their bubbling variants for delegation\\ninput.addEventListener('focusin', onIn);          // 'focus' doesn't bubble"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Delegation explains React events",
+        "text": "React attaches a single listener to the app root and dispatches synthetic events through its own component tree — that's DOM delegation at framework scale. It's why event handlers 'keep working' for re-rendered children and why stopping propagation in React must use e.stopPropagation() in the synthetic event, not the native one."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The three-phase model and that default listeners are bubble-phase\n- The closest() delegation pattern and why it handles dynamic content\n- Knowledge of non-bubbling events and their bubbling alternatives\n- Awareness of when delegation is inappropriate"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Using event.target instead of closest — clicking an icon inside a row selects the icon, not the row",
+          "Forgetting that stopPropagation in a child kills ancestor delegation",
+          "Delegating mouseenter/mouseleave — they don't bubble; use mouseover/mouseout or capture",
+          "Not checking container.contains(el) — closest can find an ancestor outside the delegated list",
+          "Re-attaching delegated listeners on every render instead of once",
+          "Delegating single-item UI (a hero button) — no scale benefit, added indirection"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do capture-phase listeners let you intercept events before a child's handler?",
+          "Why do focus and mouseenter not bubble, and what do you use for delegation instead?",
+          "How does React's synthetic event delegation differ from raw DOM delegation?",
+          "When would you still attach per-element listeners?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Events flow capture → target → bubble; default listeners fire while bubbling",
+          "Delegation: one ancestor listener + event.target.closest() — fast, dynamic-safe",
+          "Non-bubbling events (focus, mouseenter) need variants for delegation",
+          "stopPropagation in children can silently disable delegated handlers"
+        ],
+        "takeaway": "Let the event come to you: one listener on a stable ancestor handles every current and future child, and closest() tells you exactly which one was clicked."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "js-i05",
+    "js-a01"
+  ],
+  "furtherReading": [
+    {
+      "title": "Event delegation — MDN Web Docs",
+      "url": "https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Building_blocks/Events",
+      "type": "article",
+      "author": "MDN Web Docs"
+    },
+    {
+      "title": "Event order (bubbling & capturing)",
+      "url": "https://javascript.info/event-bubbling",
+      "type": "article",
+      "author": "javascript.info"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "JavaScript",
+  "estimatedMinutes": 20
+}

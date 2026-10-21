@@ -59,10 +59,10 @@ export default function HomePage() {
     },
     {
       icon: <Terminal className="h-5 w-5 text-done-fg" aria-hidden="true" />,
-      tag: 'Realistic questions',
-      title: 'Q&A by technology and depth',
+      tag: 'Realistic answers',
+      title: 'Question answers by technology and depth',
       description:
-        'Conceptual, system design, and language-specific questions grouped by depth — so you always know what to study next.',
+        'Conceptual, system design, and language-specific answers grouped by depth — so you always know what to study next.',
     },
     {
       icon: <Bug className="h-5 w-5 text-danger-fg" aria-hidden="true" />,
@@ -117,11 +117,14 @@ export default function HomePage() {
     <>
       <HeroSection
         totalLessons={stats.totalLessons}
+        totalProblems={stats.totalProblems}
+        totalQuestions={stats.totalQuestions}
+        totalCheatsheets={stats.totalCheatsheets}
         totalHours={stats.totalHours}
         totalCourses={courses.length}
         startHref={firstCourse ? `/${getCourseCategory(firstCourse.slug)}/courses/${firstCourse.slug}` : '/'}
         questionsHref={
-          firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/search'
+          firstInterviewCategory ? `/${firstInterviewCategory}/question-answers` : '/search'
         }
       />
 
@@ -231,21 +234,12 @@ export default function HomePage() {
       {/* Courses preview */}
       <section className="border-b border-border py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <SectionHeader
-              eyebrow="Start here"
-              title="Popular courses"
-              description="Self-contained paths built for beginners and working professionals alike."
-              className="mb-0"
-            />
-            <Link
-              href={firstInterviewCategory ? `/${firstInterviewCategory}/interview-questions` : '/search'}
-              className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-accent-fg hover:text-accent-emphasis"
-            >
-              Browse all questions
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </div>
+          <SectionHeader
+            eyebrow="Start here"
+            title="Popular courses"
+            description="Self-contained paths built for beginners and working professionals alike."
+            className="mb-0"
+          />
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {courses.slice(0, 6).map((course: Course) => {

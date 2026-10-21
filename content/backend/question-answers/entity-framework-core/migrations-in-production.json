@@ -1,0 +1,147 @@
+{
+  "id": "lesson-iq-ef-migrations-in-production",
+  "slug": "migrations-in-production",
+  "moduleSlug": "entity-framework-core",
+  "title": "How do you apply EF Core migrations safely in production?",
+  "description": "Idempotent scripts, expand-and-contract, zero-downtime ordering, and rollback strategy.",
+  "order": 4,
+  "difficulty": "advanced",
+  "tags": [
+    "ef-core",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you apply EF Core migrations safely in production?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Generate the migration in development (`dotnet ef migrations add`), review the generated SQL — never trust it blindly — then apply it from your deployment pipeline as a **dedicated, forward-only step** before the new code goes live, using an idempotent script or `MigrateAsync()`. Production safety comes from designing every migration to tolerate **both old and new code** running against the schema (expand-and-contract), because app deployments and schema changes are never perfectly atomic."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Pipeline mechanics:**\n- `dotnet ef migrations script --idempotent` produces a repeatable T-SQL script — safe to run multiple times (`IF NOT EXISTS` guards + `__EFMigrationsHistory` check)\n- Alternatively call `dbContext.Database.MigrateAsync()` at startup — convenient for simple apps, risky for concurrent instances (use a distributed lock) and for very large scripts\n- EF applies each migration inside a transaction where the database allows it, recording it in `__EFMigrationsHistory`\n- Apply migrations as a **separate release step** (job/task) before scaling out new app instances — one applier, not every pod at once\n\n**Zero-downtime rules (expand & contract):**\n- **Expand:** add the new table/column as nullable or with a default; add indexes `CONCURRENTLY` (Postgres) or with online options (SQL Server) on huge tables\n- **Migrate:** backfill old data in batches with the *old* code still running\n- **Switch:** deploy code that writes both formats / reads new-then-old\n- **Contract:** only in a later release, drop the old column/table after nothing references it\n- Breaking changes (rename, type change, not-null without default) require this dance — a rename is 'add new + copy + drop old' across releases, not `RenameColumn` in one shot\n\n**Review checklist:**\n- Read the generated Up()/Down() — EF sometimes guesses badly (literal `GETDATE()` defaults, table rebuilds for a nullable change)\n- Table rebuilds/scaffolding on big tables: `ALTER TABLE ... REBUILD` can lock for minutes — script manually\n- Rows affected estimates: adding `NOT NULL` to an existing table rewrites or scans; plan a backfill first\n- Keep Down() working, but treat **rollback of schema** as: roll back the app code first (it is compatible with the expanded schema), then reverse the migration only if truly needed"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "CI step: idempotent script, one applier",
+        "language": "csharp",
+        "code": "// 1) Author the migration in dev\n// dotnet ef migrations add AddOrdersStatusIndex\n\n// 2) Review Migration file before merging — this is production code\n// public partial class AddOrdersStatusIndex : Migration\n// {\n//     protected override void Up(MigrationBuilder m) =>\n//         migrationBuilder.Sql(\"\"\"\n//             CREATE INDEX IX_Orders_Status_CreatedAt\n//             ON Orders (Status, CreatedAt);\n//             \"\"\");\n// }\n\n// 3) Produce an idempotent script for the release pipeline (or run MigrateAsync)\n// dotnet ef migrations script --idempotent --output migrate.sql\n\n// 4) Single-instance apply at startup (small apps) — guard against races\npublic static async Task ApplyMigrationsAsync(this WebApplication app)\n{\n    await using var scope = app.Services.CreateAsyncScope();\n    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n    if ((await db.Database.GetPendingMigrationsAsync()).Any())\n    {\n        await db.Database.MigrateAsync();   // one runner only (release job/lock)\n    }\n}\n\n// Expand-and-contract across two releases:\n// R1:  ALTER TABLE Orders ADD Status NVARCHAR(20) NULL;   -- expand (old code ignores it)\n// R1:  deploy code that WRITES Status, still reads OldStatus\n// R2:  backfill remaining rows in batches; flip reads to Status\n// R2+: ALTER TABLE Orders DROP COLUMN OldStatus;           -- contract, only now"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-expand-contract-migration",
+        "caption": "Expand-and-contract keeps old and new code compatible with one schema throughout the rollout.",
+        "definition": "graph LR\n    A[Expand: add nullable column / new table] --> B[Deploy new code: writes both]\n    B --> C[Migrate: batch backfill old rows]\n    C --> D[Switch reads to new column]\n    D --> E[Contract: drop old column / table]\n    style A fill:#e8f5e9,stroke:#2e7d32\n    style E fill:#ffebee,stroke:#c62828"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- Real production experience: old and new code overlap during every deploy\n- Idempotent scripts vs MigrateAsync() and when each fits\n- Awareness that generated SQL must be reviewed for locking behavior on big tables\n- A sane rollback story (app first, schema second)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Running `dotnet ef database update` manually from a laptop against production",
+          "Every pod calling MigrateAsync() on startup — races and partial applies",
+          "Shipping a breaking schema change and a code deploy in the same step",
+          "Adding NOT NULL or an index on a huge table during peak hours without online options",
+          "Trusting generated Down() as a real rollback plan",
+          "Renaming a property and expecting a rename in the database — old code breaks instantly"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Your migration rebuilds a 200M-row table — how do you ship it without downtime?",
+          "How do you keep two services with separate DbContexts sharing one database in sync?",
+          "What happens when two deployment pipelines try to apply migrations concurrently?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Apply migrations from the pipeline, idempotently, before new code scales out",
+          "Review generated SQL — locking and table rebuilds don't care about your sprint",
+          "Expand-and-contract so both app versions tolerate the schema",
+          "Roll back app code first; schema rollback is the exception"
+        ],
+        "takeaway": "Treat schema changes as a staged, forward-only release: expand the schema, migrate the data, switch the code, contract later."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "code-first-db-first",
+    "optimistic-concurrency"
+  ],
+  "furtherReading": [
+    {
+      "title": "EF Core migrations in production",
+      "url": "https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Zero-downtime schema changes with EF Core",
+      "url": "https://learn.microsoft.com/ef/core/managing-schemas/migrations/",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 28
+}

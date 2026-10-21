@@ -1,0 +1,133 @@
+{
+  "id": "lesson-iq-ef-global-query-filters",
+  "slug": "global-query-filters",
+  "moduleSlug": "entity-framework-core",
+  "title": "How do you implement soft delete with EF Core global query filters?",
+  "description": "HasQueryFilter for tenant/soft-delete rules, and the gotchas when includes and keys meet filters.",
+  "order": 6,
+  "difficulty": "advanced",
+  "tags": [
+    "ef-core",
+    "advanced"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you implement soft delete with EF Core global query filters?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add a `DeletedAt`/`IsDeleted` marker to the entity, override `SaveChanges` so deletes write the marker instead of removing the row, and attach a **global query filter** (`builder.HasQueryFilter(e => !e.IsDeleted)`) so every query transparently excludes deleted records. The same mechanism handles multi-tenant scoping (`HasQueryFilter(e => e.TenantId == _tenantId)` with the tenant from a scoped service). Know the gotchas: filters don't compose with `Include` chains by default, unique indexes interact with soft deletes, and `Find`/tracked entities bypass assumptions."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**The pattern:**\n- Base entity carries `IsDeleted` (bool) or `DeletedAt` (datetime?)\n- `SaveChanges` override: for each entry marked `Deleted`, reset state to `Modified` and set the marker — the UPDATE persists it\n- `HasQueryFilter(...)` in `OnModelCreating` hides marked rows from all queries of that entity type\n- Global filters apply to **queries**, not to `ExecuteUpdate`/`ExecuteDelete` or raw SQL — those still see every row\n\n**Gotchas a strong candidate lists:**\n- **Filtered includes:** related collections are also filtered — `Include(b => b.Posts)` silently drops posts of a soft-deleted author's siblings... each level applies its own filter; there is no 'include everything' escape hatch (workaround: project or use `.IgnoreQueryFilters()` on a query you control)\n- **Reference navigation to a filtered entity:** loading a `Post` whose `Author` is filtered gives `null` — surprising nulls in DTOs\n- **Unique constraints:** `UNIQUE(Email)` still counts soft-deleted rows — re-registering the same email fails; use a filtered/partial unique index (`WHERE IsDeleted = 0`)\n- **Keys and identity:** soft-deleted rows keep consuming keys; hard-delete is now a data operation, not an app operation\n- **Duplicate filter definitions:** multiple filters on the same type AND together; EF warns when filter expressions differ between levels of a hierarchy (use an interface like `ISoftDeletable` consistently)\n- **Tenancy + soft delete:** combine both in one filter; beware `IgnoreQueryFilters()` opening a tenant leak — audit every use\n- **Find/track:** `Find` applies filters only when it queries; a tracked filtered-out entity can still be referenced"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Soft delete with a SaveChanges override",
+        "language": "csharp",
+        "code": "public interface ISoftDeletable\n{\n    bool IsDeleted { get; set; }\n    DateTime? DeletedAt { get; set; }\n}\n\npublic class Article : ISoftDeletable\n{\n    public int Id { get; set; }\n    public string Title { get; set; } = \"\";\n    public bool IsDeleted { get; set; }\n    public DateTime? DeletedAt { get; set; }\n}\n\nprotected override void OnModelCreating(ModelBuilder b)\n{\n    // One filter, applied to every implementing entity\n    foreach (var type in b.Model.GetEntityTypes()\n                 .Where(t => typeof(ISoftDeletable).IsAssignableFrom(t.ClrType)))\n    {\n        var param = Expression.Parameter(type.ClrType, \"e\");\n        var body = Expression.Not(Expression.Property(param, nameof(ISoftDeletable.IsDeleted)));\n        b.Entity(type.ClrType).HasQueryFilter(Expression.Lambda(body, param));\n    }\n\n    // Survives soft delete: same email reusable after deletion\n    b.Entity<Article>().HasIndex(a => a.Title)\n        .IsUnique()\n        .HasFilter(\"[IsDeleted] = 0\");\n}\n\npublic override async Task<int> SaveChangesAsync(CancellationToken ct = default)\n{\n    foreach (var entry in ChangeTracker.Entries<ISoftDeletable>())\n    {\n        if (entry.State == EntityState.Deleted)\n        {\n            entry.State = EntityState.Modified;      // don't remove the row\n            entry.Entity.IsDeleted = true;\n            entry.Entity.DeletedAt = DateTime.UtcNow;\n        }\n    }\n    return await base.SaveChangesAsync(ct);\n}\n\n// Queries now hide deleted rows automatically:\n// var live = await db.Articles.ToListAsync();\n// Admin restore: db.Articles.IgnoreQueryFilters().Where(a => a.IsDeleted) ... — use sparingly"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Interviewer's Expectation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Interviewers want to assess:\n- The full mechanism (marker + SaveChanges override + HasQueryFilter), not just the filter\n- Knowledge of what filters do **not** cover: includes, navigation nulls, raw SQL, unique indexes\n- Multi-tenant awareness and the security angle of IgnoreQueryFilters\n- Honest trade-offs: soft delete complicates indexes, keys, and compliance (hard purge)"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Overriding Delete to set a flag but forgetting the query filter — nothing changes for readers",
+          "Assuming Include still returns related rows that are filtered out (silent nulls/empty lists)",
+          "UNIQUE constraints over soft-deleted rows blocking re-registration",
+          "Relying on filters in raw SQL or ExecuteUpdate — they are query-only",
+          "Ignoring filtered entities in reports that need true counts (COUNT must decide deleted-or-not explicitly)",
+          "Using IgnoreQueryFilters casually in multi-tenant queries — cross-tenant data exposure"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How would you restore a soft-deleted entity along with its children?",
+          "How do global query filters behave in hierarchy/table-per-type mappings?",
+          "GDPR asks for real erasure — how does soft delete interact with that?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Marker + SaveChanges override + HasQueryFilter = transparent soft delete",
+          "Filters apply to queries only — includes, navigations, and raw SQL differ",
+          "Use filtered unique indexes so soft-deleted rows don't block re-use",
+          "Same mechanism powers tenant scoping — guard IgnoreQueryFilters"
+        ],
+        "takeaway": "Global query filters make 'deleted means hidden' the default — just remember every exception (includes, SQL, constraints) has to be designed for too."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "change-tracking-and-savechanges",
+    "ef-core-relationships-cascade"
+  ],
+  "furtherReading": [
+    {
+      "title": "Global query filters — EF Core",
+      "url": "https://learn.microsoft.com/ef/core/querying/filters",
+      "type": "article",
+      "author": "Microsoft Learn"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Entity Framework Core",
+  "estimatedMinutes": 28
+}

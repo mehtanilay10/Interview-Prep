@@ -14,7 +14,7 @@ import { ProgressErrorBoundary } from '@/components/progress/ProgressErrorBounda
 
 export const metadata: Metadata = {
   title: 'Progress Dashboard | Quotient',
-  description: 'Track your learning progress across courses, problems, and interview questions.',
+  description: 'Track your learning progress across courses, problems, and question answers.',
 };
 
 /**
@@ -37,10 +37,10 @@ function buildProgressCatalog(): ProgressCatalog {
   const moduleCourse: Record<string, ProgressModuleCourse> = {};
   for (const mod of modules) {
     if (mod.slug in moduleCourse) continue;
-    if (mod.courseSlug === 'interview-qa') {
+    if (mod.courseSlug === 'question-answers') {
       moduleCourse[mod.slug] = {
-        courseSlug: 'interview-qa',
-        courseTitle: 'Technical Interview Questions',
+        courseSlug: 'question-answers',
+        courseTitle: 'Technical Question Answers',
       };
       continue;
     }
@@ -51,9 +51,9 @@ function buildProgressCatalog(): ProgressCatalog {
   }
 
   const counts = {
-    lessons: lessons.filter((lesson) => lesson.courseSlug !== 'interview-qa').length,
+    lessons: lessons.filter((lesson) => lesson.courseSlug !== 'question-answers').length,
     problems: lessons.filter((lesson) => isProblemCourseSlug(lesson.courseSlug)).length,
-    interview: lessons.filter((lesson) => lesson.courseSlug === 'interview-qa').length,
+    interview: lessons.filter((lesson) => lesson.courseSlug === 'question-answers').length,
   };
 
   return { courses: courseEntries, moduleCourse, counts };

@@ -1,0 +1,146 @@
+{
+  "id": "lesson-iq-slow-report-pre-aggregation",
+  "slug": "slow-report-pre-aggregation",
+  "moduleSlug": "backend-database",
+  "courseSlug": "question-answers",
+  "title": "A report query takes 30 seconds on every request — how do you fix it?",
+  "description": "From index triage to pre-aggregated summary tables, incremental rollups, and staleness trade-offs.",
+  "order": 13,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": [
+    "backend",
+    "database",
+    "performance",
+    "reporting"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A 30-second report usually means the same expensive aggregate — GROUP BY over millions of rows with joins — is being recomputed on every request. Fixing it is a ladder: confirm the plan and statistics (index coverage, misestimates, missing indexes), remove accidental full scans (functions on columns, implicit conversions, client-side evaluation), and if the query is inherently O(table), stop recomputing it: pre-aggregate into summary tables, indexes, or materialized views and refresh them incrementally."
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The interviewer is testing whether you move from 'tune the query' to 'change the computation strategy' — and whether you're honest about the new trade-off: pre-aggregation trades write complexity and staleness for constant-time reads. Candidates who only know 'add an index' stall here; candidates who can discuss refresh cadence, backfill, and consistency windows sound like they've shipped this."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Step 1: verify what the 30 seconds is spent on"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Read the actual plan: look for high-cost scans, key lookups per row, sorts spilling to tempdb, and estimate-vs-actual cardinality gaps (stale statistics or parameter sniffing).",
+          "Check for accidental non-sargable predicates: WHERE CONVERT(date, CreatedAt) = @d or LIKE '%term%' or implicit conversion from nvarchar parameter to varchar column — each forces scans.",
+          "Check row volume versus semantics: does the report need every row, or aggregates that only change hourly?",
+          "Measure separately: engine time vs network (SELECT * of wide aggregates), serialization, and ORM overhead (materializing 500k entities to count them in memory).",
+          "Rule out the usual suspects first: missing index for the GROUP BY/JOIN keys, top-N operators pulling 20 rows from a 10M-row sort each request."
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Step 2: change the computation — summary tables"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Pre-aggregated daily summary, refreshed incrementally",
+        "language": "sql",
+        "code": "-- The report: 30s over raw events every request\nSELECT CAST(OrderedAt AS date) AS Day, Region, COUNT(*) AS Orders, SUM(Total) AS Revenue\nFROM Orders\nWHERE OrderedAt >= DATEADD(day, -90, GETUTCDATE())\nGROUP BY CAST(OrderedAt AS date), Region;\n\n-- The fix: maintain the aggregate once, read it in milliseconds\nCREATE TABLE OrderDailySummary (\n    Day         date        NOT NULL,\n    Region      varchar(10) NOT NULL,\n    Orders      int         NOT NULL,\n    Revenue     decimal(18,2) NOT NULL,\n    UpdatedAt   datetime2   NOT NULL,\n    PRIMARY KEY (Day, Region)\n);\n\n-- Full build (once, at migration time)\nINSERT INTO OrderDailySummary (Day, Region, Orders, Revenue, UpdatedAt)\nSELECT CAST(OrderedAt AS date), Region, COUNT(*), SUM(Total), SYSUTCDATETIME()\nFROM Orders GROUP BY CAST(OrderedAt AS date), Region;\n\n-- Incremental refresh: only today's partition (runs every minute as a job)\nMERGE OrderDailySummary AS t\nUSING (\n    SELECT CAST(OrderedAt AS date) AS Day, Region, COUNT(*) AS Orders, SUM(Total) AS Revenue\n    FROM Orders\n    WHERE OrderedAt >= CAST(GETUTCDATE() AS date)     -- touched range only\n    GROUP BY CAST(OrderedAt AS date), Region\n) AS s ON t.Day = s.Day AND t.Region = s.Region\nWHEN MATCHED THEN UPDATE SET t.Orders = s.Orders, t.Revenue = s.Revenue,\n                             t.UpdatedAt = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN INSERT (Day, Region, Orders, Revenue, UpdatedAt)\n                      VALUES (s.Day, s.Region, s.Orders, s.Revenue, SYSUTCDATETIME());\n\n-- Read path for the report: index scan of a few hundred rows\nSELECT * FROM OrderDailySummary WHERE Day BETWEEN @from AND @to ORDER BY Day;"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Refresh strategies and their trade-offs"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Scheduled rollup (above): simplest; staleness = refresh interval; ideal for dashboards that tolerate minutes.",
+          "Incremental on write: trigger from the app after committing a sale (append to today's row) — near-real-time, but doubles write-path work and needs care under concurrency (atomic UPDATE ... SET n = n + 1 or a queue).",
+          "Event-driven rebuild: consume the outbox stream and update summaries per event — real-time, builds on the messaging machinery you already have.",
+          "Late-arriving data: refunds and backfills touch old days — keep a reconciliation job that rebuilds the affected window overnight.",
+          "Database-native options: indexed views (SQL Server: schema-bound, restrictive but zero ETL) and materialized views (PostgreSQL: CONCURRENTLY refresh without blocking reads) trade flexibility for engine-managed maintenance.",
+          "The honest staleness statement: label reports 'as of 2 minutes ago' and make sure product/finance agree with the window."
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Pre-aggregation is a consistency trade, not a free lunch",
+        "text": "Summary tables answer from yesterday's math: every read becomes cheap, every write becomes slightly heavier, and a broken refresh job turns into a silent wrong-number incident. Alert on summary lag (MAX(UpdatedAt) vs now) the same way you'd alert on queue depth — otherwise staleness fails invisibly."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Talking through the decision"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A strong answer walks the ladder: (1) is the plan bad — fix statistics, sargability, indexes; (2) is the query O(table) by nature — pre-aggregate; (3) what's the staleness budget and who signed off on it; (4) how do we backfill, reconcile late data, and alert when refresh lags. You also mention what you will NOT do: cache the 30-second query with a long TTL (masks the problem, freezes wrongness), or let users export full-table scans into your primary database — reporting workloads belong on replicas or pre-aggregated storage so analytical reads can't starve transactional ones."
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "First prove the plan: scans, non-sargable predicates, estimate gaps, spills.",
+          "Inherently O(table) reports should not run per request — pre-aggregate.",
+          "Refresh incrementally (partition window or events) and reconcile late data.",
+          "Declare staleness explicitly and alert on summary lag.",
+          "Heavy analytics belong on replicas/summary storage, not the OLTP primary."
+        ],
+        "takeaway": "Stop recomputing what changes slowly: fix the plan, then move the math to write time and read the pre-aggregated result — with lag measured and alerted."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "a-production-query-suddenly-became-slow-after-a-deployment-what-do-you-check",
+    "api-latency-increased-from-100ms-to-4-seconds-how-do-you-investigate",
+    "how-would-you-add-a-cache-without-serving-stale-data"
+  ],
+  "furtherReading": [
+    {
+      "title": "Query Store — fixing plan regressions",
+      "url": "https://learn.microsoft.com/sql/relational-databases/performance/query-store-for-sql-server",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "Indexed views (SQL Server)",
+      "url": "https://learn.microsoft.com/sql/relational-databases/views/indexed-views",
+      "type": "article",
+      "author": "Microsoft Learn"
+    },
+    {
+      "title": "The Data Warehouse Toolkit by Ralph Kimball",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-techniques/",
+      "type": "article",
+      "author": "Ralph Kimball"
+    }
+  ],
+  "technology": "Backend & Database"
+}

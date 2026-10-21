@@ -1,0 +1,137 @@
+{
+  "id": "lesson-iq-scenario-q27",
+  "slug": "scenario-q27",
+  "moduleSlug": "fullstack-scenarios",
+  "title": "How do you roll out a breaking database change with zero downtime?",
+  "description": "Expand-contract migrations: additive phases, backfills, dual writes, and cutover — changing schemas under live traffic without a maintenance window.",
+  "order": 27,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": [
+    "interview",
+    "full-stack",
+    "migrations",
+    "scenarios"
+  ],
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Question:** How do you roll out a breaking database change with zero downtime?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Short Answer"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Never do the breaking change as one migration — decompose it into the **expand-contract (parallel change)** pattern: **expand** (add the new nullable column/table/index alongside the old — additive, safe), **migrate** (backfill old data into the new shape in batches, run both writes or sync until caught up), **switch** (release code that reads the new shape; verify), then **contract** (drop the old column/constraint in a later deploy once nothing references it). Each phase is independently deployable and reversible, so the app never has a moment where old code can't run against the schema. The hard parts are the **backfill under load** (batched, throttled, resumable) and the **dual-write window** (kept as short as possible, ideally avoided via CDC or read-new-after-backfill)."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Detailed Explanation"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Why one-shot migrations break:**\n- Rolling deploys mean old and new app versions run simultaneously — any schema change incompatible with either version breaks one of them\n- Locking DDL (older MySQL ALTER, index builds on hot tables) can block writes for minutes\n- Rollback of a destructive migration is impossible without backups — that's not a rollback plan\n\n**The phases, concretely (rename column users.name → users.display_name as the cliché):**\n1. **Expand**: `ALTER TABLE users ADD display_name varchar(200) NULL` — old code unaffected; new index built online (ONLINE/INPLACE on InnoDB, CREATE INDEX CONCURRENTLY on Postgres)\n2. **Backfill**: batched updates — `UPDATE ... WHERE id BETWEEN @lo AND @hi`, thousands per transaction, throttled, resumable, checkpointed; or one-shot `ADD GENERATED` for computed columns\n3. **Dual-write/switch reads**: app writes both columns (or single source + CDC sync), reads from the old until backfill verified, then flips reads to new behind a flag\n4. **Verify**: row counts, checksum sampling, shadow reads comparing old vs new outputs in logs\n5. **Contract**: remove dual-write code first (deploy), then drop the old column (deploy) — never the reverse; contract migrations ship versions after expand\n\n**Tooling:**\n- Online-safe DDL: Postgres (most ALTERs, CREATE INDEX CONCURRENTLY), MySQL 8 instant/inplace algorithms; check the exact operation's locking behavior before running it on a hot table\n- Backfill framework: batch size tuned to replica lag; pause on lag threshold; observable progress\n- CDC (Debezium/trigger-based) to sync old→new without app dual-writes where available\n\n**Rules of thumb:**\n- Compatibility window: code must tolerate both schemas for the whole expand→contract span (days/weeks, not minutes)\n- Every step reversible at its phase boundary; the only irreversible step (DROP) happens last, when risk is near zero\n- Large table? Add the column, backfill over a week, *then* make it NOT NULL — never in one release"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Rename + type change done with zero downtime",
+        "language": "text",
+        "code": "Goal: users.name (varchar(100)) -> users.display_name (varchar(200), NOT NULL)\\n\\nRelease 1 (expand):\\n  ALTER TABLE users ADD COLUMN display_name varchar(200) NULL;   -- instant/online\\n  CREATE INDEX CONCURRENTLY ix_users_display_name ON users(display_name);\\n  App: writes both name and display_name; still reads name. Deploy. Safe.\\n\\nJob (backfill, runs days):\\n  loop batches: UPDATE users SET display_name = name\\n                WHERE id BETWEEN @lo AND @hi AND display_name IS NULL;\\n  throttle on replica lag > 500ms; checkpoint the high-water mark; resumable.\\n\\nRelease 2 (switch reads, behind flag):\\n  App reads display_name when present, falls back to name otherwise.\\n  Shadow-verify: log mismatches between old and new values; expect ~0.\\n  Flip flag globally when clean.\\n\\nRelease 3 (finalize):\\n  App: single-write to display_name only (drop dual write). Deploy.\\n  Then, much later:\\nRelease 4 (contract):\\n  ALTER TABLE users DROP COLUMN name;                       -- now zero references\\n\\n❌ The one-shot: ALTER ... RENAME in one deploy -> during rolling update,\\n   old pods (expecting 'name') crash until the fleet completes. Outage.\\n❌ Backfilling 200M rows in a single UPDATE -> locks, WAL flood, replica death."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "The contract phase is where patience pays",
+        "text": "Teams drop the old column 'a few days later' — and miss a mobile client from last quarter, a forgotten cron, or an analytics job that still selects it. Let contract wait until monitoring shows zero references to the old shape for a full business cycle, and make DROP fail loudly rather than silently in the next deploy."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Common Mistakes"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "Assuming rolling deploys tolerate a rename — old and new code need a compatibility window",
+          "Single-transaction backfills on huge tables — locks and WAL spikes",
+          "Deploying contract in the same release as expand — no observation window",
+          "Dual writes without an end condition — they live forever and drift",
+          "Ignoring non-app consumers: jobs, BI pipelines, reports selecting the old column",
+          "No resumability in backfill jobs — a crash restarts a week of work"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Follow-up Questions"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "items": [
+          "How do you throttle a backfill based on replica lag?",
+          "When is CDC a better sync than app-level dual writes?",
+          "How do you verify a backfill is complete and correct?",
+          "What changes for schema changes in a sharded/partitioned database?"
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Expand → migrate/backfill → switch reads → contract, each its own deploy",
+          "Every phase tolerates both old and new code; only DROP is irreversible, so it goes last",
+          "Backfills are batched, throttled, resumable, and observable",
+          "Verify with shadow reads/checksums before flipping; wait a full cycle before contract"
+        ],
+        "takeaway": "Zero-downtime schema change means no single moment where one code version can't run — decompose the breaking change into additive steps and let time do the locking for you."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "scenario-q25",
+    "scenario-q26"
+  ],
+  "furtherReading": [
+    {
+      "title": "Safe, gradual database migrations — Stripe",
+      "url": "https://stripe.com/blog/announcing-multirail",
+      "type": "article",
+      "author": "Stripe Engineering"
+    },
+    {
+      "title": "Zero-downtime migrations — Microsoft",
+      "url": "https://learn.microsoft.com/en-us/ef/core/what-is-new/ef-core-9/what's-new#migrations",
+      "type": "article",
+      "author": "Microsoft"
+    }
+  ],
+  "courseSlug": "question-answers",
+  "technology": "Full-Stack Scenarios"
+}
