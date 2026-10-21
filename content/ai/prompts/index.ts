@@ -23,6 +23,12 @@ import writingSocialMediaPost from './writing/social-media-post.json';
 import writingEmailDraft from './writing/email-draft.json';
 import productivityPresentationOutline from './productivity/presentation-outline.json';
 import codingCodeReview from './coding/code-review.json';
+import codingDebugError from './coding/debug-error.json';
+import codingWriteUnitTests from './coding/write-unit-tests.json';
+import codingExplainCode from './coding/explain-code.json';
+import codingRefactorCode from './coding/refactor-code.json';
+import codingApiDesignReview from './coding/api-design-review.json';
+import codingSqlOptimizeQuery from './coding/sql-optimize-query.json';
 import researchResearchSynthesis from './research/research-synthesis.json';
 import learningLearningRoadmap from './learning/learning-roadmap.json';
 import thinkingDecisionMatrix from './thinking/decision-matrix.json';
@@ -52,6 +58,12 @@ const rawPromptTemplates = [
   writingEmailDraft,
   productivityPresentationOutline,
   codingCodeReview,
+  codingDebugError,
+  codingWriteUnitTests,
+  codingExplainCode,
+  codingRefactorCode,
+  codingApiDesignReview,
+  codingSqlOptimizeQuery,
   researchResearchSynthesis,
   learningLearningRoadmap,
   thinkingDecisionMatrix,

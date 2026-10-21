@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { X, Clock, Wrench, Star } from 'lucide-react';
 import { DifficultyBadge } from '@/components/ui/DifficultyBadge';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatHours } from '@/lib/utils';
 import type { MiniProject } from '@/types';
 
@@ -27,10 +28,9 @@ export function ProjectModal({ project, onClose }: ProjectModalProps) {
   // Lock body scroll while open (restores the previous value on close)
   useBodyScrollLock(true);
 
-  // Focus trap — focus the dialog on open
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
+  // Focus trap — moves focus into the dialog, keeps Tab inside it, and
+  // restores focus to the trigger element when the modal closes.
+  useFocusTrap(dialogRef, true);
 
   return (
     <div

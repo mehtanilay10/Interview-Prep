@@ -246,12 +246,14 @@ import mod09PartitioningOperatorsModule from "./backend/courses/linq/09-partitio
 import mod09PerformanceOptimizationModule from "./frontend/courses/react-fundamentals/09-performance-optimization/content.json";
 import mod09RealWorldPatternsModule from "./frontend/courses/react-query/09-real-world-patterns/content.json";
 import mod09SecurityBestPracticesModule from "./backend/courses/authentication-authorization/09-security-best-practices/content.json";
+import mod09SlidingWindowTwoPointerModule from "./backend/problems/csharp/09-sliding-window-two-pointer/content.json";
 import mod09SsrNextjsPerformanceModule from "./frontend/courses/apollo/09-ssr-nextjs-performance/content.json";
 import mod09UtilitiesHelpersModule from "./backend/courses/dotnet-nuget-packages/09-utilities-helpers/content.json";
 import mod10AdvancedFeaturesModule from "./backend/courses/ef-core/10-advanced-features/content.json";
 import mod10AdvancedHookPatternsModule from "./frontend/courses/react-advanced-patterns/10-advanced-hook-patterns/content.json";
 import mod10ConversionGenerationOperatorsModule from "./backend/courses/linq/10-conversion-generation-operators/content.json";
 import mod10DevopsCicdModule from "./devops/courses/aws/10-devops-cicd/content.json";
+import mod10HeapGreedyTrieModule from "./backend/problems/csharp/10-heap-greedy-trie/content.json";
 import mod10IndexesModule from "./database/courses/sql-server/10-indexes/content.json";
 import mod10ObservabilityAndApplicationMonitoringModule from "./devops/courses/azure/10-observability-and-application-monitoring/content.json";
 import mod10WebApiRestModule from "./backend/courses/aspnet-core/10-web-api-rest/content.json";
@@ -378,7 +380,6 @@ import devopsModule from "./devops/courses/devops/content.json";
 import devopsSystemDesignModule from "./architecture/problems/system-design/devops-system-design/content.json";
 import distributedCachingModule from "./architecture/courses/redis-caching-strategies/distributed-caching/content.json";
 import distributedSystemsFundamentalsModule from "./architecture/problems/system-design/distributed-systems-fundamentals/content.json";
-import distributedSystemsFundamentalsModule1 from "./architecture/problems/system-design/distributed-systems-fundamentals/distributed-systems-fundamentals/content.json";
 import distributedTransactionsModule from "./architecture/courses/microservices-architecture/distributed-transactions/content.json";
 import dockerComposeModule from "./devops/cheatsheet/docker-compose/content.json";
 import dotnetAiBackendModule from "./ai/courses/dotnet-ai-backend/content.json";
@@ -842,12 +843,14 @@ const rawModulesPart1 = [
 	{ ...mod09PerformanceOptimizationModule, urlCategory: "frontend" },
 	{ ...mod09RealWorldPatternsModule, urlCategory: "frontend" },
 	{ ...mod09SecurityBestPracticesModule, urlCategory: "backend" },
+	{ ...mod09SlidingWindowTwoPointerModule, urlCategory: "backend" },
 	{ ...mod09SsrNextjsPerformanceModule, urlCategory: "frontend" },
 	{ ...mod09UtilitiesHelpersModule, urlCategory: "backend" },
 	{ ...mod10AdvancedFeaturesModule, urlCategory: "backend" },
 	{ ...mod10AdvancedHookPatternsModule, urlCategory: "frontend" },
 	{ ...mod10ConversionGenerationOperatorsModule, urlCategory: "backend" },
 	{ ...mod10DevopsCicdModule, urlCategory: "devops" },
+	{ ...mod10HeapGreedyTrieModule, urlCategory: "backend" },
 	{ ...mod10IndexesModule, urlCategory: "database" },
 	{ ...mod10ObservabilityAndApplicationMonitoringModule, urlCategory: "devops" },
 	{ ...mod10WebApiRestModule, urlCategory: "backend" },
@@ -974,7 +977,6 @@ const rawModulesPart1 = [
 	{ ...devopsSystemDesignModule, urlCategory: "architecture" },
 	{ ...distributedCachingModule, urlCategory: "architecture" },
 	{ ...distributedSystemsFundamentalsModule, urlCategory: "architecture" },
-	{ ...distributedSystemsFundamentalsModule1, urlCategory: "architecture" },
 	{ ...distributedTransactionsModule, urlCategory: "architecture" },
 	{ ...dockerComposeModule, urlCategory: "devops" },
 	{ ...dotnetAiBackendModule, urlCategory: "ai" },
@@ -1095,10 +1097,10 @@ const rawModulesPart1 = [
 	{ ...rateLimitingDesignModule, urlCategory: "backend" },
 	{ ...reactModule, urlCategory: "frontend" },
 	{ ...reactModule1, urlCategory: "frontend" },
-	{ ...reactAdvancedPatternsModule, urlCategory: "frontend" },
 ];
 
 const rawModulesPart2 = [
+	{ ...reactAdvancedPatternsModule, urlCategory: "frontend" },
 	{ ...reactDataFetchingModule, urlCategory: "frontend" },
 	{ ...reactEcosystemModule, urlCategory: "frontend" },
 	{ ...reactFormsInputModule, urlCategory: "frontend" },

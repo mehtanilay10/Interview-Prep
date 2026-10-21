@@ -1,0 +1,133 @@
+{
+  "id": "lesson-problems-recursion-10",
+  "slug": "sudoku-solver",
+  "moduleSlug": "recursion-problems",
+  "courseSlug": "csharp-problems",
+  "title": "Sudoku Solver",
+  "description": "Solve a 9×9 Sudoku by backtracking with row, column, and box constraint sets and minimum-candidate ordering.",
+  "order": 10,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["csharp", "backtracking", "recursion", "constraint-satisfaction", "hard"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Problem Statement" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Fill a partially completed 9×9 Sudoku grid so that every row, every column, and every 3×3 box contains the digits 1 through 9 exactly once. The puzzle is guaranteed to have a unique solution. Modify the board in place."}
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Example" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A board where row 0 is `[\"5\",\"3\",\".\",\".\",\"7\",\".\",\".\",\".\",\".\"]` and so on. The `.` characters mark empty cells to be filled."}
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "The Naive Version" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For each empty cell in order, try every digit and check validity by scanning the whole row, column, and box — nine cells each. That is work repeated constantly, and it is the difference between a solver that finishes instantly and one that times out."}
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Backtracking with on-demand checks",
+        "content": "Correct, but repeats the same scans at every level.",
+        "language": "csharp",
+        "code": "private static bool IsValid(char[][] board, int row, int col, char digit)\n{\n    for (int i = 0; i < 9; i++)\n    {\n        if (board[row][i] == digit) return false;   // row\n        if (board[i][col] == digit) return false;   // column\n    }\n\n    int boxRow = (row / 3) * 3;\n    int boxCol = (col / 3) * 3;\n\n    for (int r = boxRow; r < boxRow + 3; r++)\n    for (int c = boxCol; c < boxCol + 3; c++)\n    {\n        if (board[r][c] == digit) return false;\n    }\n\n    return true;\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "The Better Approach: Constraint Bitmasks" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Track which digits are already used in each row, column, and box as bitmasks. Checking whether a digit is allowed becomes a single bitwise `AND`, and placing or removing a digit is a bitwise OR or XOR. The box index for cell `(r, c)` is `(r / 3) * 3 + c / 3`."}
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bitmask solver — O(1) constraint checks",
+        "content": "Three 9-element bitmask arrays make every validity check constant time.",
+        "language": "csharp",
+        "code": "public void SolveSudoku(char[][] board)\n{\n    var rows = new int[9];\n    var cols = new int[9];\n    var boxes = new int[9];\n\n    // Seed the masks with the given digits\n    for (int r = 0; r < 9; r++)\n    for (int c = 0; c < 9; c++)\n    {\n        if (board[r][c] == '.') continue;\n\n        int bit = 1 << (board[r][c] - '1');\n        rows[r] |= bit;\n        cols[c] |= bit;\n        boxes[BoxIndex(r, c)] |= bit;\n    }\n\n    Solve();\n\n    bool Solve()\n    {\n        // Find the first empty cell\n        int row = -1, col = -1;\n        for (int r = 0; r < 9 && row == -1; r++)\n        for (int c = 0; c < 9; c++)\n        {\n            if (board[r][c] == '.') { row = r; col = c; break; }\n        }\n\n        if (row == -1) return true;  // no empty cells left: solved\n\n        int box = BoxIndex(row, col);\n        int used = rows[row] | cols[col] | boxes[box];\n\n        for (int digit = 0; digit < 9; digit++)\n        {\n            int bit = 1 << digit;\n            if ((used & bit) != 0) continue;   // digit already in this row, column, or box\n\n            board[row][col] = (char)('1' + digit);\n            rows[row] |= bit;\n            cols[col] |= bit;\n            boxes[box] |= bit;\n\n            if (Solve()) return true;\n\n            // Backtrack: clear the digit from cell and masks\n            board[row][col] = '.';\n            rows[row] &= ~bit;\n            cols[col] &= ~bit;\n            boxes[box] &= ~bit;\n        }\n\n        return false;  // no digit fits here - the earlier choice was wrong\n    }\n}\n\nprivate static int BoxIndex(int row, int col) => (row / 3) * 3 + (col / 3);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Bitmasks turn three scans into one AND",
+        "text": "`rows[row] | cols[col] | boxes[box]` is the set of digits already used in all three constraints. The test `(used & bit) != 0` is a single instruction instead of up to 27 comparisons."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "Minimum remaining values dramatically prunes",
+        "text": "Instead of filling the first empty cell, fill the empty cell with the **fewest legal candidates**. That is the classic MRV heuristic from constraint satisfaction. It can cut the search tree by orders of magnitude on hard puzzles at the cost of a scan per level — well worth it."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Backtracking must undo every mask, not just the cell",
+        "text": "If you reset `board[row][col]` to `'.'` but forget to clear the three bitmasks, later digits will be rejected for reasons that no longer apply, and the solver will report a puzzle unsolvable when it is not."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-sudoku-solver",
+        "caption": "The solver fills one empty cell at a time; a dead end returns false and the caller restores the cell and its three masks.",
+        "definition": "graph TD\n    A[\"find empty cell\"] --> B[\"used = row | col | box\"]\n    B --> C[\"try each digit not in used\"]\n    C --> D[\"place, update masks, recurse\"]\n    D --> E[\"dead end? return false\"]\n    E --> F[\"restore cell and masks, try next digit\"]\n    F --> C\n    C --> G[\"all digits fail -> return false\"]\n    D --> H[\"no empty cells -> solved\"]\n    style H fill:#e8f5e9,stroke:#2e7d32"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Approach Comparison",
+        "cards": [
+          {
+            "title": "On-demand validity scans",
+            "description": "Check the row, column and box each time",
+            "pros": ["Reads exactly like the rules", "No extra state"],
+            "cons": ["Up to 27 comparisons per candidate", "Slow on hard puzzles"],
+            "tags": ["Exponential with large constant", "O(1) space"]
+          },
+          {
+            "title": "Constraint bitmasks",
+            "description": "Three int[9] masks",
+            "pros": ["O(1) validity check", "Cheap undo", "Handles hard puzzles quickly", "Recommended"],
+            "cons": ["Mask bookkeeping must be symmetric"],
+            "tags": ["Exponential with small constant", "O(1) space", "Recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Complete solution",
+        "content": "Sudoku is the reference example of constraint-satisfaction backtracking, and the two upgrades here — cheap constraint representation and the minimum-remaining-values heuristic — are the two levers that make any CSP solver practical. The same shape solves graph colouring, timetable scheduling, and the N-Queens variant that places many queens.",
+        "language": "csharp",
+        "code": "public void SolveSudoku(char[][] board)\n{\n    var rows = new int[9];\n    var cols = new int[9];\n    var boxes = new int[9];\n\n    for (int r = 0; r < 9; r++)\n    for (int c = 0; c < 9; c++)\n    {\n        if (board[r][c] == '.') continue;\n        int bit = 1 << (board[r][c] - '1');\n        rows[r] |= bit;\n        cols[c] |= bit;\n        boxes[(r / 3) * 3 + c / 3] |= bit;\n    }\n\n    Solve();\n\n    bool Solve()\n    {\n        int row = -1, col = -1;\n        for (int r = 0; r < 9 && row == -1; r++)\n        for (int c = 0; c < 9; c++)\n            if (board[r][c] == '.') { row = r; col = c; break; }\n\n        if (row == -1) return true;\n\n        int box = (row / 3) * 3 + col / 3;\n        int used = rows[row] | cols[col] | boxes[box];\n\n        for (int digit = 0; digit < 9; digit++)\n        {\n            int bit = 1 << digit;\n            if ((used & bit) != 0) continue;\n\n            board[row][col] = (char)('1' + digit);\n            rows[row] |= bit; cols[col] |= bit; boxes[box] |= bit;\n\n            if (Solve()) return true;\n\n            board[row][col] = '.';\n            rows[row] &= ~bit; cols[col] &= ~bit; boxes[box] &= ~bit;\n        }\n\n        return false;\n    }\n}"
+      }
+    }
+  ],
+  "relatedLessons": ["n-queens", "word-search"],
+  "furtherReading": []
+}

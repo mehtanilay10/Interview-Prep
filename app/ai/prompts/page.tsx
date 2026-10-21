@@ -3,11 +3,14 @@ import { SectionHeader } from '@/components/sections/SectionHeader';
 import { PromptCard } from '@/components/content/PromptCard';
 import { CalloutBox } from '@/components/ui/CalloutBox';
 import { promptTemplates } from '@/content/ai/prompts';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: 'Prompt Library',
-  description: 'Ready-to-use AI prompt templates for writing, research, learning, analysis, and more. Copy and customize for any AI tool.',
-};
+  description:
+    'Ready-to-use AI prompt templates for coding, writing, research, learning, analysis, and more. Copy and customize for any AI tool.',
+  path: '/ai/prompts',
+});
 
 const CATEGORIES = [
   { key: 'learning', label: 'Learning' },

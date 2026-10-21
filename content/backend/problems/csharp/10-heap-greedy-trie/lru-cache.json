@@ -1,0 +1,120 @@
+{
+  "id": "lesson-problems-heap-09",
+  "slug": "lru-cache",
+  "moduleSlug": "10-heap-greedy-trie",
+  "courseSlug": "csharp-problems",
+  "title": "LRU Cache",
+  "description": "Build a cache with O(1) get and put by combining a hash map with a doubly linked list.",
+  "order": 9,
+  "difficulty": "advanced",
+  "estimatedMinutes": 28,
+  "tags": ["csharp", "design", "hash-map", "linked-list", "medium"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Problem Statement" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a least-recently-used cache with a fixed capacity. `Get(key)` returns the value and marks the key as most recently used, or `-1` if absent. `Put(key, value)` inserts or updates a key and evicts the least recently used entry when capacity is exceeded. Both operations must run in O(1) average time."}
+    },
+    {
+      "type": "heading",
+      "data": { "level": 3, "text": "Example" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "**Operations:** capacity 2, `put(1,1)`, `put(2,2)`, `get(1)` → `1`, `put(3,3)` evicts key 2, `get(2)` → `-1`"
+      }
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Why Two Structures?" }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The map gives O(1) lookup by key, but a plain map cannot tell you *which* key is least recently used without a scan. The linked list encodes recency as position: the head is most recent, the tail is least recent, and moving a node is O(1) when you already hold a reference to it. The map stores that reference, which is what makes both operations constant time."}
+    },
+    {
+      "type": "heading",
+      "data": { "level": 2, "text": "Implementation" }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Dictionary + doubly linked list",
+        "content": "Sentinel nodes remove all null checks at the ends of the list.",
+        "language": "csharp",
+        "code": "public class LruCache\n{\n    private class Node\n    {\n        public int Key;\n        public int Value;\n        public Node? Prev;\n        public Node? Next;\n    }\n\n    private readonly int _capacity;\n    private readonly Dictionary<int, Node> _map = new();\n\n    // Sentinels: _head.Next is most recent, _tail.Prev is least recent.\n    // Using sentinels means we never have to special-case an empty list.\n    private readonly Node _head = new();\n    private readonly Node _tail = new();\n\n    public LruCache(int capacity)\n    {\n        _capacity = capacity;\n        _head.Next = _tail;\n        _tail.Prev = _head;\n    }\n\n    public int Get(int key)\n    {\n        if (!_map.TryGetValue(key, out var node)) return -1;\n\n        MoveToFront(node);\n        return node.Value;\n    }\n\n    public void Put(int key, int value)\n    {\n        if (_map.TryGetValue(key, out var existing))\n        {\n            existing.Value = value;\n            MoveToFront(existing);\n            return;\n        }\n\n        var node = new Node { Key = key, Value = value };\n        _map[key] = node;\n        AddToFront(node);\n\n        if (_map.Count > _capacity)\n        {\n            var lru = _tail.Prev!;      // least recently used\n            Remove(lru);\n            _map.Remove(lru.Key);\n        }\n    }\n\n    private void AddToFront(Node node)\n    {\n        node.Next = _head.Next;\n        node.Prev = _head;\n        _head.Next!.Prev = node;\n        _head.Next = node;\n    }\n\n    private void Remove(Node node)\n    {\n        node.Prev!.Next = node.Next;\n        node.Next!.Prev = node.Prev;\n    }\n\n    private void MoveToFront(Node node)\n    {\n        Remove(node);\n        AddToFront(node);\n    }\n}"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Sentinel nodes remove every null check",
+        "text": "With `_head` and `_tail` sentinels, the insert and remove logic never has to ask 'is this the first node?' or 'is this the last node?'. This is the single biggest source of bugs in hand-written LRU implementations."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Update must also refresh recency",
+        "text": "When `Put` updates an existing key, you must still move it to the front. Forgetting this is a classic bug: the value changes but the entry keeps its old, stale recency position."
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "note",
+        "title": "The link pointers must be updated in the right order",
+        "text": "In `AddToFront`, set `node.Next` and `node.Prev` before rewiring the neighbours. Getting the order wrong can temporarily orphan nodes or create a cycle, which shows up as an infinite loop on the next operation."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "mermaid-lru-cache",
+        "caption": "A doubly linked list ordered by recency with a dictionary pointing into it: get and put both move a node to the head in O(1).",
+        "definition": "graph LR\n    H((head)) --> A[\"1: 1\"]\n    A --> B[\"2: 2\"]\n    B --> T((tail))\n    T -. \"least recent, evicted\" .-> B\n    H -. \"most recent\" .-> A\n    style B fill:#ffebee,stroke:#c62828\n    style A fill:#e8f5e9,stroke:#2e7d32"
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Design Options",
+        "cards": [
+          {
+            "title": "Dictionary only",
+            "description": "Map key to value",
+            "pros": ["Trivial to write"],
+            "cons": ["Cannot identify the LRU entry without a scan", "Not O(1) eviction"],
+            "tags": ["O(1) get", "O(n) eviction"]
+          },
+          {
+            "title": "Dictionary + doubly linked list",
+            "description": "Map key to node, node holds position",
+            "pros": ["O(1) get and put", "Eviction is O(1)", "Recommended"],
+            "cons": ["Pointer bookkeeping is fiddly"],
+            "tags": ["O(1) get and put", "O(capacity) space", "Recommended"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "solution",
+      "data": {
+        "title": "Complete solution",
+        "content": "In .NET you will often reach for `Microsoft.Extensions.Caching.Memory` instead of writing this by hand, but interviews ask you to build it because the map-plus-list composition — where one structure provides the key and the other provides the order — is the transferable idea. The same shape underlies LFU caches and ordered dictionaries.",
+        "language": "csharp",
+        "code": "public class LruCache\n{\n    private class Node\n    {\n        public int Key, Value;\n        public Node? Prev, Next;\n    }\n\n    private readonly int _capacity;\n    private readonly Dictionary<int, Node> _map = new();\n    private readonly Node _head = new();\n    private readonly Node _tail = new();\n\n    public LruCache(int capacity)\n    {\n        _capacity = capacity;\n        _head.Next = _tail;\n        _tail.Prev = _head;\n    }\n\n    public int Get(int key)\n    {\n        if (!_map.TryGetValue(key, out var node)) return -1;\n        MoveToFront(node);\n        return node.Value;\n    }\n\n    public void Put(int key, int value)\n    {\n        if (_map.TryGetValue(key, out var existing))\n        {\n            existing.Value = value;\n            MoveToFront(existing);\n            return;\n        }\n\n        var node = new Node { Key = key, Value = value };\n        _map[key] = node;\n        AddToFront(node);\n\n        if (_map.Count > _capacity)\n        {\n            var lru = _tail.Prev!;\n            Remove(lru);\n            _map.Remove(lru.Key);\n        }\n    }\n\n    private void AddToFront(Node n)\n    {\n        n.Next = _head.Next;\n        n.Prev = _head;\n        _head.Next!.Prev = n;\n        _head.Next = n;\n    }\n\n    private void Remove(Node n)\n    {\n        n.Prev!.Next = n.Next;\n        n.Next!.Prev = n.Prev;\n    }\n\n    private void MoveToFront(Node n)\n    {\n        Remove(n);\n        AddToFront(n);\n    }\n}"
+      }
+    }
+  ],
+  "relatedLessons": ["implement-trie", "daily-temperatures"],
+  "furtherReading": []
+}

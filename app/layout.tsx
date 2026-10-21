@@ -5,6 +5,7 @@ import { PWARegistration } from '@/components/ui/PWARegistration';
 import { ContinuePrompt } from '@/components/ui/ContinuePrompt';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { KeyboardShortcutsHelp } from '@/hooks/useKeyboardShortcuts';
 import { getNavigationCategories } from '@/lib/content';
 import { SkipLink } from '@/components/ui/SkipLink';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
@@ -13,6 +14,7 @@ import { PreferencesProvider } from '@/components/user/PreferencesProvider';
 import { ErrorBoundaryWrapper } from '@/components/app/ErrorBoundaryWrapper';
 import { ProgressProvider } from '@/components/progress/ProgressProvider';
 import { BookmarkProvider } from '@/components/bookmarks/BookmarkProvider';
+import { KeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
@@ -68,6 +70,7 @@ export default function RootLayout({
                 <ContinuePrompt />
                 <ThemeProvider>
                   <Navbar categories={categories} />
+                  <KeyboardShortcuts />
                   <main id="main-content" className="flex-1">
                     <ErrorBoundaryWrapper>
                       {children}
