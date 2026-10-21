@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-02",
+  "slug": "merge-upsert-with-concurrency",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "MERGE Upsert with Concurrency Safety",
+  "description": "Write an upsert that does not deadlock or duplicate rows under concurrent load.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 18,
+  "tags": ["sql", "sql-server", "merge", "upsert", "concurrency", "deadlock"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your application upserts customer rows with `MERGE`. Under load you occasionally see a primary key violation on insert, and sometimes a deadlock between two sessions running the same statement with different keys. Explain why this happens and write a version that is safe."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- The classic MERGE upsert (has a known race: two sessions can both see 'not exists')\nMERGE dbo.Customers AS target\nUSING (SELECT @CustomerId AS CustomerId, @Name AS Name, @Email AS Email) AS source\n    ON target.CustomerId = source.CustomerId\nWHEN MATCHED THEN\n    UPDATE SET Name = source.Name, Email = source.Email\nWHEN NOT MATCHED THEN\n    INSERT (CustomerId, Name, Email) VALUES (source.CustomerId, source.Name, source.Email);\n-- ...plus OPTION (HOLDLOCK) or an explicit transaction with the right isolation\n\n-- Safer pattern: explicit transaction + HOLDLOCK serializable range lock on the key\nBEGIN TRANSACTION;\n\nUPDATE dbo.Customers\nSET Name = @Name, Email = @Email\nWHERE CustomerId = @CustomerId;\n\nIF @@ROWCOUNT = 0\nBEGIN\n    BEGIN TRY\n        INSERT INTO dbo.Customers (CustomerId, Name, Email)\n        VALUES (@CustomerId, @Name, @Email);\n    END TRY\n    BEGIN CATCH\n        -- Lost the race: another session inserted first, so update instead\n        IF ERROR_NUMBER() = 2627   -- primary key violation\n            UPDATE dbo.Customers\n            SET Name = @Name, Email = @Email\n            WHERE CustomerId = @CustomerId;\n        ELSE\n            THROW;\n    END CATCH\nEND;\n\nCOMMIT TRANSACTION;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Explanation",
+        "text": "MERGE evaluates its `WHEN NOT MATCHED` branch against a snapshot, so two concurrent sessions can both decide to insert the same key — one then fails with error 2627. `MERGE` also takes a range lock that can deadlock when sessions touch overlapping key ranges in different orders. The **update-then-insert-with-catch** pattern is easier to reason about: the UPDATE takes an exclusive lock on the row if it exists, and the primary key guarantees the insert cannot duplicate. If you keep MERGE, add `WITH (HOLDLOCK)` to the target to force serializable range locks, and always wrap it in an explicit transaction."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

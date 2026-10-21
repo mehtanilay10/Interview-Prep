@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-07",
+  "slug": "query-hints-and-parameter-sniffing",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "Query Hints and Parameter Sniffing",
+  "description": "Diagnose a stored procedure that is fast for one parameter and slow for another, and fix it properly.",
+  "order": 7,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["sql", "sql-server", "parameter-sniffing", "query-hints", "execution-plan"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A stored procedure `sp_GetOrders @Status` runs in 40 ms when called with `'Open'` (500 rows) but takes 12 seconds with `'Closed'` (9 million rows). The plan was compiled on the first call of the day. Explain the cause, and rank your options from best to worst."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- 1. Best fix when estimates truly vary wildly: recompile just this statement.\n--    Cost is a compile per execution; correctness of the plan is guaranteed.\nCREATE OR ALTER PROCEDURE dbo.sp_GetOrders @Status nvarchar(20)\nAS\nBEGIN\n    SELECT OrderId, CustomerId, OrderDate, Total\n    FROM dbo.Orders\n    WHERE Status = @Status\n    OPTION (RECOMPILE);\nEND;\nGO\n\n-- 2. Better when only a couple of values are skewed: branch and give each its own plan.\nCREATE OR ALTER PROCEDURE dbo.sp_GetOrdersBranched @Status nvarchar(20)\nAS\nBEGIN\n    IF @Status = 'Closed'\n        SELECT OrderId, CustomerId, OrderDate, Total FROM dbo.Orders\n        WHERE Status = @Status OPTION (OPTIMIZE FOR (@Status = 'Closed'));\n    ELSE\n        SELECT OrderId, CustomerId, OrderDate, Total FROM dbo.Orders\n        WHERE Status = @Status OPTION (OPTIMIZE FOR (@Status = 'Open'));\nEND;\nGO\n\n-- 3. Parameterise properly instead of concatenating: keep the plan reusable.\n--    (Never build WHERE clauses by string concatenation — that defeats plan caching\n--     entirely and invites SQL injection.)\n\n-- 4. Last resort only: OPTION (OPTIMIZE FOR UNKNOWN) — stable but usually mediocre.\nSELECT OrderId FROM dbo.Orders WHERE Status = @Status\nOPTION (OPTIMIZE FOR (@Status UNKNOWN));"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Explanation",
+        "text": "This is **parameter sniffing**: the optimizer compiles the plan using the parameter values of the *first* execution. If that call used `'Open'`, the plan is built for 500 rows (nested loop, nonclustered index seek) and that plan is then reused for `'Closed'`, where it performs millions of lookups. Order of preference: **`OPTION (RECOMPILE)`** on the individual statement when parameter values genuinely produce different optimal plans (small compile cost, correct plan every time); **branching with `OPTIMIZE FOR`** when only one or two values are skewed and the procedure is hot enough that the compile cost matters; **plain parameterisation** (never string-concatenated SQL) so plans stay cacheable; **`OPTIMIZE FOR UNKNOWN`** only when you cannot predict values at all and can accept a consistently average plan. Hints are a scalpel, not a default — reach for `OPTION (FORCE ORDER)` or `INDEX =` hints only after you have fixed statistics and indexing."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

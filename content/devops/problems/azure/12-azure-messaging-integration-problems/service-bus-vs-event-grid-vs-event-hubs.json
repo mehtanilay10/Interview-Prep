@@ -1,0 +1,142 @@
+{
+  "id": "lesson-azure-messaging-01",
+  "slug": "service-bus-vs-event-grid-vs-event-hubs",
+  "moduleSlug": "azure-messaging-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Service Bus vs Event Grid vs Event Hubs",
+  "description": "Pick the right Azure messaging service for commands, resource notifications, and telemetry streams.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "messaging", "service-bus", "event-grid", "event-hubs"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A new order platform needs three things: (1) send a \"reserve stock\" command to the warehouse service, retrying until it succeeds; (2) react when a blob is uploaded or a resource is deleted; (3) ingest 50,000 IoT sensor readings per second into a stream processor. Which Azure services do you use?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use **Azure Service Bus** for (1) — it delivers discrete *messages* (commands) with transactions, sessions, retries, and dead-lettering. Use **Event Grid** for (2) — it delivers lightweight *resource events* from Azure services and your own publishers with push delivery and filtering. Use **Event Hubs** for (3) — it is a partitioned *event stream* built for high throughput and replay, not per-message acknowledgement."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Service Bus — send a command",
+        "language": "csharp",
+        "code": "var client = new ServiceBusClient(connectionString);\nvar sender = client.CreateSender(\"stock-commands\");\n\nvar message = new ServiceBusMessage(BinaryData.FromObjectAsJson(new\n{\n    OrderId = orderId,\n    Sku = \"SKU-1024\",\n    Quantity = 2\n}))\n{\n    MessageId = Guid.NewGuid().ToString(),   // enables duplicate detection\n    ContentType = \"application/json\",\n    SessionId = customerId                  // ordered processing per customer\n};\n\nawait sender.SendMessageAsync(message);"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Event Grid — subscribe to blob events (Bicep)",
+        "language": "bicep",
+        "code": "resource blobSub 'Microsoft.EventGrid/eventSubscriptions@2023-12-15-preview' = {\n  name: 'thumbnails-on-upload'\n  scope: storageAccount\n  properties: {\n    destination: {\n      endpointType: 'AzureFunction'\n      properties: { resourceId: thumbnailFunction.id, maxEventsPerBatch: 10 }\n    }\n    filter: {\n      includedEventTypes: [ 'Microsoft.Storage.BlobCreated' ]\n      subjectBeginsWith: '/blobServices/default/containers/uploads/'\n    }\n    retryPolicy: { maxDeliveryAttempts: 30, eventTimeToLiveInMinutes: 1440 }\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Event Hubs — stream sensor readings",
+        "language": "csharp",
+        "code": "var producer = new EventHubProducerClient(connectionString, \"telemetry\");\nusing var batch = await producer.CreateBatchAsync();\n\nforeach (var reading in readings)\n{\n    var payload = BinaryData.FromObjectAsJson(reading);\n    if (!batch.TryAdd(new EventData(payload) { PartitionKey = reading.DeviceId }))\n    {\n        await producer.SendAsync(batch);                       // flush full batch\n        batch.Dispose();\n        batch = await producer.CreateBatchAsync();\n        batch.TryAdd(new EventData(payload) { PartitionKey = reading.DeviceId });\n    }\n}\nawait producer.SendAsync(batch);"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Split Them This Way"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The three services have different delivery semantics. You cannot ask Event Grid to hold a command until a worker acknowledges it, and you cannot ask Service Bus to stream 50k events per second cheaply. Choosing on **delivery semantic** rather than on \"which is newest\" avoids painful rewrites later."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Azure messaging decision table",
+        "cards": [
+          {
+            "title": "Service Bus",
+            "description": "Enterprise message broker (queues + topics)",
+            "pros": [
+              "Transactions and dead-letter queues",
+              "Sessions for ordered processing",
+              "Duplicate detection",
+              "Scheduled delivery and deferral"
+            ],
+            "cons": [
+              "Lower throughput than Event Hubs",
+              "Per-message pricing",
+              "Not a replayable log"
+            ],
+            "tags": ["Commands", "Recommended", "Order workflows"]
+          },
+          {
+            "title": "Event Grid",
+            "description": "Push-based reactive event routing",
+            "pros": [
+              "Native Azure resource events",
+              "Subject and advanced filtering",
+              "Very cheap",
+              "Webhook, Function, and Queue handlers"
+            ],
+            "cons": [
+              "At-least-once, no ordering guarantee",
+              "Up to 24h retry window",
+              "Not for high-rate telemetry"
+            ],
+            "tags": ["Reactive glue", "Resource notifications"]
+          },
+          {
+            "title": "Event Hubs",
+            "description": "Partitioned event streaming platform",
+            "pros": [
+              "Millions of events per second",
+              "Replayable retention with offsets",
+              "Kafka-compatible endpoint",
+              "Capture to Blob Storage"
+            ],
+            "cons": [
+              "No per-message ack or dead-lettering",
+              "Ordering only within a partition",
+              "Consumer offsets are your responsibility"
+            ],
+            "tags": ["Telemetry", "Streaming analytics"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

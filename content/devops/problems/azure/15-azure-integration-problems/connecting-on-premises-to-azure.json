@@ -1,0 +1,129 @@
+{
+  "id": "lesson-azure-integration-02",
+  "slug": "connecting-on-premises-to-azure",
+  "moduleSlug": "azure-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Connecting On-Premises to Azure",
+  "description": "Choose between VPN and ExpressRoute for a hybrid workload that must reach a legacy database.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "hybrid", "vpn", "expressroute", "networking"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A new Azure-hosted API must read from an on-premises SQL Server in the company data centre. The data centre connects to the internet through a single 200 Mbps fibre link. Traffic to the API is bursty and the business tolerates a few minutes of degradation but not a full outage. How do you connect the two networks?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Start with a **site-to-site VPN** using a **VPN Gateway** in a dedicated `GatewaySubnet`. It runs over the internet, encrypts traffic with IPsec/IKE, and is provisioned in under an hour. If the workload later becomes business-critical — voice, real-time trading, or a very large data transfer — move to **ExpressRoute** for a private, SLA-backed circuit that bypasses the public internet. Because the on-premises link is a single point of failure, ensure the design has a fallback path."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Site-to-site VPN gateway (Bicep)",
+        "language": "bicep",
+        "code": "resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = {\n  parent: vnet\n  name: 'GatewaySubnet'                 // must be exactly this name\n  properties: { addressPrefix: '10.0.255.0/27' }\n}\n\nresource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-11-01' = {\n  name: 'vgw-quotient'\n  location: location\n  properties: {\n    gatewayType: 'Vpn'\n    vpnType: 'RouteBased'\n    enableBgp: true\n    activeActive: true                   // two tunnels: no single point of failure\n    sku: { name: 'VpnGw2AZ', tier: 'VpnGw2AZ' }\n    ipConfigurations: [\n      { name: 'active1', properties: { publicIPAddress: { id: pip1.id }, subnet: { id: gatewaySubnet.id } } }\n      { name: 'active2', properties: { publicIPAddress: { id: pip2.id }, subnet: { id: gatewaySubnet.id } } }\n    ]\n  }\n}\n\nresource connection 'Microsoft.Network/connections@2023-11-01' = {\n  name: 'cn-onprem'\n  location: location\n  properties: {\n    connectionType: 'IPsec'\n    connectionProtocol: 'IKEv2'\n    virtualNetworkGateway1: { id: vpnGateway.id }\n    localNetworkGateway2: { id: localGateway.id }\n    sharedKey: vpnSharedKey\n    enableBgp: true\n    routingWeight: 0\n  }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Regardless of the transport, put the private endpoint on the on-premises database side inside a hub VNet and share it with spokes using **VNet peering**. Application code then talks to a private IP, and no traffic traverses a public endpoint."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why VPN First, ExpressRoute Later"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "ExpressRoute has a multi-week provisioning lead time through a connectivity provider and a substantially higher monthly cost. VPN over the internet is immediate and cheap, and for an internal API reading a database it is usually fast enough. The decision flips when you need guaranteed jitter, a private path for compliance, or bandwidth beyond what the internet link supports."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Hybrid connectivity options",
+        "cards": [
+          {
+            "title": "Site-to-site VPN",
+            "description": "Encrypted tunnels over the internet",
+            "pros": [
+              "Live in under an hour",
+              "Low cost",
+              "Active-active tunnels for resilience",
+              "Supports BGP dynamic routing"
+            ],
+            "cons": [
+              "Latency and jitter depend on the internet",
+              "Throughput bounded by your ISP link",
+              "No bandwidth SLA"
+            ],
+            "tags": ["Recommended", "First step"]
+          },
+          {
+            "title": "ExpressRoute",
+            "description": "Private dedicated circuit",
+            "pros": [
+              "Predictable latency",
+              "Up to 10 Gbps per circuit",
+              "Does not traverse the public internet",
+              "Financially backed SLA"
+            ],
+            "cons": [
+              "Weeks to provision",
+              "Premium monthly cost",
+              "Requires a connectivity provider",
+              "Still needs a VPN backup"
+            ],
+            "tags": ["Regulated", "High bandwidth"]
+          },
+          {
+            "title": "Point-to-site VPN",
+            "description": "Per-device client tunnels",
+            "pros": [
+              "Perfect for individual developers"
+            ],
+            "cons": [
+              "Not for service-to-service traffic",
+              "Manual client management"
+            ],
+            "tags": ["Developer access"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

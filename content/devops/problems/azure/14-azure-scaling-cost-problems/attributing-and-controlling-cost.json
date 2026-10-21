@@ -1,0 +1,134 @@
+{
+  "id": "lesson-azure-scaling-03",
+  "slug": "attributing-and-controlling-cost",
+  "moduleSlug": "azure-scaling-cost-problems",
+  "courseSlug": "azure-problems",
+  "title": "Attributing and Controlling Cost",
+  "description": "Make each team see its own spend and stop runaway resources before the invoice arrives.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "cost", "tags", "budgets", "governance"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The subscription bill arrives and nobody can explain a $4,200 increase. It turns out a developer left a GPU virtual machine running over a holiday weekend and a test storage account accumulated three years of logs. Finance asks which team owns each resource; there is no answer in the portal."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Three layers: (1) enforce a **tagging policy** (`owner`, `environment`, `costCenter`, `project`) with Azure Policy so untagged resources cannot be created; (2) set **budgets with alert thresholds** per resource group and per team, so spend is visible during the month rather than after it; (3) add **automatic shutdown** for dev and test compute, plus a **lifecycle rule** on storage so logs expire instead of growing forever."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Require tags at creation (Azure Policy)",
+        "language": "json",
+        "code": "{\n  \"if\": {\n    \"allOf\": [\n      { \"field\": \"type\", \"equals\": \"Microsoft.Web/sites\" },\n      { \"anyOf\": [\n        { \"field\": \"tags['owner']\", \"exists\": \"false\" },\n        { \"field\": \"tags['costCenter']\", \"exists\": \"false\" }\n      ] }\n    ]\n  },\n  \"then\": {\n    \"effect\": \"deny\"\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Budget with escalating alerts (Bicep)",
+        "language": "bicep",
+        "code": "resource teamBudget 'Microsoft.Consumption/budgets@2023-11-01' = {\n  name: 'budget-team-checkout'\n  properties: {\n    category: 'Cost'\n    amount: 5000\n    timeGrain: 'Monthly'\n    timePeriod: { startDate: '2024-01-01' }\n    filter: {\n      tags: { name: 'costCenter', value: 'CC-4471' }\n    }\n    notifications: {\n      at75: {\n        enabled: true\n        operator: 'GreaterThanOrEqualTo'\n        threshold: 75\n        contactEmails: [ 'checkout-team@example.com' ]\n      }\n      at100: {\n        enabled: true\n        operator: 'GreaterThanOrEqualTo'\n        threshold: 100\n        contactEmails: [ 'checkout-team@example.com', 'finops@example.com' ]\n      }\n    }\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expire logs automatically",
+        "language": "json",
+        "code": "{\n  \"rules\": [\n    {\n      \"enabled\": true,\n      \"name\": \"expire-application-logs\",\n      \"type\": \"Lifecycle\",\n      \"definition\": {\n        \"filters\": {\n          \"blobTypes\": [ \"blockBlob\" ],\n          \"prefixMatch\": [ \"logs/application/\" ]\n        },\n        \"actions\": {\n          \"baseBlob\": {\n            \"tierToCool\": { \"daysAfterModificationGreaterThan\": 30 },\n            \"tierToArchive\": { \"daysAfterModificationGreaterThan\": 180 },\n            \"delete\": { \"daysAfterModificationGreaterThan\": 1095 }\n          }\n        }\n      }\n    }\n  ]\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Attribution First"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cost optimisation without attribution is guesswork: nobody has an incentive to turn off a resource they do not know they own. Tags turn the bill from one opaque number into a per-team scoreboard, and budgets turn months of silence into an alert while there is still time to act."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Cost control mechanisms",
+        "cards": [
+          {
+            "title": "Tags + budgets + policy",
+            "description": "Attribution with proactive alerts",
+            "pros": [
+              "Every resource has an owner",
+              "Alerts fire mid-month",
+              "Untagged resources blocked"
+            ],
+            "cons": [
+              "Policy exemptions need governance",
+              "Retro-tagging existing resources takes effort"
+            ],
+            "tags": ["Recommended"]
+          },
+          {
+            "title": "Automatic shutdown schedules",
+            "description": "Stop dev compute outside working hours",
+            "pros": [
+              "Large savings on non-prod",
+              "Applies automatically"
+            ],
+            "cons": [
+              "Unexpected 3 a.m. test failures",
+              "Needs an opt-out for on-call work"
+            ],
+            "tags": ["Dev and test"]
+          },
+          {
+            "title": "Cost Management exports and dashboards",
+            "description": "Reactive reporting to Power BI",
+            "pros": [
+              "Rich analysis and trending",
+              "Can join with business metrics"
+            ],
+            "cons": [
+              "Reports arrive after spend happens",
+              "Needs a team to maintain the model"
+            ],
+            "tags": ["Finance and leadership reporting"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

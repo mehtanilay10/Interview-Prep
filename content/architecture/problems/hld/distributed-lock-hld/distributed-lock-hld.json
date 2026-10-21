@@ -1,0 +1,274 @@
+{
+  "id": "lesson-hld-distributed-lock",
+  "slug": "distributed-lock-hld",
+  "moduleSlug": "distributed-lock-hld",
+  "courseSlug": "hld-problems",
+  "title": "Distributed Lock Service: Complete Architecture",
+  "description": "Design a distributed lock service using leases, monotonic fencing tokens, and a consensus-backed store that never double-grants.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 55,
+  "tags": [
+    "hld",
+    "system-design",
+    "distributed-lock",
+    "lease",
+    "fencing-token",
+    "raft"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a distributed lock service used by thousands of workers to guarantee that at most one process performs a critical section at a time — for example running a nightly settlement job, or mutating a specific account. The service must remain correct under network partitions, GC pauses, clock skew, and leader failover, and it must never allow two holders simultaneously."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Lease",
+            "definition": "A lock with an expiry time. The holder must renew before expiry. A crashed holder's lock is automatically released when the lease lapses, which is what prevents permanent deadlock."
+          },
+          {
+            "term": "Fencing Token",
+            "definition": "A monotonically increasing number returned with each lock grant. The protected resource rejects any write carrying a token lower than the highest it has seen, so a stalled former holder cannot corrupt data."
+          },
+          {
+            "term": "Safety vs Liveness",
+            "definition": "Safety means never granting the lock twice. Liveness means eventually granting it to someone. Distributed locks must always prioritise safety."
+          },
+          {
+            "term": "Redlock Controversy",
+            "definition": "The debate over whether locking against multiple independent Redis masters is actually safe under clock skew and process pauses. The consensus is that fencing tokens are required regardless of the store."
+          },
+          {
+            "term": "Quorum Commit",
+            "definition": "A write is only considered durable once a majority of replicas acknowledge it. Locks must be committed to a quorum, never to a single node."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Acquire: attempt to take a named lock, returning success with a fencing token or failure immediately (no indefinite blocking by default)",
+          "Release: explicitly release a lock, and only by the holder that acquired it",
+          "Lease Renewal: a holder can extend its lease while it is still working",
+          "Watch / Queue: optionally wait for a lock to become available with a bounded timeout",
+          "Lock Introspection: report current holders, remaining lease time, and waiters for operations tooling",
+          "Fairness Mode: support an optional FIFO queue so no waiter starves"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Safety Above All: two clients must never hold the same lock at the same time, even during a partition or failover",
+          "Availability: lock acquisition succeeds in under 10 ms P99 with five nines of availability",
+          "Fault Tolerance: tolerate the loss of any single node without losing lock state",
+          "Bounded Staleness: a lock held by a crashed client must be recoverable within one lease duration",
+          "Auditability: every grant, renewal, release, and expiry is recorded for post-incident forensics"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "High-Level Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The lock service is a thin API in front of a replicated consensus store. Clients never talk to the store directly; they talk to lock servers, which hold leases and issue fencing tokens. The consensus store guarantees that lock grants are linearisable."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-distributed-lock-arch",
+        "caption": "Distributed Lock Architecture: Clients to Lock Servers, Consensus Store (Raft quorum), Fencing Token Generator, and Protected Resource Validating Tokens",
+        "definition": "flowchart TD\n    subgraph Clients[\"🖥️ Worker Clients\"]\n        W1[\"Worker 1\\nSettlement job\"]\n        W2[\"Worker 2\"]\n        W3[\"Worker 3\"]\n    end\n\n    subgraph LockTier[\"🔒 Stateless Lock Server Fleet\"]\n        LS1[\"Lock Server 1\"]\n        LS2[\"Lock Server 2\"]\n        LS3[\"Lock Server 3\"]\n    end\n\n    subgraph Consensus[\"🗳️ Consensus Store (Raft)\"]\n        L1[(\"Leader node\\nCommit lock writes\")]\n        L2[(\"Follower\")]\n        L3[(\"Follower\")]\n    end\n\n    TokenGen[\"🔢 Fencing Token Generator\\nMonotonic, consensus-assigned\"]\n    Resource[\"🏦 Protected Resource\\nRejects stale tokens\"]\n    Audit[(\"📜 Audit Log\\nGrants, renewals, expiries\")]\n\n    W1 & W2 & W3 -->|Acquire/Release/Renew| LockTier\n    LockTier -->|CAS write| L1\n    L1 <-->|Replicate| L2 & L3\n    L1 --> TokenGen\n    LockTier -->|Grant + token| Clients\n    Clients -->|Write with token| Resource\n    LockTier --> Audit\n    Resource -.->|Reject if token < high-water mark| Clients"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Acquire and Renew Sequence"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The critical detail is that the store, not the client, assigns the fencing token at grant time, and it is committed to a quorum before the client is told it holds the lock."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-distributed-lock-sequence",
+        "caption": "Lock acquire and renewal sequence showing quorum commit, monotonic fencing token assignment, and lease expiry recovery",
+        "definition": "sequenceDiagram\n    autonumber\n    participant W as 🖥️ Worker\n    participant LS as 🔒 Lock Server\n    participant R as 🗳️ Raft Leader\n    participant F as 🗳️ Followers (quorum)\n    participant Res as 🏦 Protected Resource\n\n    W->>LS: Acquire(\"settlement:2024-06-01\", lease=30s)\n    LS->>R: CAS: lock vacant -> holder=W, expiry=now+30s\n    R->>F: Replicate entry\n    F-->>R: Ack from majority\n    R-->>LS: Committed, fencingToken = 417\n    LS-->>W: Granted, token=417, expiry=now+30s\n\n    W->>Res: Write(data) with X-Fencing-Token: 417\n    Res->>Res: 417 >= highWaterMark (417) -> accept, set highWaterMark=417\n\n    loop Renew every 10s\n        W->>LS: Renew(token=417)\n        LS->>R: CAS holder==W -> new expiry\n        R-->>LS: Committed\n        LS-->>W: Renewed\n    end\n\n    Note over W: GC pause of 60s exceeds the lease\n    Note over R: Lease expires; lock becomes vacant\n\n    participant W2 as 🖥️ Worker 2\n    W2->>LS: Acquire same lock\n    LS->>R: CAS vacant -> holder=W2, token=418\n    R-->>LS: Committed, token=418\n    LS-->>W2: Granted, token=418\n\n    W->>Res: Write(data) with X-Fencing-Token: 417\n    Res-->>W: Rejected (417 < 418) - no corruption"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Why Fencing Tokens Are Mandatory"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A lease alone is not sufficient. A holder can pause — a long garbage-collection stop, a suspended VM, a blocked syscall — for longer than the lease duration, wake up believing it still holds the lock, and write stale data. No amount of expiry checking on the client fixes this, because the client's belief is what is broken. The protected resource must enforce the fencing token."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Server-side fencing enforcement",
+        "language": "sql",
+        "code": "-- The protected resource tracks the highest token it has ever accepted.\n-- Any write carrying a lower token is a stale former holder and must be rejected.\n\nCREATE TABLE dbo.ResourceFence\n(\n    ResourceId   int           NOT NULL PRIMARY KEY,\n    HighWaterMark bigint       NOT NULL,   -- highest fencing token accepted\n    LastWriter    nvarchar(100) NOT NULL,\n    UpdatedAt     datetime2     NOT NULL\n);\n\n-- Optimistic, atomic: only the write with a token >= the watermark succeeds\nUPDATE dbo.ResourceFence\nSET HighWaterMark = @FencingToken,\n    LastWriter    = @WriterId,\n    UpdatedAt     = SYSUTCDATETIME()\nWHERE ResourceId = @ResourceId\n  AND HighWaterMark <= @FencingToken;\n\nIF @@ROWCOUNT = 0\n    THROW 51000, 'Stale fencing token: lock was lost and re-acquired', 1;"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Client acquire with busy-wait and renewal loop",
+        "language": "csharp",
+        "code": "public async Task HoldLockAsync(string key, Func<FencingToken, CancellationToken, Task> criticalSection)\n{\n    // Bounded wait: never block forever, never silently proceed without a lock\n    var lease = await lockClient.AcquireAsync(key, lease: TimeSpan.FromSeconds(30),\n        wait: TimeSpan.FromSeconds(5), cancellationToken: ct);\n\n    if (lease is null)\n        throw new LockUnavailableException(key);\n\n    using var renewal = new CancellationTokenSource();\n    var renewTask = Task.Run(async () =>\n    {\n        while (!renewal.IsCancellationRequested)\n        {\n            await Task.Delay(TimeSpan.FromSeconds(10), renewal.Token);\n            if (!await lockClient.RenewAsync(lease, cancellationToken: renewal.Token))\n            {\n                // We lost the lock. Signal the critical section to abort.\n                await lease.SignalLostAsync();\n                return;\n            }\n        }\n    });\n\n    try\n    {\n        // Every write inside the section carries the token\n        await criticalSection(lease.FencingToken, lease.LostToken);\n    }\n    finally\n    {\n        renewal.Cancel();\n        await renewTask;\n        await lockClient.ReleaseAsync(lease);\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Lock Store Options Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Store",
+          "Consistency Model",
+          "Fencing Support",
+          "Typical Use",
+          "Key Risk"
+        ],
+        "rows": [
+          [
+            "etcd / ZooKeeper (Raft or ZAB)",
+            "Linearizable",
+            "Yes — revision or zxid is monotonic",
+            "Coordination, leader election, cluster membership",
+            "Operationally heavier; write latency tied to quorum commit"
+          ],
+          [
+            "Redis single instance",
+            "Not linearizable under failover",
+            "Only if the app manufactures tokens",
+            "Best-effort locks, cache invalidation",
+            "A failover can lose a grant and hand the lock to two holders"
+          ],
+          [
+            "Redis Cluster + Redlock",
+            "Disputed under clock skew",
+            "Only if the app manufactures tokens",
+            "Simple distributed coordination",
+            "Correctness depends on bounded clock drift and no long pauses"
+          ],
+          [
+            "Relational DB (unique row + row lock)",
+            "Strong when in one database",
+            "Yes — identity column is monotonic",
+            "Locks that live beside the data they protect",
+            "Holds a connection per lock; not suited to very high lock rates"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Why not just use a database row lock inside a transaction?",
+            "answer": "If the critical section is short and lives in the same database, a row lock is the correct and simplest choice. A dedicated lock service earns its keep when the critical section spans multiple systems, lasts longer than a transaction should, or must coordinate processes that have no shared database."
+          },
+          {
+            "question": "How long should the lease be?",
+            "answer": "Long enough to cover the expected critical section plus renewal jitter, short enough that a crashed holder is recovered quickly. Start around ten times the expected work duration and always renew at roughly a third of the lease. If the work can exceed the lease, the work is too large for a single critical section — split it."
+          },
+          {
+            "question": "Is Redlock safe?",
+            "answer": "Redlock makes assumptions about bounded clock drift and bounded process pauses that are not guaranteed in practice. The practical answer is that fencing tokens make the correctness question moot: if the protected resource validates tokens, even an incorrect lock grant cannot cause data corruption. Never rely on lock ownership alone for correctness."
+          },
+          {
+            "question": "How do you handle a waiter that starves?",
+            "answer": "Offer a FIFO mode backed by a consensus-replicated queue: waiters register in order and take the lock in turn. That costs extra write amplification per handoff, so only enable it for locks where starvation is a real risk. For most workloads, exponential backoff retry is simpler and adequate."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Leases prevent permanent deadlock but cannot by themselves prevent two holders",
+          "Fencing tokens, validated by the protected resource, are what actually guarantee safety",
+          "Lock grants must be committed to a quorum before the holder is told it holds the lock",
+          "Prefer the simplest correct store for the job; a database row lock is often enough",
+          "Never block indefinitely: bounded waits plus explicit failure keep the system predictable"
+        ],
+        "takeaway": "A correct distributed lock is a lease issued by a consensus store plus a monotonic fencing token enforced by the protected resource — the token, not the lock, is what prevents corruption."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "distributed-lock-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Martin Kleppmann — How to do distributed locking",
+      "url": "https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html",
+      "type": "article"
+    },
+    {
+      "title": "etcd — Distributed locks and leader election",
+      "url": "https://etcd.io/docs/latest/learning/api/",
+      "type": "article"
+    }
+  ]
+}

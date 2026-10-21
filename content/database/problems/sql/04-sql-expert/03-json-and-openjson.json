@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-03",
+  "slug": "json-and-openjson",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "JSON in SQL Server: OPENJSON and FOR JSON",
+  "description": "Shred a JSON payload into relational rows and rebuild it, including indexes on JSON paths.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 18,
+  "tags": ["sql", "sql-server", "json", "openjson", "for-json", "computed-columns"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An API stores order metadata as JSON in an `nvarchar(max)` column because the shape changes frequently. Write T-SQL that (a) reads the `priority` and `tags` fields from a stored document, (b) explodes an array of line items into rows, and (c) makes `priority` efficiently searchable. Then explain how to return a relational result as nested JSON."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- Sample payload shape\n-- {\"priority\":\"high\",\"tags\":[\"vip\",\"gift\"],\"items\":[{\"sku\":\"A1\",\"qty\":2},{\"sku\":\"B7\",\"qty\":1}]}\n\n-- (a) Read scalar fields\nSELECT\n    OrderId,\n    JSON_VALUE(Metadata, '$.priority')                       AS Priority,\n    JSON_QUERY(Metadata, '$.tags')                            AS TagsJson\nFROM Orders;\n\n-- (b) Explode the items array into rows\nSELECT o.OrderId,\n       i.sku,\n       i.qty\nFROM Orders AS o\nCROSS APPLY OPENJSON(o.Metadata, '$.items')\n    WITH (\n        sku nvarchar(50)  '$.sku',\n        qty int           '$.qty'\n    ) AS i\nWHERE JSON_VALUE(o.Metadata, '$.priority') = 'high';\n\n-- (c) Index the hot JSON path with a computed column\nALTER TABLE Orders\n    ADD Priority AS (JSON_VALUE(Metadata, '$.priority')) PERSISTED;\nGO\nCREATE INDEX IX_Orders_Priority ON Orders (Priority) INCLUDE (OrderId);\n\n-- Return relational rows as nested JSON\nSELECT\n    c.CustomerId,\n    c.CustomerName,\n    OrderList.Orders\nFROM Customers AS c\nCROSS APPLY (\n    SELECT o.OrderId, o.OrderDate, o.Total\n    FROM Orders AS o\n    WHERE o.CustomerId = c.CustomerId\n    FOR JSON PATH\n) AS OrderList(Orders)\nFOR JSON PATH, ROOT('result');"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Explanation",
+        "text": "`OPENJSON` with a `WITH` clause is the workhorse: it gives each array element a typed row. Always supply explicit types — `OPENJSON` without a `WITH` clause returns everything as `nvarchar(4000)` and forces implicit conversions downstream. `JSON_VALUE` extracts a scalar; `JSON_QUERY` extracts an object or array as JSON text (use it inside `FOR JSON` so a nested array is not escaped as a string). For searchable fields, a **PERSISTED computed column plus an index** is the standard trick — you cannot index the raw JSON column directly, but the persisted expression is materialised and indexable."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

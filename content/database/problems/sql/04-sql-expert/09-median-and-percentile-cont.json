@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-09",
+  "slug": "median-and-percentile-cont",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "Median and PERCENTILE_CONT",
+  "description": "Compute a correct median per group and explain how PERCENTILE_CONT interpolates.",
+  "order": 9,
+  "difficulty": "advanced",
+  "estimatedMinutes": 16,
+  "tags": ["sql", "sql-server", "median", "percentile-cont", "statistics"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You need the median salary per department. The table has millions of rows, so you cannot sort in the app. Someone suggested `PERCENTILE_CONT(0.5)`, someone else an `AVG` over the middle rows. Write the query and explain when the two disagree."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- Standard approach: an interpolated median.\n-- With an odd count, PERCENTILE_CONT returns the exact middle value.\n-- With an even count, it returns the average of the two middle values.\nSELECT DISTINCT\n    Department,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY Salary)\n        OVER (PARTITION BY Department) AS MedianSalary\nFROM Employees;\n\n-- Equivalent hand-rolled median using row numbers (works anywhere).\nWITH Ranked AS\n(\n    SELECT\n        Department,\n        Salary,\n        ROW_NUMBER() OVER (PARTITION BY Department ORDER BY Salary) AS rn,\n        COUNT(*)    OVER (PARTITION BY Department)                  AS cnt\n    FROM Employees\n)\nSELECT\n    Department,\n    AVG(Salary) AS MedianSalary\nFROM Ranked\nWHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)   -- middle one or two rows\nGROUP BY Department;\n\n-- Discrete alternative: returns an actual salary that exists in the data.\nSELECT DISTINCT\n    Department,\n    PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY Salary)\n        OVER (PARTITION BY Department) AS MedianSalaryDiscrete\nFROM Employees;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Explanation",
+        "text": "`PERCENTILE_CONT` **interpolates**, so with an even number of rows the median is the mean of the two middle values — a number that may not exist in the table. For an odd count both approaches return the exact middle row. `PERCENTILE_DISC` instead returns the smallest value in the data whose cumulative distribution reaches the percentile, so the result is always a real row. Because `PERCENTILE_CONT` is a window function you must wrap it in `SELECT DISTINCT` or a subquery to get one row per group. On very large tables, a single `PERCENTILE_CONT` over millions of rows can be expensive; for an approximate median, an index seek on the middle row number (via `OFFSET` over an ordered index) is often dramatically cheaper."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

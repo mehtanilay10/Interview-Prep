@@ -1,0 +1,127 @@
+{
+  "id": "lesson-azure-iac-01",
+  "slug": "bicep-modules-and-environments",
+  "moduleSlug": "azure-iac-problems",
+  "courseSlug": "azure-problems",
+  "title": "Bicep Modules and Environments",
+  "description": "Split a growing Bicep template into reusable modules and drive each environment from a parameter file.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "bicep", "iac", "modules", "arm"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A single 1,400-line Bicep file now deploys App Service, SQL, Storage, Key Vault, Application Insights, and three role assignments. Dev and production differ only by SKU names and a handful of settings, but someone duplicated the whole file with a `-prod` suffix. Refactor it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Extract one **Bicep module per concern** (`modules/app-service.bicep`, `modules/sql.bicep`, `modules/monitoring.bicep`) each with a typed `param`/`output` contract. Keep one entry template per environment that composes the modules and reads environment-specific values from a **`.bicepparam` parameter file**. Never branch environment logic with long inline `if` chains inside a shared file."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "modules/app-service.bicep — typed contract",
+        "language": "bicep",
+        "code": "@description('Base name, e.g. app-quotient')\nparam name string\n@description('Deployment location')\nparam location string = resourceGroup().location\n@allowed(['B1', 'P1v3', 'P2v3'])\nparam skuName string = 'B1'\nparam appSettings object = {}\n\nresource plan 'Microsoft.Web/serverfarms@2023-12-01' = {\n  name: '${name}-plan'\n  location: location\n  sku: { name: skuName }\n  properties: { reserved: true }\n}\n\nresource site 'Microsoft.Web/sites@2023-12-01' = {\n  name: name\n  location: location\n  identity: { type: 'SystemAssigned' }\n  properties: {\n    serverFarmId: plan.id\n    siteConfig: { appSettings: [ for k in items(appSettings): { name: k.key, value: k.value } ] }\n  }\n}\n\noutput principalId string = site.identity.principalId\noutput defaultHostName string = site.properties.defaultHostName"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "main.prod.bicepparam — environment values only",
+        "language": "bicep",
+        "code": "using './main.bicep'\n\nparam environment = 'prod'\nparam location = 'westeurope'\nparam appServiceSku = 'P1v3'\nparam sqlSku = 'S3'\nparam alertEmail = 'oncall@example.com'"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Modules Plus Parameter Files"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Duplicating a template means every fix must be applied twice and the copies silently diverge. A module contract also makes the blast radius explicit: reviewers see that `app-service.bicep` only touches `Microsoft.Web/*`, and typed `@allowed` parameters catch a typo in a SKU name at validation time instead of mid-deployment."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Bicep structure options",
+        "cards": [
+          {
+            "title": "Modules + .bicepparam per environment",
+            "description": "One composition, many parameter files",
+            "pros": [
+              "Single source of truth",
+              "Typed parameter validation",
+              "Compiles to plain ARM JSON",
+              "No state file to manage"
+            ],
+            "cons": [
+              "Explicit deployment stack per environment",
+              "Module contracts need maintenance"
+            ],
+            "tags": ["Recommended", "Azure-native"]
+          },
+          {
+            "title": "Monolithic template with conditions",
+            "description": "One file, `if (isProd)` everywhere",
+            "pros": [
+              "Nothing to compose"
+            ],
+            "cons": [
+              "Unreadable and untestable",
+              "High blast radius",
+              "Reuse means copy-paste"
+            ],
+            "tags": ["Very small deployments"]
+          },
+          {
+            "title": "Azure Verified Modules",
+            "description": "Microsoft-maintained module library",
+            "pros": [
+              "Follows well-architected defaults",
+              "Regularly updated"
+            ],
+            "cons": [
+              "Large surface area",
+              "Version pinning discipline required"
+            ],
+            "tags": ["Common resources at scale"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

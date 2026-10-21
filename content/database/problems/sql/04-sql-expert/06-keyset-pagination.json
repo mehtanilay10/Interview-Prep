@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-06",
+  "slug": "keyset-pagination",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "Keyset Pagination Instead of OFFSET",
+  "description": "Page through a large table in constant time instead of degrading as the page number grows.",
+  "order": 6,
+  "difficulty": "advanced",
+  "estimatedMinutes": 18,
+  "tags": ["sql", "sql-server", "pagination", "keyset", "performance", "offset"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An API pages through a 40-million-row events table with `ORDER BY EventDate DESC OFFSET @n ROWS FETCH NEXT 25 ROWS ONLY`. Page 1 is fast but page 20,000 takes seconds, and rows can be skipped or duplicated when new events arrive mid-browse. Rewrite the pagination."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- OFFSET pagination: the engine must find and discard @n rows on every request.\n-- Cost grows linearly with the page number.\nSELECT EventId, EventDate, Payload\nFROM Events\nORDER BY EventDate DESC, EventId DESC\nOFFSET 500000 ROWS FETCH NEXT 25 ROWS ONLY;\n\n-- Keyset (seek) pagination: remember the last row you returned, then seek.\n-- Constant cost regardless of depth, and stable while new rows arrive.\nDECLARE @LastEventDate datetime2 = '2024-06-01T12:00:00';\nDECLARE @LastEventId    bigint    = 987654321;\n\nSELECT TOP (25) EventId, EventDate, Payload\nFROM Events\nWHERE EventDate < @LastEventDate\n   OR (EventDate = @LastEventDate AND EventId < @LastEventId)   -- tiebreaker\nORDER BY EventDate DESC, EventId DESC;\n\n-- Index that makes the seek O(log n)\nCREATE INDEX IX_Events_Date_Id ON Events (EventDate DESC, EventId DESC)\n    INCLUDE (Payload);"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "warning",
+        "title": "Explanation",
+        "text": "`OFFSET 500000` does not skip cheaply — SQL Server still has to locate and count past those 500,000 rows, so cost grows with depth. Keyset pagination instead asks for rows **after a known position**, which an index satisfies as a single seek: the cost is the same on page 1 and page 20,000. Two conditions make it work: the `ORDER BY` must be backed by a matching index, and it must include a **unique tiebreaker** (`EventId` here) or rows with identical timestamps can be skipped or repeated across page boundaries. The trade-off is that the client cannot jump to \"page 47\" — it receives a cursor instead. That is a good trade for infinite scroll; for random page access, keep `OFFSET` but cap how deep users can go."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

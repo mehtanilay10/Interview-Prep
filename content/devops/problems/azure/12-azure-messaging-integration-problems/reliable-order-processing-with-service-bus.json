@@ -1,0 +1,130 @@
+{
+  "id": "lesson-azure-messaging-02",
+  "slug": "reliable-order-processing-with-service-bus",
+  "moduleSlug": "azure-messaging-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Reliable Order Processing with Service Bus",
+  "description": "Handle retries, poison messages, and duplicate deliveries so an order is never lost or charged twice.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 30,
+  "tags": ["azure", "service-bus", "retry", "dead-letter", "idempotency"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your order worker reads from a Service Bus queue. Occasionally a malformed message throws an exception and, because the message was never completed, it is redelivered forever — blocking the subscription and re-running the credit card charge each time. Meanwhile genuine transient failures fail permanently after a single attempt. Fix the consumer."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Three things: (1) make the handler **idempotent** using a business key so a redelivery is harmless; (2) set `MaxDeliveryCount` so a repeatedly failing message is automatically moved to the **dead-letter queue** instead of looping; (3) distinguish transient from permanent failures and **abandon** the former (with backoff) while **dead-lettering** the latter immediately."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Worker with idempotency, backoff, and dead-lettering",
+        "language": "csharp",
+        "code": "var processor = client.CreateProcessor(\"orders\", new ServiceBusProcessorOptions\n{\n    MaxConcurrentCalls = 8,\n    AutoCompleteMessages = false,\n    MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)\n});\n\nprocessor.ProcessMessageAsync += async args =>\n{\n    var order = args.Message.Body.ToObjectFromJson<OrderMessage>();\n\n    // 1. Idempotency guard: has this order already been charged?\n    if (await db.Payments.AnyAsync(p => p.IdempotencyKey == order.IdempotencyKey))\n    {\n        await args.CompleteMessageAsync(args.Message);\n        return;\n    }\n\n    try\n    {\n        await paymentGateway.ChargeAsync(order, order.IdempotencyKey);\n        await args.CompleteMessageAsync(args.Message);\n    }\n    catch (TransientException ex)\n    {\n        // 2. Transient: let the broker redeliver after the lock expires\n        logger.LogWarning(ex, \"Transient failure, abandoning {MessageId}\", args.Message.MessageId);\n        await args.AbandonMessageAsync(args.Message);\n    }\n    catch (ValidationException ex)\n    {\n        // 3. Permanent: never retry, preserve the payload for a human\n        await args.DeadLetterMessageAsync(args.Message,\n            deadLetterReason: \"InvalidPayload\",\n            deadLetterErrorDescription: ex.Message);\n    }\n};\n\nawait processor.StartProcessingAsync();"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Queue settings that make this work (Bicep)",
+        "language": "bicep",
+        "code": "resource ordersQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview' = {\n  name: 'orders'\n  parent: serviceBusNamespace\n  properties: {\n    maxDeliveryCount: 5                 // 5 attempts, then dead-letter automatically\n    lockDuration: 'PT2M'\n    defaultMessageTimeToLive: 'P7D'\n    requiresDuplicateDetection: true    // broker-level dedupe by MessageId\n    duplicateDetectionHistoryTimeWindow: 'PT10M'\n    deadLetteringOnMessageExpiration: true\n    maxSizeInMegabytes: 5120\n  }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Add an alert on `deadletteredmessages` count so a new poison message produces a ticket instead of silence, and a small replay tool that reads the DLQ and re-submits after a fix."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Idempotency Is Non-Negotiable"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Service Bus guarantees **at-least-once** delivery. A worker can crash after charging the card but before completing the message, and the broker will legitimately redeliver. There is no configuration that turns at-least-once into exactly-once end to end — deduplication must be enforced by the consumer using a stable business key."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Failure handling patterns",
+        "cards": [
+          {
+            "title": "Idempotent handler + dead-letter queue",
+            "description": "Dedupe by business key, park poison messages",
+            "pros": [
+              "Safe under at-least-once delivery",
+              "Queue never blocks on one bad message",
+              "Failure payload retained for replay"
+            ],
+            "cons": [
+              "Requires a stable natural key",
+              "DLQ needs monitoring and a replay path"
+            ],
+            "tags": ["Recommended", "Business critical"]
+          },
+          {
+            "title": "Infinite retry with abandon",
+            "description": "Keep retrying until it works",
+            "pros": [
+              "No lost messages"
+            ],
+            "cons": [
+              "One poison message blocks the queue",
+              "Side effects repeat every attempt"
+            ],
+            "tags": ["Never for payment flows"]
+          },
+          {
+            "title": "Complete-then-log-on-failure",
+            "description": "Ack first, log the error",
+            "pros": [
+              "Queue never backs up"
+            ],
+            "cons": [
+              "Silent data loss",
+              "No retry for transient faults"
+            ],
+            "tags": ["Never"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

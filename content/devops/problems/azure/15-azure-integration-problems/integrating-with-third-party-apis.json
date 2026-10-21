@@ -1,0 +1,126 @@
+{
+  "id": "lesson-azure-integration-03",
+  "slug": "integrating-with-third-party-apis",
+  "moduleSlug": "azure-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Integrating with Third-Party APIs",
+  "description": "Call an unreliable external API without letting its outages take down your own service.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "integration", "resilience", "circuit-breaker", "polly"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your checkout calls a third-party tax calculation API. Last Tuesday it returned 503s for twenty minutes, and your own API returned 500s for the same twenty minutes even though nothing was wrong on your side. The finance team also wants every tax calculation to be reproducible for audit purposes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Treat the third party as an **untrusted dependency** and wrap it in a policy: bounded **retries with jittered backoff** for transient faults, a **circuit breaker** that fails fast once the API is clearly down, a **timeout** on every call, and a **fallback** that degrades gracefully (use the last known rate, or queue the order for later). Cache successful responses in Redis keyed on the request so audit replays do not hit the vendor. Route the calls through **API Management** or a small facade so all this lives in one place and credentials stay server-side."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Resilience pipeline with Polly",
+        "language": "csharp",
+        "code": "var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()\n    .AddRetry(new RetryStrategyOptions<HttpResponseMessage>\n    {\n        ShouldHandle = new PredicateBuilder<HttpResponseMessage>()\n            .Handle<HttpRequestException>()\n            .HandleResult(r => r.StatusCode is HttpStatusCode.ServiceUnavailable\n                                       or HttpStatusCode.TooManyRequests),\n        MaxRetryAttempts = 3,\n        DelayGenerator = args => new ValueTask<TimeSpan?>(\n            TimeSpan.FromMilliseconds(Math.Pow(2, args.AttemptNumber) * 200))\n    })\n    .AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>\n    {\n        FailureRatio = 0.5,\n        SamplingDuration = TimeSpan.FromSeconds(30),\n        MinimumThroughput = 10,\n        BreakDuration = TimeSpan.FromSeconds(60)\n    })\n    .AddTimeout(TimeSpan.FromSeconds(3))\n    .Build();\n\npublic async Task<TaxRate> GetTaxRateAsync(TaxQuery query, CancellationToken ct)\n{\n    var cacheKey = $\"tax:{query.Country}:{query.PostalCode}:{query.Category}\";\n    var cached = await cache.GetStringAsync(cacheKey, ct);\n    if (cached is not null) return JsonSerializer.Deserialize<TaxRate>(cached)!;\n\n    try\n    {\n        var response = await pipeline.ExecuteAsync(\n            async token => await httpClient.GetAsync($\"/rate?{query}\", token), ct);\n        response.EnsureSuccessStatusCode();\n        var rate = await response.Content.ReadFromJsonAsync<TaxRate>(ct)!;\n\n        // Cache with a long TTL: rates change rarely and audit needs the value\n        await cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(rate),\n            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) }, ct);\n        return rate;\n    }\n    catch (Exception ex) when (ex is BrokenCircuitException or TimeoutRejectedException)\n    {\n        // Degrade: use the stored rate if we have one, otherwise defer\n        await queue.EnqueueAsync(new TaxCalculationDeferred(query), ct);\n        throw new TaxServiceUnavailableException(query, ex);\n    }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Keep vendor credentials out of the client",
+        "language": "xml",
+        "code": "<!-- APIM injects the vendor key; callers never see it -->\n<policies>\n  <inbound>\n    <rate-limit-by-key calls=\"100\" renewal-period=\"60\" counter-key=\"@(context.Subscription.Id)\" />\n    <set-header name=\"X-Api-Key\" exists-action=\"override\">\n      <value>{{third-party-tax-key}}</value>\n    </set-header>\n  </inbound>\n  <backend>\n    <forward-request timeout=\"3\" />\n    <retry condition=\"@(context.Response.StatusCode == 503)\" count=\"3\" interval=\"2\" />\n  </backend>\n</policies>"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Treat Vendors as Hostile"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "You cannot fix someone else's service, but you can decide what your own service does when it misbehaves. Retries absorb blips, a circuit breaker prevents a stampede of doomed calls from consuming your own worker threads, timeouts stop a hung vendor from exhausting your connection pool, and a fallback keeps the core user journey working. All four together are what turns \"the vendor was down and so were we\" into \"tax was estimated and reconciled later\"."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Third-party integration patterns",
+        "cards": [
+          {
+            "title": "Retry + circuit breaker + fallback",
+            "description": "Policy-wrapped synchronous call",
+            "pros": [
+              "Absorbs transient faults",
+              "Fails fast when the vendor is down",
+              "Keeps the user journey alive"
+            ],
+            "cons": [
+              "Fallback logic must be written per use case",
+              "Cached data may be briefly stale"
+            ],
+            "tags": ["Recommended"]
+          },
+          {
+            "title": "Asynchronous queue decoupling",
+            "description": "Publish a request, process later",
+            "pros": [
+              "Vendor outage is invisible to users",
+              "Natural retry and backpressure"
+            ],
+            "cons": [
+              "Only works when a delayed result is acceptable",
+              "Adds eventual consistency"
+            ],
+            "tags": ["Non-interactive flows"]
+          },
+          {
+            "title": "Direct synchronous call",
+            "description": "Call the vendor inline, no policy",
+            "pros": [
+              "Simplest code"
+            ],
+            "cons": [
+              "Vendor incident becomes your incident",
+              "Thread pool exhaustion on hangs",
+              "No audit trail"
+            ],
+            "tags": ["Never for critical paths"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

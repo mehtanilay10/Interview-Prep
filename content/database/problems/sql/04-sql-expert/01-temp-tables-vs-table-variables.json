@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-01",
+  "slug": "temp-tables-vs-table-variables",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "Temp Tables vs Table Variables",
+  "description": "Explain when to use a #temp table, a table variable, or a CTE, and why the optimizer treats them differently.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 15,
+  "tags": ["sql", "sql-server", "temp-tables", "table-variables", "performance"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A reporting procedure stages about 200,000 rows before joining them back to base tables. The developer used a table variable (`DECLARE @staging TABLE (...)`) for the staging step instead of a `#temp` table, and the query has become very slow with a nested loop over all 200,000 rows. Explain the trade-off and what you would change."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- Problem: table variable estimated at 1 row, so the optimizer picks a nested loop\nDECLARE @staging TABLE (CustomerID int, OrderDate date, Amount decimal(18,2));\nINSERT INTO @staging\nSELECT CustomerID, OrderDate, Amount\nFROM Orders\nWHERE OrderDate >= '2024-01-01';\n\n-- Fix: use a #temp table so statistics exist and the estimate is realistic\nCREATE TABLE #staging\n(\n    CustomerID int NOT NULL,\n    OrderDate  date NOT NULL,\n    Amount     decimal(18,2) NOT NULL,\n    PRIMARY KEY (CustomerID, OrderDate)\n);\n\nINSERT INTO #staging (CustomerID, OrderDate, Amount)\nSELECT CustomerID, OrderDate, Amount\nFROM Orders\nWHERE OrderDate >= '2024-01-01';\n\n-- The optimizer now estimates 200k rows and chooses a hash join\nSELECT c.CustomerName, SUM(s.Amount) AS Total\nFROM #staging AS s\nJOIN Customers AS c ON c.CustomerID = s.CustomerID\nGROUP BY c.CustomerName\nOPTION (RECOMPILE);   -- lets the optimizer see the actual row count at runtime\n\nDROP TABLE #staging;  -- temp tables created inside a proc are dropped automatically, but be explicit"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Explanation",
+        "text": "A table variable is deliberately treated as having **one row** by the optimizer (no statistics, no distribution), which pushes it toward nested loop joins. A `#temp` table participates in statistics and can be re-estimated. Rules of thumb: use a CTE for a single-use expression, a table variable for a handful of rows or when you need no side effects, and a `#temp` table once the row count can exceed a few hundred or when you need indexes and statistics. `OPTION (RECOMPILE)` is valuable on the statement that reads a freshly populated temp table, because statistics are not yet available at compile time."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

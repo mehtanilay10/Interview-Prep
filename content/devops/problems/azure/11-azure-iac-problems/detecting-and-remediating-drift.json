@@ -1,0 +1,131 @@
+{
+  "id": "lesson-azure-iac-03",
+  "slug": "detecting-and-remediating-drift",
+  "moduleSlug": "azure-iac-problems",
+  "courseSlug": "azure-problems",
+  "title": "Detecting and Remediating Drift",
+  "description": "Find resources that were changed by hand in the portal and decide whether to import or revert them.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "iac", "drift", "bicep", "governance"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "During an incident an engineer scaled up the App Service plan from P1v3 to P2v3 in the portal to survive a traffic spike. Two weeks later, a routine `terraform apply` from the pipeline plans to scale it back down. Nobody knows which value is correct. How should the team detect and handle this?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Treat hand-made changes as **drift that must be reconciled in code**. Run a scheduled `plan`/`what-if` in CI that fails (or opens a ticket) when it is not empty, so drift is visible within a day instead of at the next deployment. Then decide explicitly: either update the IaC to codify the emergency change (scaling up was right), or reapply the original code to revert it. In the portal, use **Azure Resource Graph** to spot resources whose tags or configuration no longer match the standard."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Scheduled drift detection in a pipeline",
+        "language": "yaml",
+        "code": "schedules:\n  - cron: '0 6 * * *'      # every morning\n    displayName: Nightly drift check\n    branches: { include: [ main ] }\n\nsteps:\n  - script: terraform init -input=false\n    displayName: Init\n  - script: |\n      terraform plan -input=false -detailed-exitcode -out=tfplan\n      case $? in\n        0) echo \"No drift\" ;;                    # 0 = no changes\n        2) echo \"##vso[task.logissue type=warning]Drift detected\";\n           terraform show -no-color tfplan;\n           exit 1 ;;                             # 2 = changes pending\n        *) exit 1 ;;                             # 1 = error\n      esac\n    displayName: Plan and fail on drift"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Azure Resource Graph — find App Services without the required tag",
+        "language": "sql",
+        "code": "resources\n| where type == 'microsoft.web/sites'\n| extend owner = tostring(tags['owner']), env = tostring(tags['environment'])\n| where isempty(owner) or isempty(env)\n| project name, resourceGroup, location, owner, env\n| order by resourceGroup asc"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For a legitimate emergency change, codify it in the same sprint: bump the SKU parameter's allowed list and default, merge, and let the next apply be a no-op. Microsoft's `what-if` for Bicep and `terraform plan` for Terraform are the two preview mechanisms that make this safe."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Reconcile Rather Than Block"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Preventing all portal writes is tempting but brittle: during a real incident, an on-call engineer needs to act. Making drift **detectable and cheap to reconcile** keeps the emergency path open while ensuring the declared state in git remains the source of truth within a day."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Drift handling approaches",
+        "cards": [
+          {
+            "title": "Scheduled plan + reconcile in code",
+            "description": "Detect daily, codify or revert",
+            "pros": [
+              "Emergency fixes stay possible",
+              "Drift surfaced within a day",
+              "Git stays authoritative"
+            ],
+            "cons": [
+              "Needs a triage routine",
+              "Plan output can be noisy"
+            ],
+            "tags": ["Recommended"]
+          },
+          {
+            "title": "Deny portal writes via Azure Policy",
+            "description": "Lock resources to the IaC pipeline",
+            "pros": [
+              "Drift becomes impossible",
+              "Strong compliance story"
+            ],
+            "cons": [
+              "Blocks incident response",
+              "Policy scope mistakes lock out the platform team"
+            ],
+            "tags": ["Regulated workloads"]
+          },
+          {
+            "title": "Ignore drift, converge on deploy",
+            "description": "Let each apply overwrite reality",
+            "pros": [
+              "Zero extra process"
+            ],
+            "cons": [
+              "Emergency fixes silently reverted",
+              "Nobody learns what changed or why"
+            ],
+            "tags": ["Never"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

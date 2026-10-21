@@ -1,0 +1,130 @@
+{
+  "id": "lesson-azure-messaging-03",
+  "slug": "orchestrating-long-running-workflows",
+  "moduleSlug": "azure-messaging-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Orchestrating Long-Running Workflows",
+  "description": "Coordinate a multi-day approval and fulfilment process that must survive restarts and wait for humans.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "durable-functions", "orchestration", "workflow", "logic-apps"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An onboarding workflow must: call a credit-check API, wait for a human manager to approve (usually hours, sometimes days), provision three systems, then email the result. Current implementation is a saga of queue messages with a status column in SQL, and a server restart has stranded eleven workflows mid-flight. Redesign it."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use **Durable Functions** (the orchestrator pattern) so workflow state is persisted automatically at every `await` and the process can be replayed after a restart or redeploy. Model human approval as an **external event** with a timeout — never as a polling loop or a `Thread.Sleep`. The orchestrator stays deterministic; all I/O goes in **activity functions**."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Orchestrator with human approval and timeout",
+        "language": "csharp",
+        "code": "[Function(nameof(OnboardingOrchestrator))]\npublic static async Task<OnboardingResult> OnboardingOrchestrator(\n    [OrchestrationTrigger] TaskOrchestrationContext context)\n{\n    var request = context.GetInput<OnboardingRequest>();\n\n    // 1. Automated step — runs in an activity, retried automatically\n    var credit = await context.CallActivityAsync<CreditResult>(\n        nameof(CheckCredit), request, new TaskOptions { Retry = RetryPolicy(...) });\n\n    if (!credit.Approved)\n        return new OnboardingResult(\"Rejected\", credit.Reason);\n\n    // 2. Wait for a human, with a deadline — durable, survives restarts\n    using var cts = new CancellationTokenSource();\n    var approvalTask = context.WaitForExternalEvent<ApprovalDecision>(\"ManagerApproval\");\n    var timeoutTask = context.CreateTimer(context.CurrentUtcDateTime.AddDays(3), cts.Token);\n\n    var winner = await Task.WhenAny(approvalTask, timeoutTask);\n    if (winner == timeoutTask)\n        return new OnboardingResult(\"Expired\", \"No manager decision within 3 days\");\n\n    cts.Cancel(); // cancel the timer so it does not fire later\n    var decision = approvalTask.Result;\n    if (!decision.Approved)\n        return new OnboardingResult(\"Rejected\", decision.Comment);\n\n    // 3. Fan-out provisioning in parallel\n    var tasks = new[]\n    {\n        context.CallActivityAsync(nameof(ProvisionAdAccount), request),\n        context.CallActivityAsync(nameof(ProvisionEmail), request),\n        context.CallActivityAsync(nameof(AssignLicenses), request)\n    };\n    await Task.WhenAll(tasks);\n\n    await context.CallActivityAsync(nameof(SendWelcomeEmail), request);\n    return new OnboardingResult(\"Completed\", null);\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Raise the approval event from the API",
+        "language": "csharp",
+        "code": "var client = new DurableTaskClient(new AzureStorageDurableTaskClientOptions(connectionString));\n\nawait client.RaiseEventAsync(\n    instanceId: instanceId,\n    eventName: \"ManagerApproval\",\n    eventPayload: new ApprovalDecision { Approved = true, Comment = \"Looks good\" });"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Event-Driven Orchestration"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A workflow that waits days cannot live in a process, a thread, or an HTTP request. Durable Functions persist a **history of decisions** and replay it, so the orchestrator can be unloaded between steps and resumed on any instance. External events make human steps first-class, and timers handle deadlines without polling."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Long-running workflow options",
+        "cards": [
+          {
+            "title": "Durable Functions",
+            "description": "Code-first durable orchestration",
+            "pros": [
+              "State persisted and replayed automatically",
+              "Fan-out/fan-in and sub-orchestrations",
+              "External events and durable timers",
+              "Full language expressiveness"
+            ],
+            "cons": [
+              "Orchestrator must stay deterministic",
+              "Versioning running instances needs care",
+              "Storage account is a dependency"
+            ],
+            "tags": ["Recommended", "Developer-owned"]
+          },
+          {
+            "title": "Logic Apps (Consumption or Standard)",
+            "description": "Low-code connector-driven workflows",
+            "pros": [
+              "Hundreds of built-in connectors",
+              "Visual designer for business users",
+              "Approval actions out of the box"
+            ],
+            "cons": [
+              "Complex branching gets awkward",
+              "Harder to unit test",
+              "Per-action pricing model"
+            ],
+            "tags": ["Integration-heavy, low-code teams"]
+          },
+          {
+            "title": "Hand-rolled saga over queues + SQL status",
+            "description": "Custom state machine in a table",
+            "pros": [
+              "No extra service"
+            ],
+            "cons": [
+              "You rebuild replay, timeouts, and recovery",
+              "Restarts strand in-flight work",
+              "Compensation logic is error-prone"
+            ],
+            "tags": ["Legacy"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

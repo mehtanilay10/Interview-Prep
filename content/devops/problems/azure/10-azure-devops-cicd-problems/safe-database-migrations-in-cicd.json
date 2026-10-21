@@ -1,0 +1,126 @@
+{
+  "id": "lesson-azure-cicd-03",
+  "slug": "safe-database-migrations-in-cicd",
+  "moduleSlug": "azure-devops-cicd-problems",
+  "courseSlug": "azure-problems",
+  "title": "Safe Database Migrations in CI/CD",
+  "description": "Ship schema changes that are backward compatible so app and database versions can coexist during a rolling deploy.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "cicd", "database", "migrations", "zero-downtime"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your pipeline runs `dotnet ef database update` against Azure SQL immediately before deploying the new app version. Last release it dropped a column the previous app version was still reading, and users saw errors for the four minutes the old instances remained in the load balancer. Fix this."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Adopt **expand/contract** migrations. Every release is backward compatible with the previous app version: release N only **adds** things (new nullable columns, new tables, backfill jobs). Destructive steps such as dropping a column move to release N+1, after no running instance references it. Migrations should be **idempotent and re-runnable**, and they must not hold long locks on large tables."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Expand/contract across two releases (SQL)",
+        "language": "sql",
+        "code": "-- Release N: EXPAND — additive only, safe for the old app version\nALTER TABLE dbo.Orders\n    ADD CustomerEmail nvarchar(320) NULL;\nGO\n\n-- Backfill in batches so we never lock the whole table\nWHILE 1 = 1\nBEGIN\n    UPDATE TOP (5000) dbo.Orders\n    SET CustomerEmail = c.Email\n    FROM dbo.Orders o\n    JOIN dbo.Customers c ON c.Id = o.CustomerId\n    WHERE o.CustomerEmail IS NULL;\n\n    IF @@ROWCOUNT = 0 BREAK;\n    WAITFOR DELAY '00:00:00.100';\nEND\nGO\n\n-- Release N+1 (after the new version is fully rolled out): CONTRACT\n-- ALTER TABLE dbo.Orders DROP COLUMN LegacyEmail;\n-- ALTER TABLE dbo.Orders ALTER COLUMN CustomerEmail nvarchar(320) NOT NULL;"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Idempotent migration step in a pipeline",
+        "language": "yaml",
+        "code": "- task: SqlAzureDacpacDeployment@1\n  displayName: Apply migrations\n  inputs:\n    azureSubscription: quotient-prod-connection\n    ServerName: $(sqlServer).database.windows.net\n    DatabaseName: $(sqlDatabase)\n    AuthenticationType: servicePrincipal\n    deployType: SqlTask\n    SqlFile: $(Pipeline.Workspace)/drop/migrations/*.sql\n    # every script starts with: IF NOT EXISTS (...) guards\n\n- task: AzureWebApp@1\n  displayName: Deploy app (slot swap)\n  inputs:\n    azureSubscription: quotient-prod-connection\n    appName: $(appName)\n    deployToSlotOrASE: true\n    resourceGroupName: $(resourceGroup)\n    slotName: staging"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Expand/Contract"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "During any rolling or slot-swap deployment, the old and new app versions run **at the same time** against one database. Any schema change that removes or renames something visible to the old version causes errors during that window, regardless of how fast the deployment is. Expand/contract removes the window entirely."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Migration strategies",
+        "cards": [
+          {
+            "title": "Expand/contract (two releases)",
+            "description": "Add now, remove later",
+            "pros": [
+              "Zero-downtime and rollback-safe",
+              "Works with slot swaps and canary",
+              "Old and new versions coexist"
+            ],
+            "cons": [
+              "Requires two releases per destructive change",
+              "Needs discipline to finish the contract step"
+            ],
+            "tags": ["Recommended", "Zero-downtime"]
+          },
+          {
+            "title": "Migrate then deploy",
+            "description": "Schema first, then app code",
+            "pros": [
+              "Single release per change",
+              "Simple to reason about"
+            ],
+            "cons": [
+              "Breaks during the coexistence window",
+              "Rollback is not symmetric"
+            ],
+            "tags": ["Single-instance or maintenance window"]
+          },
+          {
+            "title": "App-managed migrations at startup",
+            "description": "Each instance migrates on boot",
+            "pros": [
+              "No pipeline step to forget"
+            ],
+            "cons": [
+              "Concurrent instances race",
+              "Startup fails under load",
+              "Slows cold start"
+            ],
+            "tags": ["Local development only"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

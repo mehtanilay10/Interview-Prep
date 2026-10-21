@@ -1,0 +1,118 @@
+{
+  "id": "lesson-azure-cicd-01",
+  "slug": "multi-stage-pipeline-design",
+  "moduleSlug": "azure-devops-cicd-problems",
+  "courseSlug": "azure-problems",
+  "title": "Multi-Stage Pipeline Design",
+  "description": "Structure one YAML pipeline that builds once and promotes the same artifact through dev, staging, and production.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "azure-devops", "pipelines", "yaml", "environments"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Three separate pipelines build the same code for dev, staging, and production. The production build sometimes differs from what was tested in staging because it was compiled minutes later from a different commit. Design a pipeline where what you test is exactly what you ship."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use a **single multi-stage YAML pipeline** that builds the artifact **once** and publishes it, then deploys that immutable artifact to each stage. Configuration differences belong in **variable groups** or app settings, never in a rebuild. Attach **Environments** with approval checks to staging and production so promotion is a deliberate, auditable act."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "azure-pipelines.yml — build once, deploy many",
+        "language": "yaml",
+        "code": "trigger:\n  branches: { include: [ main ] }\n\nvariables:\n  - group: quotient-shared\n  - name: buildConfiguration\n    value: Release\n\nstages:\n  - stage: Build\n    jobs:\n      - job: BuildAndTest\n        pool: { vmImage: ubuntu-latest }\n        steps:\n          - task: UseDotNet@2\n            inputs: { version: '8.x' }\n          - script: dotnet test --configuration $(buildConfiguration)\n            displayName: Run tests\n          - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/app\n            displayName: Publish\n          - publish: $(Build.ArtifactStagingDirectory)/app\n            artifact: drop\n\n  - stage: Dev\n    dependsOn: Build\n    variables:\n      - group: quotient-dev\n    jobs:\n      - deployment: DeployDev\n        environment: dev\n        strategy:\n          runOnce:\n            deploy:\n              steps:\n                - download: current\n                  artifact: drop\n                - task: AzureWebApp@1\n                  inputs:\n                    azureSubscription: quotient-dev-connection\n                    appName: $(appName)\n                    package: $(Pipeline.Workspace)/drop\n\n  - stage: Production\n    dependsOn: [ Build, Dev ]\n    condition: succeeded()\n    variables:\n      - group: quotient-prod\n    jobs:\n      - deployment: DeployProd\n        environment: production   # approval check configured on this environment\n        strategy:\n          runOnce:\n            deploy:\n              steps:\n                - download: current\n                  artifact: drop\n                - task: AzureWebApp@1\n                  inputs:\n                    azureSubscription: quotient-prod-connection\n                    appName: $(appName)\n                    package: $(Pipeline.Workspace)/drop"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why One Pipeline"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Rebuilding per environment reintroduces risk: dependency versions drift between builds, and the artifact tested is not the artifact shipped. A single build with promoted artifacts also makes rollback trivial — redeploy the previous immutable artifact instead of rebuilding old source."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Pipeline structures",
+        "cards": [
+          {
+            "title": "Single multi-stage pipeline",
+            "description": "Build once, promote the same artifact",
+            "pros": [
+              "Tested artifact equals shipped artifact",
+              "One place to read the deployment path",
+              "Approvals and gates per environment",
+              "Simple rollback to a prior artifact"
+            ],
+            "cons": [
+              "One file grows large",
+              "All environments share a trigger"
+            ],
+            "tags": ["Recommended", "Microservices"]
+          },
+          {
+            "title": "Separate pipeline per environment",
+            "description": "Independent build and release per stage",
+            "pros": [
+              "Teams can own a stage end to end"
+            ],
+            "cons": [
+              "Artifacts can drift",
+              "Duplicated configuration",
+              "Harder to audit promotion"
+            ],
+            "tags": ["Multiple teams, shared code"]
+          },
+          {
+            "title": "Classic release pipelines",
+            "description": "Visual designer, GUI-defined stages",
+            "pros": [
+              "Approachable for non-developers"
+            ],
+            "cons": [
+              "Not stored as reviewable YAML",
+              "Poor diff and reuse story"
+            ],
+            "tags": ["Legacy"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

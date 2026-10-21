@@ -1,0 +1,52 @@
+{
+  "id": "lesson-sql-expert-10",
+  "slug": "cumulative-distribution-and-ties",
+  "moduleSlug": "sql-expert",
+  "courseSlug": "sql-problems",
+  "title": "Cumulative Distribution and Tie Handling",
+  "description": "Compute percentiles and deciles with NTILE and CUME_DIST while handling ties predictably.",
+  "order": 10,
+  "difficulty": "advanced",
+  "estimatedMinutes": 18,
+  "tags": ["sql", "sql-server", "ntile", "cume-dist", "percentile", "analytics"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Question"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Marketing wants customers split into value quartiles, and also wants the exact percentile of each customer's spend. The first attempt with `NTILE(4)` put customers with identical spend into different quartiles, which the business says is wrong. Write both the quartile assignment and the percentile, and explain the tie behaviour."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Answer"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "SQL Solution",
+        "language": "sql",
+        "code": "-- NTILE is an even split: it fills quartiles by row count,\n-- so identical values CAN land in different quartiles.\nSELECT\n    CustomerId,\n    TotalSpend,\n    NTILE(4) OVER (ORDER BY TotalSpend DESC) AS SpendQuartile\nFROM CustomerTotals;\n\n-- CUME_DIST gives the fraction of rows with a value <= this row,\n-- so ties all receive the SAME value.\nSELECT\n    CustomerId,\n    TotalSpend,\n    CUME_DIST() OVER (ORDER BY TotalSpend)          AS CumeDist,\n    PERCENT_RANK() OVER (ORDER BY TotalSpend)       AS PercentRank,\n    ROUND(CUME_DIST() OVER (ORDER BY TotalSpend) * 100, 1) AS Percentile\nFROM CustomerTotals;\n\n-- Tie-safe quartiles derived from the distribution itself (1 = lowest spend)\nWITH Dist AS\n(\n    SELECT\n        CustomerId,\n        TotalSpend,\n        CUME_DIST() OVER (ORDER BY TotalSpend) AS cd\n    FROM CustomerTotals\n)\nSELECT\n    CustomerId,\n    TotalSpend,\n    CASE WHEN cd <= 0.25 THEN 1\n         WHEN cd <= 0.50 THEN 2\n         WHEN cd <= 0.75 THEN 3\n         ELSE                 4 END AS SpendQuartile\nFROM Dist;"
+      }
+    },
+    {
+      "type": "callout",
+      "data": {
+        "variant": "tip",
+        "title": "Explanation",
+        "text": "`NTILE(n)` divides the ordered rows into `n` buckets of as-equal-as-possible **row count** — the buckets are equal in rows, not in value, and it will happily split identical values across two quartiles (the split depends only on position in the row number ordering). `CUME_DIST()` returns, for each row, the proportion of rows whose value is less than or equal to it, so **all peers share one value** — exactly what the business wants. `PERCENT_RANK()` is the other common function: it returns `(rank - 1) / (rows - 1)`, which means the minimum is always 0 and the maximum is always 1. Rule of thumb: use `NTILE` when you specifically need equal-sized groups (top 100 customers), and use `CUME_DIST`/`PERCENT_RANK` when you need a value-based distribution that respects ties (quartiles, deciles, percentiles)."
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

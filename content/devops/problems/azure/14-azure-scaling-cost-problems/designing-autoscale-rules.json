@@ -1,0 +1,125 @@
+{
+  "id": "lesson-azure-scaling-01",
+  "slug": "designing-autoscale-rules",
+  "moduleSlug": "azure-scaling-cost-problems",
+  "courseSlug": "azure-problems",
+  "title": "Designing Autoscale Rules",
+  "description": "Scale on the metric that actually predicts load, with cooldowns that stop the fleet oscillating.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "autoscale", "scaling", "performance", "capacity"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "An App Service plan autoscales on CPU above 70%. Every morning at 9 a.m. the fleet scales out to 12 instances, then back to 2 by 9:30, then out again — flapping 40 times a day. On the one genuinely busy day, it never scaled out at all, because CPU stayed at 55% while requests queued for 4 seconds. Redesign the rules."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Scale on a **leading indicator of demand** — request count, queue depth, or concurrent connections — not on a **lagging resource** like CPU. Add a **schedule-based rule** for the predictable morning ramp so you are already at capacity before users arrive, and set **cooldowns** long enough that a scale-out is not immediately followed by a scale-in."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Profile with schedule floor + metric ramp + cooldowns (Bicep)",
+        "language": "bicep",
+        "code": "resource autoscale 'Microsoft.Insights/autoscaleSettings@2022-10-01' = {\n  name: 'autoscale-quotient-prod'\n  location: location\n  properties: {\n    enabled: true\n    targetResourceUri: appServicePlan.id\n    profiles: [\n      {\n        name: 'business-hours'\n        capacity: { minimum: '4', maximum: '20', default: '6' }\n        rules: [\n          {\n            // Leading indicator: scale out on request volume\n            metricTrigger: {\n              metricName: 'Requests'\n              metricResourceUri: appServicePlan.id\n              timeGrain: 'PT1M'\n              statistic: 'Total'\n              timeWindow: 'PT5M'\n              timeAggregation: 'Average'\n              operator: 'GreaterThan'\n              threshold: 9000\n            }\n            scaleAction: { direction: 'Increase', type: 'ChangeCount', value: '2', cooldown: 'PT5M' }\n          }\n          {\n            metricTrigger: {\n              metricName: 'Requests'\n              metricResourceUri: appServicePlan.id\n              timeGrain: 'PT1M'\n              statistic: 'Total'\n              timeWindow: 'PT15M'\n              timeAggregation: 'Average'\n              operator: 'LessThan'\n              threshold: 2000\n            }\n            // Longer cooldown so we do not scale in during a lull\n            scaleAction: { direction: 'Decrease', type: 'ChangeCount', value: '1', cooldown: 'PT20M' }\n          }\n        ]\n      }\n    ]\n  }\n}"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "For queue-driven workers the same pattern applies with `ApproximateMessageCount` as the trigger. For AKS, scale on **KEDA** scalers instead of the horizontal pod autoscaler's CPU default, and use the **cluster autoscaler** so node count follows pod count."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Leading Indicators"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CPU rises only once work is already being served, and it can stay moderate while every request waits on a slow database — precisely the day the CPU rule failed to fire. Request and queue metrics measure demand directly, so the fleet grows before users feel it. The long scale-in cooldown addresses the cost side: scaling in too eagerly guarantees you scale out again in ten minutes."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Autoscale trigger options",
+        "cards": [
+          {
+            "title": "Request / queue-depth metric",
+            "description": "Demand-proportional trigger",
+            "pros": [
+              "Predicts load rather than reacting to it",
+              "Works for API and worker workloads",
+              "Composes with schedule floors"
+            ],
+            "cons": [
+              "Threshold must be tuned per workload",
+              "Metric may lag a few minutes"
+            ],
+            "tags": ["Recommended"]
+          },
+          {
+            "title": "Schedule-based scaling",
+            "description": "Fixed instance count per time window",
+            "pros": [
+              "Zero reaction time for known peaks",
+              "Predictable cost",
+              "No threshold tuning"
+            ],
+            "cons": [
+              "Blind to unexpected traffic",
+              "Needs maintenance as usage patterns shift"
+            ],
+            "tags": ["Predictable business hours"]
+          },
+          {
+            "title": "CPU / memory percentage",
+            "description": "Classic resource trigger",
+            "pros": [
+              "Simple to understand"
+            ],
+            "cons": [
+              "Lagging indicator",
+              "Blocked-on-IO work never triggers it",
+              "Flaps without long cooldowns"
+            ],
+            "tags": ["Backstop rule only"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

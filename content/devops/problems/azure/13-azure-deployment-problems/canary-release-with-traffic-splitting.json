@@ -1,0 +1,133 @@
+{
+  "id": "lesson-azure-deployment-02",
+  "slug": "canary-release-with-traffic-splitting",
+  "moduleSlug": "azure-deployment-problems",
+  "courseSlug": "azure-problems",
+  "title": "Canary Release with Traffic Splitting",
+  "description": "Expose a new version to a small slice of real traffic and promote it only when metrics agree.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "canary", "traffic-splitting", "front-door", "progressive-delivery"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A refactor of the checkout flow passes every test in staging but you are not confident it will behave under real traffic with real payment providers. You want to release it to 5% of users first, watch error rate and latency, then either promote it or roll back — without a second full deployment."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Run the new version alongside the old one and use **weighted traffic splitting** at the edge. **Azure Front Door** supports percentage-based routing across two origins directly; **Application Gateway** fronting two App Service slots can do the same with two backend pools. Ramp 5% → 25% → 100%, with an automated gate that inspects Application Insights before each step."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Front Door origin group with weights (Bicep)",
+        "language": "bicep",
+        "code": "resource originGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {\n  parent: frontDoorProfile\n  name: 'checkout-origins'\n  properties: {\n    loadBalancingSettings: { sampleSize: 4, successfulSamplesRequired: 3, additionalLatencyInMilliseconds: 50 }\n    healthProbeSettings: { probePath: '/health/ready', probeProtocol: 'Https', probeIntervalInSeconds: 30 }\n    trafficRestorationTimeToHealedOrNewEndpointsInMinutes: 5\n  }\n}\n\nresource originStable 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {\n  parent: originGroup\n  name: 'stable'\n  properties: {\n    hostName: 'app-quotient-prod.azurewebsites.net'\n    httpPort: 80\n    httpsPort: 443\n    priority: 1\n    weight: 950            // 95% of traffic\n    enabledState: 'Enabled'\n  }\n}\n\nresource originCanary 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {\n  parent: originGroup\n  name: 'canary'\n  properties: {\n    hostName: 'app-quotient-prod-staging.azurewebsites.net'\n    httpPort: 80\n    httpsPort: 443\n    priority: 1\n    weight: 50             // 5% of traffic\n    enabledState: 'Enabled'\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Automated promotion gate",
+        "language": "sql",
+        "code": "// Compare canary vs stable over the last 15 minutes by cloud role instance\nlet window = ago(15m);\nlet byVersion = requests\n    | where timestamp > window\n    | extend version = tostring(customDimensions['deployment'])\n    | summarize requests = count(),\n                errorRate = countif(success == false) * 100.0 / count(),\n                p95 = percentile(duration, 95)\n              by version;\nbyVersion\n| where errorRate > 2 or p95 > 1500\n| project version, requests, errorRate, p95"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Emit a `deployment` custom dimension (for example an assembly informational version or a build id) on every telemetry item so canary and stable traffic can be compared directly instead of inferred from the timestamp of the swap."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Canary"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Staging never reproduces production data volumes, third-party latency, or user behaviour. A canary uses real conditions while capping the blast radius: if the 5% slice degrades, you revert a weight to 100/0 and only a handful of requests were affected. The key prerequisite is that both versions tolerate the same database schema — which is why expand/contract migrations matter."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Progressive delivery options",
+        "cards": [
+          {
+            "title": "Front Door weighted canary",
+            "description": "Percentage split at global edge",
+            "pros": [
+              "Global anycast edge",
+              "Weights change without redeploying",
+              "Works with slots as origins"
+            ],
+            "cons": [
+              "Both versions share one database",
+              "Front Door is a paid tier feature",
+              "Session stickiness is not guaranteed"
+            ],
+            "tags": ["Recommended", "Global apps"]
+          },
+          {
+            "title": "Application Gateway weighted backends",
+            "description": "Regional L7 split",
+            "pros": [
+              "Regional, cheaper than Front Door",
+              "Integrates with VNet-injected apps"
+            ],
+            "cons": [
+              "Regional only",
+              "Cookie-based affinity can skew the split"
+            ],
+            "tags": ["Single-region"]
+          },
+          {
+            "title": "Feature flags in code",
+            "description": "One deployment, two code paths",
+            "pros": [
+              "Instant, per-user rollout",
+              "No infrastructure change"
+            ],
+            "cons": [
+              "Dead flags accumulate",
+              "Both paths ship in every release"
+            ],
+            "tags": ["User-targeted rollouts"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

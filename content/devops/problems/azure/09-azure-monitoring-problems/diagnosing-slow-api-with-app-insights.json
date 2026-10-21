@@ -1,0 +1,133 @@
+{
+  "id": "lesson-azure-monitoring-01",
+  "slug": "diagnosing-slow-api-with-app-insights",
+  "moduleSlug": "azure-monitoring-problems",
+  "courseSlug": "azure-problems",
+  "title": "Diagnosing a Slow API with Application Insights",
+  "description": "Use distributed tracing to find which downstream dependency is making your API slow.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "application-insights", "tracing", "performance", "apm"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Customers report that the checkout page takes 8 seconds to load. The page calls three services: an orders API, an inventory API, and a payment API. Your logs show nothing unusual — every service logs \"request completed\" with no errors. How do you find where the time goes?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use **Application Insights** distributed tracing. Every service emits a **correlation id** (`operation_Id`) that is propagated on the `traceparent` header, so the whole fulfilment of one user request becomes a single timeline in the **Transaction Search** and **Application Map**. Because no errors are logged, you cannot use logs alone — you need the timing of each span."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Instrument a .NET API with Application Insights",
+        "language": "csharp",
+        "code": "// Program.cs\nvar builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddApplicationInsightsTelemetry(options =>\n{\n    options.ConnectionString = builder.Configuration[\"APPLICATIONINSIGHTS_CONNECTION_STRING\"];\n});\n\n// Add a custom span around an expensive call\nbuilder.Services.AddHttpClient(\"inventory\", c =>\n    c.BaseAddress = new Uri(\"https://inventory.internal\"));\n\napp.MapGet(\"/checkout\", async (TelemetryClient telemetry, IHttpClientFactory factory) =>\n{\n    using var span = telemetry.StartOperation<DependencyTelemetry>(\"inventory-reserve\");\n    span.Telemetry.Type = \"HTTP\";\n    span.Telemetry.Target = \"inventory.internal\";\n\n    var client = factory.CreateClient(\"inventory\");\n    var response = await client.PostAsync(\"/reserve\", content);\n\n    span.Telemetry.Success = response.IsSuccessStatusCode;\n    return Results.Ok();\n});"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Then run a Kusto query in **Logs** to rank the slowest spans for the checkout operation:"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Kusto query — slowest dependencies per request",
+        "language": "sql",
+        "code": "let slowCheckout = requests\n    | where name == \"GET /checkout\" and timestamp > ago(24h)\n    | project operation_Id, requestDuration = duration, timestamp;\nslowCheckout\n| join kind=inner (dependencies\n    | project operation_Id, span = name, target, spanDuration = duration)\n    on operation_Id\n| summarize avgSpan = avg(spanDuration), p95Span = percentile(spanDuration, 95)\n          by span, target\n| order by p95Span desc"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Application Insights"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Plain application logs cannot tell you **where** time was spent across process boundaries. Application Insights records each HTTP call, SQL query, and cache hit as a **dependency telemetry** event tagged with the same `operation_Id`, so you can attribute the 8 seconds without guessing."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Diagnosing latency: which tool",
+        "cards": [
+          {
+            "title": "Application Insights",
+            "description": "Distributed tracing and dependency timing",
+            "pros": [
+              "End-to-end request timelines",
+              "Automatic dependency capture",
+              "Application Map view",
+              "Works across languages"
+            ],
+            "cons": [
+              "Requires instrumentation",
+              "Sampling can hide rare calls"
+            ],
+            "tags": ["Latency", "Recommended"]
+          },
+          {
+            "title": "Azure Monitor Metrics",
+            "description": "Numeric time series at 1-minute granularity",
+            "pros": [
+              "Cheap and fast",
+              "Great for CPU, memory, RPS"
+            ],
+            "cons": [
+              "No request-level detail",
+              "No payload context"
+            ],
+            "tags": ["Infrastructure dashboards"]
+          },
+          {
+            "title": "Raw application logs",
+            "description": "Text emitted by your service",
+            "pros": [
+              "Zero extra cost",
+              "Full control of format"
+            ],
+            "cons": [
+              "No cross-service correlation",
+              "Cannot attribute time to a dependency"
+            ],
+            "tags": ["Error text only"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

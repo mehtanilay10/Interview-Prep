@@ -1,0 +1,239 @@
+{
+  "id": "lesson-hld-consistent-hashing",
+  "slug": "consistent-hashing-hld",
+  "moduleSlug": "consistent-hashing-hld",
+  "courseSlug": "hld-problems",
+  "title": "Consistent Hashing: Complete Architecture",
+  "description": "Design a consistent hashing ring with virtual nodes to minimize key remapping when servers join or leave.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 50,
+  "tags": [
+    "hld",
+    "system-design",
+    "consistent-hashing",
+    "sharding",
+    "hash-ring",
+    "virtual-nodes"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a partitioning scheme for a distributed cache that must keep keys mapped to servers when the fleet changes. With naive modulo hashing (`hash(key) % N`), adding or removing a server remaps nearly every key and causes a massive cache miss storm. The scheme must spread keys evenly across heterogeneous servers, minimize remapping on membership changes, and support replication."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Hash Ring",
+            "definition": "A circular space of size 2^m. Keys and servers are both hashed onto this ring, and a key is mapped to the next server encountered moving clockwise."
+          },
+          {
+            "term": "Virtual Nodes (VNodes)",
+            "definition": "Each physical server is represented by multiple points on the ring, so a server with more capacity gets more points and the key distribution becomes far more uniform."
+          },
+          {
+            "term": "Monotonic Membership",
+            "definition": "When a server joins, only the keys from its predecessor on the ring move to it. When it leaves, only its keys move to its successor. Most keys stay put."
+          },
+          {
+            "term": "Jump Hash / Rendezvous Hash",
+            "definition": "Alternative non-ring hashing schemes. Rendezvous is easy to compute and has good distribution; Jump Hash is minimal-memory but only supports nodes in a fixed sequence."
+          },
+          {
+            "term": "Hotspot",
+            "definition": "A server that receives disproportionately many keys due to poor hash distribution or an unlucky ring layout."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Key Placement: for any key, deterministically find the responsible server(s)",
+          "Dynamic Membership: support adding and removing servers with minimal key rebalancing",
+          "Replication: write to the primary and the next N-1 distinct servers on the ring",
+          "Weighting: assign more virtual nodes to larger instances so capacity is respected",
+          "Lookup API: given a key, return the ordered list of replica servers in under a microsecond"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Even Distribution: standard deviation under 2% of the mean across all servers",
+          "Minimal Disruption: add one server -> move only ~1/N of keys, not ~all",
+          "Low Lookup Cost: ring lookup in O(log V) with binary search over V virtual nodes",
+          "Stateless Clients: clients can compute the target server themselves without a central router",
+          "Avoid Hotspots: resist adversarial keys and natural clustering"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "How Consistent Hashing Works"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Both keys and server endpoints are hashed onto a ring of integers modulo 2^32 or 2^64. Walking clockwise from the key's hash position hits the first server hash — that server owns the key."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-consistent-hash-ring",
+        "caption": "Hash ring with three physical servers and four virtual nodes each; key K hashes to a position and is owned by the next clockwise vnode",
+        "definition": "flowchart TD\n    subgraph Ring[\"🔄 Hash Ring (circular 2^64 space)\"]\n        K((\"🔑 Key K\\nh(K)\") )\n        S1A((\"🖥️ S1-v1\"))\n        S2A((\"🖥️ S2-v1\"))\n        S1B((\"🖥️ S1-v2\"))\n        S3A((\"🖥️ S3-v1\"))\n        S2B((\"🖥️ S2-v2\"))\n        S3B((\"🖥️ S3-v2\"))\n    end\n\n    K -->|walk clockwise| S2A\n    S2A -.->|owns K| K\n    S1A --> S1B --> S3A --> S2A\n    S2A --> S2B --> S3B --> S1A\n\n    Note[\"When S4 joins, only keys between S3-vX and S4-vY move to S4\"]"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Virtual Nodes and Weighting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Without virtual nodes, a small number of server positions on the ring leaves large gaps and causes skew. With virtual nodes, each physical server gets many random points, and a larger server gets proportionally more to match its capacity."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Ring construction and lookup",
+        "language": "csharp",
+        "code": "public class ConsistentHash<T>\n{\n    private readonly SortedList<long, T> _ring = new();\n    private readonly int _vNodes;\n    private readonly IHasher _hasher;\n\n    public ConsistentHash(IEnumerable<T> nodes, int virtualNodes = 150)\n    {\n        _vNodes = virtualNodes;\n        _hasher = new Murmur3();\n        foreach (var node in nodes) AddNode(node);\n    }\n\n    public void AddNode(T node)\n    {\n        for (int i = 0; i < _vNodes; i++)\n        {\n            var key = _hasher.Hash(ComputeVNodeKey(node, i));\n            _ring[key] = node;        // store physical node at vnode position\n        }\n    }\n\n    public T GetNode(string key)\n    {\n        if (_ring.Count == 0) return default!;\n        var h = _hasher.Hash(key);\n\n        // Find the first vnode position >= h (lower-bound / ceiling)\n        var idx = _ring.Keys.ToList().BinarySearch(h);\n        if (idx < 0) idx = ~idx;                // bitwise complement = insertion point\n        if (idx == _ring.Count) idx = 0;       // wrap around the ring\n\n        return _ring[_ring.Keys[idx]];\n    }\n\n    // Return next N distinct physical nodes for replication\n    public IReadOnlyList<T> GetNodes(string key, int count)\n    {\n        var result = new HashSet<T>();\n        if (_ring.Count == 0) return result.ToList();\n        var h = _hasher.Hash(key);\n        var idx = LowerBound(h);               // first >= h\n\n        var physicalCount = CountDistinct();\n        count = Math.Min(count, physicalCount);\n\n        while (result.Count < count)\n        {\n            var vnodeKey = _ring.Keys[idx % _ring.Count];\n            result.Add(_ring[vnodeKey]);\n            idx++;\n        }\n        return result.ToList();\n    }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Modulo Hash vs Consistent Hash"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Aspect",
+          "Modulo Hashing (`key % N`)",
+          "Consistent Hashing (ring + vnodes)"
+        ],
+        "rows": [
+          [
+            "Key remapping on add/remove",
+            "Nearly all keys (K * N/(N±1))",
+            "Only keys on the affected arc (~K/N on average)"
+          ],
+          [
+            "Load distribution",
+            "Perfect if hash is uniform but brittle",
+            "Very uniform with enough virtual nodes (>=100 per server)"
+          ],
+          [
+            "Replication",
+            "Must be handled separately with complex logic",
+            "Natural: walk clockwise to next distinct servers"
+          ],
+          [
+            "Client-side routing",
+            "Clients must know the server list and count",
+            "Clients can hold a copy of the ring and compute targets themselves"
+          ],
+          [
+            "Heterogeneous servers",
+            "Cannot weight capacity without manual sharding",
+            "Weight by assigning more virtual nodes per server"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "How many virtual nodes should each server have?",
+            "answer": "100-200 virtual nodes is typical for caches and object stores. More virtual nodes give better uniformity but increase the size of the ring (more points to search) and memory. For large fleets, 64 is sometimes enough; for small fleets, 256 improves evenness."
+          },
+          {
+            "question": "What hash function should be used?",
+            "answer": "Use a non-cryptographic, fast hash like MurmurHash3 or xxHash. MD5 and SHA are too slow for per-request routing. The goal is good avalanche distribution, not cryptographic strength."
+          },
+          {
+            "question": "How do clients learn about ring changes?",
+            "answer": "Options: push updates from a control plane (zookeeper/etcd) to all clients, or have clients discover membership via a service registry and rebuild their local ring periodically. For stateless clients that compute the target themselves, pushing a compact ring snapshot is cheap (each vnode is a pair of 8-byte hash and server id)."
+          },
+          {
+            "question": "What about hotspots caused by a specific key?",
+            "answer": "Consistent hashing avoids hotspotting from membership changes, but it cannot stop an adversarial client from hammering one key. Combine with key salting (append a random suffix) only if replicas are read in parallel, or use a per-key rate limit / hot-key caching. Never rely on consistent hashing alone to fix hot keys."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Consistent hashing limits remapping to the arc when servers change, unlike modulo hashing",
+          "Virtual nodes smooth the distribution and allow weighting by server capacity",
+          "Replication is a natural extension: walk clockwise to the next N distinct physical nodes",
+          "Clients can route without a proxy by holding a local copy of the ring",
+          "Even distribution requires both a good hash function and enough virtual nodes"
+        ],
+        "takeaway": "Consistent hashing turns a brittle modulo partition into a stable ring where most keys stay put on membership changes, with virtual nodes making it uniform enough for production."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "consistent-hashing-hld"
+  ],
+  "furtherReading": [
+    {
+      "title": "Consistent Hashing and Random Trees — Karger et al.",
+      "url": "https://www.cs.princeton.edu/courses/archive/fall09/cos518/papers/chord.pdf",
+      "type": "article"
+    },
+    {
+      "title": "Amazon Dynamo — Consistent Hashing",
+      "url": "https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf",
+      "type": "article"
+    }
+  ]
+}

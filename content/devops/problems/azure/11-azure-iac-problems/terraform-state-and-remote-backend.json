@@ -1,0 +1,128 @@
+{
+  "id": "lesson-azure-iac-02",
+  "slug": "terraform-state-and-remote-backend",
+  "moduleSlug": "azure-iac-problems",
+  "courseSlug": "azure-problems",
+  "title": "Terraform State and Remote Backend",
+  "description": "Move Terraform state into Azure Storage with locking so concurrent pipeline runs cannot corrupt it.",
+  "order": 2,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "terraform", "iac", "state", "locking"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A developer ran `terraform apply` from their laptop while a pipeline run was applying simultaneously. The state file is now inconsistent, `terraform plan` wants to recreate the production SQL server, and nobody has a backup of the previous state. Fix the workflow."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use a **remote backend on Azure Storage** with **blob lease locking**, and make the pipeline the only place `apply` runs. Enable **blob versioning** and **soft delete** on the state container so a corrupted or overwritten state file can be recovered. Split environments into separate state keys so a dev mistake cannot touch production state."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Bootstrap the state storage account",
+        "language": "bash",
+        "code": "az group create --name rg-tfstate --location westeurope\n\naz storage account create \\\n  --name sttfstatequotient \\\n  --resource-group rg-tfstate \\\n  --sku Standard_ZRS \\\n  --encryption-services blob \\\n  --min-tls-version TLS1_2\n\n# Data protection: versioning + soft delete make state recoverable\naz storage account blob-service-properties update \\\n  --account-name sttfstatequotient \\\n  --enable-versioning true \\\n  --enable-delete-retention true \\\n  --delete-retention-days 30\n\naz storage container create --name tfstate --account-name sttfstatequotient"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "backend.tf — remote state with locking",
+        "language": "terraform",
+        "code": "terraform {\n  required_version = \">= 1.7.0\"\n\n  required_providers {\n    azurerm = {\n      source  = \"hashicorp/azurerm\"\n      version = \"~> 4.0\"\n    }\n  }\n\n  backend \"azurerm\" {\n    resource_group_name  = \"rg-tfstate\"\n    storage_account_name = \"sttfstatequotient\"\n    container_name       = \"tfstate\"\n    key                  = \"prod/quotient.tfstate\"   # one key per environment\n    use_azuread_auth     = true                       # no storage account key\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Remote State with Locking"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Local state is a single mutable file with no concurrency control and no audit trail. Two simultaneous applies will both read a stale snapshot and write back conflicting results — which is exactly how a plan ends up \"recreating\" infrastructure that already exists. A leased blob lets the second runner fail fast instead of corrupting the world."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Terraform state options",
+        "cards": [
+          {
+            "title": "Azure Storage backend with blob lease",
+            "description": "Remote state plus native locking",
+            "pros": [
+              "Automatic locking",
+              "Versioning and soft delete",
+              "Entra ID auth via `use_azuread_auth`",
+              "Cheap and Azure-native"
+            ],
+            "cons": [
+              "State storage needs its own bootstrap",
+              "Requires network access from runners"
+            ],
+            "tags": ["Recommended", "Azure"]
+          },
+          {
+            "title": "Terraform Cloud / HCP remote state",
+            "description": "Managed backend with run history",
+            "pros": [
+              "No storage to operate",
+              "Run history and policy as code"
+            ],
+            "cons": [
+              "Third-party dependency",
+              "Per-resource pricing",
+              "State leaves your tenant"
+            ],
+            "tags": ["Multi-cloud teams"]
+          },
+          {
+            "title": "Local state in the repo",
+            "description": "Committed `.tfstate` file",
+            "pros": [
+              "No setup"
+            ],
+            "cons": [
+              "No locking",
+              "Secrets in plain text in git",
+              "Merge conflicts break everything"
+            ],
+            "tags": ["Never for shared environments"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

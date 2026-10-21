@@ -1,0 +1,132 @@
+{
+  "id": "lesson-azure-deployment-01",
+  "slug": "zero-downtime-deployment-with-slots",
+  "moduleSlug": "azure-deployment-problems",
+  "courseSlug": "azure-problems",
+  "title": "Zero-Downtime Deployment with Slots",
+  "description": "Use a staging slot with warm-up so a swap never serves errors or cold-start latency.",
+  "order": 1,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "app-service", "slots", "zero-downtime", "deployment"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every deployment causes 30-60 seconds of 500 errors followed by a minute of very slow requests. The team has tried deploying at 3 a.m. to hide it. Users in other time zones still notice. Fix the deployment process."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Deploy to a **staging slot**, not production. Configure **application initialization** (`WEBSITE_SWAP_WARMUP_PING_PATH`) so App Service waits for the new instance to be genuinely ready before traffic arrives, then perform a **slot swap**. The swap is near-instant because it only updates routing rules. Crucially, ensure your app tolerates a swap: no in-memory session state, no instance-local file writes."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Warm-up path plus slot swap",
+        "language": "yaml",
+        "code": "- task: AzureWebApp@1\n  displayName: Deploy to staging slot\n  inputs:\n    azureSubscription: quotient-prod-connection\n    appName: app-quotient-prod\n    deployToSlotOrASE: true\n    resourceGroupName: rg-quotient-prod\n    slotName: staging\n    package: $(Pipeline.Workspace)/drop\n    appSettings: |\n      -WEBSITE_SWAP_WARMUP_PING_PATH \"/health/ready\"\n      -WEBSITE_SWAP_WARMUP_PING_STATUSES \"200\"\n      -ASPNETCORE_ENVIRONMENT \"Production\"\n\n- task: AzureAppServiceManage@0\n  displayName: Swap staging into production\n  inputs:\n    azureSubscription: quotient-prod-connection\n    Action: 'Swap Slots'\n    WebAppName: app-quotient-prod\n    ResourceGroupName: rg-quotient-prod\n    SourceSlot: staging"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Readiness endpoint that actually checks dependencies",
+        "language": "csharp",
+        "code": "builder.Services.AddHealthChecks()\n    .AddDbContextCheck<AppDbContext>(\"sql\", tags: [\"ready\"])\n    .AddAzureBlobStorage(builder.Configuration[\"Storage:ConnectionString\"], tags: [\"ready\"]);\n\napp.MapHealthChecks(\"/health/live\", new HealthCheckOptions\n{\n    Predicate = _ => false              // process is up: no dependency checks\n});\n\napp.MapHealthChecks(\"/health/ready\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"ready\")   // safe to receive traffic\n});"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Keep two separate probes: **liveness** answers \"is the process running?\" and must be cheap; **readiness** answers \"can this instance serve requests?\" and may check SQL and storage. Conflating them means a transient SQL blip restarts every healthy instance."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Slots Beat In-Place Deployment"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "In-place deployment overwrites files under a running process, so some requests hit a half-updated application. Slots give you a fully running, warmed-up second copy; the swap itself is a routing change measured in seconds, and the previous version stays in the staging slot as an instant rollback target."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Deployment techniques on App Service",
+        "cards": [
+          {
+            "title": "Staging slot + warm-up + swap",
+            "description": "Pre-warmed second instance, instant cutover",
+            "pros": [
+              "No cold start on cutover",
+              "Instant rollback by swapping back",
+              "Can validate in production config at staging hostname"
+            ],
+            "cons": [
+              "Runs double capacity briefly",
+              "Requires stateless app and shared session store"
+            ],
+            "tags": ["Recommended", "App Service"]
+          },
+          {
+            "title": "Weighted (canary) routing",
+            "description": "Send a percentage of traffic to staging",
+            "pros": [
+              "Real-user validation before full cutover",
+              "Gradual exposure"
+            ],
+            "cons": [
+              "Both versions run against one database",
+              "Needs schema compatibility"
+            ],
+            "tags": ["High-risk releases"]
+          },
+          {
+            "title": "In-place zip deploy",
+            "description": "Overwrite files in the production slot",
+            "pros": [
+              "Simplest possible pipeline"
+            ],
+            "cons": [
+              "Errors during restart",
+              "Cold start visible to users",
+              "No automatic rollback"
+            ],
+            "tags": ["Dev and test environments"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

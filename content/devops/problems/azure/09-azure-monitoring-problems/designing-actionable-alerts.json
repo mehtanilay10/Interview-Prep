@@ -1,0 +1,126 @@
+{
+  "id": "lesson-azure-monitoring-03",
+  "slug": "designing-actionable-alerts",
+  "moduleSlug": "azure-monitoring-problems",
+  "courseSlug": "azure-problems",
+  "title": "Designing Actionable Alerts",
+  "description": "Build alerts that fire on user-visible symptoms and route them to the right on-call engineer.",
+  "order": 3,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "alerts", "action-groups", "sre", "on-call"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The on-call rotation is burned out. Alert rules fire dozens of times a day on CPU spikes that nobody can act on, and the team has started ignoring the alert channel. Meanwhile a genuine outage last week was only noticed when a customer tweeted. Redesign the alerting."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Alert on **symptoms, not causes**. Page on error rate and latency budgets that users actually feel; send everything else to a low-urgency channel. Separate alerts into two tiers using **Action Groups** with different notification channels and severities, and use **dynamic thresholds** so a workload with a naturally spiky CPU profile does not page every night."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Symptom-based alert with an action group (Bicep)",
+        "language": "bicep",
+        "code": "resource pageOnCall 'Microsoft.Insights/actionGroups@2023-01-01' = {\n  name: 'ag-page-oncall'\n  location: 'global'\n  properties: {\n    groupShortName: 'oncall'\n    enabled: true\n    emailReceivers: [ { name: 'oncall', emailAddress: 'oncall@example.com', useCommonAlertSchema: true } ]\n    webhookReceivers: [ { name: 'pagerduty', serviceUri: pagerDutyUrl, useCommonAlertSchema: true } ]\n  }\n}\n\nresource highErrorRate 'Microsoft.Insights/metricAlerts@2018-03-01' = {\n  name: 'alert-api-5xx-rate'\n  location: 'global'\n  properties: {\n    severity: 1\n    enabled: true\n    scopes: [ appInsights.id ]\n    evaluationFrequency: 'PT1M'\n    windowSize: 'PT5M'\n    criteria: {\n      allOf: [\n        {\n          criterionType: 'DynamicThresholdCriterion'\n          metricName: 'requests/failed'\n          operator: 'GreaterThan'\n          alertSensitivity: 'Medium'\n          failingPeriods: { numberOfEvaluationPeriods: 5, minFailingPeriodsToAlert: 3 }\n        }\n      ]\n    }\n    actions: [ { actionGroupId: pageOnCall.id } ]\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Log-search alert with a latency budget",
+        "language": "sql",
+        "code": "requests\n| where timestamp > ago(5m)\n| summarize p95 = percentile(duration, 95), total = count() by name\n| where total > 20 and p95 > 1500\n| project name, p95Ms = p95, total"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Symptom-Based Alerting"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "CPU at 90% is not a problem; a slow checkout is. Alerts tied to causes produce false positives whenever the workload legitimately gets busy, which trains engineers to ignore the channel — the single most dangerous failure mode in incident response."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Alert rule types",
+        "cards": [
+          {
+            "title": "Metric alert (dynamic threshold)",
+            "description": "Statistical baseline per metric",
+            "pros": [
+              "Learns daily and weekly seasonality",
+              "Low noise",
+              "Fast evaluation"
+            ],
+            "cons": [
+              "Needs history before it settles",
+              "Limited to metrics"
+            ],
+            "tags": ["Recommended", "Symptom alerts"]
+          },
+          {
+            "title": "Log-search alert",
+            "description": "Kusto query evaluated on a schedule",
+            "pros": [
+              "Arbitrary logic and joins",
+              "Can alert on business metrics"
+            ],
+            "cons": [
+              "Minimum 1-minute cadence",
+              "Costs query time",
+              "Can be slow on large tables"
+            ],
+            "tags": ["Business metrics"]
+          },
+          {
+            "title": "Static metric threshold",
+            "description": "Fixed number such as CPU > 90%",
+            "pros": [
+              "Simple to reason about"
+            ],
+            "cons": [
+              "Goes stale as traffic grows",
+              "High false-positive rate"
+            ],
+            "tags": ["Capacity only"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

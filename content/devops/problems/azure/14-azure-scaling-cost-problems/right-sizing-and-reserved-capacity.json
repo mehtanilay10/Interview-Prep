@@ -1,0 +1,132 @@
+{
+  "id": "lesson-azure-scaling-02",
+  "slug": "right-sizing-and-reserved-capacity",
+  "moduleSlug": "azure-scaling-cost-problems",
+  "courseSlug": "azure-problems",
+  "title": "Right-Sizing and Reserved Capacity",
+  "description": "Cut spend by matching SKUs to real utilisation, then commit only the steady-state floor.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "cost", "reservations", "savings-plan", "finops"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "The monthly Azure bill is $18,000 and finance wants it down 30% without hurting performance. The App Service plan runs at 12% average CPU across 6 instances, the SQL database is S3 with 700 DTU peak but 90 DTU average, and everything is pay-as-you-go."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Two independent levers. First **right-size**: 6 instances at 12% CPU is 4 instances too many, and S3 sized for a 700 DTU peak pays for idle capacity all month — move the database to a serverless or lower tier and let a scale-out handle peaks, or keep the peak tier but only during known windows. Second, **commit the steady-state floor** with a **reserved instance** or **savings plan** covering the minimum you run 24/7; never commit the burst."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Find the steady-state floor before committing",
+        "language": "sql",
+        "code": "// Azure Monitor metrics exported to Log Analytics:\n// p05 of usage is your floor; p95 is your peak.\nAzureMetrics\n| where ResourceId has \"app-quotient-prod\"\n| where MetricName == \"CpuPercentage\"\n| summarize p05 = percentile(Average, 5),\n            p50 = percentile(Average, 50),\n            p95 = percentile(Average, 95)\n          by bin(TimeGenerated, 1d)\n| order by TimeGenerated desc\n| take 30"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Buy a reservation against the floor",
+        "language": "bash",
+        "code": "# Inspect what is eligible and how much is already covered\naz consumption reservation summary list \\\n  --reservation-order-id <order-id> --grain-type daily\n\n# 1-year reservation for the SQL steady-state, not the peak tier\naz reservations reservation-order purchase \\\n  --reservation-order-id <order-id> \\\n  --sku \"Standard_D4s_v3\" \\\n  --location westeurope \\\n  --reserved-resource-type VirtualMachines \\\n  --billing-scope <subscription-id> \\\n  --term P1Y \\\n  --quantity 4"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "A **savings plan** is usually the better fit for App Service and Functions because it commits to a spend rate per hour across a family of compute rather than to a specific SKU — so you can change size and region without losing the discount."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Floor-Only Commitments"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Reservations are a bet on capacity you will definitely use. Committing to your peak means paying for the peak around the clock, and if the architecture changes (scale-to-zero, new SKU, region move) an unused reservation is money already spent and non-refundable. Covering p05 usage captures most of the discount at almost no risk."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Commitment options",
+        "cards": [
+          {
+            "title": "Savings plan (compute)",
+            "description": "Hourly spend commitment across compute",
+            "pros": [
+              "SKU- and region-flexible",
+              "Covers App Service, Functions, VMs",
+              "Up to ~65% off pay-as-you-go"
+            ],
+            "cons": [
+              "You pay the commitment even at zero usage",
+              "Compute only, not storage or bandwidth"
+            ],
+            "tags": ["Recommended", "Variable architecture"]
+          },
+          {
+            "title": "Reserved instances",
+            "description": "Specific SKU in a specific region",
+            "pros": [
+              "Highest discount",
+              "Can be scoped to a resource group",
+              "Exchangeable within limits"
+            ],
+            "cons": [
+              "Locked to SKU and region",
+              "Useless if you re-architect"
+            ],
+            "tags": ["Stable, long-lived tiers"]
+          },
+          {
+            "title": "Pay-as-you-go only",
+            "description": "No commitment",
+            "pros": [
+              "Maximum flexibility",
+              "Ideal for spiky or new workloads"
+            ],
+            "cons": [
+              "Full price on predictable base load"
+            ],
+            "tags": ["Burst capacity", "Uncertain workloads"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

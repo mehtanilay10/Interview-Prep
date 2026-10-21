@@ -1,0 +1,127 @@
+{
+  "id": "lesson-azure-monitoring-02",
+  "slug": "log-analytics-vs-app-insights",
+  "moduleSlug": "azure-monitoring-problems",
+  "courseSlug": "azure-problems",
+  "title": "Log Analytics vs Application Insights",
+  "description": "Decide where platform logs and application telemetry should live, and query them together.",
+  "order": 2,
+  "difficulty": "intermediate",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "log-analytics", "monitoring", "kusto", "workspace"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Your team has Application Insights for the API, diagnostic settings flowing into a Log Analytics workspace, and a separate workspace created by the platform team. An incident starts with an App Service restart but the root cause is in firewall logs. Where should all this data live so one query explains the incident?"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use a **single Log Analytics workspace** as the data plane for both platform diagnostics and Application Insights. Application Insights should be created in **workspace-based mode** so its tables (`AppRequests`, `AppDependencies`, `AppTraces`) sit beside `AzureDiagnostics` and `AzureMetrics` in the same workspace. Then one Kusto query can join an App Service restart to a network security group denial."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Workspace-based Application Insights (Bicep)",
+        "language": "bicep",
+        "code": "resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {\n  name: 'log-quotient-prod'\n  location: location\n  properties: {\n    retentionInDays: 90\n    sku: { name: 'PerGB2018' }\n  }\n}\n\nresource appInsights 'Microsoft.Insights/components@2020-02-02' = {\n  name: 'appi-quotient-prod'\n  location: location\n  kind: 'web'\n  properties: {\n    Application_Type: 'web'\n    WorkspaceResourceId: workspace.id   // workspace-based mode\n  }\n}\n\nresource appServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {\n  name: 'to-workspace'\n  scope: appService\n  properties: {\n    workspaceId: workspace.id\n    logs: [ { category: 'AppServiceHTTPLogs', enabled: true } ]\n    metrics: [ { category: 'AllMetrics', enabled: true } ]\n  }\n}"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Kusto query — join restart with firewall denial",
+        "language": "sql",
+        "code": "let restarts = AzureActivity\n    | where OperationNameValue has \"restart\"\n    | project restartTime = TimeGenerated, resource = ResourceId;\nlet denials = AzureDiagnostics\n    | where Category == \"AzureFirewallNetworkRule\" and msg_s has \"Deny\"\n    | project denyTime = TimeGenerated, source = SourceIP_s;\ndenials\n| join kind=leftouter restarts on $left.denyTime == $right.restartTime\n| where isnotempty(resource)\n| project denyTime, source, resource"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why One Workspace"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Separate workspaces make incident investigation a manual copy-paste exercise between portals. A shared workspace also lets you apply one **retention** and **access control** policy, and cross-resource queries (`app()`, `workspace()`) still work if a legal or regional boundary forces you to split."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Telemetry destinations",
+        "cards": [
+          {
+            "title": "Single workspace (workspace-based App Insights)",
+            "description": "All telemetry in one queryable store",
+            "pros": [
+              "Cross-resource joins",
+              "One retention policy",
+              "One RBAC boundary",
+              "Workbooks and alerts reuse tables"
+            ],
+            "cons": [
+              "Ingestion cost is centralised",
+              "Requires governance on table schemas"
+            ],
+            "tags": ["Recommended", "Central platform"]
+          },
+          {
+            "title": "Separate workspaces per team",
+            "description": "Isolated data ownership",
+            "pros": [
+              "Strong isolation",
+              "Independent retention"
+            ],
+            "cons": [
+              "Queries need cross-workspace `app()`",
+              "Duplicated dashboards",
+              "Higher management overhead"
+            ],
+            "tags": ["Strict compliance only"]
+          },
+          {
+            "title": "Classic Application Insights",
+            "description": "Legacy non-workspace mode",
+            "pros": [
+              "Familiar portal experience"
+            ],
+            "cons": [
+              "Cannot join with platform logs",
+              "Deprecated for new resources"
+            ],
+            "tags": ["Legacy"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

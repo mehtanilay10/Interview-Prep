@@ -1,0 +1,132 @@
+{
+  "id": "lesson-azure-deployment-03",
+  "slug": "rollback-strategies-and-health-probes",
+  "moduleSlug": "azure-deployment-problems",
+  "courseSlug": "azure-problems",
+  "title": "Rollback Strategies and Health Probes",
+  "description": "Get back to a known-good state in minutes when a release goes wrong, including schema changes.",
+  "order": 3,
+  "difficulty": "advanced",
+  "estimatedMinutes": 20,
+  "tags": ["azure", "rollback", "health-probes", "incident-response", "slots"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Twenty minutes after a release, error rate climbs to 12%. The team's documented rollback procedure is \"redeploy the previous commit\", which takes 25 minutes to build and deploy — longer than the incident has already lasted, and it rebuilds from source rather than restoring the exact artifact that was running."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Make rollback a **routing decision, not a build**. Keep the previous artifact intact in the staging slot and rollback becomes swapping the slots back — seconds, no build. Ensure health probes mark an unhealthy instance out of rotation automatically so a degraded release sheds traffic before a human notices. For database rollback, rely on the **expand/contract** discipline: the previous app version is still schema-compatible, so no reversal is needed."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "One-command rollback",
+        "language": "bash",
+        "code": "# Previous version is still running in the staging slot — swap back\naz webapp deployment slot swap \\\n  --resource-group rg-quotient-prod \\\n  --name app-quotient-prod \\\n  --slot staging \\\n  --target-slot production\n\n# For a canary: just send all traffic back to stable\naz afd origin update \\\n  --resource-group rg-quotient-prod \\\n  --profile-name afd-quotient \\\n  --origin-group-name checkout-origins \\\n  --origin-name canary \\\n  --weight 0\naz afd origin update \\\n  --resource-group rg-quotient-prod \\\n  --profile-name afd-quotient \\\n  --origin-group-name checkout-origins \\\n  --origin-name stable \\\n  --weight 1000"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Probe configuration that sheds a bad instance",
+        "language": "yaml",
+        "code": "# In the App Service site config\nhealthCheckPath: /health/ready        # instances failing this leave rotation\n\n# Front Door / App Gateway probe\nprobePath: /health/ready\nprobeProtocol: Https\nprobeIntervalInSeconds: 30\nnumberOfProbesToUnhealthy: 3          # ~90s to eject a bad instance"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Also keep a **small feature flag** for the riskiest part of each release. Rolling back a flag takes one second and requires no deployment at all, which is often faster than any routing change."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why Routing-Based Rollback"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "During an incident, every minute of rolling back is a minute of impact. A rebuild pipeline is the worst possible rollback mechanism because it is slow, non-deterministic (dependency versions may have moved), and competes for the same build agents that are also trying to produce a fix."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "Rollback mechanisms",
+        "cards": [
+          {
+            "title": "Slot swap back",
+            "description": "Previous version still warm in staging",
+            "pros": [
+              "Seconds, no rebuild",
+              "Exact artifact restored",
+              "No dependency drift"
+            ],
+            "cons": [
+              "Needs double capacity",
+              "Only one version of history retained by default"
+            ],
+            "tags": ["Recommended"]
+          },
+          {
+            "title": "Canary weight to zero",
+            "description": "Return all traffic to stable origin",
+            "pros": [
+              "Instant",
+              "No slot management"
+            ],
+            "cons": [
+              "Requires Front Door or App Gateway tier",
+              "Does not help if stable origin was replaced"
+            ],
+            "tags": ["Progressive delivery setups"]
+          },
+          {
+            "title": "Rebuild and redeploy previous commit",
+            "description": "Rebuild from source",
+            "pros": [
+              "Works without slots"
+            ],
+            "cons": [
+              "Minutes to tens of minutes",
+              "Non-deterministic artifact",
+              "Uses build infrastructure needed for the fix"
+            ],
+            "tags": ["Last resort"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

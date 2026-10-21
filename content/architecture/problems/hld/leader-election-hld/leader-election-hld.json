@@ -1,0 +1,150 @@
+{
+  "id": "lesson-hld-leader-election",
+  "slug": "leader-election-hld",
+  "moduleSlug": "leader-election-hld",
+  "courseSlug": "hld-problems",
+  "title": "Leader Election: Complete Architecture",
+  "description": "Design a leader election service using distributed consensus with ephemeral locks and fencing to avoid split-brain.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 55,
+  "tags": [
+    "hld",
+    "system-design",
+    "leader-election",
+    "raft",
+    "split-brain",
+    "failover"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a leader election mechanism so exactly one node in a distributed system performs the role of coordinator (e.g. scheduler, lock manager, or partition leader). The system must detect failures within seconds, elect a new leader safely, and never have two leaders active simultaneously."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "Split-Brain",
+            "definition": "Two nodes both believe they are leader, which can cause data corruption if both write to the same resource."
+          },
+          {
+            "term": "Ephemeral Node",
+            "definition": "A node in a consensus store that is automatically removed if its session expires. This makes a crashed leader's claim disappear without cleanup."
+          },
+          {
+            "term": "Session Timeout",
+            "definition": "If the leader fails to send heartbeats before its session expires, its ephemeral lease disappears and another candidate can take over."
+          },
+          {
+            "term": "Fast Leader Failover",
+            "definition": "Minimising the time between a leader crash and a new leader taking over, while still ensuring safety."
+          },
+          {
+            "term": "Leadership Lease",
+            "definition": "A time-bounded claim that the leader must renew; if not renewed, it lapses automatically."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Exactly-One Leader: safety — at any moment there is 0 or 1 leader, never 2",
+          "Automatic Failover: elect a new leader when the current one crashes or becomes unreachable",
+          "Leadership Renewal: the leader must heartbeat periodically to keep its claim",
+          "Leader Discovery: all nodes can discover who the current leader is",
+          "Clean Handoff: a leader should relinquish leadership on shutdown"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Failover Time: under 5 seconds to detect and elect a new leader",
+          "Correctness: no split-brain under network partitions",
+          "Resilience: tolerate minority node failures",
+          "Low Overhead: heartbeats every 1 second at most"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "High-Level Architecture"
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-leader-arch",
+        "caption": "Leader Election: Candidates compete for an ephemeral lock in a consensus store; clients discover the leader via a registry",
+        "definition": "flowchart TD\n    C1[Candidate A]\n    C2[Candidate B]\n    C3[Candidate C]\n    Store[(Raft/etcd with ephemeral nodes)]\n    Clients[Service Clients]\n\n    C1 -->|Create ephemeral /leader| Store\n    C2 -->|Try to create /leader| Store\n    C3 -->|Watch /leader| Store\n    Store -->|Leader identity| C3\n    C1 -.->|Heartbeat lease| Store\n    Clients -->|Discover leader| Store"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Approach"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Use a consensus-backed ephemeral key. The first node to successfully create the key becomes leader. The key has a TTL/lease and the leader must renew it; if it fails to renew, the key is deleted automatically and another candidate claims it."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Leader election with etcd-like lease",
+        "language": "csharp",
+        "code": "var lease = await client.LeaseGrantAsync(TimeSpan.FromSeconds(5));\nvar claim = await client.PutAsync(\"/leader\", instanceId,\n    new PutOption { Lease = lease.ID });\n\nif (claim is not null)\n{\n    // We are leader; renew lease every 1-2s\n    var renewal = Task.Run(async () => {\n        while (true) {\n            await Task.Delay(2000);\n            await client.LeaseKeepAliveAsync(lease.ID);\n        }\n    });\n}"
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "Ephemeral leases plus renewal prevent split-brain automatically",
+          "Safety comes from the consensus store's linearizable writes",
+          "Watchers enable fast discovery of leadership changes",
+          "Failover time is determined by lease expiry and election latency"
+        ],
+        "takeaway": "Consensus-backed ephemeral locks are the simplest and safest way to implement leader election."
+      }
+    }
+  ],
+  "relatedLessons": ["distributed-lock-hld"],
+  "furtherReading": [
+    {
+      "title": "etcd Leader Election Documentation",
+      "url": "https://etcd.io/docs/latest/learning/why/#leader-election",
+      "type": "article"
+    }
+  ]
+}

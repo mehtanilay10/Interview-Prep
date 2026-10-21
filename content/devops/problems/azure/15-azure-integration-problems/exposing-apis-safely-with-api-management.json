@@ -1,0 +1,128 @@
+{
+  "id": "lesson-azure-integration-01",
+  "slug": "exposing-apis-safely-with-api-management",
+  "moduleSlug": "azure-integration-problems",
+  "courseSlug": "azure-problems",
+  "title": "Exposing APIs Safely with API Management",
+  "description": "Put a policy-driven gateway in front of internal APIs so partners get keys, quotas, and a stable contract.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 25,
+  "tags": ["azure", "api-management", "gateway", "rate-limiting", "security"],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Three partner companies need to call your order API. Today you give each of them the same backend URL and an API key baked into a query string. You cannot rate-limit one abusive partner without affecting the others, cannot version the contract without breaking everyone, and cannot audit who called what."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "What to Do"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Front the backend with **Azure API Management**. Publish a **versioned API** (`v1`, `v2`) so the contract can evolve, register each partner as a **subscription** with its own key and **rate/quota limits**, and keep the backend URL private. Add policies for JWT validation, caching, and request transformation so the backend stays simple."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "How to Implement"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Gateway policies: validate, limit, cache, hide backend",
+        "language": "xml",
+        "code": "<policies>\n  <inbound>\n    <!-- Reject unauthenticated callers before they reach the backend -->\n    <validate-jwt header-name=\"Authorization\" failed-validation-httpcode=\"401\">\n      <openid-config url=\"https://login.microsoftonline.com/{{tenant}}/v2.0/.well-known/openid-configuration\" />\n      <required-claims>\n        <claim name=\"aud\" match=\"any\">\n          <value>api://quotient-orders</value>\n        </claim>\n      </required-claims>\n    </validate-jwt>\n\n    <!-- Per-subscription throttling: one abuser cannot starve others -->\n    <rate-limit-by-key calls=\"200\" renewal-period=\"60\"\n      counter-key=\"@(context.Subscription?.Id)\" />\n\n    <quota-by-key calls=\"100000\" renewal-period=\"86400\"\n      counter-key=\"@(context.Subscription?.Id)\" />\n\n    <!-- Serve repeat reads from the gateway cache -->\n    <cache-lookup vary-by-developer=\"true\" vary-by-developer-groups=\"false\" />\n\n    <set-backend-service base-url=\"https://app-quotient-internal.azurewebsites.net\" />\n  </inbound>\n\n  <backend>\n    <forward-request timeout=\"30\" />\n  </backend>\n\n  <outbound>\n    <cache-store duration=\"60\" />\n    <!-- Strip internal headers before returning to the partner -->\n    <set-header name=\"X-Powered-By\" exists-action=\"delete\" />\n  </outbound>\n\n  <on-error>\n    <return-response>\n      <set-status code=\"429\" reason=\"Rate limit exceeded\" />\n      <set-header name=\"Retry-After\" exists-action=\"override\"><value>60</value></set-header>\n    </return-response>\n  </on-error>\n</policies>"
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Backend behind a private endpoint (network isolation)",
+        "language": "bicep",
+        "code": "resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {\n  name: 'apim-quotient'\n  location: location\n  sku: { name: 'Premium', capacity: 1 }   // Premium supports VNet injection\n  identity: { type: 'SystemAssigned' }\n  properties: { publisherEmail: 'platform@example.com', publisherName: 'Quotient' }\n}\n\n// Backend App Service uses a private endpoint and denies public traffic\nresource site 'Microsoft.Web/sites@2023-12-01' = {\n  name: 'app-quotient-internal'\n  location: location\n  properties: {\n    publicNetworkAccess: 'Disabled'\n    siteConfig: { ipSecurityRestrictionsDefaultAction: 'Deny' }\n  }\n}"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 3,
+        "text": "Why a Gateway"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Cross-cutting concerns — authentication, throttling, quotas, versioning, logging, transformation — belong in one place rather than reimplemented in every backend. API Management also gives you a **developer portal** where partners self-serve keys, and separates the public contract (`api.example.com/v1/orders`) from internal topology so you can move backends without telling anyone."
+      }
+    },
+    {
+      "type": "comparison-cards",
+      "data": {
+        "title": "API exposure options",
+        "cards": [
+          {
+            "title": "API Management",
+            "description": "Full-featured API gateway with policies",
+            "pros": [
+              "Per-subscription keys and quotas",
+              "Policy engine for auth and transform",
+              "API versioning and revisions",
+              "Developer portal self-service"
+            ],
+            "cons": [
+              "Premium tier needed for VNet injection",
+              "Learning curve for policy expressions",
+              "Gateway adds a small hop latency"
+            ],
+            "tags": ["Recommended", "External partners"]
+          },
+          {
+            "title": "Application Gateway with WAF",
+            "description": "L7 load balancer and firewall",
+            "pros": [
+              "Strong WAF rules",
+              "SSL termination and path routing"
+            ],
+            "cons": [
+              "No API keys, versioning, or portal",
+              "No per-tenant quota model"
+            ],
+            "tags": ["Internal APIs behind WAF"]
+          },
+          {
+            "title": "Direct App Service URL",
+            "description": "Partners call the app directly",
+            "pros": [
+              "Zero setup"
+            ],
+            "cons": [
+              "Credentials shared across consumers",
+              "No throttling or audit trail",
+              "Backend topology exposed"
+            ],
+            "tags": ["Prototypes only"]
+          }
+        ]
+      }
+    }
+  ],
+  "relatedLessons": [],
+  "furtherReading": []
+}

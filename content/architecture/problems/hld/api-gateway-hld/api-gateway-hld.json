@@ -1,0 +1,278 @@
+{
+  "id": "lesson-hld-api-gateway",
+  "slug": "api-gateway-hld",
+  "moduleSlug": "api-gateway-hld",
+  "courseSlug": "hld-problems",
+  "title": "API Gateway: Complete Architecture",
+  "description": "Design a horizontally scalable API gateway that routes, authenticates, and observes traffic to hundreds of internal microservices.",
+  "order": 1,
+  "difficulty": "advanced",
+  "estimatedMinutes": 55,
+  "tags": [
+    "hld",
+    "system-design",
+    "api-gateway",
+    "routing",
+    "service-discovery",
+    "envoy"
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Problem Statement"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Design a single ingress layer for 200+ internal microservices that terminate TLS, authenticate and authorize every request, route to the correct upstream version, enforce rate limits and quotas, and expose consistent metrics — while adding under 5 ms of latency at P99 and surviving the loss of an entire availability zone."
+      }
+    },
+    {
+      "type": "key-terms",
+      "data": {
+        "terms": [
+          {
+            "term": "North-South vs East-West Traffic",
+            "definition": "North-south is traffic entering the cluster from clients (handled by the gateway). East-west is service-to-service traffic inside the cluster (handled by a service mesh)."
+          },
+          {
+            "term": "Service Discovery",
+            "definition": "The mechanism by which the gateway learns healthy upstream addresses — either a control plane pushing endpoint lists, or DNS-based discovery."
+          },
+          {
+            "term": "Route Table",
+            "definition": "A declarative mapping from request attributes (host, path, header, method) to an upstream cluster, with optional transforms and weighted splits."
+          },
+          {
+            "term": "Edge Authentication",
+            "definition": "Validating JWTs and API keys at the gateway so that downstream services can trust a signed identity header instead of re-validating every token."
+          },
+          {
+            "term": "Backpressure",
+            "definition": "Refusing or queuing work when an upstream is saturated, so a slow service cannot exhaust the gateway's connection pools and threads."
+          }
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Requirements"
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Functional Requirements",
+        "items": [
+          "Dynamic Routing: map host plus path prefix to an upstream service, including weighted splits for canary releases",
+          "TLS Termination: manage certificates for hundreds of hostnames with automated rotation",
+          "Authentication: validate OAuth2 JWTs, API keys, and mTLS client certificates at the edge",
+          "Authorization: enforce coarse-grained scopes and route-level allowlists",
+          "Rate Limiting & Quotas: per API key, per user, and per route limits",
+          "Request/Response Transformation: header injection, path rewriting, and payload size limits",
+          "Observability: emit structured access logs, trace context propagation, and per-route RED metrics"
+        ]
+      }
+    },
+    {
+      "type": "bullet-list",
+      "data": {
+        "title": "Non-Functional Requirements",
+        "items": [
+          "Low Latency Overhead: under 5 ms P99 added compared to a direct call",
+          "High Throughput: sustain 500,000 requests per second per region with horizontal scaling",
+          "High Availability: no single point of failure; survive the loss of a whole AZ with zero customer-visible errors",
+          "Instant Configuration: route changes propagate in under 5 seconds without a deploy or restart",
+          "Safe Failure: an unhealthy upstream must be ejected quickly and recovered automatically"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "High-Level Architecture"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Clients hit a global anycast DNS and CDN layer, which forwards to a regional load balancer. The gateway fleet is stateless and shares nothing except the control plane that pushes route and certificate configuration."
+      }
+    },
+    {
+      "type": "mermaid",
+      "data": {
+        "id": "hld-api-gateway-arch",
+        "caption": "API Gateway Architecture: Global DNS/CDN, Regional Load Balancer, Stateless Gateway Fleet, Control Plane for Routes, and Upstream Services",
+        "definition": "flowchart TD\n    Clients[\"🌐 Clients: Web, Mobile, Partners\"]\n\n    subgraph EdgeTier[\"🌍 Edge\"]\n        DNS[\"Anycast DNS + Global CDN\\nDDoS scrubbing\"]\n    end\n\n    subgraph RegionA[\"Region A\"]\n        LB[\"⚖️ Regional L4 Load Balancer\"]\n        subgraph GW[\"🚪 Stateless Gateway Fleet\"]\n            GW1[\"Gateway Node 1\"]\n            GW2[\"Gateway Node 2\"]\n            GW3[\"Gateway Node N\"]\n        end\n        Registry[(\"🧭 Service Registry\\nHealthy endpoints\")]\n    end\n\n    subgraph ControlPlane[\"🛠️ Control Plane\"]\n        RouteAPI[\"Route Config API\\nGitOps pipeline\"]\n        CertMgr[\"Certificate Manager\\nACME + rotation\"]\n        Policy[\"Auth & Rate Policy Store\"]\n    end\n\n    subgraph Services[\"🏢 Upstream Microservices\"]\n        S1[\"UserService v2 / v3\"]\n        S2[\"OrderService\"]\n        S3[\"PaymentService\"]\n    end\n\n    Clients --> DNS --> LB --> GW\n    GW -->|Lookup endpoint| Registry\n    GW --> S1 & S2 & S3\n\n    RouteAPI -->|xDS push < 5s| GW\n    CertMgr --> GW\n    Policy --> GW\n    GW -.->|health checks| S1 & S2 & S3"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Request Lifecycle"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Every request passes through an ordered filter chain. Ordering matters: authenticate cheaply before doing expensive work, and reject early rather than deep in the stack."
+      }
+    },
+    {
+      "type": "numbered-list",
+      "data": {
+        "items": [
+          "TLS handshake and SNI-based certificate selection",
+          "Connection-level protections: IP allow/deny lists and DDoS shape",
+          "Request validation: size limit, header sanity, and allowed methods",
+          "Authentication: parse and verify the JWT or API key; reject with 401 if invalid",
+          "Authorization: check route-level scope requirements; reject with 403 if insufficient",
+          "Rate limit evaluation against the distributed counter; reject with 429 if exceeded",
+          "Route match: select the upstream cluster and apply any weighted split",
+          "Apply transforms: header injection, path rewrite, and request id generation",
+          "Forward to upstream with a bounded timeout and retry policy",
+          "Capture response: metrics, access log, and trace span"
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Load Balancing and Failure Handling"
+      }
+    },
+    {
+      "type": "paragraph",
+      "data": {
+        "text": "Each upstream cluster uses **outlier detection** plus **least-request** balancing. Passive health checks eject an endpoint after a configured number of consecutive 5xx responses; active health checks probe it in the background to bring it back."
+      }
+    },
+    {
+      "type": "example",
+      "data": {
+        "title": "Envoy-style gateway configuration",
+        "language": "yaml",
+        "code": "static_resources:\n  listeners:\n    - name: https_in\n      address: { socket_address: { address: 0.0.0.0, port_value: 443 } }\n      filter_chains:\n        - filters:\n            - name: envoy.filters.network.http_connection_manager\n              typed_config:\n                \"@type\": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager\n                stat_prefix: ingress\n                route_config:\n                  name: local_routes\n                  virtual_hosts:\n                    - name: api\n                      domains: [ \"api.example.com\" ]\n                      routes:\n                        - match: { prefix: \"/orders\" }\n                          route:\n                            cluster: orders_service\n                            timeout: 3s\n                            retry_policy:\n                              retry_on: \"5xx,reset,connect-failure\"\n                              num_retries: 2\n                              per_try_timeout: 1s\n                        - match: { prefix: \"/\" }\n                          route: { cluster: default_service, timeout: 5s }\n                http_filters:\n                  - name: envoy.filters.http.jwt_authn\n                  - name: envoy.filters.http.local_ratelimit\n                  - name: envoy.filters.http.router\n\n  clusters:\n    - name: orders_service\n      type: EDS                                  # endpoints from the control plane\n      eds_cluster_config: { eds_config: { ads: {} } }\n      lb_policy: LEAST_REQUEST\n      circuit_breakers:\n        thresholds:\n          - priority: DEFAULT\n            max_connections: 1024\n            max_pending_requests: 1024\n            max_retries: 3\n      outlier_detection:\n        consecutive_5xx: 5\n        interval: 10s\n        base_ejection_time: 30s\n        max_ejection_percent: 50"
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Cross-Cutting Concerns Compared"
+      }
+    },
+    {
+      "type": "table",
+      "data": {
+        "headers": [
+          "Concern",
+          "Implementation Location",
+          "Mechanism",
+          "Trade-off"
+        ],
+        "rows": [
+          [
+            "TLS termination",
+            "Edge load balancer / gateway",
+            "Certificate per hostname, SNI selection, automated rotation",
+            "Simplifies services but the gateway sees plaintext internally"
+          ],
+          [
+            "Authentication",
+            "Gateway (edge)",
+            "JWT signature and claim validation, cached JWKS",
+            "Downstream services trust a signed identity header and cannot re-verify without the key"
+          ],
+          [
+            "Rate limiting",
+            "Gateway + Redis",
+            "Lua-atomic token bucket keyed by API key or user",
+            "Distributed counter adds a network hop; local cache reduces it"
+          ],
+          [
+            "Retries",
+            "Gateway",
+            "Idempotency-aware retry on connect failure and 5xx",
+            "Retrying non-idempotent POSTs can duplicate side effects"
+          ],
+          [
+            "Request transformation",
+            "Gateway",
+            "Path rewrite, header injection, payload size limits",
+            "Logic in the gateway is harder to unit test than service code"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "level": 2,
+        "text": "Key Design Decisions & Trade-Offs"
+      }
+    },
+    {
+      "type": "faq-block",
+      "data": {
+        "faqs": [
+          {
+            "question": "Should the gateway do business logic or stay purely a router?",
+            "answer": "Keep it a router plus cross-cutting concerns. Business logic in the gateway means every service team must coordinate a shared deploy to change behaviour, and the gateway becomes a single point of coordination. Anything that differs per service belongs in the service; anything identical across all services belongs at the gateway."
+          },
+          {
+            "question": "How do you push route changes in under 5 seconds without restarting?",
+            "answer": "Run a control plane that implements the xDS protocol (or Consul/Nacos equivalent). Gateways hold a long-lived gRPC stream to the control plane and receive incremental updates. Configuration is validated and canaried before it reaches production, and each node applies changes atomically so a partially applied route table is never served."
+          },
+          {
+            "question": "Why not let every service validate its own JWT?",
+            "answer": "You can, and many teams do for defense in depth. But validating at the edge lets you reject unauthenticated traffic before it consumes any downstream capacity, and it centralises JWKS caching. The usual compromise is edge validation for the happy path plus local validation for zero-trust at the service boundary."
+          },
+          {
+            "question": "How do you avoid the gateway becoming a single point of failure?",
+            "answer": "The gateway fleet is stateless, so it scales horizontally and any node can serve any request. Deploy across at least three availability zones behind a regional load balancer. The only shared dependencies are the service registry and the rate-limit store, both of which must themselves be replicated and must fail open rather than block traffic."
+          }
+        ]
+      }
+    },
+    {
+      "type": "summary-box",
+      "data": {
+        "title": "Key Takeaways",
+        "points": [
+          "The gateway owns cross-cutting concerns; services own business logic",
+          "A stateless fleet plus a pushed control plane gives instant config and horizontal scale",
+          "Authenticate and rate limit early so expensive work is never done for unwanted traffic",
+          "Outlier detection plus circuit breakers stop one sick service from consuming the whole edge",
+          "Fail open for availability, fail closed only for security-critical paths"
+        ],
+        "takeaway": "An API gateway is a stateless, control-plane-driven ingress tier that centralises routing, security, and observability while deliberately staying free of business logic."
+      }
+    }
+  ],
+  "relatedLessons": [
+    "rate-limiter",
+    "url-shortener"
+  ],
+  "furtherReading": [
+    {
+      "title": "Envoy Proxy Documentation",
+      "url": "https://www.envoyproxy.io/docs/envoy/latest/",
+      "type": "tool"
+    },
+    {
+      "title": "Microsoft — API Gateway pattern",
+      "url": "https://learn.microsoft.com/azure/architecture/microservices/design/gateway",
+      "type": "article"
+    }
+  ]
+}
