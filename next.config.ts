@@ -19,10 +19,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Types are checked by `yarn typecheck`, not by `next build`.
+  // Next's build-time `tsc` pass re-checks the whole project (including the
+  // ~20 MB generated content graph) and costs several minutes on every build.
+  // `yarn typecheck` is now the only type gate — always run it before shipping.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   turbopack: {},
   experimental: {
     staticGenerationMaxConcurrency: 8,
-    useOffline: true,
+    // The server bundle is dominated by lesson JSON. Minifying it takes Terser
+    // minutes (single 7 MB chunk) and saves almost nothing on data, while the
+    // browser bundle (the part users download) stays minified regardless.
+    serverMinification: false,
   },
 };
 

@@ -389,6 +389,11 @@ yarn build   # optional but recommended for major changes
 
 Fix all errors before calling the task complete. Do not suppress TypeScript errors to make them pass.
 
+> `next build` intentionally skips type validation (`typescript.ignoreBuildErrors`
+> in `next.config.ts`) because the build-time `tsc` pass adds several minutes on
+> this content-heavy repo. `yarn typecheck` is therefore the only type gate and
+> must be run (and enforced in CI) before merging.
+
 ---
 
 ## Maintenance scripts
